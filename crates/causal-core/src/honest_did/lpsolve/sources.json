@@ -1,0 +1,132 @@
+{
+  "package": "lpSolveAPI",
+  "version": "5.5.2.0-17.15",
+  "adaptations": [
+    "disable logging, file-output formatters and timing",
+    "BLAS bridge supplied by existing translations",
+    "initialize fixed native BLAS once",
+    "namespace solver exports"
+  ],
+  "files": [
+    {
+      "file": "src/lp_solve/colamd.c",
+      "source_sha256": "ad759ca79e15df783300accfcc76b6a473494fabb9ffdbb4e921e203cc4451f3",
+      "adapted_sha256": "ad759ca79e15df783300accfcc76b6a473494fabb9ffdbb4e921e203cc4451f3"
+    },
+    {
+      "file": "src/lp_solve/lp_MDO.c",
+      "source_sha256": "b43ab4f982622d0024b3e5a65b20a1bb460f489fc39c164debae7b242e126b66",
+      "adapted_sha256": "b43ab4f982622d0024b3e5a65b20a1bb460f489fc39c164debae7b242e126b66"
+    },
+    {
+      "file": "src/lp_solve/lp_mipbb.c",
+      "source_sha256": "189abaca18dbb8e903fc036089b1a18fe7894ec7f4fa9947181810d22327cd58",
+      "adapted_sha256": "189abaca18dbb8e903fc036089b1a18fe7894ec7f4fa9947181810d22327cd58"
+    },
+    {
+      "file": "src/lp_solve/mmio.c",
+      "source_sha256": "46a7e9ddb3dacc7e9b8d8c7085e382b9abaa6b57e8570eb13cc4335729d377bc",
+      "adapted_sha256": "46a7e9ddb3dacc7e9b8d8c7085e382b9abaa6b57e8570eb13cc4335729d377bc"
+    },
+    {
+      "file": "src/lp_solve/commonlib.c",
+      "source_sha256": "0f112d89c73969ca967a569b8edbcd142bc69cd0defd43a9c03eafc28a8c27ba",
+      "adapted_sha256": "dd9ac71a00dda8f2cc6f85b3e0f8adb788c31fda2876b0b2a88c9c070081d4e0"
+    },
+    {
+      "file": "src/lp_solve/lp_MPS.c",
+      "source_sha256": "5511ae2a5f87dc2d1b64bbc4c86722a3b9f8f2cb1fc670a3c4f63fb58bf9d6d4",
+      "adapted_sha256": "7182b2919b5bc80f9d8bc854eee2a21e1dad1344daf741c3541cf6cad823f768"
+    },
+    {
+      "file": "src/lp_solve/lp_params.c",
+      "source_sha256": "046b15fc60a88d635178482f657ca9539c077a85601f5b959b720a9985e04d7a",
+      "adapted_sha256": "046b15fc60a88d635178482f657ca9539c077a85601f5b959b720a9985e04d7a"
+    },
+    {
+      "file": "src/lp_solve/lp_scale.c",
+      "source_sha256": "ce2fd14d432356f6035e2c934f7ea0267b92ba7c8bd1ad21af1ada1c30bb5ab4",
+      "adapted_sha256": "ce2fd14d432356f6035e2c934f7ea0267b92ba7c8bd1ad21af1ada1c30bb5ab4"
+    },
+    {
+      "file": "src/lp_solve/lp_SOS.c",
+      "source_sha256": "32a5f09a69f73c3102680a8d020cfb3147fed2a112e8e8a2c10a65e07cebdb55",
+      "adapted_sha256": "32a5f09a69f73c3102680a8d020cfb3147fed2a112e8e8a2c10a65e07cebdb55"
+    },
+    {
+      "file": "src/lp_solve/lp_presolve.c",
+      "source_sha256": "00f63de197baa279bbbcbc35d09a4c442a5c553adeb8d6687a1b2c3378bd1571",
+      "adapted_sha256": "00f63de197baa279bbbcbc35d09a4c442a5c553adeb8d6687a1b2c3378bd1571"
+    },
+    {
+      "file": "src/lp_solve/lp_simplex.c",
+      "source_sha256": "0290c70364b4ae15321538837afb03e50aba6b99b37494e3752b378feeabc629",
+      "adapted_sha256": "0290c70364b4ae15321538837afb03e50aba6b99b37494e3752b378feeabc629"
+    },
+    {
+      "file": "src/lp_solve/ini.c",
+      "source_sha256": "3eba1f8b1d053cc5d37b6bacb40908d406ce66f6f10e741b50a7feaa51c6829b",
+      "adapted_sha256": "3eba1f8b1d053cc5d37b6bacb40908d406ce66f6f10e741b50a7feaa51c6829b"
+    },
+    {
+      "file": "src/lp_solve/lp_crash.c",
+      "source_sha256": "c2d4f35002c9a4e8ccf4962405ecc8b9ddd0512726f23fa877cad287702d0c69",
+      "adapted_sha256": "c2d4f35002c9a4e8ccf4962405ecc8b9ddd0512726f23fa877cad287702d0c69"
+    },
+    {
+      "file": "src/lp_solve/lp_price.c",
+      "source_sha256": "7ba430e7b990e69ca43b908d8dd0aac559552d1c8f734bdcea2a2c856e6ae894",
+      "adapted_sha256": "7ba430e7b990e69ca43b908d8dd0aac559552d1c8f734bdcea2a2c856e6ae894"
+    },
+    {
+      "file": "src/lp_solve/lp_utils.c",
+      "source_sha256": "4c29edfaf51d48b398769e0905f65b96c4979c3a86c85194b29506130ba07069",
+      "adapted_sha256": "4c29edfaf51d48b398769e0905f65b96c4979c3a86c85194b29506130ba07069"
+    },
+    {
+      "file": "src/lp_solve/lp_Hash.c",
+      "source_sha256": "3639fb3ff8a4fceb72f3a9d525151b361c7e087fdc7e7054c56e0d5572e92a6f",
+      "adapted_sha256": "3639fb3ff8a4fceb72f3a9d525151b361c7e087fdc7e7054c56e0d5572e92a6f"
+    },
+    {
+      "file": "src/lp_solve/lp_lib.c",
+      "source_sha256": "d9e06267a8b3e8bcfbee59535b03d950dd0760504e1dd6461536794d728d523f",
+      "adapted_sha256": "d9e06267a8b3e8bcfbee59535b03d950dd0760504e1dd6461536794d728d523f"
+    },
+    {
+      "file": "src/lp_solve/lp_pricePSE.c",
+      "source_sha256": "a7e564c6f7f04b860321f055f63382045ef2a4f589853544f58dad5bb9aa3edf",
+      "adapted_sha256": "a7e564c6f7f04b860321f055f63382045ef2a4f589853544f58dad5bb9aa3edf"
+    },
+    {
+      "file": "src/lp_solve/lp_wlp.c",
+      "source_sha256": "ff553b3235526f554f15e90961b15806b99a1d120d394467aa377739570f17cf",
+      "adapted_sha256": "9f07b25b92ac26d3638bb636d0278e1e5625391762187104b36a1de7c930a757"
+    },
+    {
+      "file": "src/lp_solve/lp_LUSOL.c",
+      "source_sha256": "7d746bc6dc59ede814529d4c69c0a4111b7c6f8f81eb8e9cee438d933a1ff669",
+      "adapted_sha256": "7d746bc6dc59ede814529d4c69c0a4111b7c6f8f81eb8e9cee438d933a1ff669"
+    },
+    {
+      "file": "src/lp_solve/lp_matrix.c",
+      "source_sha256": "4c2f220feb3f0f24a1228ad60ca7ccbb79e672cd59d51e8e6c35a75cf6ae5ead",
+      "adapted_sha256": "4c2f220feb3f0f24a1228ad60ca7ccbb79e672cd59d51e8e6c35a75cf6ae5ead"
+    },
+    {
+      "file": "src/lp_solve/lp_report.c",
+      "source_sha256": "28c70018f321b3142c729c96489d99e0a7b6f5ebde9fa3658a445b84af26390d",
+      "adapted_sha256": "3aa6444a1df7781d7558cacb356cf6d5baf94a0b4f76af99ddd5eff87c85829b"
+    },
+    {
+      "file": "src/lp_solve/lusol.c",
+      "source_sha256": "6243781525710ccf4f028914ead843776da60af8c5cc48309ba5b7fa672ace9e",
+      "adapted_sha256": "9c5217f5332b31d0f17133cc9501cbbd528a58b6c80702b291621d8fe1fd74b9"
+    },
+    {
+      "file": "src/lp_solve/myblas.c",
+      "source_sha256": "41db034a06861bde6b368dc7d96e31e86284ef91c5b8b847cde93719ac97018f",
+      "adapted_sha256": "1ab8ae570dd9119a54bd9cb02b5b187b2e4968ad166ab9729aa32d3f594adb0f"
+    }
+  ]
+}

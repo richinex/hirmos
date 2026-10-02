@@ -5,6 +5,7 @@
 //! evidence or copy the numerical implementations out of the Hirmos causal core.
 
 mod causal_forest;
+mod honest_did;
 mod network_query;
 mod conditional_gaussian_query;
 mod causal_forest_analysis;
@@ -1032,6 +1033,7 @@ pub fn run_analysis(
             seed,
         ),
         AnalysisCommand::ArdlModel { rows, columns, model } => ardl_model::fit(values, rows, columns, model),
+        AnalysisCommand::HonestDid { model } => honest_did::fit(model),
         AnalysisCommand::ArdlPss {
             rows,
             columns,

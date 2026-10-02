@@ -1,0 +1,8 @@
+[package]
+name = "ecos-reference-port"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-or-later"
+
+[dev-dependencies]
+serde_json = { version = "1", features = ["float_roundtrip"] }

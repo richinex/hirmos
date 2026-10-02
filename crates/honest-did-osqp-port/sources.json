@@ -1,0 +1,123 @@
+{
+  "package": "osqp",
+  "version": "1.0.0",
+  "adaptations": [
+    "disable logging, profiling and signal handling",
+    "namespace exports to coexist with ECOS",
+    "reuse Rust allocation runtime"
+  ],
+  "files": [
+    {
+      "file": "osqp_sources/src/osqp_api.c",
+      "sha256": "f5921f7941581335f44622902ed21b9b6813db69d19c6879484d08a509b8d143"
+    },
+    {
+      "file": "osqp_sources/src/auxil.c",
+      "sha256": "b682e3fba83dc2aba7d39d08c1a0f3059d538d74814e464cffbefa6a35cc5591"
+    },
+    {
+      "file": "osqp_sources/src/error.c",
+      "sha256": "cdf034c6004eecfcde842221637b220b5a42b824c45344a73eaa4924fcbb1718"
+    },
+    {
+      "file": "osqp_sources/src/polish.c",
+      "sha256": "999f34dc02dcb91a3ea0cd941d18af6bec6c4a90bba82bfd7bea458b99bbfae8"
+    },
+    {
+      "file": "osqp_sources/src/scaling.c",
+      "sha256": "64153c5e106de10ada67a277bd02ea4fcb19f764bc4ae61826b133fe5adfae02"
+    },
+    {
+      "file": "osqp_sources/src/util.c",
+      "sha256": "9115443be3b8cae3d65f65b65228bd3d1786be091e52c5519cbfea393104cce3"
+    },
+    {
+      "file": "osqp_sources/src/profilers.c",
+      "sha256": "a205b67310d61350e3c747953e69da97d92b0af8e0438797206405c529411099"
+    },
+    {
+      "file": "osqp_sources/algebra/_common/csc_math.c",
+      "sha256": "7a81ef139e5b3df5a14e142cd7f17570c423f7e747defe9b03df56f69d347f84"
+    },
+    {
+      "file": "osqp_sources/algebra/_common/csc_utils.c",
+      "sha256": "0389f1951f2f536c98abae1e281334cdf577d69114b5c2a90a86ab3d34ef6a71"
+    },
+    {
+      "file": "osqp_sources/algebra/_common/kkt.c",
+      "sha256": "87bd0d3503da4df3b9c8b40227ee0ee1dee749d77a4adfc484f189e08a50e338"
+    },
+    {
+      "file": "osqp_sources/algebra/_common/reduced_kkt.c",
+      "sha256": "f271dad555fda4f6c049cc76e6a05da74617f63d0c39097502533f970aa8ea64"
+    },
+    {
+      "file": "osqp_sources/algebra/_common/lin_sys/qdldl/qdldl_interface.c",
+      "sha256": "419cbf3f84e1d5ae3d2d23df2d2c5800d0e6575d3663fa3ba3cc00a9cd1a11aa"
+    },
+    {
+      "file": "osqp_sources/algebra/_common/lin_sys/qdldl/amd/src/SuiteSparse_config.c",
+      "sha256": "c877594d2af178b8541d93e41d76e4584dc4a8e32d6a6df5ee7d3cef66509f04"
+    },
+    {
+      "file": "osqp_sources/algebra/_common/lin_sys/qdldl/amd/src/amd_1.c",
+      "sha256": "246798ba429d0b5474cf98e7104e1d77b4cf671d55c5e09255b1c30b04b39dcc"
+    },
+    {
+      "file": "osqp_sources/algebra/_common/lin_sys/qdldl/amd/src/amd_2.c",
+      "sha256": "1ddcbf2540171b669caf8af08b51ab0675f67db4844e654d906da2e7ee78cb65"
+    },
+    {
+      "file": "osqp_sources/algebra/_common/lin_sys/qdldl/amd/src/amd_aat.c",
+      "sha256": "823b15833e913af293c0b059f7bf5174b387f77699253ce0a0ff92a281e4fb2c"
+    },
+    {
+      "file": "osqp_sources/algebra/_common/lin_sys/qdldl/amd/src/amd_control.c",
+      "sha256": "28332db3a647186f4002b1e4f45bb13eb01dc863036243b1510cd0ffcc2981d1"
+    },
+    {
+      "file": "osqp_sources/algebra/_common/lin_sys/qdldl/amd/src/amd_defaults.c",
+      "sha256": "0c8c7acfddaaa6a1c1bfc1a50e6b79fce07be1fbb6269e3de181d55fa51ee008"
+    },
+    {
+      "file": "osqp_sources/algebra/_common/lin_sys/qdldl/amd/src/amd_info.c",
+      "sha256": "1ef5b3f8faa0d2d297ee192c449a002ec5c9db768307d97319d3ddafe1b1a763"
+    },
+    {
+      "file": "osqp_sources/algebra/_common/lin_sys/qdldl/amd/src/amd_order.c",
+      "sha256": "c8e733de701400d4afbf610cc17247fa3144249c4a0d7511d05c4333c5380918"
+    },
+    {
+      "file": "osqp_sources/algebra/_common/lin_sys/qdldl/amd/src/amd_post_tree.c",
+      "sha256": "f97d516d22e20ea6e81d3a1a4dfd04f8ad38a5e434657620a1b2ff89c34ebb87"
+    },
+    {
+      "file": "osqp_sources/algebra/_common/lin_sys/qdldl/amd/src/amd_postorder.c",
+      "sha256": "49e2ec4776e8638a07c3504fcafac8b28cf4b6773d80ffe198f0976ce14e93d6"
+    },
+    {
+      "file": "osqp_sources/algebra/_common/lin_sys/qdldl/amd/src/amd_preprocess.c",
+      "sha256": "e7022d7a1ff673e8d7e0c8325a916f1c8205653e9b1b8ecc79112c27bf44ff75"
+    },
+    {
+      "file": "osqp_sources/algebra/_common/lin_sys/qdldl/amd/src/amd_valid.c",
+      "sha256": "45bb926b9fbdffd3bf6712d48be030c3fad160d58cf15b25fc63f4b8806a739c"
+    },
+    {
+      "file": "osqp_sources/algebra/builtin/algebra_libs.c",
+      "sha256": "fffc067763bf613538dfb1a528ee480baf0dd13545ca980d6d0211f33bf663ac"
+    },
+    {
+      "file": "osqp_sources/algebra/builtin/matrix.c",
+      "sha256": "9de2c33cae4822b4f3f9dd8356397eea07781e8efeb8679a4939c5276645744a"
+    },
+    {
+      "file": "osqp_sources/algebra/builtin/vector.c",
+      "sha256": "830a1785a174f15c5322d7fc0db70123d021d2f645cc49c4d469c3b2d8912b63"
+    },
+    {
+      "file": "qdldl_sources/src/qdldl.c",
+      "sha256": "ecbc2e131ac5b76b8afe5e5ea244bb966b1bedc10ae12b087d39ce3a982844a7"
+    }
+  ]
+}

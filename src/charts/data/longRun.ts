@@ -17,7 +17,8 @@ export function longRunOption(view: {
     useUTC: true,
     grid: gridAuto({ top: 42, bottom: view.slider ? 78 : 30 }),
     ...rangeSelection(theme, 0, { slider: view.slider }),
-    legend: { ...legend(theme, view.series.map((s) => s.name)), bottom: 'auto', top: 0 },
+    // Series that share a name, such as a lower and an upper limit, share one legend entry.
+    legend: { ...legend(theme, [...new Set(view.series.map((s) => s.name))]), bottom: 'auto', top: 0 },
     tooltip: tooltip(theme, 'axis'),
     xAxis: {
       type: view.axis.kind === 'calendar' ? 'time' : 'value',

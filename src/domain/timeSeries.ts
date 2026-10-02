@@ -98,12 +98,12 @@ export const timeSeriesRunSchema = z.discriminatedUnion('kind', [
       if (s.outcome !== 0 || s.predictors.length !== run.predictors.length || s.fixed.length !== run.fixed.length ||
         s.predictors.some((index, i) => index !== i + 1) || s.fixed.some((index, i) => index !== i + 1 + run.predictors.length)) fail('The specification must refer to the saved model columns in their recorded order.')
       if (e.predictorLags.length !== run.predictors.length) fail('The fitted orders must match the selected predictors.')
-      if ((s.orders.kind === 'fixed' || s.orders.kind === 'rFixed') && (s.orders.outcomeLag !== e.outcomeLag || s.orders.predictorLags.some((q, i) => q !== e.predictorLags[i]))) fail('The fitted orders differ from the requested fixed orders.')
+      if ((s.orders.kind === 'fixed' || s.orders.kind === 'rFixed' || s.orders.kind==='rRestricted') && (s.orders.outcomeLag !== e.outcomeLag || s.orders.predictorLags.some((q, i) => q !== e.predictorLags[i]))) fail('The fitted orders differ from the requested fixed orders.')
       if (s.orders.kind === 'search' && (e.outcomeLag > s.orders.maximumLag || e.predictorLags.some((q, i) => q !== null && q > (s.orders.kind === 'search' ? s.orders.maximumOrders[i] ?? -1 : -1)))) fail('The selected orders exceed the search limits.')
       const orders = s.orders
-      const isR = orders.kind === 'rFixed' || orders.kind === 'rHorizontal' || orders.kind === 'rGrid'
+      const isR = orders.kind === 'rFixed' || orders.kind === 'rRestricted' || orders.kind === 'rHorizontal' || orders.kind === 'rGrid'
       if (isR !== (e.rAnalysis.kind === 'recorded')) fail('R error-correction evidence must match the recorded fitting method.')
-      if ((e.longRun.kind === 'uncalibrated' && !isR) || (e.longRun.kind === 'recorded' && isR)) fail('Bounds calibration must match the recorded fitting method.')
+      if (((e.longRun.kind === 'uncalibrated'||e.longRun.kind==='rCalibrated') && !isR) || (e.longRun.kind === 'recorded' && isR)) fail('Bounds calibration must match the recorded fitting method.')
       if (orders.kind === 'rHorizontal') {
         const actual = [e.outcomeLag, ...e.predictorLags]
         if (actual.some((q,i)=>q===null||q>orders.maximum[i]!||(orders.fixed[i]!==null&&q!==orders.fixed[i]))) fail('The selected orders violate horizontal-search constraints.')
@@ -113,6 +113,12 @@ export const timeSeriesRunSchema = z.discriminatedUnion('kind', [
       }
       if (e.rAnalysis.kind === 'recorded') {
         const r = e.rAnalysis
+        if(orders.kind==='rRestricted'&&orders.omitted.some(change=>r.coefficients.some(term=>change.kind==='outcome'?term.kind==='outcomeChange'&&term.lag===change.lag:term.kind==='predictorChange'&&term.column===change.column&&term.lag===change.lag)))fail('A restricted ECM still contains an omitted short-run change term.')
+        if(orders.kind==='rRestricted'){
+          const expectedChanges=[...Array.from({length:orders.outcomeLag-1},(_,i)=>({kind:'outcomeChange',lag:i+1})),...orders.predictorLags.flatMap((q,column)=>Array.from({length:q},(_,lag)=>({kind:'predictorChange',column,lag})))].filter(term=>!orders.omitted.some(change=>change.kind==='outcome'?term.kind==='outcomeChange'&&term.lag===change.lag:term.kind==='predictorChange'&&'column' in term&&term.column===change.column&&term.lag===change.lag))
+          const actualChanges=r.coefficients.filter(term=>term.kind==='outcomeChange'||term.kind==='predictorChange')
+          if(JSON.stringify(expectedChanges)!==JSON.stringify(actualChanges))fail('The restricted ECM change terms do not match the recorded omissions.')
+        }
         const expected = orders.kind === 'rHorizontal' ? 'horizontal' : orders.kind === 'rGrid' ? 'grid' : 'notRequested'
         if (r.ranking.kind !== expected) fail('The search ranking must match the requested search method.')
         const unrestricted = s.terms === 'constant' || s.terms === 'trend'

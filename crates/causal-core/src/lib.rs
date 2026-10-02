@@ -31,6 +31,7 @@ pub mod jpcmciplus;
 mod lapack_cholesky;
 mod lapack_dgeev;
 mod lapack_dgelsd;
+pub mod honest_did;
 mod lapack_dgesdd;
 mod lapack_dsyevd;
 mod lapack_lu;

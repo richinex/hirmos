@@ -103,6 +103,9 @@ test('DuckDB parses explicit time formats without guessing or rolling invalid we
       dayFirst: await read(['03/04/2024'], { kind: 'date-format', format: '%d/%m/%Y' }),
       monthFirst: await read(['03/04/2024'], { kind: 'date-format', format: '%m/%d/%Y' }),
       invalidDate: await read(['31/02/2024', '03/04/2024'], { kind: 'date-format', format: '%d/%m/%Y' }),
+      yearMonth: await read(['2004-02', '2004-01'], { kind: 'date-format', format: '%Y-%m' }),
+      invalidMonth: await read(['2004-13'], { kind: 'date-format', format: '%Y-%m' }),
+      duplicateMonth: await read(['2004-01', '2004-01'], { kind: 'date-format', format: '%Y-%m' }),
     }
   })
   expect(results).toEqual({
@@ -110,5 +113,7 @@ test('DuckDB parses explicit time formats without guessing or rolling invalid we
     invalidWeek: 'time-value-unparseable', zeroWeek: 'time-value-unparseable',
     repeated: 'duplicate-time-value', ordinal: [1, 2], invalidDate: 'time-value-unparseable',
     dayFirst: ['2024-04-03T00:00:00.000Z'], monthFirst: ['2024-03-04T00:00:00.000Z'],
+    yearMonth: ['2004-01-01T00:00:00.000Z', '2004-02-01T00:00:00.000Z'],
+    invalidMonth: 'time-value-unparseable', duplicateMonth: 'duplicate-time-value',
   })
 })

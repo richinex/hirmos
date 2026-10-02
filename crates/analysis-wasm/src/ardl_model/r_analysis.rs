@@ -3,7 +3,6 @@ use super::{problem, Coefficient, Orders};
 use hirmos_causal_core::ardl::{
     bounds_statistic,
     multivariate::{
-        fit_r_uecm,
         horizontal::HorizontalSearch,
         search::{Criterion, Search},
         Input, Specification, Term,
@@ -83,7 +82,7 @@ pub(super) fn select(
         Orders::RFixed {
             outcome_lag,
             predictor_lags,
-        } => Ok((
+        } | Orders::RRestricted { outcome_lag, predictor_lags, .. } => Ok((
             Specification::new(
                 outcome_lag,
                 predictor_lags.into_iter().map(Some).collect(),
@@ -175,8 +174,9 @@ pub(super) fn fit(
     case: usize,
     ranking: Ranking,
     coefficient: impl Fn(&Term) -> Coefficient,
+    omitted: &[hirmos_causal_core::ardl::multivariate::OmittedChange],
 ) -> Result<Evidence, String> {
-    let model = fit_r_uecm(input, spec).map_err(problem)?;
+    let model = super::ecm(input, spec, omitted).map_err(problem)?;
     let (aic_pss, sbc_pss) = model.pss_information_criteria().map_err(problem)?;
     let max_order = 5.min(model.fit.nobs.saturating_sub(model.fit.params.len() + 1));
     let serial_correlation = (1..=max_order)

@@ -8,11 +8,16 @@ const interval = z.tuple([finite, finite]).refine(([lower, upper]) => lower <= u
 const level = z.number().gt(0).lt(1)
 const values = z.array(finite)
 const series = z.tuple([finite]).rest(finite)
+export const omittedEcmChangeSchema=z.discriminatedUnion('kind',[
+  z.object({kind:z.literal('outcome'),lag:lag.min(1)}).strict(),
+  z.object({kind:z.literal('predictor'),column:index,lag}).strict(),
+])
 
 export const ardlOrdersSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('fixed'), outcomeLag: lag, predictorLags: z.array(lag.nullable()).min(1) }).strict(),
   z.object({ kind: z.literal('search'), maximumLag: lag, maximumOrders: z.array(lag).min(1) }).strict(),
   z.object({ kind: z.literal('rFixed'), outcomeLag: lag.min(1), predictorLags: z.array(lag).min(1) }).strict(),
+  z.object({ kind: z.literal('rRestricted'), outcomeLag:lag.min(1),predictorLags:z.array(lag).min(1),omitted:z.array(omittedEcmChangeSchema).min(1) }).strict(),
   z.object({ kind: z.literal('rHorizontal'), maximum: z.array(lag).min(2), fixed: z.array(lag.nullable()).min(2), starting: z.array(lag).min(2) }).strict(),
   z.object({ kind: z.literal('rGrid'), minimumLag: lag.min(1), maximumLag: lag.min(1), maximumOrders: z.array(lag).min(1), fixedOrders: z.array(lag.nullable()).min(1) }).strict(),
 ])
@@ -28,8 +33,9 @@ export const ardlModelRequestSchema = z.object({
 }).strict().superRefine((request, ctx) => {
   const columns = [request.outcome, ...request.predictors, ...request.fixed]
   const selection = request.orders
-  const orders = selection.kind === 'rHorizontal' ? selection.maximum.slice(1) : selection.kind === 'fixed' || selection.kind === 'rFixed' ? selection.predictorLags : selection.maximumOrders
-  const maximum = Math.max(selection.kind === 'rHorizontal' ? selection.maximum[0]! : selection.kind === 'fixed' || selection.kind === 'rFixed' ? selection.outcomeLag : selection.maximumLag, ...orders.map((q) => q ?? 0))
+  const orders = selection.kind === 'rHorizontal' ? selection.maximum.slice(1) : selection.kind === 'fixed' || selection.kind === 'rFixed' || selection.kind==='rRestricted' ? selection.predictorLags : selection.maximumOrders
+  const maximum = Math.max(selection.kind === 'rHorizontal' ? selection.maximum[0]! : selection.kind === 'fixed' || selection.kind === 'rFixed' || selection.kind==='rRestricted' ? selection.outcomeLag : selection.maximumLag, ...orders.map((q) => q ?? 0))
+  if(selection.kind==='rRestricted'&&(new Set(selection.omitted.map(change=>JSON.stringify(change))).size!==selection.omitted.length||selection.omitted.some(change=>change.kind==='outcome'?change.lag>=selection.outcomeLag:change.column>=selection.predictorLags.length||change.lag>=selection.predictorLags[change.column]!)))ctx.addIssue({code:'custom',message:'Omit only distinct short-run change terms included in the specified ECM.'})
   const checks = [
     { valid: new Set(columns).size === columns.length, message: 'Choose distinct outcome, predictor and fixed columns.' },
     { valid: orders.length === request.predictors.length, message: 'Specify one lag order for each predictor.' },
@@ -86,6 +92,13 @@ const longRun = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('recorded'), departures: series, normalized: series, intervals: z.array(interval), boundsStatistic: finite.nonnegative(),
     boundsCritical: z.array(interval).length(4), pLower: finite.min(0).max(1), pUpper: finite.min(0).max(1) }).strict(),
   z.object({ kind: z.literal('uncalibrated'), departures: series, normalized: series, intervals: z.array(interval), boundsStatistic: finite.nonnegative() }).strict(),
+  z.object({ kind:z.literal('rCalibrated'),departures:series,normalized:series,intervals:z.array(interval),boundsStatistic:finite.nonnegative(),
+    fBounds:z.array(z.object({alpha:level,i0:finite,i1:finite}).strict()).length(8),fPValue:finite.min(0).max(1),
+    tBounds:z.discriminatedUnion('kind',[
+      z.object({kind:z.literal('notApplicable')}).strict(),
+      z.object({kind:z.literal('recorded'),statistic:finite,critical:z.array(z.object({alpha:level,i0:finite,i1:finite}).strict()).length(8),pValue:finite.min(0).max(1)}).strict(),
+    ]),
+  }).strict(),
 ])
 const rankedOrder = z.object({ order: z.array(lag).min(2), aicPss: finite }).strict()
 const ranking = z.discriminatedUnion('kind', [
@@ -149,7 +162,7 @@ export const ardlModelEvidenceSchema = z.object({
     const size = r.params.length
     if (r.coefficients.length !== size || r.covariance.length !== size || r.covariance.some(row => row.length !== size) || r.residuals.length !== result.fittedRows) ctx.addIssue({ code: 'custom', message: 'Error-correction coefficients, covariance and residuals must match their estimation sample.' })
     if (r.covariance.some((row,i)=>(row[i]??-1)<0)) ctx.addIssue({ code:'custom',message:'Error-correction coefficient variances cannot be negative.' })
-    if (result.longRun.kind==='uncalibrated' && Math.abs(result.longRun.boundsStatistic-r.boundsF)>1e-8*Math.max(1,Math.abs(r.boundsF))) ctx.addIssue({ code:'custom',message:'The reported bounds statistics must agree.' })
+    if ((result.longRun.kind==='uncalibrated'||result.longRun.kind==='rCalibrated') && Math.abs(result.longRun.boundsStatistic-r.boundsF)>1e-8*Math.max(1,Math.abs(r.boundsF))) ctx.addIssue({ code:'custom',message:'The reported bounds statistics must agree.' })
     if (r.serialCorrelation.some((row, i) => row.order !== i + 1)) ctx.addIssue({ code: 'custom', message: 'Serial-correlation tests must cover consecutive orders.' })
     if (r.ranking.kind !== 'notRequested') {
       const rows = r.ranking.rows
@@ -157,10 +170,18 @@ export const ardlModelEvidenceSchema = z.object({
       if (rows[0]!.order.some((q, i) => q !== [result.outcomeLag, ...result.predictorLags][i])) ctx.addIssue({ code: 'custom', message: 'The fitted orders must match the best search row.' })
     }
   }
-  if (result.longRun.kind==='uncalibrated' && r.kind!=='recorded') ctx.addIssue({ code:'custom',message:'An uncalibrated R bounds statistic requires its error-correction evidence.' })
+  if ((result.longRun.kind==='uncalibrated'||result.longRun.kind==='rCalibrated') && r.kind!=='recorded') ctx.addIssue({ code:'custom',message:'R bounds evidence requires its error-correction evidence.' })
+  if(result.longRun.kind==='rCalibrated'){
+    const b=result.longRun
+    const levels=[0.005,0.01,0.025,0.05,0.075,0.1,0.15,0.2]
+    if(b.fBounds.some((row,i)=>row.alpha!==levels[i]||row.i0>row.i1))ctx.addIssue({code:'custom',message:'F critical bounds must cover the recorded significance levels in order.'})
+    if(b.tBounds.kind==='recorded'&&(b.tBounds.critical.some((row,i)=>row.alpha!==levels[i]||row.i1>row.i0)||r.kind!=='recorded'||r.boundsT.kind!=='recorded'||Math.abs(b.tBounds.statistic-r.boundsT.value)>1e-8*Math.max(1,Math.abs(r.boundsT.value))))ctx.addIssue({code:'custom',message:'The t critical bounds and statistic must match the error-correction evidence.'})
+    if(r.kind==='recorded'&&(b.tBounds.kind==='recorded')!==(r.boundsT.kind==='recorded'))ctx.addIssue({code:'custom',message:'The applicability of the t-bounds test must match the error-correction evidence.'})
+  }
   switch (result.longRun.kind) {
     case 'unavailable': return
     case 'recorded':
+    case 'rCalibrated':
     case 'uncalibrated': {
       const active = result.predictorLags.filter((q) => q !== null)
       const terms = result.coefficients.filter((term) => term.kind === 'constant' || term.kind === 'trend').length
@@ -175,6 +196,12 @@ export const ardlModelEvidenceSchema = z.object({
   }
 }).brand<'ArdlModelEvidence'>()
 export type ArdlModelEvidence = z.infer<typeof ardlModelEvidenceSchema>
+
+/** Compare each statistic with its own calibrated rejection bounds. */
+export function ardlBoundsDecision(statistic: number, bounds: { readonly i0: number; readonly i1: number }, family: 'F' | 't'): 'Reject the null' | 'Do not reject' | 'Inconclusive' {
+  if (family === 'F') return statistic > bounds.i1 ? 'Reject the null' : statistic < bounds.i0 ? 'Do not reject' : 'Inconclusive'
+  return statistic < bounds.i1 ? 'Reject the null' : statistic > bounds.i0 ? 'Do not reject' : 'Inconclusive'
+}
 
 /** Parse the transport envelope before exposing its validated numerical evidence. */
 export const ardlModelResponseSchema = z.object({

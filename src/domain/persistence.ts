@@ -20,6 +20,7 @@ import { backdoorLinearConfigurationSchema, backdoorLinearEvidenceSchema } from 
 import { tLearnerEvidenceSchema, crossFittedTLearnerEvidenceSchema, tLearnerConfigurationSchema, tLearnerRunMatches, parseCausalImpactEvidence, bayesianImpactSettingsSchema, impactInferenceMatches } from './estimation'
 import type { PreparedDatasetArtifact, StationarityEvidenceArtifact } from './preprocessing'
 import type { SensitivityRunArtifact } from './sensitivity'
+import {honestRunSchema,honestRunMatches} from './honestDid'
 import { EMPTY_STUDY_DRAFT, type IdentificationArtifact, type StudyDesignDraft, type StudySpecification } from './study'
 import type { ProjectOrigin } from './projectOrigin'
 import type { Project, SelectedSource, Workflow } from './workflow'
@@ -225,7 +226,7 @@ const envelopeSchema = z.object({
   studies: z.array(artifact),
   identifications: z.array(artifact),
   estimationRuns: z.array(artifact),
-  sensitivityRuns: z.array(artifact),
+  sensitivityRuns: z.array(artifact.superRefine((run,ctx)=>{if(run.kind==='honest-did-run'){const parsed=honestRunSchema.safeParse(run);if(!parsed.success)ctx.addIssue({code:'custom',message:z.prettifyError(parsed.error)})}})),
   counterfactualRuns: z.array(artifact),
   survivalRuns: z.array(artifact).default([]),
   timeSeriesRuns: z.array(timeSeriesRunSchema).default([]),
@@ -661,6 +662,11 @@ export function parseSnapshotValue(value: unknown): Result<PersistedProject, Sna
     if (!evidence.success || !settings.success || !tLearnerRunMatches(settings.data, evidence.data)) {
       return err({ kind: 'invalid-snapshot', detail: 'The saved T-learner result does not match its outcome model settings.' })
     }
+  }
+  for(const record of parsed.data.sensitivityRuns){
+    if(record.kind!=='honest-did-run')continue
+    const run=honestRunSchema.safeParse(record)
+    if(!run.success||!honestRunMatches(run.data,estimationRuns as unknown as PersistedProject['estimationRuns'],parsed.data.timeSeriesRuns))return err({kind:'invalid-snapshot',detail:'Parallel-trends sensitivity evidence does not match its saved event-study source.'})
   }
   const survivalRuns = parsed.data.survivalRuns.map((run) => upgradeSurvivalRunRecord(run))
   const identifications = parsed.data.identifications.map((identification) => upgradeIdentificationRecord(identification))

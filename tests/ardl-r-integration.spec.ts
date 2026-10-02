@@ -5,12 +5,48 @@ import { choose, prepare } from './examples/support'
 const root = new URL('../../octopus/rust-causal-transpile/oracle/fixtures/', import.meta.url)
 const reference = JSON.parse(readFileSync(new URL('ardl_paper.json', root), 'utf8'))
 const searches = JSON.parse(readFileSync(new URL('ardl_paper_search.json', root), 'utf8'))
+const calibration = JSON.parse(readFileSync(new URL('ardl_bounds_calibration.json', root), 'utf8'))
+const nigeria = readFileSync(new URL('../docs/ardl-paper/ardl_paper_data_digitised.csv', import.meta.url), 'utf8').trim().split(/\r?\n/).slice(1).map(line => line.split(','))
 const names = ['w', 'Prod', 'UR', 'Wedge', 'Union', 'D7475', 'D7579']
 function close(actual: number, expected: number, label: string) {
   if (!Number.isFinite(actual) || Math.abs(actual - expected) > 1e-8 * Math.max(1, Math.abs(expected))) {
     throw new Error(`${label}: ${actual} differs from ${expected}`)
   }
 }
+
+test('Nigeria zero-order predictor retains R bounds calibration and separate F and t conclusions', async ({ page }) => {
+  await page.goto('/app')
+  const columns = [1, 2, 3].map(column => nigeria.map(row => Math.log(Number(row[column]))))
+  columns.push(nigeria.map(row => row[0]! <= '2009-02' ? 1 : 0))
+  const result = await page.evaluate(async columns => {
+    const client = await import(new URL('/src/analysis/client.ts', location.href).href)
+    const domain = await import(new URL('/src/domain/ardlModel.ts', location.href).href)
+    const request = domain.ardlModelRequestSchema.parse({ outcome: 0, predictors: [1, 2], fixed: [3], terms: 'trend',
+      orders: { kind: 'rFixed', outcomeLag: 4, predictorLags: [4, 0] }, holdBack: null, multiplierHorizon: 0, future: { kind: 'none' } })
+    const fitted = await client.runArdlModel(new Float64Array(columns.flat()), columns[0]!.length, columns.length, request)
+    if (!fitted.ok || fitted.value.longRun.kind !== 'rCalibrated' || fitted.value.longRun.tBounds.kind !== 'recorded') return { fitted }
+    const evidence = domain.ardlModelEvidenceSchema.parse(JSON.parse(JSON.stringify(fitted.value)))
+    const f = fitted.value.longRun.fBounds.find((row: { alpha: number }) => row.alpha === 0.1)!
+    const t = fitted.value.longRun.tBounds.critical.find((row: { alpha: number }) => row.alpha === 0.1)!
+    return { fitted, evidence, fDecision: domain.ardlBoundsDecision(fitted.value.longRun.boundsStatistic, f, 'F'),
+      tDecision: domain.ardlBoundsDecision(fitted.value.longRun.tBounds.statistic, t, 't') }
+  }, columns)
+  expect(result.fitted.ok, JSON.stringify(result)).toBe(true)
+  if (!result.fitted.ok) throw Error(JSON.stringify(result))
+  const evidence = result.fitted.value.longRun
+  expect(evidence.kind).toBe('rCalibrated')
+  expect(result.evidence).toEqual(result.fitted.value)
+  for (const check of calibration.checks) {
+    const rows = check.family === 'F' ? evidence.fBounds : evidence.tBounds.critical
+    const bounds = rows.find((row: { alpha: number }) => row.alpha === check.alpha)!
+    close(bounds.i0, check.i0, `${check.family} I(0) at ${check.alpha}`)
+    close(bounds.i1, check.i1, `${check.family} I(1) at ${check.alpha}`)
+    close(check.family === 'F' ? evidence.boundsStatistic : evidence.tBounds.statistic, check.statistic, `${check.family} statistic`)
+    close(check.family === 'F' ? evidence.fPValue : evidence.tBounds.pValue, check.p_value, `${check.family} p-value`)
+  }
+  expect(result.fDecision).toBe('Reject the null')
+  expect(result.tDecision).toBe('Inconclusive')
+})
 
 test('all 38 R ECM fixtures pass through WASM with both deterministic bounds cases', async ({ page }) => {
   test.setTimeout(180_000)
@@ -36,7 +72,9 @@ test('all 38 R ECM fixtures pass through WASM with both deterministic bounds cas
     close(r.boundsF,bounds.f,input.name)
     if (typeof bounds.t==='number') close(r.boundsT.value,bounds.t,input.name)
     else expect(r.boundsT.kind).toBe('notApplicable')
-    expect(result.value.longRun.kind).toBe('uncalibrated')
+    expect(result.value.longRun.kind).toBe('rCalibrated')
+    expect(result.value.longRun.fBounds).toHaveLength(8)
+    expect(result.value.longRun.tBounds.kind).toBe(typeof bounds.t==='number'?'recorded':'notApplicable')
     expect(r.params.length).toBe(input.params.length)
     r.params.forEach((v:number,i:number)=>close(v,input.params[i],`${input.name} coefficient ${i}`))
     r.covariance.forEach((row:number[],i:number)=>row.forEach((v,j)=>close(v,input.covariance[i][j],`${input.name} covariance ${i},${j}`)))
@@ -116,6 +154,14 @@ for (const mode of ['rHorizontal','rGrid','rFixed'] as const) {
     expect(await page.locator('body').evaluate(el=>el.scrollWidth<=innerWidth+1)).toBe(true)
     await result.scrollIntoViewIfNeeded()
     await page.screenshot({path:info.outputPath(`${mode}.png`)})
+    const boundsRegion=page.getByRole('region',{name:'Bounds calibration',exact:true})
+    await expect(boundsRegion).toBeVisible()
+    await expect(boundsRegion.getByRole('table',{name:'Bounds tests'}).getByRole('row')).toHaveCount(17)
+    await boundsRegion.scrollIntoViewIfNeeded()
+    await page.screenshot({path:info.outputPath(`${mode}-bounds-light.png`)})
+    await page.evaluate(()=>document.documentElement.classList.add('dark'))
+    await page.screenshot({path:info.outputPath(`${mode}-bounds-dark.png`)})
+    await page.evaluate(()=>document.documentElement.classList.remove('dark'))
     await page.reload()
     await page.getByRole('button',{name:`Open ${projectName}`,exact:true}).click()
     await expect(page.getByRole('heading',{name:'Choose the data file again',exact:true})).toBeVisible()

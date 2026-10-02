@@ -1214,6 +1214,10 @@ export function runArdlModel(values: Float64Array, rows: number, columns: number
   return post('ardl-model-succeeded', { kind: 'ardl-model', request, values, rows, columns, model }, values)
 }
 
+export function runHonestDid(model:import('@/domain/honestDid').HonestRequest):Promise<Result<import('@/domain/honestDid').HonestEvidence,AnalysisWorkerProblem>>{
+  const request=newWorkerRequestId(),values=new Float64Array()
+  return post('honest-did-succeeded',{kind:'honest-did',request,values,model},values)
+}
 export function runArdlPss(values: Float64Array, rows: number, columns: number, design: { readonly treatment: number; readonly outcome: number; readonly maxLag: number; readonly trend: 'c' | 'ct'; readonly case: number }): Promise<ArdlOutcome> {
   const request = newWorkerRequestId()
   return post('ardl-succeeded', { kind: 'ardl-pss', request, values, rows, columns, ...design }, values)

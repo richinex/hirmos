@@ -7,6 +7,7 @@ use nalgebra::{DMatrix, DVector};
 pub mod multivariate;
 pub mod multipliers;
 pub mod diagnostics;
+pub mod bounds_calibration;
 
 /// `scipy.stats.norm.cdf`.
 fn norm_cdf(x: f64) -> f64 {

@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { brand, err, isNonEmpty, ok, type Brand, type NonEmptyArray, type Result } from './dop'
 import { inputDescriptorSchema, parseInputDescriptors, type SqlInputAlias, type SqlInputDescriptor } from './sourceInputs'
-import { timestampSql, type CalendarTimeInterpretation } from './timeInterpretation'
+import { calendarTimeInterpretationSchema, timestampSql, type CalendarTimeInterpretation } from './timeInterpretation'
 
 /**
  * A preparation pipeline: blocks on a canvas, each one operation on a table, wired into a directed
@@ -531,11 +531,7 @@ const blockSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('calendar-events'),
     column: z.string(),
-    interpretation: z.discriminatedUnion('kind', [
-      z.object({ kind: z.literal('timestamp') }).strict(),
-      z.object({ kind: z.literal('iso-week') }).strict(),
-      z.object({ kind: z.literal('date-format'), format: z.enum(['%d/%m/%Y', '%m/%d/%Y', '%Y-%m-%d']) }).strict(),
-    ]),
+    interpretation: calendarTimeInterpretationSchema,
     span: z.enum(['day', 'week', 'month']),
     window: z.discriminatedUnion('kind', [
       z.object({ kind: z.literal('year-end') }).strict(),

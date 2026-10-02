@@ -3,7 +3,7 @@ import type { DagDocument } from './dag'
 import type { DatasetProfile } from './dataset'
 import { adjustmentLabels, type EstimationRunArtifact } from './estimation'
 import { describeSeriesTransform, type PreparedDatasetArtifact, type StationarityEvidenceArtifact } from './preprocessing'
-import type { SensitivityRunArtifact } from './sensitivity'
+import {sensitivityEstimationRun, type SensitivityRunArtifact} from './sensitivity'
 import type { IdentificationArtifact, StudySpecification } from './study'
 import type { SelectedSource } from './workflow'
 
@@ -96,7 +96,7 @@ export function buildResultManifest(inputs: ResultInputs, run: EstimationRunArti
     study,
     identification,
     estimation: run,
-    sensitivity: inputs.sensitivityRuns.filter((probe) => probe.estimationRun === run.id),
+    sensitivity: inputs.sensitivityRuns.filter((probe) => sensitivityEstimationRun(probe) === run.id),
     counterfactuals: study === null ? [] : inputs.counterfactualRuns.filter((counterfactual) => counterfactual.study === study.id),
     warnings,
   }

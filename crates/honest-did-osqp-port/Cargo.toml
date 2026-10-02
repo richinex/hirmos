@@ -1,0 +1,8 @@
+[package]
+name = "osqp-reference-port"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+
+[dev-dependencies]
+serde_json = { version = "1", features = ["float_roundtrip"] }

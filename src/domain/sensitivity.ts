@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type {HonestRun} from './honestDid'
 import { assertNever, brand, err, ok, type Brand, type NonEmptyArray, type Result } from './dop'
 import { contemporaneousAdjustmentVariables, type EstimationRunArtifact, type EstimationRunId } from './estimation'
 import type { MethodId } from './methods'
@@ -228,10 +229,14 @@ interface RunIdentity {
   readonly columns: NonEmptyArray<StudyVariable>
 }
 
-export type SensitivityRunArtifact =
+export type LegacySensitivityRunArtifact =
   | RunIdentity & { readonly kind: 'linear-refutation-run'; readonly configuration: RefutationConfiguration; readonly evidence: LinearRefutationEvidence; readonly refuters: NonEmptyArray<RefuterFact>; readonly diagnostics: NonEmptyArray<DiagnosticFact> }
   | RunIdentity & { readonly kind: 'unobserved-confounding-run'; readonly configuration: UnobservedConfiguration; readonly evidence: UnobservedConfoundingEvidence }
   | RunIdentity & { readonly kind: 'dml-refutation-run'; readonly configuration: DmlRefutationConfiguration; readonly evidence: DmlRefutationEvidence; readonly refuters: NonEmptyArray<RefuterFact> }
+export type SensitivityRunArtifact=LegacySensitivityRunArtifact|HonestRun
+export function sensitivityEstimationRun(run:SensitivityRunArtifact):EstimationRunId|null{
+  return run.kind==='honest-did-run'?(run.source.kind==='estimation'?brand<string,'EstimationRunId'>(run.source.run):null):run.estimationRun
+}
 
 export type ProbeEligibility =
   | { readonly kind: 'eligible' }

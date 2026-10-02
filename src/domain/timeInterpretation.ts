@@ -1,13 +1,17 @@
 import { z } from 'zod'
 import { calendarReportSchema } from './calendar'
 
+/** Calendar readings shared by preparation and calendar-event pipelines. */
+export const calendarTimeInterpretationSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('timestamp') }).strict(),
+  z.object({ kind: z.literal('iso-week') }).strict(),
+  z.object({ kind: z.literal('date-format'), format: z.enum(['%d/%m/%Y', '%m/%d/%Y', '%Y-%m-%d', '%Y-%m']) }).strict(),
+])
 /** Omitted in older recipes: numeric source types are indices; other types are ISO timestamps. */
 export const timeInterpretationSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('source-type') }).strict(),
-  z.object({ kind: z.literal('timestamp') }).strict(),
   z.object({ kind: z.literal('ordinal') }).strict(),
-  z.object({ kind: z.literal('iso-week') }).strict(),
-  z.object({ kind: z.literal('date-format'), format: z.enum(['%d/%m/%Y', '%m/%d/%Y', '%Y-%m-%d']) }).strict(),
+  ...calendarTimeInterpretationSchema.options,
 ])
 
 export type TimeInterpretation = z.infer<typeof timeInterpretationSchema>
@@ -29,7 +33,7 @@ export const timePreviewSchema = z.object({
 export type TimePreview = z.infer<typeof timePreviewSchema>
 
 /** The readings that yield a calendar date; a numeric index has none. */
-export type CalendarTimeInterpretation = Exclude<TimeInterpretation, { kind: 'source-type' | 'ordinal' }>
+export type CalendarTimeInterpretation = z.infer<typeof calendarTimeInterpretationSchema>
 
 /**
  * DuckDB owns calendar arithmetic. The SQL for one column read as a timestamp: a cast, a format,
@@ -54,6 +58,7 @@ export const TIME_INTERPRETATIONS: readonly { readonly label: string; readonly v
   { label: 'Day/month/year (31/12/2024)', value: '%d/%m/%Y', interpretation: { kind: 'date-format', format: '%d/%m/%Y' } },
   { label: 'Month/day/year (12/31/2024)', value: '%m/%d/%Y', interpretation: { kind: 'date-format', format: '%m/%d/%Y' } },
   { label: 'Year-month-day (2024-12-31)', value: '%Y-%m-%d', interpretation: { kind: 'date-format', format: '%Y-%m-%d' } },
+  { label: 'Year-month (2024-12), first day of month', value: '%Y-%m', interpretation: { kind: 'date-format', format: '%Y-%m' } },
   { label: 'Numeric time index', value: 'ordinal', interpretation: { kind: 'ordinal' } },
 ]
 

@@ -38,6 +38,7 @@ import { parseSeasonalAdjustedEvidence } from '@/domain/seasonal'
 import { parsePandasResamplingEvidence } from '@/domain/resampling'
 import { ardlEvidenceSchema, bayesianGaussianEvidenceSchema, binaryEttEvidenceSchema, discreteBnEvidenceSchema, doubleMlEvidenceSchema, negbinNutsEvidenceSchema, panelInterventionEvidenceSchema, syntheticControlEvidenceSchema, tLearnerEvidenceSchema, crossFittedTLearnerEvidenceSchema, vecmEvidenceSchema } from '@/domain/estimation'
 import { parseDmlRefutationEvidence } from '@/domain/sensitivity'
+import {honestEvidenceSchema} from '@/domain/honestDid'
 import { dynamicCounterfactualUncertaintyMatches, dynamicLinearScmEvidenceSchema, linearScmEvidenceSchema } from '@/domain/counterfactual'
 import { parseLinearRefutationEvidence, parseSeriesStructureEvidence, parseUnobservedConfoundingEvidence } from '@/domain/sensitivity'
 import { parseStationarityBattery } from '@/domain/stationarity'
@@ -404,6 +405,7 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
       return { kind: 'ardlPss', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, maxLag: command.maxLag, trend: command.trend, case: command.case }
     case 'ardl-model':
       return { kind: 'ardlModel', rows: command.rows, columns: command.columns, model: command.model }
+    case 'honest-did': return {kind:'honestDid',model:command.model}
     case 'root-cause':
       return { kind: 'rootCause', request: command.model }
     case 'gcm-effects':
@@ -900,6 +902,11 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
         emit({ kind: 'ardl-model-succeeded', request: command.request, result: result.data.evidence })
         return
+      }
+      case 'honest-did': {
+        const envelope=z.object({kind:z.literal('honestDid'),evidence:honestEvidenceSchema}).strict().safeParse(decoded)
+        if(!envelope.success){fail(command.request,{kind:'worker-protocol-failed',detail:z.prettifyError(envelope.error)});return}
+        emit({kind:'honest-did-succeeded',request:command.request,result:envelope.data.evidence});return
       }
       case 'root-cause': {
         const result = rootCauseResponseSchema.safeParse(decoded)

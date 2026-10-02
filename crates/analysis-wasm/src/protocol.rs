@@ -1025,6 +1025,7 @@ pub(crate) enum AnalysisCommand {
     GcmInfluence { request: crate::gcm_influence::Request },
     RootCauseChecks { request: crate::root_cause_checks::Request },
     ArdlModel { rows: usize, columns: usize, model: crate::ardl_model::Request },
+    HonestDid { model: crate::honest_did::Request },
     StationarityBattery,
     Multicollinearity {
         rows: usize,
@@ -2651,6 +2652,7 @@ pub(crate) enum AnalysisResult {
     GcmInfluence { evidence: crate::gcm_influence::Evidence },
     RootCauseChecks { evidence: crate::root_cause_checks::Evidence },
     ArdlModel { evidence: crate::ardl_model::Evidence },
+    HonestDid { evidence: crate::honest_did::Evidence },
     DiscreteStateRefused {
         query: DiscreteStateQuery,
         node: usize,

@@ -7,7 +7,7 @@ use hirmos_causal_core::ardl::{
     multivariate::{
         fit_levels, fit_uecm,
         search::{Criterion, Search},
-        Error, Input, Specification, Term,
+        Error, Input, Specification, Term, OmittedChange, RestrictedEcmSpecification, fit_restricted_levels,
     },
     Trend,
 };
@@ -53,6 +53,11 @@ pub(crate) enum Orders {
         outcome_lag: usize,
         predictor_lags: Vec<usize>,
     },
+    RRestricted {
+        outcome_lag: usize,
+        predictor_lags: Vec<usize>,
+        omitted: Vec<Change>,
+    },
     RHorizontal {
         maximum: Vec<usize>,
         fixed: Vec<Option<usize>>,
@@ -80,6 +85,18 @@ pub(crate) enum Future {
         fixed: Vec<Vec<f64>>,
         confidence: f64,
     },
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(tag="kind",rename_all="camelCase",deny_unknown_fields)]
+pub(crate) enum Change { Outcome { lag:usize }, Predictor { column:usize, lag:usize } }
+impl Change {
+    fn numerical(&self)->OmittedChange { match *self { Self::Outcome{lag}=>OmittedChange::Outcome{lag},Self::Predictor{column,lag}=>OmittedChange::Predictor{column,lag} } }
+}
+fn ecm(input:&Input<'_>,spec:&Specification,omitted:&[OmittedChange])->Result<hirmos_causal_core::ardl::Uecm,Error>{
+    if omitted.is_empty(){hirmos_causal_core::ardl::multivariate::fit_r_uecm(input,spec)}else{
+        hirmos_causal_core::ardl::multivariate::fit_restricted_r_uecm(input,&RestrictedEcmSpecification::new(spec.clone(),omitted.to_vec())?)
+    }
 }
 
 #[derive(Deserialize, Serialize)]
@@ -135,6 +152,30 @@ pub(crate) enum LongRun {
         intervals: Vec<(f64, f64)>,
         bounds_statistic: f64,
     },
+    RCalibrated {
+        departures: Vec<f64>,
+        normalized: Vec<f64>,
+        intervals: Vec<(f64,f64)>,
+        bounds_statistic: f64,
+        f_bounds: Vec<CriticalBounds>,
+        f_p_value: f64,
+        t_bounds: TBounds,
+    },
+}
+#[derive(Serialize)]
+pub(crate) struct CriticalBounds {alpha:f64,i0:f64,i1:f64}
+#[derive(Serialize)]
+#[serde(tag="kind",rename_all="camelCase",rename_all_fields="camelCase")]
+pub(crate) enum TBounds {
+    NotApplicable,
+    Recorded {statistic:f64,critical:Vec<CriticalBounds>,p_value:f64},
+}
+fn calibrated_rows(statistic:hirmos_causal_core::ardl::bounds_calibration::Statistic,k:usize,case:usize)->Result<(Vec<CriticalBounds>,f64),String>{
+    use hirmos_causal_core::ardl::bounds_calibration::{calibrate,LEVELS};
+    let rows=LEVELS.iter().map(|alpha|calibrate(statistic,k,case,*alpha)).collect::<Result<Vec<_>,_>>()
+        .map_err(|e|format!("The selected bounds calibration is unavailable: {e:?}."))?;
+    let p_value=rows[0].p_value;
+    Ok((rows.into_iter().map(|r|CriticalBounds{alpha:r.alpha,i0:r.i0,i1:r.i1}).collect(),p_value))
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -225,6 +266,7 @@ fn problem(error: Error) -> String {
     match error {
     Error::InsufficientRows=>"The selected lags leave too few observations to fit this model.",
     Error::HoldBackTooShort=>"The sample must start after every included lag.",
+    Error::InvalidEcmRestriction=>"Choose distinct short-run change terms included in the specified model.",
     Error::SearchLimit=>"This lag search exceeds 10,000 candidate models. Reduce the maximum lags or specify the orders.",
     Error::RowMismatch|Error::OrderMismatch=>"The supplied columns or future scenario do not match the model.",
     Error::InvalidConfidence=>"Choose a confidence level strictly between zero and one.",
@@ -244,6 +286,7 @@ fn long_run(
     x: &[Vec<f64>],
     case: usize,
     r: bool,
+    omitted: &[OmittedChange],
 ) -> Result<LongRun, String> {
     let active: Vec<&[f64]> = x
         .iter()
@@ -264,7 +307,7 @@ fn long_run(
         return Ok(LongRun::Unavailable { reason });
     }
     let fit = if r {
-        hirmos_causal_core::ardl::multivariate::fit_r_uecm(input, spec)
+        ecm(input, spec, omitted)
     } else {
         fit_uecm(input, spec)
     }
@@ -287,6 +330,17 @@ fn long_run(
             return Ok(LongRun::Unavailable {
                 reason: LongRunReason::UndefinedNormalization,
             });
+        }
+        if active.len()<=10 {
+            use hirmos_causal_core::ardl::bounds_calibration::Statistic;
+            let (f_bounds,f_p_value)=calibrated_rows(Statistic::F(statistic),active.len(),case)?;
+            let t_bounds=if [1,3,5].contains(&case){
+                let value=fit.fit.params[fit.n_det]/fit.fit.cov_params[(fit.n_det,fit.n_det)].sqrt();
+                let (critical,p_value)=calibrated_rows(Statistic::T(value),active.len(),case)?;
+                TBounds::Recorded{statistic:value,critical,p_value}
+            }else{TBounds::NotApplicable};
+            return Ok(LongRun::RCalibrated{departures,normalized:vector.params,intervals:vector.conf_int,
+                bounds_statistic:statistic,f_bounds,f_p_value,t_bounds});
         }
         return Ok(LongRun::Uncalibrated {
             departures,
@@ -358,7 +412,7 @@ pub(crate) fn fit(
         Orders::RFixed {
             outcome_lag,
             predictor_lags,
-        } => *outcome_lag > 0 && *outcome_lag <= 24 && predictor_lags.iter().all(|q| *q <= 24),
+        } | Orders::RRestricted { outcome_lag, predictor_lags, .. } => *outcome_lag > 0 && *outcome_lag <= 24 && predictor_lags.iter().all(|q| *q <= 24),
         Orders::RHorizontal {
             maximum,
             fixed,
@@ -390,8 +444,9 @@ pub(crate) fn fit(
     }
     let is_r = matches!(
         request.orders,
-        Orders::RFixed { .. } | Orders::RHorizontal { .. } | Orders::RGrid { .. }
+        Orders::RFixed { .. } | Orders::RRestricted { .. } | Orders::RHorizontal { .. } | Orders::RGrid { .. }
     );
+    let omitted=match &request.orders{Orders::RRestricted{omitted,..}=>omitted.iter().map(Change::numerical).collect::<Vec<_>>(),_=>vec![]};
     let (spec, ranking) = match request.orders {
         Orders::Fixed {
             outcome_lag,
@@ -421,7 +476,7 @@ pub(crate) fn fit(
         ),
         orders => r_analysis::select(orders, &input, trend, request.hold_back)?,
     };
-    let fitted = fit_levels(&input, &spec).map_err(problem)?;
+    let fitted = if omitted.is_empty(){fit_levels(&input, &spec)}else{fit_restricted_levels(&input,&RestrictedEcmSpecification::new(spec.clone(),omitted.clone()).map_err(problem)?)}.map_err(problem)?;
     let coefficient = |term: &Term| match *term {
         Term::Constant => Coefficient::Constant,
         Term::Trend => Coefficient::Trend,
@@ -504,13 +559,13 @@ pub(crate) fn fit(
         covariance: (0..regression.cov_params.nrows())
             .map(|r| regression.cov_params.row(r).iter().copied().collect())
             .collect(),
-        long_run: long_run(&input, &spec, &y, &x, case, is_r)?,
+        long_run: long_run(&input, &spec, &y, &x, case, is_r, &omitted)?,
         observed: y.clone(),
         fitted: fitted.fitted,
         multipliers: curves,
         forecast,
         r_analysis: if is_r {
-            r_analysis::fit(&input, &spec, case, ranking, coefficient)?
+            r_analysis::fit(&input, &spec, case, ranking, coefficient, &omitted)?
         } else {
             r_analysis::Evidence::NotRequested
         },

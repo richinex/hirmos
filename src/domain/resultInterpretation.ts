@@ -743,6 +743,10 @@ export function interpretCounterfactualResult(run: CounterfactualRunArtifact, st
 /** Sensitivity procedures answer different questions; none is a second identification analysis. */
 export function interpretSensitivityResult(run: SensitivityRunArtifact): ResultInterpretation {
   switch (run.kind) {
+    case 'honest-did-run':return {kind:'result-interpretation',statements:[
+      {kind:'qualification',text:'These confidence sets allow violations of parallel trends within the recorded restriction. They account for estimation error in both the pre-treatment and post-treatment estimates.'},
+      {kind:'qualification',text:'Failure to reject pre-treatment differences does not establish parallel trends. The restriction is a substantive assumption, not a result of the pre-trend test.'},
+    ]}
     case 'linear-refutation-run': {
       const placeboDistance = Math.abs(run.evidence.placeboEffect)
       const subsetMovement = Math.abs(run.evidence.subsetEffect - run.evidence.estimate)

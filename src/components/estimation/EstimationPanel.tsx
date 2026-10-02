@@ -2618,7 +2618,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
       </ul>
     </>
   )
-  const dependentProbes = pendingDelete === null ? 0 : sensitivityRuns.filter((probe) => probe.estimationRun === pendingDelete.id).length
+  const dependentProbes = pendingDelete === null ? 0 : sensitivityRuns.filter((probe) => probe.kind==='honest-did-run'?probe.source.kind==='estimation'&&probe.source.run===pendingDelete.id:probe.estimationRun === pendingDelete.id).length
 
   const deleteDialog = (
     <ConfirmDialog

@@ -1,6 +1,7 @@
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { useMemo, useState } from 'react'
 import { TimeSeriesRunResult } from '@/components/time-series/TimeSeriesRunResult'
+import {HonestDidResult} from '@/components/sensitivity/HonestDidPanel'
 import { CountSeriesRecord } from '@/components/time-series/CountSeriesCard'
 import { isRegressionDesignRun, type TimeSeriesRun } from '@/domain/timeSeries'
 import type { CountSeriesModelArtifact } from '@/domain/countSeries'
@@ -180,7 +181,7 @@ function Manifest({ manifest, stepLabel }: { readonly manifest: ResultManifest; 
       </Section>
 
       <Section title="Sensitivity and counterfactuals">
-        <Row term="Sensitivity">{manifest.sensitivity.length === 0 ? 'none recorded' : manifest.sensitivity.map((probe) => probe.kind === 'linear-refutation-run' ? `movement-only perturbations, no refuter p-values (placebo ${formatStatistic('raw', probe.evidence.placeboEffect).text}; subset ${formatStatistic('raw', probe.evidence.subsetEffect).text})` : probe.kind === 'dml-refutation-run' ? `DML mean-shift tests (placebo p ${formatP(probe.evidence.placebo.pValue, { withLabel: false }).text}; random covariate p ${formatP(probe.evidence.randomCommonCause.pValue, { withLabel: false }).text})` : `simulated-confounder movement grid ${probe.evidence.kappaT.length}×${probe.evidence.kappaY.length}, no p-value`).join('; ')}</Row>
+        <Row term="Sensitivity">{manifest.sensitivity.length === 0 ? 'none recorded' : manifest.sensitivity.map((probe) => probe.kind === 'honest-did-run' ? `parallel-trends sensitivity, ${probe.evidence.request.configuration.bounds.length} restriction bounds` : probe.kind === 'linear-refutation-run' ? `movement-only perturbations, no refuter p-values (placebo ${formatStatistic('raw', probe.evidence.placeboEffect).text}; subset ${formatStatistic('raw', probe.evidence.subsetEffect).text})` : probe.kind === 'dml-refutation-run' ? `DML mean-shift tests (placebo p ${formatP(probe.evidence.placebo.pValue, { withLabel: false }).text}; random covariate p ${formatP(probe.evidence.randomCommonCause.pValue, { withLabel: false }).text})` : `simulated-confounder movement grid ${probe.evidence.kappaT.length}×${probe.evidence.kappaY.length}, no p-value`).join('; ')}</Row>
         <Row term="Counterfactuals">{manifest.counterfactuals.length === 0 ? 'none recorded' : manifest.counterfactuals.map((counterfactual) => `model-implied ${counterfactual.evidence.interventions[0]} → ${counterfactual.evidence.interventions[1]} contrast: ${formatStatistic('raw', counterfactual.evidence.averageEffect).text}`).join('; ')}</Row>
       </Section>
       </div>
@@ -296,7 +297,7 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
         {[...gcmInfluences].reverse().map(run => <GcmInfluenceResult key={run.id} run={run} />)}
       </div>
       case 'time-series': return <><div className="space-y-4">{[...temporalRuns].reverse().map((run) => <TimeSeriesRunResult key={run.id} run={run} />)}</div><ul className="list-none space-y-4 p-0">{[...countSeriesModels].reverse().map((artifact) => <CountSeriesRecord key={artifact.id} artifact={artifact} open />)}</ul></>
-      case 'regression-designs': return <div className="space-y-4">{[...designRuns].reverse().map(run => <TimeSeriesRunResult key={run.id} run={run}/>)}</div>
+      case 'regression-designs': return <div className="space-y-4">{[...designRuns].reverse().map(run => <div key={run.id} className="space-y-4"><TimeSeriesRunResult run={run}/>{sensitivityRuns.map(probe=>probe.kind==='honest-did-run'&&probe.source.kind==='regressionDesign'&&probe.source.run===run.id?<HonestDidResult key={probe.id} run={probe}/>:null)}</div>)}</div>
       case 'estimation': {
         const run = estimationRuns.find((candidate) => candidate.id === activeView.selected) ?? null
         const other = estimationRuns.find((candidate) => candidate.id === activeView.compareWith) ?? null
@@ -310,6 +311,7 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
           </div>
           {otherManifest !== null && manifest !== null && <section className={panel('p-(--panel-space)')} aria-label="Differences"><h3 className="mb-2 mt-0 text-faint text-label font-medium"><Metadata><span>Differences</span><span>{differences.length}</span></Metadata></h3>{differences.length === 0 ? <p className="m-0 text-body text-muted">The two runs share every recorded field.</p> : <div className="figure-strip overflow-x-auto"><table className={table}><thead><tr><th className={th()}>Field</th><th className={th()}>Selected</th><th className={th()}>Compared</th></tr></thead><tbody>{differences.map((difference) => <tr key={difference.field} className={tr()}><td className={td('text-ink')}>{difference.field}</td><td className={td('whitespace-normal text-muted')}>{difference.left}</td><td className={td('whitespace-normal text-muted')}>{difference.right}</td></tr>)}</tbody></table></div>}</section>}
           {manifest !== null && <Manifest manifest={manifest} stepLabel={stepLabel} />}
+          {manifest?.sensitivity.map(probe=>probe.kind==='honest-did-run'?<HonestDidResult key={probe.id} run={probe}/>:null)}
         </>
       }
       case 'survival': {

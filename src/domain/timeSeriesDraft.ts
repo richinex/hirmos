@@ -22,6 +22,7 @@ export interface ArdlDraft {
   readonly terms: ArdlTerms
   readonly horizon: string
   readonly future: Future
+  readonly omitted: readonly {readonly column:ColumnId;readonly lag:number}[]
 }
 export interface LongRunDraft {
   readonly selected: readonly ColumnId[]
@@ -111,7 +112,7 @@ export function retainTimeSeriesDraft(current: TimeSeriesDraft | null, workflow:
     cohortRegression: {...initialCountRegression(true),model:{kind:'events',onset:null,cohort:'',window:{kind:'all'}}},
     // The selection follows the restored linear draft, so a project last left on Bacon reopens on Bacon.
     regressionDesign: designOfLinearModel(panelRegression.model),
-    ardl: { outcome: null, roles: {}, mode: 'search', starting: {}, fixedOrders: {}, minimum: '1', outcomeLag: '2', holdBack: '', terms: 'constant', horizon: '12', future: { kind: 'none' } },
+    ardl: { outcome: null, roles: {}, mode: 'search', starting: {}, fixedOrders: {}, minimum: '1', outcomeLag: '2', holdBack: '', terms: 'constant', horizon: '12', future: { kind: 'none' }, omitted:[] },
     longRun: { ardl: longRunDraft('ardl', workflow.timeSeriesRuns), vecm: longRunDraft('vecm', workflow.timeSeriesRuns) },
     count: { outcome: null, link: 'identity', pastObservationLags: [1], pastMeanLags: [1], candidateStart: Math.max(1, Math.floor(prepared.observations * 0.2)), candidateEnd: Math.max(1, Math.floor(prepared.observations * 0.8)), delta: 1 },
     interrupted: { outcome: null, model: { kind: 'continuous', errors: { kind: 'neweyWest', maxLags: '' } }, interventionRow: '', lag: '0', impact: { kind: 'level' }, harmonicPairs: '2' },

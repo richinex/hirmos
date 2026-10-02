@@ -13,6 +13,7 @@ pub enum Error {
     NonFinite,
     OrderMismatch,
     InvalidEcmOrder,
+    InvalidEcmRestriction,
     HoldBackTooShort,
     InsufficientRows,
     InvalidHorizon,
@@ -137,6 +138,75 @@ pub enum Term {
     OutcomeChange { lag: usize },
     PredictorChange { column: usize, lag: usize },
     Fixed { column: usize },
+}
+
+/// Only short-run change terms may be omitted. Level terms stay in the bounds test.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum OmittedChange {
+    Outcome { lag: usize },
+    Predictor { column: usize, lag: usize },
+}
+
+pub struct RestrictedEcmSpecification {
+    base: Specification,
+    omitted: Vec<OmittedChange>,
+}
+
+impl RestrictedEcmSpecification {
+    pub fn new(base: Specification, omitted: Vec<OmittedChange>) -> Result<Self, Error> {
+        if base.outcome_lag == 0 {
+            return Err(Error::InvalidEcmOrder);
+        }
+        for (index, change) in omitted.iter().enumerate() {
+            let valid = match *change {
+                OmittedChange::Outcome { lag } => lag > 0 && lag < base.outcome_lag,
+                OmittedChange::Predictor { column, lag } => base.predictor_lags.get(column)
+                    .and_then(|order| *order).is_some_and(|order| lag < order),
+            };
+            if !valid || omitted[..index].contains(change) {
+                return Err(Error::InvalidEcmRestriction);
+            }
+        }
+        Ok(Self { base, omitted })
+    }
+}
+
+pub fn fit_restricted_r_uecm(input: &Input<'_>, specification: &RestrictedEcmSpecification) -> Result<Uecm, Error> {
+    fit_ecm(input, &specification.base, EcmConvention::RArdl, &specification.omitted)
+}
+
+/// Express the restricted difference equation in levels without refitting an unrestricted model.
+/// The affine coefficient map carries the restricted covariance and residual degrees of freedom.
+pub fn fit_restricted_levels<'a>(input: &Input<'a>, specification: &RestrictedEcmSpecification) -> Result<LevelsFit<'a>, Error> {
+    let model = fit_restricted_r_uecm(input, specification)?;
+    let base = &specification.base;
+    let start = base.sample_start(input, true)?;
+    let mut terms = deterministic(base.trend);
+    terms.extend((1..=base.outcome_lag).map(|lag| Term::Outcome { lag }));
+    for (column, order) in base.predictor_lags.iter().enumerate() {
+        if let Some(order) = order { terms.extend((0..=*order).map(|lag| Term::Predictor { column, lag })); }
+    }
+    terms.extend((0..input.fixed.len()).map(|column| Term::Fixed { column }));
+    let mut map = DMatrix::zeros(terms.len(), model.terms.len());
+    for (j, term) in model.terms.iter().enumerate() {
+        let contributions = match *term {
+            Term::OutcomeChange { lag } => vec![(Term::Outcome { lag }, 1.0), (Term::Outcome { lag: lag+1 }, -1.0)],
+            Term::PredictorChange { column, lag } => vec![(Term::Predictor { column, lag }, 1.0), (Term::Predictor { column, lag: lag+1 }, -1.0)],
+            _ => vec![(term.clone(), 1.0)],
+        };
+        for (level, weight) in contributions {
+            let row = terms.iter().position(|t| *t == level).ok_or(Error::InvalidEcmRestriction)?;
+            map[(row,j)] += weight;
+        }
+    }
+    let mut params = &map * &model.fit.params;
+    let outcome = terms.iter().position(|term| *term == (Term::Outcome { lag: 1 })).ok_or(Error::InvalidEcmOrder)?;
+    params[outcome] += 1.0;
+    let cov_params = &map * &model.fit.cov_params * map.transpose();
+    let x = design(input, &terms, start)?;
+    let fitted = (&x * &params).iter().copied().collect();
+    let fit = Ols { params, cov_params, resid: model.fit.resid, nobs: model.fit.nobs, df_model: model.fit.df_model };
+    Ok(LevelsFit { fit, terms, start_row: start, fitted, input: *input, reported_nobs: model.reported_nobs })
 }
 
 fn deterministic(trend: Trend) -> Vec<Term> {
@@ -317,7 +387,7 @@ impl LevelsFit<'_> {
 
 /// Fit the source UECM without dropping fixed regressors or changing its sample.
 pub fn fit_uecm(input: &Input<'_>, specification: &Specification) -> Result<Uecm, Error> {
-    fit_ecm(input, specification, EcmConvention::Statsmodels)
+    fit_ecm(input, specification, EcmConvention::Statsmodels, &[])
 }
 
 /// R ARDL's conditional UECM: zero-order predictors enter at the current time,
@@ -326,7 +396,7 @@ pub fn fit_r_uecm(input: &Input<'_>, specification: &Specification) -> Result<Ue
     if specification.outcome_lag == 0 {
         return Err(Error::InvalidEcmOrder);
     }
-    fit_ecm(input, specification, EcmConvention::RArdl)
+    fit_ecm(input, specification, EcmConvention::RArdl, &[])
 }
 
 #[derive(Clone, Copy)]
@@ -339,6 +409,7 @@ fn fit_ecm(
     input: &Input<'_>,
     specification: &Specification,
     convention: EcmConvention,
+    omitted: &[OmittedChange],
 ) -> Result<Uecm, Error> {
     let orders: Vec<_> = specification
         .predictor_lags
@@ -366,6 +437,11 @@ fn fit_ecm(
         }));
     }
     terms.extend((0..input.fixed.len()).map(|column| Term::Fixed { column }));
+    terms.retain(|term| match *term {
+        Term::OutcomeChange { lag } => !omitted.contains(&OmittedChange::Outcome { lag }),
+        Term::PredictorChange { column, lag } => !omitted.contains(&OmittedChange::Predictor { column, lag }),
+        _ => true,
+    });
     let x = design(input, &terms, start)?;
     let y = DVector::from_iterator(
         input.outcome.len() - start,

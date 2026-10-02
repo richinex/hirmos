@@ -15,6 +15,8 @@ import type { CountSeriesModelArtifact } from './countSeries'
 import type { InterventionQueryArtifact } from './intervention'
 import type { EstimationRunArtifact, EstimationRunId } from './estimation'
 import type { SensitivityRunArtifact, SensitivityRunId } from './sensitivity'
+import {sensitivityEstimationRun} from './sensitivity'
+import {honestRunMatches} from './honestDid'
 import type { CounterfactualRunArtifact, CounterfactualRunId } from './counterfactual'
 import type { SurvivalRunArtifact, SurvivalRunId } from './survival'
 import { timeSeriesRunMatches, type TimeSeriesRun, type TimeSeriesRunId } from './timeSeries'
@@ -513,7 +515,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
       if (event.type === 'sensitivity-run-created'
         && state.prepared !== null
         && event.run.preparedDataset === state.prepared.id
-        && state.estimationRuns.some((run) => run.id === event.run.estimationRun)) {
+        && (event.run.kind==='honest-did-run'?honestRunMatches(event.run,state.estimationRuns,state.timeSeriesRuns):state.estimationRuns.some((run) => run.id === sensitivityEstimationRun(event.run)))) {
         return { ...state, sensitivityRuns: [...state.sensitivityRuns, event.run] }
       }
       if (event.type === 'counterfactual-run-created'
@@ -527,7 +529,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
         return {
           ...state,
           estimationRuns: state.estimationRuns.filter((run) => run.id !== event.run),
-          sensitivityRuns: state.sensitivityRuns.filter((run) => run.estimationRun !== event.run),
+          sensitivityRuns: state.sensitivityRuns.filter((run) => sensitivityEstimationRun(run) !== event.run),
         }
       }
       if (event.type === 'sensitivity-run-deleted') {
@@ -551,7 +553,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
         return { ...state, timeSeriesRuns: [...state.timeSeriesRuns, event.run] }
       }
       if (event.type === 'time-series-run-deleted') {
-        return { ...state, timeSeriesRuns: state.timeSeriesRuns.filter((run) => run.id !== event.run) }
+        return { ...state, timeSeriesRuns: state.timeSeriesRuns.filter((run) => run.id !== event.run),sensitivityRuns:state.sensitivityRuns.filter(run=>run.kind!=='honest-did-run'||run.source.kind!=='regressionDesign'||run.source.run!==event.run) }
       }
       if (event.type === 'count-series-model-deleted') {
         return { ...state, countSeriesModels: state.countSeriesModels.filter((run) => run.id !== event.run) }

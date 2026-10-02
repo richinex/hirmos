@@ -40,7 +40,7 @@ function ordersFor(mode: Mode, p: number, q: number[], starting: number[], fixed
 
 export function ArdlModelPanel(props: TimeSeriesPanelProps & {readonly selector: ReactNode}) {
   const columns = props.profile.columns.filter(c => props.prepared.columns.includes(c.id) && isNumericDuckDbType(c.duckdbType))
-  const { outcome, roles, mode, starting, fixedOrders, minimum, outcomeLag, holdBack, terms, horizon, future } = useTimeSeriesDraft(props.prepared.id, state => state.ardl)
+  const { outcome, roles, mode, starting, fixedOrders, minimum, outcomeLag, holdBack, terms, horizon, future, omitted } = useTimeSeriesDraft(props.prepared.id, state => state.ardl)
   const change = useWorkflow(state => state.changeTimeSeries)
   const setOutcome = (value: ArdlDraft['outcome']) => change(props.prepared.id, { type: 'ardl', field: 'outcome', value })
   const setRoles = (value: ArdlDraft['roles']) => change(props.prepared.id, { type: 'ardl', field: 'roles', value })
@@ -61,8 +61,13 @@ export function ArdlModelPanel(props: TimeSeriesPanelProps & {readonly selector:
   const predictors = columns.filter(c => c.id !== outcome && roles[c.id]?.kind === 'predictor')
   const fixed = columns.filter(c => c.id !== outcome && roles[c.id]?.kind === 'fixed')
   const futureColumns = [...predictors, ...fixed]
+  const changes=[...(outcome===null?[]:Array.from({length:Math.max(0,Math.min(24,numeric(outcomeLag))-1)},(_,i)=>({column:outcome,lag:i+1,name:columns.find(c=>c.id===outcome)!.name}))),...predictors.flatMap(c=>{const role=roles[c.id];return Array.from({length:Math.max(0,Math.min(24,numeric(role?.kind==='predictor'?role.lag:'0')))},(_,lag)=>({column:c.id,lag,name:c.name}))})]
+  const selectedOmissions=omitted.filter(o=>changes.some(c=>c.column===o.column&&c.lag===o.lag))
+  const staleOmissions=mode==='rFixed'&&selectedOmissions.length!==omitted.length
+  const changeWorkflowOmission=(include:boolean,item:ArdlDraft['omitted'][number])=>change(props.prepared.id,{type:'ardl',field:'omitted',value:include?omitted.filter(o=>o.column!==item.column||o.lag!==item.lag):[...omitted,item]})
   const runs = props.runs.filter(run => run.kind === 'ardl' || run.kind === 'ardl-model')
   const fit = async () => {
+    if(staleOmissions)return
     const y = columns.find(c => c.id === outcome)
     if (y === undefined) return
     const current = session.start('analysis', 'Preparing ARDL')
@@ -70,7 +75,7 @@ export function ArdlModelPanel(props: TimeSeriesPanelProps & {readonly selector:
     const fail = (detail: string) => session.fail(current, detail)
     const orders = predictors.map(c => {const role = roles[c.id]; return role?.kind === 'predictor' ? numeric(role.lag) : NaN})
     const parsed = ardlModelRequestSchema.safeParse({outcome: 0, predictors: predictors.map((_,i) => i+1), fixed: fixed.map((_,i) => i+1+predictors.length), terms,
-      orders: ordersFor(mode, numeric(outcomeLag), orders, [y,...predictors].map(c=>numeric(starting[c.id]??'1')), [y,...predictors].map(c=>(fixedOrders[c.id]??'').trim()===''?null:numeric(fixedOrders[c.id]!)), numeric(minimum)),
+      orders: mode==='rFixed'&&selectedOmissions.length>0?{kind:'rRestricted',outcomeLag:numeric(outcomeLag),predictorLags:orders,omitted:selectedOmissions.map(change=>change.column===outcome?{kind:'outcome',lag:change.lag}:{kind:'predictor',column:predictors.findIndex(c=>c.id===change.column),lag:change.lag})}:ordersFor(mode, numeric(outcomeLag), orders, [y,...predictors].map(c=>numeric(starting[c.id]??'1')), [y,...predictors].map(c=>(fixedOrders[c.id]??'').trim()===''?null:numeric(fixedOrders[c.id]!)), numeric(minimum)),
       holdBack: holdBack.trim() === '' ? null : numeric(holdBack), multiplierHorizon: numeric(horizon),
       future: future.kind === 'none' ? future : {kind: 'scenario', confidence: 0.95, predictors: predictors.map(c => futureValues(future.columns[c.id] ?? '')), fixed: fixed.map(c => futureValues(future.columns[c.id] ?? ''))}})
     if (!parsed.success) {fail(z.prettifyError(parsed.error)); return}
@@ -119,6 +124,7 @@ export function ArdlModelPanel(props: TimeSeriesPanelProps & {readonly selector:
             </section>}
           </SettingsStep>
           <SettingsStep number={3} title="Set the sample and multipliers">
+            {mode==='rFixed'&&changes.length>0&&<fieldset className="m-0 min-w-0 border-0 p-0"><legend className={fieldLabel}>Short-run change terms</legend><p className={fieldHint}>All change terms are included by default. Clear a term to refit the restricted error-correction model on the same sample. Level terms remain included in the bounds tests.</p><div className="grid gap-2 @md/panel:grid-cols-2">{changes.map(change=><label key={`${change.column}-${change.lag}`} className="flex items-center gap-2 text-body text-ink"><input type="checkbox" checked={!selectedOmissions.some(o=>o.column===change.column&&o.lag===change.lag)} onChange={event=>changeWorkflowOmission(event.target.checked,change)} />Change in {change.name}, lag {change.lag}</label>)}</div></fieldset>}
             <div className={fieldRow.two}><label><span className={fieldLabel}>Initial observations to exclude</span><input className={field('text','mt-1')} type="number" min={0} placeholder="Use the largest lag" value={holdBack} onChange={e=>setHoldBack(e.target.value)} /></label><label><span className={fieldLabel}>Multiplier horizon</span><input className={field('text','mt-1')} type="number" min={0} max={200} value={horizon} onChange={e=>setHorizon(e.target.value)} /></label></div>
           </SettingsStep>
           <SettingsStep number={4} title="Forecast">
@@ -126,6 +132,6 @@ export function ArdlModelPanel(props: TimeSeriesPanelProps & {readonly selector:
             {future.kind==='scenario'&&<div className={settingsStack}><p className={cn(fieldHint, 'm-0 max-w-[65ch]')}>Enter one value per future period, separated by spaces or commas. Supply the same number of periods for every included column. No future values are filled in automatically.</p>{futureColumns.map(c=><label key={c.id} className="block"><span className={fieldLabel}>Future {c.name}</span><textarea className={field('text','mt-1')} rows={2} value={future.columns[c.id]??''} onChange={e=>setFuture({kind:'scenario',columns:{...future.columns,[c.id]:e.target.value}})} /></label>)}</div>}
           </SettingsStep>
         </div>
-      </fieldset><RunActions className={actionGap} running={job.kind==='running'} onCancel={session.cancel} orbLabel="ARDL running"><button className={button('signal')} disabled={session.blocked||outcome===null||predictors.length===0} aria-busy={job.kind==='running'} onClick={job.kind==='running'?undefined:()=>void fit()}>Fit ARDL</button></RunActions>
+      </fieldset>{staleOmissions&&<p className={fieldHint}>Some omitted change terms no longer belong to the selected lag orders. Restore those orders or <button type="button" className={button('quiet')} onClick={()=>change(props.prepared.id,{type:'ardl',field:'omitted',value:selectedOmissions})}>Clear unavailable omissions</button> before fitting.</p>}<RunActions className={actionGap} running={job.kind==='running'} onCancel={session.cancel} orbLabel="ARDL running"><button className={button('signal')} disabled={session.blocked||outcome===null||predictors.length===0||staleOmissions} aria-busy={job.kind==='running'} onClick={job.kind==='running'?undefined:()=>void fit()}>Fit ARDL</button></RunActions>
       <JobNotice job={job} /></section>{runs.slice(-1).map(run=><TimeSeriesRunResult key={run.id} run={run} />)}</section>} />
 }

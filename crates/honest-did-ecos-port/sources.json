@@ -1,0 +1,98 @@
+{
+  "package": "ECOSolveR",
+  "version": "0.6.1",
+  "ecos": "2.0.7",
+  "adaptations": [
+    "disable printing, profiling and signal handling",
+    "SOC-only build without exponential cones",
+    "retain 64-bit indices on native and WASM",
+    "Rust-owned allocation and scalar sqrt/abs",
+    "double NaN classification instead of Darwin long-double shim"
+  ],
+  "files": [
+    {
+      "file": "src/ecos.c",
+      "sha256": "46843c29e8f7a6641349ca061d7393df1dd9f9540336e1356ec4221828a92b60"
+    },
+    {
+      "file": "src/kkt.c",
+      "sha256": "dcbbcd47d7637bc9d564c9fa5bab075e56bc683b3847a896a59a10be3b51901f"
+    },
+    {
+      "file": "src/cone.c",
+      "sha256": "d0104b96e234fdf0f889f558a102378cebf90478beee2dfb68156a87d3639560"
+    },
+    {
+      "file": "src/spla.c",
+      "sha256": "1204a717875b7ec17d8867c18efca28b16927dfed769e362e6811db5a6f301b4"
+    },
+    {
+      "file": "src/preproc.c",
+      "sha256": "1157a1aaad1bf459ab3b96049b775fb81531c2ecadf42afb7dca4e081031ca04"
+    },
+    {
+      "file": "src/splamm.c",
+      "sha256": "15d944db01931d9b4028287331f931c49eacab0da9c8a4864c2dfaf7dead08af"
+    },
+    {
+      "file": "src/equil.c",
+      "sha256": "84f219837f904383bdbb69872ca957ad699b0cca0f5adcf9974fc7ea101bbad4"
+    },
+    {
+      "file": "external/ldl/src/ldl.c",
+      "sha256": "07722ddd83e4b3316abf1f4a1dead209d8c0759a2d48e1839413413be62de749"
+    },
+    {
+      "file": "external/amd/src/amd_1.c",
+      "sha256": "42d0b4962d6dece4a2f7a3d0bf1ae0b05dd142f097bfd105720323b1108ab14d"
+    },
+    {
+      "file": "external/amd/src/amd_2.c",
+      "sha256": "b89b9f78ab267a286fe2cd2a51dc8770fa7bd3bf17ed2eab37a13fd9ddd29208"
+    },
+    {
+      "file": "external/amd/src/amd_aat.c",
+      "sha256": "e030fcd227392cc1437fcd6859dcb58eff37f4c889393c93d464be42d00f6470"
+    },
+    {
+      "file": "external/amd/src/amd_control.c",
+      "sha256": "3865f25772204caa769a9486d81680700b363ffffd4fca31e29a1808d32a141c"
+    },
+    {
+      "file": "external/amd/src/amd_defaults.c",
+      "sha256": "6010ee9cabe18a0437bacf4e0ff32b77d72cae9678dbca73cd31f27b1b1c522a"
+    },
+    {
+      "file": "external/amd/src/amd_dump.c",
+      "sha256": "85215ca792ebee328574302e585b111c7ea54ab9727888b897d7f37a3cdeb05c"
+    },
+    {
+      "file": "external/amd/src/amd_global.c",
+      "sha256": "471c32fd11400271b1eb99eb58d972b67d3f2b2c70562072920398b373f64b37"
+    },
+    {
+      "file": "external/amd/src/amd_info.c",
+      "sha256": "40779ac9ed17bc699678bc55e0e89539ad81e8245b607239a2b185ebad78fddb"
+    },
+    {
+      "file": "external/amd/src/amd_order.c",
+      "sha256": "10f80757b028d1392cd83b5f80cf70ec9c08138392dec057f08ced134b108f89"
+    },
+    {
+      "file": "external/amd/src/amd_post_tree.c",
+      "sha256": "f97d516d22e20ea6e81d3a1a4dfd04f8ad38a5e434657620a1b2ff89c34ebb87"
+    },
+    {
+      "file": "external/amd/src/amd_postorder.c",
+      "sha256": "49e2ec4776e8638a07c3504fcafac8b28cf4b6773d80ffe198f0976ce14e93d6"
+    },
+    {
+      "file": "external/amd/src/amd_preprocess.c",
+      "sha256": "e7022d7a1ff673e8d7e0c8325a916f1c8205653e9b1b8ecc79112c27bf44ff75"
+    },
+    {
+      "file": "external/amd/src/amd_valid.c",
+      "sha256": "45bb926b9fbdffd3bf6712d48be030c3fad160d58cf15b25fc63f4b8806a739c"
+    }
+  ]
+}

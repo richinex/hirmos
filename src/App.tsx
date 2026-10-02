@@ -474,6 +474,7 @@ function App() {
     && workflow.dagDocuments.some((document) => document.current.validation.structure.kind === 'sound')
   const identifiedStudy = workflow.kind === 'profiled'
     && workflow.identifications.some((identification) => identificationAllowsEstimation(identification.result.kind))
+  const hasSensitivitySource=workflow.kind==='profiled'&&workflow.prepared!==null&&(workflow.estimationRuns.length>0||workflow.timeSeriesRuns.some(run=>run.kind==='panel-regression'&&run.specification.specification.kind==='eventStudy'))
 
   const chapterIsAvailable = (chapter: ChapterId): boolean => {
     if (chapter === 'projects') return workflow.kind === 'awaiting-project'
@@ -485,7 +486,7 @@ function App() {
     if (chapter === 'dag') return workflow.kind === 'profiled' && workflow.prepared !== null
     if (chapter === 'study') return validatedDag
     if (chapter === 'estimation') return workflow.kind === 'profiled' && workflow.prepared !== null
-    if (chapter === 'sensitivity') return workflow.kind === 'profiled' && workflow.estimationRuns.length > 0
+    if (chapter === 'sensitivity') return hasSensitivitySource
     if (chapter === 'counterfactual') return workflow.kind === 'profiled' && workflow.estimationRuns.length > 0
     if (chapter === 'results') return workflow.kind === 'profiled' && (causalModelRunCount(workflow.rootCause) > 0 || workflow.estimationRuns.length > 0 || workflow.survivalRuns.length > 0 || workflow.timeSeriesRuns.length > 0 || workflow.countSeriesModels.length > 0)
     return false
@@ -513,7 +514,7 @@ function App() {
       case 'estimation': return !prepared || workflow.kind !== 'profiled'
         ? 'locked'
         : workflow.estimationRuns.length > 0 || workflow.timeSeriesRuns.some(isRegressionDesignRun) ? 'done' : 'not-started'
-      case 'sensitivity': return workflow.kind !== 'profiled' || workflow.estimationRuns.length === 0
+      case 'sensitivity': return !hasSensitivitySource
         ? 'locked'
         : workflow.sensitivityRuns.length > 0 ? 'done' : 'not-started'
       case 'counterfactual': return workflow.kind !== 'profiled' || workflow.estimationRuns.length === 0
@@ -1066,6 +1067,7 @@ function App() {
                     <Suspense fallback={<ChapterSkeleton label="Loading sensitivity…" />}>
                       <SensitivityPanel
                       onActivity={reportActivity.sensitivity}
+                        designRuns={workflow.timeSeriesRuns}
                         key={workflow.prepared.id}
                         source={workflow.source}
                         profile={workflow.profile}

@@ -55,6 +55,9 @@ import type { RunActivity } from '@/domain/activity'
 import { formatTime, formatTimestamp } from '@/lib/format/date'
 import { interpretSensitivityResult } from '@/domain/resultInterpretation'
 import { cn } from '@/lib/utils'
+import {HonestDidPanel} from './HonestDidPanel'
+import type {TimeSeriesRun} from '@/domain/timeSeries'
+import type {LegacySensitivityRunArtifact} from '@/domain/sensitivity'
 
 const PROBES: NonEmptyArray<SensitivityProbe> = ['linear-refutation', 'unobserved-confounding', 'dml-refutation']
 
@@ -251,14 +254,15 @@ function UnobservedCard({ run, estimation, study, current, onDelete }: { readonl
   )
 }
 
-export function SensitivityPanel({ source, profile, prepared, studies, estimationRuns, runs, onRun: recordRun, onDeleteRun, onActivity }: {
+function LegacySensitivityPanel({ source, profile, prepared, studies, estimationRuns, runs, onRun: recordRun, onDeleteRun, onActivity, selector }: {
   readonly onActivity?: (activity: RunActivity | null) => void
   readonly source: SelectedSource
   readonly profile: DatasetProfile
   readonly prepared: PreparedDatasetArtifact
   readonly studies: readonly StudySpecification[]
   readonly estimationRuns: readonly EstimationRunArtifact[]
-  readonly runs: readonly SensitivityRunArtifact[]
+  readonly runs: readonly LegacySensitivityRunArtifact[]
+  readonly selector: React.ReactNode
   readonly onRun: (run: SensitivityRunArtifact) => void
   readonly onDeleteRun: (run: SensitivityRunArtifact['id']) => void
 }) {
@@ -356,6 +360,7 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
       </div>
 
       <section className={panel('p-(--panel-space)')} aria-label="Sensitivity setup">
+        {selector}
         {estimationRuns.length === 0 ? (
           <Alert tone="info" live={false}><p className="m-0">Run an estimate before choosing a sensitivity probe.</p></Alert>
         ) : (
@@ -515,7 +520,7 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
   )
 }
 
-function RunRecord({ run }: { readonly run: SensitivityRunArtifact }) {
+function RunRecord({ run }: { readonly run: LegacySensitivityRunArtifact }) {
   if (run.kind === 'unobserved-confounding-run') { const { evidence } = run; return (<dl className="mb-0 mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-micro text-faint">
           <dt>Probe</dt><dd className={literal('m-0 break-all')}>{run.id}</dd>
           <dt>Estimation run</dt><dd className={literal('m-0 break-all')}>{run.estimationRun}</dd>
@@ -530,4 +535,10 @@ function RunRecord({ run }: { readonly run: SensitivityRunArtifact }) {
           <dt>Configuration</dt><dd className={literal('m-0 break-all')}>{JSON.stringify(run.configuration)}</dd>
           <dt>Created</dt><dd className={literal('m-0')}>{formatTimestamp(run.createdAt)}</dd>
         </dl>)
+}
+
+export function SensitivityPanel(props:Omit<React.ComponentProps<typeof LegacySensitivityPanel>,'runs'|'selector'>&{readonly runs:readonly SensitivityRunArtifact[];readonly designRuns:readonly TimeSeriesRun[]}){
+  const [track,setTrack]=useState<'estimation'|'parallelTrends'>(props.runs.at(-1)?.kind==='honest-did-run'||props.estimationRuns.length===0?'parallelTrends':'estimation')
+  const selector=<SegmentedControl variant="line" size="sm" ariaLabel="Sensitivity analysis" value={track} onChange={setTrack} options={[{value:'estimation',label:'Estimator probes'},{value:'parallelTrends',label:'Parallel trends'}]} />
+  return track==='parallelTrends'?<HonestDidPanel prepared={props.prepared} estimates={props.estimationRuns} designs={props.designRuns} runs={props.runs.filter(run=>run.kind==='honest-did-run')} onRun={props.onRun} onDelete={props.onDeleteRun} onActivity={props.onActivity} selector={selector} />:<LegacySensitivityPanel {...props} runs={props.runs.filter(run=>run.kind!=='honest-did-run')} selector={selector} />
 }
