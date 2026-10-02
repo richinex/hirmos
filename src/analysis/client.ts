@@ -773,6 +773,7 @@ export function runPropensityWeighting(
   rows: number,
   columns: number,
   design: {
+    readonly target?: 'ate' | 'att'
     readonly treatment: number
     readonly outcome: number
     readonly adjustment: readonly number[]
@@ -783,7 +784,7 @@ export function runPropensityWeighting(
   const request = newWorkerRequestId()
   return new Promise((resolve) => {
     pending.set(request, pendingRun('propensity-weighting-succeeded', resolve))
-    const command: AnalysisWorkerCommand = { kind: 'propensity-weighting', request, values, rows, columns, ...design }
+    const command: AnalysisWorkerCommand = { kind: 'propensity-weighting', request, values, rows, columns, target: design.target ?? 'ate', ...design }
     try {
       analysisWorker().postMessage(command, [values.buffer])
     } catch (cause: unknown) {
@@ -798,6 +799,7 @@ export function runPropensityMatching(
   rows: number,
   columns: number,
   design: {
+    readonly target?: 'ate' | 'att'
     readonly treatment: number
     readonly outcome: number
     readonly adjustment: readonly number[]
@@ -807,7 +809,7 @@ export function runPropensityMatching(
   const request = newWorkerRequestId()
   return new Promise((resolve) => {
     pending.set(request, pendingRun('propensity-matching-succeeded', resolve))
-    const command: AnalysisWorkerCommand = { kind: 'propensity-matching', request, values, rows, columns, ...design }
+    const command: AnalysisWorkerCommand = { kind: 'propensity-matching', request, values, rows, columns, target: design.target ?? 'ate', ...design }
     try {
       analysisWorker().postMessage(command, [values.buffer])
     } catch (cause: unknown) {
@@ -822,6 +824,7 @@ export function runDoublyRobust(
   rows: number,
   columns: number,
   design: {
+    readonly target?: 'ate' | 'att'
     readonly treatment: number
     readonly outcome: number
     readonly adjustment: readonly number[]
@@ -832,7 +835,7 @@ export function runDoublyRobust(
   const request = newWorkerRequestId()
   return new Promise((resolve) => {
     pending.set(request, pendingRun('doubly-robust-succeeded', resolve))
-    const command: AnalysisWorkerCommand = { kind: 'doubly-robust', request, values, rows, columns, ...design }
+    const command: AnalysisWorkerCommand = { kind: 'doubly-robust', request, values, rows, columns, target: design.target ?? 'ate', ...design }
     try {
       analysisWorker().postMessage(command, [values.buffer])
     } catch (cause: unknown) {
@@ -1241,6 +1244,14 @@ export function runSyntheticControl(values: Float64Array, rows: number, columns:
 export function runCountRegression(values:Float64Array, model:import('@/domain/countRegression').CountRegressionRequest):Promise<Result<import('@/domain/countRegression').CountRegressionEvidence,AnalysisWorkerProblem>> {
   const request=newWorkerRequestId()
   return post('count-regression-succeeded',{kind:'count-regression',request,values,model},values)
+}
+export function runSunAbraham(values:Float64Array,model:import('@/domain/remixExtensions').SunAbrahamRequest):Promise<Result<import('@/domain/remixExtensions').SunAbrahamEvidence,AnalysisWorkerProblem>> {
+  const request=newWorkerRequestId()
+  return post('sun-abraham-succeeded',{kind:'sun-abraham',request,values,model},values)
+}
+export function runRidgeAugmentedSynthetic(values:Float64Array,model:import('@/domain/remixExtensions').RidgeAugmentedRequest):Promise<Result<import('@/domain/remixExtensions').RidgeAugmentedEvidence,AnalysisWorkerProblem>> {
+  const request=newWorkerRequestId()
+  return post('ridge-augmented-synthetic-succeeded',{kind:'ridge-augmented-synthetic',request,values,model},values)
 }
 export function runPanelRegression(values:Float64Array,model:import('@/domain/panelRegression').PanelRegressionRequest):Promise<Result<import('@/domain/panelRegression').PanelRegressionEvidence,AnalysisWorkerProblem>> {
   const request=newWorkerRequestId()

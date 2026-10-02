@@ -1,4 +1,8 @@
 import { z } from 'zod'
+import { ridgeConfigurationSchema, ridgeMatches, type RidgeConfiguration } from './ridgeAugmented'
+import type { RidgeAugmentedEvidence } from './remixExtensions'
+import { sunAbrahamConfigurationSchema, sameSunAbraham, type SunAbrahamConfiguration } from './sunAbraham'
+import { sunAbrahamEvidenceSchema } from './remixExtensions'
 import { DEFAULT_BDEU_EQUIVALENT_SAMPLE_SIZE } from './discreteDefaults'
 import { CAUSAL_FOREST_METHOD_ID } from './methods'
 import { DEFAULT_CAUSAL_FOREST, causalForestConfigurationSchema, causalForestTarget, causalForestInputs, sameCausalForestTarget, type CausalForestConfiguration, type CausalForestEvidence } from './causalForest'
@@ -289,7 +293,7 @@ export interface VecmConfiguration {
 }
 
 import { defaultPredictorSyntheticConfiguration, predictorSyntheticRecordMatches, type PredictorSyntheticConfiguration, type PredictorSyntheticEvidence, type PredictorSyntheticCatalog } from './predictorSyntheticControl'
-export type SyntheticControlConfiguration = OutcomeHistorySyntheticConfiguration | PredictorSyntheticConfiguration
+export type SyntheticControlConfiguration = RidgeConfiguration | OutcomeHistorySyntheticConfiguration | PredictorSyntheticConfiguration
 export interface OutcomeHistorySyntheticConfiguration {
   readonly specification?: 'outcome-history'
   readonly kind: 'synthetic-control'
@@ -301,7 +305,7 @@ export interface OutcomeHistorySyntheticConfiguration {
 
 import { staggeredEvidenceSchema, staggeredConfigurationSchema, sameStaggeredSpecification, type StaggeredConfiguration } from './staggeredDid'
 
-export type PanelInterventionConfiguration = StaggeredConfiguration | {
+export type PanelInterventionConfiguration = SunAbrahamConfiguration | StaggeredConfiguration | {
   readonly kind: 'panel-intervention'
   readonly primary: 'adjusted'
   readonly covariates: readonly ColumnId[]
@@ -659,7 +663,7 @@ export const defaultConfiguration = (estimator: EstimatorId, prepared: PreparedD
     case 'negative-binomial-ingarch': return { kind: estimator, link: 'identity', pastObservationLags: [1], pastMeanLags: [1], horizon: 12, controlValue: 0, treatmentValue: 1, schedule: { kind: 'persistent' } }
     case 'propensity-weighting': return { kind: estimator, model: 'newton', maxIter: 1000, boosted: DEFAULT_BOOSTED_GRID, scale: 'inverseProbability', uncertainty: { kind: 'none' } }
     case 'propensity-matching': return { kind: estimator, model: 'newton', maxIter: 1000, boosted: DEFAULT_BOOSTED_GRID }
-    case 'doubly-robust': return { kind: estimator, model: 'lbfgsb', maxIter: 1000, uncertainty: { kind: 'none' } }
+    case 'doubly-robust': return { kind: estimator, model: 'newton', maxIter: 1000, uncertainty: { kind: 'none' } }
     case 'continuous-gps': return { kind: estimator, scale: 'stabilized', uncertainty: { kind: 'none' } }
     case 'dml-plr': return { kind: estimator, att: false, seed: 7 }
     case 'dml-irm': return { kind: estimator, att: study?.estimand.kind === 'average-treatment-effect-on-treated', seed: 7 }
@@ -788,6 +792,7 @@ export const treatmentModelStoppedEarly = (model: TreatmentModelEvidence): boole
 
 export const propensityWeightingEvidenceSchema = z.object({
   kind: z.literal('propensityWeighting'),
+  target: z.enum(['ate', 'att']),
   observations: z.number().int().positive(),
   treatmentModel: treatmentModelEvidenceSchema,
   treatedRows: z.number().int().positive(),
@@ -821,6 +826,7 @@ export type GridSliceEvidence = z.infer<typeof gridSliceEvidenceSchema>
 
 export const propensityMatchingEvidenceSchema = z.object({
   kind: z.literal('propensityMatching'),
+  target: z.enum(['ate', 'att']),
   observations: z.number().int().positive(),
   treatmentModel: treatmentModelEvidenceSchema,
   treatedRows: z.number().int().positive(),
@@ -834,6 +840,7 @@ export const propensityMatchingEvidenceSchema = z.object({
 
 export const doublyRobustEvidenceSchema = z.object({
   kind: z.literal('doublyRobust'),
+  target: z.enum(['ate', 'att']),
   observations: z.number().int().positive(),
   /** The treatment model's parameter count: the constant plus one per design column. */
   parameters: z.number().int().positive(),
@@ -1373,7 +1380,7 @@ const conventionalPanelEvidenceSchema = z.object({
   if (e.did.omega.length !== e.controlUnits || e.did.lambda.length !== e.nPre || e.did.effectCurve.length !== e.nPost) ctx.addIssue({ code: 'custom', message: 'DiD weights or period effects do not match the panel.' })
 })
 
-export const panelInterventionEvidenceSchema = z.union([syntheticPanelEvidenceSchema, conventionalPanelEvidenceSchema, adjustedDidEvidenceSchema, staggeredEvidenceSchema])
+export const panelInterventionEvidenceSchema = z.union([syntheticPanelEvidenceSchema, conventionalPanelEvidenceSchema, adjustedDidEvidenceSchema, staggeredEvidenceSchema, sunAbrahamEvidenceSchema])
 export type PanelInterventionEvidence = z.infer<typeof panelInterventionEvidenceSchema>
 
 export const negbinNutsEvidenceSchema = z.object({
@@ -2055,6 +2062,7 @@ interface RunIdentity {
 }
 
 export type EstimationRunArtifact =
+  | RunIdentity & {readonly kind:'ridge-augmented-synthetic-run';readonly method:typeof SYNTHETIC_CONTROL_METHOD_ID;readonly configuration:RidgeConfiguration;readonly evidence:RidgeAugmentedEvidence;readonly sourcePeriods:readonly {readonly code:number;readonly label:string}[]}
   | Omit<RunIdentity, 'columns'> & { readonly kind: 'predictor-synthetic-control-run'; readonly method: typeof SYNTHETIC_CONTROL_METHOD_ID; readonly configuration: PredictorSyntheticConfiguration; readonly evidence: PredictorSyntheticEvidence; readonly catalog: PredictorSyntheticCatalog; readonly columns: NonEmptyArray<Pick<StudyVariable, 'column' | 'name'>> }
   | RunIdentity & { readonly kind: 'causal-forest-run'; readonly method: typeof CAUSAL_FOREST_METHOD_ID; readonly configuration: CausalForestConfiguration; readonly evidence: CausalForestEvidence }
   | RunIdentity & { readonly kind: 'sharp-rd-run'; readonly method: typeof SHARP_RD_METHOD_ID; readonly configuration: SharpRdConfiguration; readonly evidence: SharpRdEvidence }
@@ -2103,6 +2111,7 @@ export interface EligibilityContext {
   /** The study whose variables the stationarity rules look up; null when the identification has no study loaded. */
   readonly study: StudySpecification | null
   /** Structural treatment-layout evidence loaded before a panel estimator can run. */
+  readonly sunAbrahamComparison?: { readonly ok: true; readonly value: null } | { readonly ok: false; readonly error: string }
   readonly panelPreflight: PanelInterventionPreflight
 }
 
@@ -2214,6 +2223,9 @@ const reported = (evidence: string): TargetVerdict => ({ kind: 'reported', evide
 const notReported = (evidence: string): TargetVerdict => ({ kind: 'not-reported', evidence })
 
 function targetCompatibility(estimand: Estimand, configuration: EstimatorConfiguration): TargetVerdict {
+  if (configuration.kind === 'synthetic-control' && configuration.specification === 'ridge-augmented') return estimand.kind==='average-treatment-effect-on-treated'&&estimand.scale==='additive'
+    ? reported('Ridge augmentation estimates the post-treatment gap for the selected treated unit.')
+    : notReported('Ridge-augmented synthetic control requires an additive ATT study for the treated unit.')
   if (configuration.kind === 'synthetic-control' && configuration.specification === 'predictors') return estimand.kind === 'average-treatment-effect-on-treated'
     ? reported('This comparison estimates the effect for the selected treated unit over the selected post-intervention periods.')
     : notReported('Predictor-based synthetic control targets the treated unit. Record an ATT study before running this comparison.')
@@ -2245,9 +2257,11 @@ function targetCompatibility(estimand: Estimand, configuration: EstimatorConfigu
       if (configuration.kind === 'dml-irm' && configuration.att) return notReported('The DML configuration reports ATT, but the study records ATE.')
       return reported('Estimator and study both target ATE.')
     case 'average-treatment-effect-on-treated':
+      if (configuration.kind === 'backdoor-linear-regression') return reported('The additive regression assumes one treatment contrast for every row. Under this common-effect model, the coefficient also represents ATT.')
+      if (configuration.kind === 'propensity-weighting' || configuration.kind === 'propensity-matching' || configuration.kind === 'doubly-robust') return reported('The propensity estimator averages the treatment contrast over treated rows.')
       if (configuration.kind === 'binary-ett-idc-star') return reported('Estimator and study both target ATT.')
       if (configuration.kind === 'dml-irm') return configuration.att ? reported('Estimator and study both target ATT.') : notReported('The DML configuration reports ATE, but the study records ATT.')
-      return notReported('This study targets ATT. DML interactive and the binary IDC* evaluator report ATT.')
+      return notReported('This specification does not report ATT. Choose an estimator that averages the treatment contrast over treated rows.')
     case 'conditional-average-treatment-effect':
       if (configuration.kind === 'dml-plr' || (configuration.kind === 'dml-irm' && !configuration.att)) {
         return reported('')
@@ -2376,7 +2390,7 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
       else if (configuration.errors.kind === 'hc1') satisfy('linear-serial-dependence', 'The prepared dataset contains independent rows. The interval permits error variance to differ between rows.')
       else satisfy('linear-serial-dependence', timeSeries ? 'Heteroskedasticity and autocorrelation consistent (HAC) Newey–West interval selected for time-series rows.' : 'The prepared dataset holds independent rows, so the classical interval applies.')
       satisfy('linear-hac-bandwidth', 'The run records the bandwidth from the default rule.')
-      leave('linear-functional-form', 'Check linearity with the residual diagnostics in the sensitivity section.')
+      leave('linear-functional-form', context.study?.estimand.kind === 'average-treatment-effect-on-treated' ? 'ATT uses the common treatment coefficient. This assumes an additive outcome model with no treatment interactions and the same treatment contrast for every row; inspect residual diagnostics and plausible effect modification.' : 'Check linearity with the residual diagnostics in the sensitivity section.')
       leave('linear-overlap', 'Inspect treatment overlap against the adjustment variables in Data studio.')
       if (timeSeries) leave('linear-not-time-graph', 'Lagged effects are not estimated by this method.')
       else satisfy('linear-not-time-graph', 'Independent observations carry no lag structure.')
@@ -2417,6 +2431,19 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
       break
     }
     case 'panel-intervention': {
+      if (configuration.primary === 'sunAbraham') {
+        if (prepared.kind !== 'prepared-panel') violate('panel-balanced-layout','Prepare a long panel with unit and period keys.')
+        else satisfy('panel-balanced-layout','Unit and period keys are recorded. Sun–Abraham can use an unbalanced panel.')
+        if (!sunAbrahamConfigurationSchema.safeParse(configuration).success) violate('panel-pre-fit','Choose a reference event period and confidence level.')
+        else if (context.sunAbrahamComparison === undefined) leave('panel-pre-fit','Reading adoption cohorts and reference support.')
+        else if (!context.sunAbrahamComparison.ok) violate('panel-pre-fit',context.sunAbrahamComparison.error)
+        else satisfy('panel-pre-fit','Absorbing adoption and the selected reference cohorts are supported by the prepared panel. The fit checks which interactions are estimable.')
+        leave('panel-parallel-trends','Interpretation requires parallel untreated trends for the adoption cohorts and their comparison units.')
+        leave('panel-no-anticipation','Assume no treatment effect before adoption.')
+        leave('panel-no-spillovers','Treatment of one unit must not affect another unit’s outcome.')
+        leave('panel-no-interval','Pointwise intervals use unit-clustered covariance. Units must be independent clusters.')
+        break
+      }
       if (configuration.primary === 'staggered') {
         if (prepared.kind !== 'prepared-panel' || !prepared.panel.balanced) violate('panel-balanced-layout', 'Staggered DiD requires a balanced long panel with unit and time keys.')
         else satisfy('panel-balanced-layout', 'A balanced panel is prepared. Each unit’s first treatment period is derived from its binary treatment indicator; treatment must remain on afterwards.')
@@ -2603,6 +2630,17 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
       break
     }
     case 'synthetic-control': {
+      if (configuration.specification === 'ridge-augmented') {
+        if(!panel)violate('synthetic-panel-layout','Prepare a long panel with unit and period keys.')
+        else if(configuration.treatedUnit===null||configuration.donorUnits.length<2||new Set(configuration.donorUnits).size!==configuration.donorUnits.length||configuration.donorUnits.includes(configuration.treatedUnit))violate('synthetic-panel-layout','Choose one treated unit and at least two distinct donors.')
+        else satisfy('synthetic-panel-layout','The selected treated unit and donors are checked on the same period grid before fitting.')
+        if(configuration.interventionPeriod===null||!ridgeConfigurationSchema.safeParse(configuration).success)violate('synthetic-pre-period','Choose an intervention period and valid regularization settings.')
+        else satisfy('synthetic-pre-period','The run checks pre-treatment support and held-out blocks before fitting.')
+        leave('synthetic-donors-untreated','Donors must remain untreated and must not be affected by the intervention or its spillovers.')
+        leave('synthetic-convex-hull','Inspect pre-treatment fit and augmented weights. Ridge augmentation can assign negative weights.')
+        leave('synthetic-no-interval',configuration.uncertainty.kind==='none'?'No uncertainty interval was requested.':'Jackknife intervals hold the initially selected lambda fixed during refits; these are not conformal intervals.')
+        break
+      }
       if (configuration.specification === 'predictors') {
         if (!panel) violate('synthetic-panel-layout', 'Prepare a long panel with unit and period keys.')
         else if (configuration.treatedUnit === null || configuration.donorUnits.length < 2 || new Set(configuration.donorUnits).size !== configuration.donorUnits.length || configuration.donorUnits.includes(configuration.treatedUnit)) violate('synthetic-panel-layout', 'Choose one treated unit and at least two distinct donor units.')
@@ -2671,12 +2709,12 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
         leave('ipw-treatment-model', `${modelDescription[configuration.model]} Declare categorical covariates before fitting.`)
       }
       if (configuration.kind === 'propensity-matching') {
-        leave('matching-single-neighbour', 'Every row is paired with one nearest neighbour on the score.')
-        leave('matching-average-not-treated', 'Pairs are averaged over every row, so this is the average effect rather than the effect on the treated.')
+        leave('matching-single-neighbour', context.study?.estimand.kind === 'average-treatment-effect-on-treated' ? 'Each treated row is paired with one nearest control neighbour on the score.' : 'Every row is paired with one nearest neighbour on the score.')
+        leave('matching-average-not-treated', context.study?.estimand.kind === 'average-treatment-effect-on-treated' ? 'Matched differences are averaged over treated rows, so the target is ATT.' : 'Matched differences are averaged over every row, so the target is ATE.')
       }
       if (configuration.kind === 'doubly-robust') {
-        leave('aipw-one-model-right', 'Consistency requires a correctly specified propensity model or correctly specified outcome regressions in both arms, together with the identification and regularity assumptions.')
-        leave('aipw-arm-regressions', 'The outcome model is a linear regression fitted within each arm on the same design.')
+        leave('aipw-one-model-right', context.study?.estimand.kind === 'average-treatment-effect-on-treated' ? 'Consistency requires a correctly specified propensity model or control-outcome regression, together with no unmeasured confounding and adequate control support for treated rows.' : 'Consistency requires a correctly specified propensity model or correctly specified outcome regressions in both arms, together with the identification and regularity assumptions.')
+        leave('aipw-arm-regressions', context.study?.estimand.kind === 'average-treatment-effect-on-treated' ? 'The outcome regression is fitted to control rows and evaluated at the covariate values of treated rows.' : 'The outcome model is a linear regression fitted within each arm on the same design.')
       }
       break
     }
@@ -2857,6 +2895,7 @@ export function causalEstimateFrom(
     | { readonly kind: 't-learner-run'; readonly configuration: TLearnerConfiguration; readonly evidence: TLearnerEvidence | CrossFittedTLearnerEvidence }
     | { readonly kind: 'ardl-run'; readonly configuration: ArdlConfiguration; readonly evidence: ArdlEvidence }
     | { readonly kind: 'vecm-run'; readonly configuration: VecmConfiguration; readonly evidence: VecmEvidence }
+    | {readonly kind:'ridge-augmented-synthetic-run';readonly configuration:RidgeConfiguration;readonly evidence:RidgeAugmentedEvidence}
     | { readonly kind: 'predictor-synthetic-control-run'; readonly configuration: PredictorSyntheticConfiguration; readonly evidence: PredictorSyntheticEvidence; readonly catalog: PredictorSyntheticCatalog; readonly columns: NonEmptyArray<Pick<StudyVariable, 'column' | 'name'>> }
     | { readonly kind: 'synthetic-control-run'; readonly configuration: OutcomeHistorySyntheticConfiguration; readonly evidence: SyntheticControlEvidence }
     | { readonly kind: 'panel-intervention-run'; readonly configuration: PanelInterventionConfiguration; readonly evidence: PanelInterventionEvidence }
@@ -2867,6 +2906,14 @@ export function causalEstimateFrom(
     | { readonly kind: 'causal-effects-run'; readonly configuration: CausalEffectsConfiguration; readonly evidence: CausalEffectsEvidence; readonly graphVariables: readonly (StudyVariable | null)[] }
     | { readonly kind: 'causal-impact-run'; readonly configuration: CausalImpactConfiguration; readonly evidence: CausalImpactEvidence },
 ): CausalEstimate | null {
+  if (run.kind === 'ridge-augmented-synthetic-run') {
+    if(study.estimand.kind!=='average-treatment-effect-on-treated'||study.estimand.scale!=='additive'||!ridgeMatches(run.configuration,run.evidence))return null
+    const e=run.evidence,b=e.bounds,u=e.request.uncertainty
+    if(b.kind==='jackknife'&&u.kind==='none')return null
+    return {kind:'causal-estimate',estimand:study.estimand,effect:{kind:'additive',value:e.average,unit:''},
+      interval:b.kind==='jackknife'&&u.kind!=='none'?{kind:'confidence',level:u.confidence,lower:b.averageLower,upper:b.averageUpper}:{kind:'none',reason:'No jackknife interval was requested.'},
+      standardError:null,adjustment:{kind:'none'},sample:{observations:e.periods.length*(e.request.donors.length+1),parameters:e.donorWeights.length,degreesOfFreedom:null}}
+  }
   if (run.kind === 'predictor-synthetic-control-run') {
     if (study.estimand.kind !== 'average-treatment-effect-on-treated' || !predictorSyntheticRecordMatches(run.configuration, run.evidence, run.catalog, run.columns, study.outcome.column)) return null
     const points: TimeEffectPoint[] = []
@@ -2970,6 +3017,7 @@ export function causalEstimateFrom(
     case 'propensity-weighting-run':
     case 'doubly-robust-run': {
       const { evidence } = run
+      if (evidence.target !== (study.estimand.kind === 'average-treatment-effect-on-treated' ? 'att' : 'ate')) return null
       const parameters = evidence.kind === 'doublyRobust'
         ? evidence.parameters
         : treatmentModelParameters(evidence.treatmentModel)
@@ -2988,6 +3036,7 @@ export function causalEstimateFrom(
     }
     case 'propensity-matching-run': {
       const { evidence } = run
+      if (evidence.target !== (study.estimand.kind === 'average-treatment-effect-on-treated' ? 'att' : 'ate')) return null
       return {
         kind: 'causal-estimate',
         estimand: study.estimand,
@@ -3161,6 +3210,14 @@ export function causalEstimateFrom(
     }
     case 'panel-intervention-run': {
       const { evidence } = run
+      if (run.configuration.primary === 'sunAbraham') {
+        if (study.estimand.kind !== 'average-treatment-effect-on-treated' || evidence.kind !== 'sunAbraham' || !sameSunAbraham(run.configuration,evidence.request)) return null
+        const point=evidence.overall
+        return {kind:'causal-estimate',estimand:study.estimand,effect:{kind:'additive',value:point.estimate,unit:''},
+          interval:{kind:'confidence',level:evidence.request.confidence,lower:point.lower,upper:point.upper},standardError:point.standardError,
+          adjustment:{kind:'none'},sample:{observations:evidence.observations,parameters:evidence.cells.length,degreesOfFreedom:evidence.clusters-1}}
+      }
+      if (evidence.kind === 'sunAbraham') return null
       if (run.configuration.primary === 'staggered') {
         if (study.estimand.kind !== 'average-treatment-effect-on-treated' || evidence.kind !== 'staggeredDid' || !sameStaggeredSpecification(run.configuration.specification,evidence.specification) || run.configuration.covariates.length !== evidence.covariates) return null
         const point=evidence.overall.dynamic
@@ -3428,6 +3485,7 @@ export function defaultEstimatorFor(identification: Identification | null, prepa
   if (study?.estimand.kind === 'conditional-average-treatment-effect') return 'dml-plr'
   // The per-row target is reported only by the T-learner.
   if (study?.estimand.kind === 'conditional-average-treatment-effect-per-row') return 't-learner'
+  if (study?.estimand.kind === 'average-treatment-effect-on-treated' && (identification?.kind === 'identified' || identification?.kind === 'backdoor-not-identified' || identification === null)) return prepared.kind === 'prepared-panel' ? 'panel-intervention' : 'propensity-weighting'
   const fallback: EstimatorId = prepared.kind === 'prepared-panel' ? 'panel-intervention' : 'backdoor-linear-regression'
   if (identification === null) return fallback
   switch (identification.kind) {
@@ -3440,6 +3498,21 @@ export function defaultEstimatorFor(identification: Identification | null, prepa
       return fallback
     default: return assertNever(identification)
   }
+}
+
+/** Target-aware presentation of the same estimator; the study owns the target. */
+export function propensityMethodForTarget(method: MethodDefinition, target: 'ate' | 'att'): MethodDefinition {
+  if (target === 'ate') return method
+  const expressions: Readonly<Record<string, { readonly tex: string; readonly plain: string }>> = {"propensity-weighting":{"tex":"\\widehat{\\mathrm{ATT}}=\\frac{\\sum_i T_iY_i}{\\sum_i T_i}-\\frac{\\sum_i(1-T_i)\\frac{e(X_i)}{1-e(X_i)}Y_i}{\\sum_i(1-T_i)\\frac{e(X_i)}{1-e(X_i)}}","plain":"ATT = treated outcome mean minus the treatment-odds-weighted control outcome mean."},"propensity-matching":{"tex":"\\widehat{\\mathrm{ATT}}=\\frac{1}{N_1}\\sum_{i:T_i=1}\\left(Y_i-Y_{j_0(i)}\\right)","plain":"ATT = average among treated rows of observed outcome minus nearest matched control outcome."},"doubly-robust":{"tex":"\\widehat{\\mathrm{ATT}}=\\frac{1}{N_1}\\sum_i\\left[T_i\\{Y_i-\\hat\\mu_0(X_i)\\}-(1-T_i)\\frac{e(X_i)}{1-e(X_i)}\\{Y_i-\\hat\\mu_0(X_i)\\}\\right]","plain":"ATT = the treated residual sum minus the treatment-odds-weighted control residual sum, divided by the number of treated rows."}}
+  const expression = expressions[method.id]
+  if (expression === undefined) return method
+  const describeCaveat = (caveat: MethodDefinition['caveats'][number]): MethodDefinition['caveats'][number] =>
+    caveat.id.endsWith('-positivity') ? { ...caveat, requirement: 'Control outcomes must be supported at the covariate values of treated rows. Extreme treatment probabilities can produce unstable weights or poor matches.' }
+    : caveat.id === 'aipw-one-model-right' ? { ...caveat, requirement: 'Either the propensity model or the control-outcome regression must be correctly specified. Double robustness does not replace no unmeasured confounding or control support for treated rows.' }
+    : caveat.id === 'matching-single-neighbour' ? { ...caveat, requirement: 'Each treated row is paired with one nearest control neighbour on the propensity score.' }
+    : caveat
+  const [first, ...rest] = method.caveats
+  return { ...method, summaryTex: expression, caveats: [describeCaveat(first), ...rest.map(describeCaveat)] }
 }
 
 export function describeEstimator(estimator: EstimatorId): string {

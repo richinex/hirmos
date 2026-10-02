@@ -294,6 +294,7 @@ pub(crate) fn propensity_grid_slice(
 /// In[10]: one nearest opposite-arm neighbour for every row, averaged over the whole sample, so
 /// the estimand is the average effect rather than the effect on the treated.
 pub(crate) fn propensity_matching(
+    target: PropensityTarget,
     values: &[f64],
     rows: usize,
     columns: usize,
@@ -308,10 +309,11 @@ pub(crate) fn propensity_matching(
     let (propensity, treatment_model) =
         propensity_scores("propensity matching", &design, &treated, &model)?;
     let matched =
-        hirmos_causal_core::propensity::match_on_score(&responses, &treated, &propensity)
+        hirmos_causal_core::propensity::match_on_score_target(&responses, &treated, &propensity, target.kernel())
             .map_err(|cause| format!("propensity matching could not pair the arms: {cause:?}"))?;
     let treated_rows = treated.iter().filter(|&&t| t).count();
     Ok(AnalysisResult::PropensityMatching {
+        target,
         observations: rows,
         treatment_model,
         treated_rows,
@@ -326,6 +328,7 @@ pub(crate) fn propensity_matching(
 /// In[21]: the propensity on one side and a per-arm outcome regression on the other, so only one
 /// of the two models has to be right.
 pub(crate) fn doubly_robust_estimate(
+    target: PropensityTarget,
     values: &[f64],
     rows: usize,
     columns: usize,
@@ -339,8 +342,8 @@ pub(crate) fn doubly_robust_estimate(
         "doubly robust estimate", values, rows, columns, treatment, outcome, adjustment,
     )?;
     let treatment_model = treatment_model_of(model);
-    let estimate = hirmos_causal_core::propensity::doubly_robust(
-        &design, &responses, &treated, DESIGN_INTERCEPT, treatment_model,
+    let estimate = hirmos_causal_core::propensity::doubly_robust_target(
+        &design, &responses, &treated, DESIGN_INTERCEPT, treatment_model, target.kernel(),
     )
     .map_err(|cause| format!("doubly robust estimate could not fit: {cause:?}"))?;
     let scores = hirmos_causal_core::propensity::fit(
@@ -354,7 +357,8 @@ pub(crate) fn doubly_robust_estimate(
             let (lower, upper) = percentile_tails(&request, "doubly robust estimate")?;
             let drawn = hirmos_causal_core::propensity::bootstrap_interval(
                 &design, &responses, &treated, DESIGN_INTERCEPT,
-                hirmos_causal_core::propensity::Estimand::DoublyRobust,
+                match target { PropensityTarget::Ate => hirmos_causal_core::propensity::Estimand::DoublyRobust,
+                    PropensityTarget::Att => hirmos_causal_core::propensity::Estimand::DoublyRobustAtt },
                 request.rounds, request.seed, treatment_model, lower, upper,
             )
             .map_err(|cause| format!("doubly robust estimate could not resample: {cause:?}"))?;
@@ -365,6 +369,7 @@ pub(crate) fn doubly_robust_estimate(
         }
     };
     Ok(AnalysisResult::DoublyRobust {
+        target,
         observations: rows,
         parameters: design[0].len() + 1,
         estimate: estimate.effect,
@@ -381,6 +386,7 @@ pub(crate) fn doubly_robust_estimate(
 /// the potential-outcome totals over every row. The design is the caller's, so a covariate that
 /// entered as indicators arrives as separate columns.
 pub(crate) fn propensity_weighting(
+    target: PropensityTarget,
     values: &[f64],
     rows: usize,
     columns: usize,
@@ -422,7 +428,10 @@ pub(crate) fn propensity_weighting(
         .collect();
 
     let specification = hirmos_causal_core::propensity::Specification {
-        normalization: hirmos_causal_core::propensity::Normalization::HorvitzThompson,
+        normalization: match target {
+            PropensityTarget::Ate => hirmos_causal_core::propensity::Normalization::HorvitzThompson,
+            PropensityTarget::Att => hirmos_causal_core::propensity::Normalization::Hajek,
+        },
         scale: match scale {
             PropensityWeightScale::InverseProbability => {
                 hirmos_causal_core::propensity::WeightScale::InverseProbability
@@ -440,7 +449,7 @@ pub(crate) fn propensity_weighting(
     let (propensity, treatment_model) =
         propensity_scores("propensity weighting", &design, &treated, &model)?;
     let estimate =
-        hirmos_causal_core::propensity::ate(&responses, &treated, &propensity, specification)
+        hirmos_causal_core::propensity::weighted_effect(&responses, &treated, &propensity, specification, target.kernel())
             .map_err(|cause| format!("propensity weighting could not weight the sample: {cause:?}"))?;
 
     let interval = match &fit {
@@ -453,7 +462,8 @@ pub(crate) fn propensity_weighting(
                 &responses,
                 &treated,
                 DESIGN_INTERCEPT,
-                hirmos_causal_core::propensity::Estimand::InverseProbability(specification),
+                match target { PropensityTarget::Ate => hirmos_causal_core::propensity::Estimand::InverseProbability(specification),
+                    PropensityTarget::Att => hirmos_causal_core::propensity::Estimand::InverseProbabilityAtt(specification) },
                 request.rounds,
                 request.seed,
                 treatment_model_of(*model),
@@ -472,6 +482,7 @@ pub(crate) fn propensity_weighting(
     };
 
     Ok(AnalysisResult::PropensityWeighting {
+        target,
         observations: rows,
         treatment_model,
         treated_rows: estimate.treated_rows,

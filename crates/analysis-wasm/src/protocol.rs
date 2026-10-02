@@ -1020,6 +1020,8 @@ pub(crate) enum AnalysisCommand {
     StaggeredDid { request: crate::staggered_did::Request },
     Bacon { request: crate::bacon::Request },
     PanelRegression { request: crate::panel_regression::Request },
+    SunAbraham { request: crate::remix_extensions::SunRequest },
+    RidgeAugmentedSynthetic { request: crate::remix_extensions::RidgeRequest },
     RootCause { request: crate::root_cause::Request },
     GcmEffects { request: crate::gcm_effects::Request },
     GcmInfluence { request: crate::gcm_influence::Request },
@@ -1300,6 +1302,8 @@ pub(crate) enum AnalysisCommand {
         fixed_effects: Option<FixedEffectsModel>,
     },
     PropensityWeighting {
+        #[serde(default)]
+        target: PropensityTarget,
         rows: usize,
         columns: usize,
         treatment: usize,
@@ -1309,6 +1313,8 @@ pub(crate) enum AnalysisCommand {
         fit: WeightingFit,
     },
     PropensityMatching {
+        #[serde(default)]
+        target: PropensityTarget,
         rows: usize,
         columns: usize,
         treatment: usize,
@@ -1333,6 +1339,8 @@ pub(crate) enum AnalysisCommand {
         seed: u32,
     },
     DoublyRobust {
+        #[serde(default)]
+        target: PropensityTarget,
         rows: usize,
         columns: usize,
         treatment: usize,
@@ -1919,6 +1927,15 @@ pub(crate) enum GpsWeightScale {
 }
 
 /// Weights as the inverse propensity, or stabilized by the marginal treatment prevalence.
+#[derive(Clone, Copy, Debug, Default, serde::Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum PropensityTarget { #[default] Ate, Att }
+impl PropensityTarget {
+    pub(crate) fn kernel(self) -> hirmos_causal_core::propensity::Target {
+        match self { Self::Ate => hirmos_causal_core::propensity::Target::Ate, Self::Att => hirmos_causal_core::propensity::Target::Att }
+    }
+}
+
 #[derive(Clone, Copy, serde::Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) enum PropensityWeightScale {
@@ -2647,6 +2664,8 @@ pub(crate) enum AnalysisResult {
     StaggeredDid { evidence: crate::staggered_did::Evidence },
     Bacon { evidence: crate::bacon::Evidence },
     PanelRegression { evidence: crate::panel_regression::Evidence },
+    SunAbraham { evidence: crate::remix_extensions::SunEvidence },
+    RidgeAugmentedSynthetic { evidence: crate::remix_extensions::RidgeEvidence },
     RootCause { evidence: crate::root_cause::Evidence },
     GcmEffects { evidence: crate::gcm_effects::Evidence },
     GcmInfluence { evidence: crate::gcm_influence::Evidence },
@@ -3058,6 +3077,8 @@ pub(crate) enum AnalysisResult {
         fixed_effects: FixedEffectsEvidence,
     },
     PropensityWeighting {
+        #[serde(default)]
+        target: PropensityTarget,
         observations: usize,
         treatment_model: TreatmentModelEvidence,
         treated_rows: usize,
@@ -3081,6 +3102,8 @@ pub(crate) enum AnalysisResult {
         scores: Vec<GridCandidateScore>,
     },
     PropensityMatching {
+        #[serde(default)]
+        target: PropensityTarget,
         observations: usize,
         treatment_model: TreatmentModelEvidence,
         treated_rows: usize,
@@ -3092,6 +3115,8 @@ pub(crate) enum AnalysisResult {
         matches: Vec<f64>,
     },
     DoublyRobust {
+        #[serde(default)]
+        target: PropensityTarget,
         observations: usize,
         /// The treatment model's parameter count: the constant plus one per design column.
         parameters: usize,

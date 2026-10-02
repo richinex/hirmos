@@ -425,8 +425,10 @@ function RefitOnResize({ host, layoutKey }: { readonly host: React.RefObject<HTM
   return null
 }
 
-function CanvasControls({ onTidy, viewLocked, onToggleLock, expanded, onToggleExpand, labelsShown, onToggleLabels, drawing, onToggleDrawing, variableView, disconnectedCount, onToggleVariables }: {
+function CanvasControls({ onTidy, orientation, onToggleOrientation, viewLocked, onToggleLock, expanded, onToggleExpand, labelsShown, onToggleLabels, drawing, onToggleDrawing, variableView, disconnectedCount, onToggleVariables }: {
   readonly onTidy: () => void
+  readonly orientation: DagLayoutOrientation
+  readonly onToggleOrientation: () => void
   readonly viewLocked: boolean
   readonly onToggleLock: () => void
   readonly expanded: boolean
@@ -442,7 +444,17 @@ function CanvasControls({ onTidy, viewLocked, onToggleLock, expanded, onToggleEx
   const { fitView } = useReactFlow<CanvasNode, CanvasEdge>()
   const control = flowControl
   return (
-    <FlowControls fit={FIT_VIEW} fitLabel="Fit graph">
+    // Tidy graph fits the view, so the strip carries no separate fit button.
+    <FlowControls>
+        <button
+          type="button"
+          className={control}
+          title={orientation === 'across' ? 'Lay out the graph down the page' : 'Lay out the graph across the page'}
+          aria-label={orientation === 'across' ? 'Lay out down' : 'Lay out across'}
+          onClick={onToggleOrientation}
+        >
+          <Icon name={orientation === 'across' ? 'rotate_90_degrees_cw' : 'rotate_90_degrees_ccw'} size={14} />
+        </button>
         <button
           type="button"
           className={control}
@@ -669,12 +681,14 @@ export function DagCanvas({
 }) {
   const hostRef = useRef<HTMLDivElement>(null)
   const [expanded, setExpanded] = useState(false)
-  // A narrow canvas runs the layout down the page instead of across it.
-  const [orientation, setOrientation] = useState<DagLayoutOrientation>('across')
+  // A narrow canvas runs the layout down the page instead of across it, unless the reader has turned it.
+  const [fitted, setFitted] = useState<DagLayoutOrientation>('across')
+  const [chosen, setChosen] = useState<DagLayoutOrientation | null>(null)
+  const orientation = chosen ?? fitted
   useEffect(() => {
     const host = hostRef.current
     if (host === null) return
-    const observer = new ResizeObserver(([entry]) => { setOrientation(entry.contentRect.width < 600 ? 'down' : 'across') })
+    const observer = new ResizeObserver(([entry]) => { setFitted(entry.contentRect.width < 600 ? 'down' : 'across') })
     observer.observe(host)
     return () => observer.disconnect()
   }, [expanded])
@@ -1049,7 +1063,7 @@ export function DagCanvas({
               }}
             />
           )}
-          <CanvasControls onTidy={tidy} viewLocked={viewLocked} onToggleLock={() => setViewLocked((locked) => !locked)} expanded={expanded} onToggleExpand={() => setExpanded((open) => !open)} labelsShown={labelsShown} onToggleLabels={() => setLabelsShown((shown) => !shown)} drawing={drawing} onToggleDrawing={() => setDrawing(style => style === 'clean' ? 'sketch' : 'clean')} variableView={variableView} disconnectedCount={disconnectedCount} onToggleVariables={() => { placedByHand.current.clear(); setVariableView(view => view === 'all' ? 'connected' : 'all'); setRearrangements(count => count + 1) }} />
+          <CanvasControls onTidy={tidy} orientation={orientation} onToggleOrientation={() => { placedByHand.current.clear(); setChosen(orientation === 'across' ? 'down' : 'across') }} viewLocked={viewLocked} onToggleLock={() => setViewLocked((locked) => !locked)} expanded={expanded} onToggleExpand={() => setExpanded((open) => !open)} labelsShown={labelsShown} onToggleLabels={() => setLabelsShown((shown) => !shown)} drawing={drawing} onToggleDrawing={() => setDrawing(style => style === 'clean' ? 'sketch' : 'clean')} variableView={variableView} disconnectedCount={disconnectedCount} onToggleVariables={() => { placedByHand.current.clear(); setVariableView(view => view === 'all' ? 'connected' : 'all'); setRearrangements(count => count + 1) }} />
           <RefitOnResize host={hostRef} layoutKey={`${bindingKey}\u0000${rearrangements}`} />
         </ReactFlow>
         </div>

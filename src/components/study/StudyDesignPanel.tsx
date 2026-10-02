@@ -596,7 +596,7 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
           <dt className="text-faint">Estimand</dt>
           <dd className="m-0 text-ink">{preview === null ? <Metadata><span>Average treatment effect</span><span>additive scale</span><span>total effect, mediators included</span></Metadata> : describeEstimand(preview)}</dd>
           <dt className="text-faint">Population</dt>
-          <dd className={num('m-0 text-ink')}>All {formatCount(prepared.observations).text} rows</dd>
+          <dd className={num('m-0 text-ink')}>{state.draft.estimand === 'average-treatment-effect-on-treated' ? 'Treated rows (treatment = 1)' : `All ${formatCount(prepared.observations).text} rows`}</dd>
           <dt className="text-faint">Graph revision</dt>
           <dd className="m-0 text-ink">{document === null ? '—' : <><Metadata><span><span className={literal()}>{document.current.id.slice(0, 8)}</span></span><span>{document.current.graph.edges.length} arrows{preview !== null && preview.graph.laggedArrows > 0 ? `, ${preview.graph.laggedArrows} lagged` : ''}</span></Metadata></>}</dd>
         </dl>

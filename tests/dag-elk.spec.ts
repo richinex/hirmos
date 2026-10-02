@@ -223,7 +223,7 @@ test('Proposition 99 can hide disconnected variables without changing its DAG', 
   await expect(page.getByRole('button', { name: 'Graph display', exact: true })).toHaveCount(0)
   await expect(page.locator('.react-flow__node')).toHaveCount(2)
   await expect(page.locator('.react-flow__edge-path')).toHaveCount(1)
-  await page.getByRole('button', { name: 'Fit graph', exact: true }).click()
+  await page.getByRole('button', { name: 'Tidy graph', exact: true }).click()
   await expect.poll(() => page.locator('.react-flow__node').evaluateAll(nodes => nodes.every(n => {
     const b = n.getBoundingClientRect(); return b.left >= 0 && b.right <= innerWidth && b.top >= 0 && b.bottom <= innerHeight
   }))).toBe(true)

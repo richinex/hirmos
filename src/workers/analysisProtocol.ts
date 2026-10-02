@@ -1,4 +1,5 @@
 import { countRegressionRequestSchema, countRegressionEvidenceSchema, type CountRegressionRequest, type CountRegressionEvidence } from '@/domain/countRegression'
+import { sunAbrahamRequestSchema, sunAbrahamEvidenceSchema, ridgeAugmentedRequestSchema, ridgeAugmentedEvidenceSchema, type SunAbrahamRequest, type SunAbrahamEvidence, type RidgeAugmentedRequest, type RidgeAugmentedEvidence } from '@/domain/remixExtensions'
 import {panelRegressionRequestSchema,panelRegressionEvidenceSchema,baconRequestSchema,baconEvidenceSchema,type PanelRegressionRequest,type PanelRegressionEvidence,type BaconRequest,type BaconEvidence} from '@/domain/panelRegression'
 import { z } from 'zod'
 import { predictorSyntheticRequestSchema, predictorSyntheticEvidenceSchema, type PredictorSyntheticRequest, type PredictorSyntheticEvidence } from '@/domain/predictorSyntheticControl'
@@ -657,6 +658,7 @@ export type AnalysisWorkerCommand =
     }
   | {
       readonly kind: 'propensity-weighting'
+      readonly target: 'ate' | 'att'
       readonly request: WorkerRequestId
       readonly values: Float64Array
       readonly rows: number
@@ -686,6 +688,7 @@ export type AnalysisWorkerCommand =
     }
   | {
       readonly kind: 'propensity-matching'
+      readonly target: 'ate' | 'att'
       readonly request: WorkerRequestId
       readonly values: Float64Array
       readonly rows: number
@@ -697,6 +700,7 @@ export type AnalysisWorkerCommand =
     }
   | {
       readonly kind: 'doubly-robust'
+      readonly target: 'ate' | 'att'
       readonly request: WorkerRequestId
       readonly values: Float64Array
       readonly rows: number
@@ -1055,6 +1059,8 @@ export type AnalysisWorkerCommand =
       readonly values: Float64Array
       readonly model: CountRegressionRequest
     }
+  | {readonly kind:'sun-abraham';readonly request:WorkerRequestId;readonly values:Float64Array;readonly model:SunAbrahamRequest}
+  | {readonly kind:'ridge-augmented-synthetic';readonly request:WorkerRequestId;readonly values:Float64Array;readonly model:RidgeAugmentedRequest}
   | {readonly kind:'panel-regression';readonly request:WorkerRequestId;readonly values:Float64Array;readonly model:PanelRegressionRequest}
   | {readonly kind:'bacon';readonly request:WorkerRequestId;readonly values:Float64Array;readonly model:BaconRequest}
   | {
@@ -1379,6 +1385,8 @@ export type AnalysisWorkerEvent =
   | { readonly kind: 'predictor-synthetic-control-succeeded'; readonly request: WorkerRequestId; readonly result: PredictorSyntheticEvidence }
   | { readonly kind: 'synthetic-control-succeeded'; readonly request: WorkerRequestId; readonly result: SyntheticControlEvidence }
   | { readonly kind: 'count-regression-succeeded'; readonly request: WorkerRequestId; readonly result: CountRegressionEvidence }
+  | {readonly kind:'sun-abraham-succeeded';readonly request:WorkerRequestId;readonly result:SunAbrahamEvidence}
+  | {readonly kind:'ridge-augmented-synthetic-succeeded';readonly request:WorkerRequestId;readonly result:RidgeAugmentedEvidence}
   | {readonly kind:'panel-regression-succeeded';readonly request:WorkerRequestId;readonly result:PanelRegressionEvidence}
   | {readonly kind:'bacon-succeeded';readonly request:WorkerRequestId;readonly result:BaconEvidence}
   | { readonly kind: 'staggered-did-succeeded'; readonly request: WorkerRequestId; readonly result: StaggeredEvidence }
@@ -1943,6 +1951,7 @@ const commandSchema = z.discriminatedUnion('kind', [
   }).strict(),
   z.object({
     kind: z.literal('propensity-weighting'),
+    target: z.enum(['ate', 'att']).default('ate'),
     ...propensityCommandFields,
     scale: z.enum(['inverseProbability', 'stabilized']),
     fit: z.discriminatedUnion('kind', [
@@ -1956,6 +1965,7 @@ const commandSchema = z.discriminatedUnion('kind', [
   }).strict(),
   z.object({
     kind: z.literal('propensity-matching'),
+    target: z.enum(['ate', 'att']).default('ate'),
     ...propensityCommandFields,
     model: propensityTreatmentModelSchema,
   }).strict(),
@@ -1972,6 +1982,7 @@ const commandSchema = z.discriminatedUnion('kind', [
   }).strict(),
   z.object({
     kind: z.literal('doubly-robust'),
+    target: z.enum(['ate', 'att']).default('ate'),
     ...propensityCommandFields,
     model: logisticTreatmentModelSchema,
     bootstrap: propensityBootstrapSchema.nullable(),
@@ -2308,6 +2319,8 @@ const commandSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('count-regression'), request: requestSchema, values:z.instanceof(Float64Array),model:countRegressionRequestSchema,
   }).strict(),
+  z.object({kind:z.literal('sun-abraham'),request:requestSchema,values:z.instanceof(Float64Array),model:sunAbrahamRequestSchema}).strict(),
+  z.object({kind:z.literal('ridge-augmented-synthetic'),request:requestSchema,values:z.instanceof(Float64Array),model:ridgeAugmentedRequestSchema}).strict(),
   z.object({kind:z.literal('panel-regression'),request:requestSchema,values:z.instanceof(Float64Array),model:panelRegressionRequestSchema}).strict(),
   z.object({kind:z.literal('bacon'),request:requestSchema,values:z.instanceof(Float64Array),model:baconRequestSchema}).strict(),
   z.object({
@@ -2620,6 +2633,8 @@ const eventSchema = z.discriminatedUnion('kind', [
   z.object({kind:z.literal('predictor-synthetic-control-succeeded'),request:requestSchema,result:predictorSyntheticEvidenceSchema}).strict(),
   z.object({ kind: z.literal('synthetic-control-succeeded'), request: requestSchema, result: syntheticControlEvidenceSchema }).strict(),
   z.object({kind:z.literal('count-regression-succeeded'),request:requestSchema,result:countRegressionEvidenceSchema}).strict(),
+  z.object({kind:z.literal('sun-abraham-succeeded'),request:requestSchema,result:sunAbrahamEvidenceSchema}).strict(),
+  z.object({kind:z.literal('ridge-augmented-synthetic-succeeded'),request:requestSchema,result:ridgeAugmentedEvidenceSchema}).strict(),
   z.object({kind:z.literal('panel-regression-succeeded'),request:requestSchema,result:panelRegressionEvidenceSchema}).strict(),
   z.object({kind:z.literal('bacon-succeeded'),request:requestSchema,result:baconEvidenceSchema}).strict(),
   z.object({ kind:z.literal('staggered-did-succeeded'),request:requestSchema,result:staggeredEvidenceSchema }).strict(),
@@ -3019,6 +3034,7 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
     return result.success ? ok({ kind: 'sharp-rd-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
   if (parsed.data.kind === 'count-regression-succeeded') return ok({...parsed.data,request:request.value})
+  if (parsed.data.kind === 'sun-abraham-succeeded'||parsed.data.kind === 'ridge-augmented-synthetic-succeeded') return ok({...parsed.data,request:request.value})
   if (parsed.data.kind === 'panel-regression-succeeded'||parsed.data.kind==='bacon-succeeded') return ok({...parsed.data,request:request.value})
   if (parsed.data.kind === 'staggered-did-succeeded') return ok({...parsed.data,request:request.value})
   if (parsed.data.kind === 'panel-intervention-succeeded') {

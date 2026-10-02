@@ -65,7 +65,7 @@ mod tests {
         };
         assert!(naive > 1.8, "the confounder should bias the raw comparison, got {naive}");
 
-        let result = propensity_weighting(
+        let result = propensity_weighting(PropensityTarget::Ate, 
             &values, rows, 3, 0, 1, &[2],
             PropensityWeightScale::InverseProbability,
             WeightingFit::Logistic { model: LogisticModel::Newton, bootstrap: None },
@@ -82,7 +82,7 @@ mod tests {
         // The two treatment models differ only by where each stops, so a design handed to one of
         // them wrongly shows up here. Fitting the Newton model without its intercept column gave
         // 1.356 against 1.500, which is a plausible number rather than an error.
-        let sklearn = propensity_weighting(
+        let sklearn = propensity_weighting(PropensityTarget::Ate, 
             &values, rows, 3, 0, 1, &[2],
             PropensityWeightScale::InverseProbability,
             WeightingFit::Logistic { model: LogisticModel::Lbfgsb { max_iter: 1000 }, bootstrap: None },
@@ -93,7 +93,7 @@ mod tests {
         assert!(apart < 5e-3, "the two treatment models should agree, {apart:.3e} apart");
 
         // Stabilizing rescales both arms by the prevalence, which leaves this estimand alone.
-        let stabilized = propensity_weighting(
+        let stabilized = propensity_weighting(PropensityTarget::Ate, 
             &values, rows, 3, 0, 1, &[2],
             PropensityWeightScale::Stabilized,
             WeightingFit::Logistic { model: LogisticModel::Newton, bootstrap: None },
@@ -120,7 +120,7 @@ mod tests {
             scoring: BoostedScoring::OneModel,
             candidates_searched: None,
         };
-        let result = propensity_weighting(
+        let result = propensity_weighting(PropensityTarget::Ate, 
             &values, rows, 3, 0, 1, &[2],
             PropensityWeightScale::InverseProbability,
             WeightingFit::Boosted { model: boosted.clone() },
@@ -138,7 +138,7 @@ mod tests {
 
         // Cross-fitting scores every row from the half that did not contain it, so the scores
         // change but the estimand does not.
-        let split = propensity_weighting(
+        let split = propensity_weighting(PropensityTarget::Ate, 
             &values, rows, 3, 0, 1, &[2],
             PropensityWeightScale::InverseProbability,
             WeightingFit::Boosted { model: BoostedTreatmentModel { scoring: BoostedScoring::CrossFitted, ..boosted } },
@@ -177,7 +177,7 @@ mod tests {
     #[test]
     fn propensity_matching_recovers_a_planted_effect() {
         let (values, rows) = confounded_sample();
-        let result = propensity_matching(&values, rows, 3, 0, 1, &[2], PropensityModel::Logistic { model: LogisticModel::Newton })
+        let result = propensity_matching(PropensityTarget::Ate, &values, rows, 3, 0, 1, &[2], PropensityModel::Logistic { model: LogisticModel::Newton })
             .expect("the design matches");
         let json = serde_json::to_value(&result).expect("the evidence serialises");
         assert_eq!(json["kind"], "propensityMatching");
@@ -194,7 +194,7 @@ mod tests {
     #[test]
     fn doubly_robust_recovers_a_planted_effect_and_reports_its_halves() {
         let (values, rows) = confounded_sample();
-        let result = doubly_robust_estimate(
+        let result = doubly_robust_estimate(PropensityTarget::Ate, 
             &values, rows, 3, 0, 1, &[2], LogisticModel::Newton, None,
         )
         .expect("the design fits");
@@ -245,11 +245,11 @@ mod tests {
     fn propensity_weighting_refuses_input_it_cannot_use() {
         let values = vec![0.0, 1.0, 0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 0.1, 0.2, 0.3, 0.4];
         let newton = || WeightingFit::Logistic { model: LogisticModel::Newton, bootstrap: None };
-        assert!(propensity_weighting(&values, 4, 3, 0, 1, &[],
+        assert!(propensity_weighting(PropensityTarget::Ate, &values, 4, 3, 0, 1, &[],
             PropensityWeightScale::Stabilized, newton()).is_err(), "no adjustment columns");
-        assert!(propensity_weighting(&values, 4, 3, 0, 0, &[2],
+        assert!(propensity_weighting(PropensityTarget::Ate, &values, 4, 3, 0, 0, &[2],
             PropensityWeightScale::Stabilized, newton()).is_err(), "treatment repeated as outcome");
-        assert!(propensity_weighting(&values, 4, 3, 1, 0, &[2],
+        assert!(propensity_weighting(PropensityTarget::Ate, &values, 4, 3, 1, 0, &[2],
             PropensityWeightScale::Stabilized, newton()).is_err(), "treatment column is not 0/1");
     }
 

@@ -114,6 +114,7 @@ mod staggered_did;
 mod bacon;
 mod predictor_synthetic_control;
 mod panel_regression;
+mod remix_extensions;
 mod count_regression;
 mod calendar;
 
@@ -680,7 +681,7 @@ pub fn run_analysis(
             fixed_effects,
         ),
         AnalysisCommand::PropensityWeighting {
-            rows,
+            target, rows,
             columns,
             treatment,
             outcome,
@@ -688,7 +689,7 @@ pub fn run_analysis(
             scale,
             fit,
         } => propensity_weighting(
-            values,
+            target, values,
             rows,
             columns,
             treatment,
@@ -698,8 +699,8 @@ pub fn run_analysis(
             fit,
         ),
         AnalysisCommand::PropensityMatching {
-            rows, columns, treatment, outcome, adjustment, model,
-        } => propensity_matching(values, rows, columns, treatment, outcome, &adjustment, model),
+            target, rows, columns, treatment, outcome, adjustment, model,
+        } => propensity_matching(target, values, rows, columns, treatment, outcome, &adjustment, model),
         AnalysisCommand::PropensityGridSlice {
             rows, columns, treatment, outcome, adjustment, learning_rate, max_depth,
             n_estimators, splits, min_samples_leaf, min_samples_split, seed,
@@ -708,9 +709,9 @@ pub fn run_analysis(
             n_estimators, splits, min_samples_leaf, min_samples_split, seed,
         ),
         AnalysisCommand::DoublyRobust {
-            rows, columns, treatment, outcome, adjustment, model, bootstrap,
+            target, rows, columns, treatment, outcome, adjustment, model, bootstrap,
         } => doubly_robust_estimate(
-            values, rows, columns, treatment, outcome, &adjustment, model, bootstrap,
+            target, values, rows, columns, treatment, outcome, &adjustment, model, bootstrap,
         ),
         AnalysisCommand::ContinuousGps {
             rows, columns, treatment, outcome, adjustment, scale, bootstrap,
@@ -1088,6 +1089,8 @@ pub fn run_analysis(
         AnalysisCommand::StaggeredDid { request } => staggered_did::run(values, request).map(|evidence| AnalysisResult::StaggeredDid { evidence }),
         AnalysisCommand::PredictorSyntheticControl { request } => predictor_synthetic_control::run(values, request).map(|evidence| AnalysisResult::PredictorSyntheticControl { evidence }),
         AnalysisCommand::Bacon { request } => bacon::run(values, request).map(|evidence| AnalysisResult::Bacon { evidence }),
+        AnalysisCommand::SunAbraham { request } => remix_extensions::sun_run(values, request).map(|evidence| AnalysisResult::SunAbraham { evidence }),
+        AnalysisCommand::RidgeAugmentedSynthetic { request } => remix_extensions::ridge_run(values, request).map(|evidence| AnalysisResult::RidgeAugmentedSynthetic { evidence }),
         AnalysisCommand::PanelRegression { request } => panel_regression::run(values, request).map(|evidence| AnalysisResult::PanelRegression { evidence }),
         AnalysisCommand::PanelIntervention {
             primary,

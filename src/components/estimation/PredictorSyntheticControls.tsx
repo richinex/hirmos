@@ -1,4 +1,5 @@
-import { memo, useEffect, useState } from 'react'
+import { memo } from 'react'
+import { usePanelCatalog } from './usePanelCatalog'
 import { SettingsStep } from '@/components/ui/SettingsStep'
 import { ColumnChecklist } from '@/components/ui/ColumnChecklist'
 import { ParameterLabel } from '@/components/ui/ParameterLabel'
@@ -6,13 +7,11 @@ import { Select } from '@/components/ui/Select'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { Icon } from '@/components/Icon'
 import { button, field, fieldHint, fieldLabel, fieldRow, stepsStack } from '@/components/ui/recipes'
-import { predictorSyntheticCatalog, predictorSummarySchema, type PredictorSyntheticCatalog, type PredictorSyntheticConfiguration } from '@/domain/predictorSyntheticControl'
-import { describePanelDataProblem } from '@/domain/panel'
+import { predictorSummarySchema, type PredictorSyntheticCatalog, type PredictorSyntheticConfiguration } from '@/domain/predictorSyntheticControl'
 import type { DatasetProfile, ColumnId } from '@/domain/dataset'
 import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
 import type { SelectedSource } from '@/domain/workflow'
 
-type CatalogJob = { readonly kind: 'loading' } | { readonly kind: 'failed'; readonly detail: string } | { readonly kind: 'ready'; readonly catalog: PredictorSyntheticCatalog }
 const summaries = predictorSummarySchema.options
 const summaryLabels = { mean: 'Mean', median: 'Median', minimum: 'Minimum', maximum: 'Maximum', sum: 'Sum', variance: 'Sample variance', 'standard-deviation': 'Standard deviation' }
 
@@ -29,21 +28,7 @@ export const PredictorSyntheticControls = memo(function PredictorSyntheticContro
   readonly configuration: PredictorSyntheticConfiguration; readonly onChange: (configuration: PredictorSyntheticConfiguration) => void;
   readonly source: SelectedSource; readonly profile: DatasetProfile; readonly prepared: PreparedDatasetArtifact; readonly treatment: ColumnId | null;
 }) {
-  const [job, setJob] = useState<CatalogJob>({ kind: 'loading' })
-  const unitColumn = prepared.kind === 'prepared-panel' ? prepared.sampling.unitColumn : null
-  const timeColumn = prepared.kind === 'prepared-panel' ? prepared.sampling.timeColumn : null
-  useEffect(() => {
-    let cancelled = false
-    if (unitColumn === null || timeColumn === null) { setJob({ kind: 'failed', detail: 'Prepare a long panel with unit and period keys for predictor-based synthetic control.' }); return }
-    setJob({ kind: 'loading' })
-    void (async () => {
-      const { materializePanelKeysInWorker } = await import('@/data/client')
-      const keys = await materializePanelKeysInWorker(source.file, profile, unitColumn, timeColumn)
-      if (cancelled) return
-      setJob(keys.ok ? { kind: 'ready', catalog: predictorSyntheticCatalog(keys.value) } : { kind: 'failed', detail: describePanelDataProblem(keys.error) })
-    })()
-    return () => { cancelled = true }
-  }, [source.file, profile, unitColumn, timeColumn, prepared.id])
+  const job = usePanelCatalog(source,profile,prepared)
   if (job.kind !== 'ready') return <p className={fieldHint}>{job.kind === 'loading' ? 'Reading panel units and periods…' : job.detail}</p>
   const catalog = job.catalog
   const columns = profile.columns.filter(column => prepared.columns.includes(column.id) && column.id !== treatment).map(column => ({ id: column.id, name: column.name }))

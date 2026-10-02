@@ -15,6 +15,13 @@ pub enum WeightScale {
     Stabilized,
 }
 
+/// Population over which the binary treatment contrast is averaged.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Target {
+    Ate,
+    Att,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Specification {
     pub normalization: Normalization,
@@ -150,6 +157,18 @@ pub fn bootstrap_interval(
                 )?;
                 (estimate.effect, estimate.fitted)
             }
+            Estimand::InverseProbabilityAtt(specification) => {
+                let scores = fit(&resampled_design, intercept, &resampled_treated, model)
+                    .map_err(EstimateError::Fit)?;
+                let estimate = weighted_effect(&resampled_outcome, &resampled_treated,
+                    &scores.propensity, specification, Target::Att).map_err(EstimateError::Weighting)?;
+                (estimate.effect, scores.fitted)
+            }
+            Estimand::DoublyRobustAtt => {
+                let estimate = doubly_robust_target(&resampled_design, &resampled_outcome,
+                    &resampled_treated, intercept, model, Target::Att)?;
+                (estimate.effect, estimate.fitted)
+            }
         };
         if !fitted.converged() {
             unconverged.push(round);
@@ -179,6 +198,12 @@ pub fn match_on_score(
     outcome: &[f64],
     treated: &[bool],
     propensity: &[f64],
+) -> Result<Matched, Error> {
+    match_on_score_target(outcome, treated, propensity, Target::Ate)
+}
+
+pub fn match_on_score_target(
+    outcome: &[f64], treated: &[bool], propensity: &[f64], target: Target,
 ) -> Result<Matched, Error> {
     let n = outcome.len();
     if n == 0 {
@@ -223,12 +248,13 @@ pub fn match_on_score(
         })
         .collect();
     let effect = (0..n)
+        .filter(|&row| target == Target::Ate || treated[row])
         .map(|row| {
             let sign = if treated[row] { 1. } else { -1. };
             sign * (outcome[row] - matches[row])
         })
         .sum::<f64>()
-        / n as f64;
+        / if target == Target::Att { treated_rows as f64 } else { n as f64 };
     if !effect.is_finite() {
         return Err(Error::NumericalOverflow);
     }
@@ -239,6 +265,8 @@ pub fn match_on_score(
 pub enum Estimand {
     InverseProbability(Specification),
     DoublyRobust,
+    InverseProbabilityAtt(Specification),
+    DoublyRobustAtt,
 }
 
 #[derive(Clone, Debug)]
@@ -262,6 +290,13 @@ pub fn doubly_robust(
     treated: &[bool],
     intercept: Intercept,
     model: TreatmentModel,
+) -> Result<DoublyRobust, EstimateError> {
+    doubly_robust_target(design, outcome, treated, intercept, model, Target::Ate)
+}
+
+pub fn doubly_robust_target(
+    design: &[Vec<f64>], outcome: &[f64], treated: &[bool],
+    intercept: Intercept, model: TreatmentModel, target: Target,
 ) -> Result<DoublyRobust, EstimateError> {
     let n = design.len();
     if outcome.len() != n || treated.len() != n {
@@ -299,6 +334,18 @@ pub fn doubly_robust(
         ))
     };
     let control_hat = arm_prediction(false)?;
+    if target == Target::Att {
+        let count = treated.iter().filter(|&&t| t).count() as f64;
+        let treated_term = outcome.iter().zip(treated).filter(|(_, t)| **t)
+            .map(|(y, _)| *y).sum::<f64>() / count;
+        // ATTE score: D(Y-m0(X)) - (1-D)e(X)/(1-e(X))(Y-m0(X)), divided by sum D.
+        let control_term = (0..n).map(|row| if treated[row] { control_hat[row] }
+            else { scores.propensity[row] / (1. - scores.propensity[row])
+                * (outcome[row] - control_hat[row]) }).sum::<f64>() / count;
+        let effect = treated_term - control_term;
+        if !effect.is_finite() { return Err(EstimateError::Weighting(Error::NumericalOverflow)); }
+        return Ok(DoublyRobust { effect, treated_term, control_term, fitted: scores.fitted });
+    }
     let treated_hat = arm_prediction(true)?;
 
     let mut treated_values = Vec::with_capacity(n);
@@ -483,6 +530,13 @@ pub fn ate(
     propensity: &[f64],
     specification: Specification,
 ) -> Result<Estimate, Error> {
+    weighted_effect(outcome, treated, propensity, specification, Target::Ate)
+}
+
+pub fn weighted_effect(
+    outcome: &[f64], treated: &[bool], propensity: &[f64],
+    specification: Specification, target: Target,
+) -> Result<Estimate, Error> {
     let n = outcome.len();
     if n == 0 {
         return Err(Error::EmptySample);
@@ -515,9 +569,9 @@ pub fn ate(
             return Err(Error::InvalidProbability { row });
         }
         let w = if treated[row] {
-            treated_scale / p
+            if target == Target::Att { treated_scale } else { treated_scale / p }
         } else {
-            control_scale / (1. - p)
+            control_scale * if target == Target::Att { p / (1. - p) } else { 1. / (1. - p) }
         };
         weights.push(w);
         if treated[row] {
@@ -529,7 +583,10 @@ pub fn ate(
         }
     }
     let (treated_denominator, control_denominator) = match specification.normalization {
-        Normalization::HorvitzThompson => (n as f64 * treated_scale, n as f64 * control_scale),
+        Normalization::HorvitzThompson => {
+            let count = if target == Target::Att { treated_rows } else { n } as f64;
+            (count * treated_scale, count * control_scale)
+        },
         Normalization::Hajek => (treated_weight_sum, control_weight_sum),
     };
     let treated_mean = treated_sum / treated_denominator;

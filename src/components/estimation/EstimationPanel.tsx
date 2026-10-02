@@ -23,6 +23,14 @@ import { BayesianImpactResult } from './BayesianImpactResult'
 import { ImpactEffectPanel } from './ImpactEffectPanel'
 import { StaggeredDidControls } from './StaggeredDidControls'
 import { StaggeredDidResult } from './StaggeredDidResult'
+import { ridgeConfigurationForPanel, ridgeMethodDefinition, ridgeInput } from '@/domain/ridgeAugmented'
+import { defaultPredictorSyntheticConfiguration } from '@/domain/predictorSyntheticControl'
+import { RidgeAugmentedControls } from './RidgeAugmentedControls'
+import { RidgeAugmentedResult } from './RidgeAugmentedResult'
+import { defaultSunAbraham, sunAbrahamInput, sunAbrahamComparison } from '@/domain/sunAbraham'
+import { SunAbrahamControls } from './SunAbrahamControls'
+import { useSunAbrahamPanel } from './useSunAbrahamPanel'
+import { SunAbrahamResult } from './SunAbrahamResult'
 import { defaultStaggeredSpecification, staggeredInput, recordedStaggeredAdjustment, staggeredAdjustmentDescriptions } from '@/domain/staggeredDid'
 import { AdjustedDidControls } from './AdjustedDidControls'
 import { AdjustedDidResult } from './AdjustedDidResult'
@@ -52,6 +60,7 @@ import { runComparisonOption, type RunComparisonRow } from '@/charts/estimation/
 import { useChartTheme } from '@/charts/theme'
 import { EligibilityView } from '@/components/EligibilityView'
 import { MethodCaveats } from '@/components/MethodCaveats'
+import { propensityMethodForTarget } from '@/domain/estimation'
 import { IdentificationRecord } from '@/components/IdentificationRecord'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { Alert } from '@/components/ui/Alert'
@@ -320,6 +329,7 @@ function panelPeriodDisplay(run: Extract<EstimationRunArtifact, { readonly kind:
 
 function PanelEvidenceDetails({ run }: { readonly run: Extract<EstimationRunArtifact, { readonly kind: 'panel-intervention-run' }> }) {
   const { evidence } = run
+  if (evidence.kind === 'sunAbraham') return <SunAbrahamResult evidence={evidence} sourcePeriods={run.sourcePeriods} />
   if (evidence.kind === 'staggeredDid') return <StaggeredDidResult evidence={evidence} labels={panelPeriodDisplay(run).labels} sourcePeriods={run.sourcePeriods} />
   const controls = evidence.units.slice(0, evidence.controlUnits)
   const periods = panelPeriodDisplay(run)
@@ -502,6 +512,7 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
             : { label: 'Chow break', value: formatP(evidence.chow[1], { withLabel: false }), context: <Metadata><span>F {formatStatistic('raw', evidence.chow[0]).text}</span><span>split after row {run.configuration.breakIndex}</span></Metadata> },
         ]
       }
+      case 'ridge-augmented-synthetic-run': return [{label:'Selected lambda',value:formatStatistic('raw',run.evidence.lambda)},{label:'Donor units',value:formatCount(run.evidence.request.donors.length)},{label:'Pre-treatment periods',value:formatCount(run.evidence.request.prePeriods)}]
       case 'predictor-synthetic-control-run': return [{ label: 'Pre-intervention outcome MSPE', value: formatStatistic('raw', run.evidence.outcomeMspe) }, { label: 'Donor units', value: formatCount(run.evidence.donors.length) }, { label: 'Predictor summaries', value: formatCount(run.evidence.balance.length) }]
       case 'synthetic-control-run': {
         const { evidence } = run
@@ -532,6 +543,7 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
       }
       case 'panel-intervention-run': {
         const { evidence } = run
+        if (evidence.kind === 'sunAbraham') return [{label:'Method',value:formatWords('Sun–Abraham')}, {label:'Retained clusters',value:formatCount(evidence.clusters)}, {label:'Overall ATT',value:formatWords('Post-treatment aggregation'),context:'Weighted by supported treated observations'}]
         if (evidence.kind === 'staggeredDid') return [
           {label:'Adjustment method',value:formatWords(staggeredAdjustmentDescriptions[recordedStaggeredAdjustment(evidence.specification).kind].label),context:'Group-time ATT estimation'},
           {label:'Cohorts',value:formatCount(evidence.cohorts.keys.length),context:'Distinct first-treatment periods'},
@@ -678,16 +690,16 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
       case 'propensity-matching-run': {
         const { evidence } = run
         return [
-          { label: 'Paired rows', value: formatCount(evidence.matches.length), context: 'one nearest neighbour from the other arm for every row' },
-          { label: 'Arms', value: formatWords(`${evidence.treatedRows} treated, ${evidence.controlRows} control`), context: 'pairs are averaged over every row' },
+          { label: 'Paired rows', value: formatCount(evidence.target === 'att' ? evidence.treatedRows : evidence.matches.length), context: evidence.target === 'att' ? 'one nearest control neighbour for each treated row' : 'one nearest neighbour from the other arm for every row' },
+          { label: 'Arms', value: formatWords(`${evidence.treatedRows} treated, ${evidence.controlRows} control`), context: evidence.target === 'att' ? 'matched differences are averaged over treated rows' : 'pairs are averaged over every row' },
           ...treatmentModelTiles(evidence.treatmentModel),
         ]
       }
       case 'doubly-robust-run': {
         const { evidence } = run
         return [
-          { label: 'Treated term', value: formatStatistic('raw', evidence.treatedTerm), context: 'weighted residual plus the fitted outcome under treatment' },
-          { label: 'Control term', value: formatStatistic('raw', evidence.controlTerm), context: 'the same under no treatment' },
+          { label: 'Treated term', value: formatStatistic('raw', evidence.treatedTerm), context: evidence.target === 'att' ? 'observed outcome mean among treated rows' : 'weighted residual plus the fitted outcome under treatment' },
+          { label: 'Control term', value: formatStatistic('raw', evidence.controlTerm), context: evidence.target === 'att' ? 'control-outcome predictions for treated rows plus the treatment-odds-weighted control residual correction' : 'the same under no treatment' },
           { label: 'Treatment model', value: formatWords(evidence.converged ? 'Converged' : 'Stopped early'), context: `${formatCount(evidence.parameters).text} parameters` },
         ]
       }
@@ -715,7 +727,7 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
   // The design-specific tiles say what stands in for an adjustment set; otherwise the set itself, counted when
   // long with its first names beneath. The identification record lists every one.
   const adjustmentTile = ((): { readonly value: Formatted; readonly preview: string | null } => {
-    if (run.kind === 'panel-intervention-run') return { value: formatWords(run.evidence.kind === 'staggeredDid' ? 'Adoption-cohort comparisons' : 'Unit and time weights'), preview: null }
+    if (run.kind === 'panel-intervention-run') return { value: formatWords(run.evidence.kind === 'sunAbraham' ? 'Cohort-by-event-time interactions' : run.evidence.kind === 'staggeredDid' ? 'Adoption-cohort comparisons' : 'Unit and time weights'), preview: null }
     if (run.kind === 'frontdoor-two-stage-run') {
       const stage = (columns: readonly number[]) => columns.length === 0 ? 'none' : columns.map((index) => run.columns[index]?.name ?? index).join(', ')
       return { value: formatWords(`stage 1: ${stage(run.evidence.firstStageAdjustment)}, stage 2: ${stage(run.evidence.secondStageAdjustment)}`), preview: null }
@@ -922,6 +934,7 @@ const ResultCard = memo(function ResultCard({ run, study, current, stepLabel, on
       {run.kind === 'causal-impact-run' && run.evidence.kind !== 'causalImpact' && <BayesianImpactResult evidence={run.evidence} columnNames={run.columns.map(column => column.name)} />}
       {run.kind === 'sharp-rd-run' && <SharpRdResult evidence={run.evidence} running={run.columns[0].name} outcome={study.outcome.name} />}
       {run.kind === 'synthetic-control-run' ? <SyntheticControlEvidenceDetails run={run} /> : null}
+      {run.kind === 'ridge-augmented-synthetic-run' ? <RidgeAugmentedResult evidence={run.evidence} sourcePeriods={run.sourcePeriods} outcome={study.outcome.name} /> : null}
       {run.kind === 'predictor-synthetic-control-run' ? <PredictorSyntheticResult run={run} outcome={study.outcome.name} /> : null}
       {run.kind === 'panel-intervention-run' ? <PanelEvidenceDetails run={run} /> : null}
     </>
@@ -996,6 +1009,9 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
   const panelBinding = useMemo<PanelBinding | null>(() => prepared.kind === 'prepared-panel' && study !== null
     ? { prepared: prepared.id, unit: prepared.sampling.unitColumn, time: prepared.sampling.timeColumn, outcome: study.outcome.column, treatment: study.treatment.column }
     : null, [prepared, study])
+  const sunPanel = useSunAbrahamPanel(state.panelPreflight, configuration.kind === 'panel-intervention' && configuration.primary === 'sunAbraham' ? panelBinding : null)
+  const sunComparison = useMemo(() => configuration.kind === 'panel-intervention' && configuration.primary === 'sunAbraham' && sunPanel.kind === 'ready' ? sunAbrahamComparison(sunPanel.catalog, configuration) : null, [configuration, sunPanel])
+  const sunBlocked = configuration.kind === 'panel-intervention' && configuration.primary === 'sunAbraham' && (sunPanel.kind !== 'ready' || sunComparison === null || !sunComparison.ok)
   const studyDataBinding = useMemo<StudyDataBinding | null>(() => study === null
     ? null
     : { prepared: prepared.id, dagRevision: study.dagRevision, treatment: study.treatment.column, outcome: study.outcome.column }, [prepared.id, study])
@@ -1022,6 +1038,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
     switch (job.kind) {
       case 'loading': return { kind: 'pending' }
       case 'ready': return { kind: 'ready', layout: job.layout }
+      case 'layout-refused':
       case 'refused': return { kind: 'refused', problem: job.problem }
       default: return assertNever(job)
     }
@@ -1049,7 +1066,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
       }
       const layout = assessPanelInterventionLayout(matrix.value)
       if (!layout.ok) {
-        dispatch({ type: 'panel-preflight-refused', binding: panelBinding, problem: { kind: 'panel-layout', problem: layout.error } })
+        dispatch({ type: 'panel-layout-refused', binding: panelBinding, matrix: matrix.value, problem: { kind: 'panel-layout', problem: layout.error } })
         return
       }
       dispatch({ type: 'panel-preflight-succeeded', binding: panelBinding, matrix: matrix.value, layout: layout.value })
@@ -1105,10 +1122,11 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
         document,
         study,
         panelPreflight,
+        sunAbrahamComparison: sunPanel.kind === 'failed' ? { ok: false, error: sunPanel.detail } : sunComparison ?? undefined,
       }))
     }
     return evaluations
-  }, [document, identification, panelPreflight, prepared, state.configurations, stationarity, study, studyDataFacts])
+  }, [document, identification, panelPreflight, prepared, state.configurations, stationarity, study, studyDataFacts, sunPanel, sunComparison])
   const eligibility = eligibilityByEstimator.get(state.estimator) ?? null
   const configure = (next: EstimatorConfiguration) => dispatch({ type: 'configured', configuration: next })
   const adjustmentDraftOpen = configuration.kind === 'causal-effects-total'
@@ -1445,6 +1463,23 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           return
         }
         case 'synthetic-control': {
+          if(configuration.specification==='ridge-augmented'){
+            if(panelBinding===null){dispatch({type:'run-failed',detail:'Prepare a long panel with an ATT study.'});return}
+            const {materializePanelInWorker}=await import('@/data/client')
+            const materialized=await materializePanelInWorker(source.file,profile,{unit:panelBinding.unit,time:panelBinding.time,outcome:panelBinding.outcome,treatment:panelBinding.treatment})
+            if(!session.current(current))return
+            if(!materialized.ok){dispatch({type:'run-failed',detail:describePanelDataProblem(materialized.error)});return}
+            const input=ridgeInput(materialized.value,configuration)
+            if(!input.ok){dispatch({type:'run-failed',detail:input.error});return}
+            const result=await analysis.runRidgeAugmentedSynthetic(input.value.values,input.value.model)
+            if(!session.current(current))return
+            if(!result.ok){dispatch({type:'run-failed',detail:describeAnalysisWorkerProblem(result.error)});return}
+            const columns:NonEmptyArray<StudyVariable>=[study.outcome,study.treatment]
+            const run={kind:'ridge-augmented-synthetic-run',configuration,evidence:result.value,sourcePeriods:materialized.value.periods} as const
+            const estimate=causalEstimateFrom(study,identification,run)
+            finish(estimate===null?null:{...identity,...run,method:methodIdOf(configuration.kind),columns,estimate},'The ridge-augmented comparison does not match the recorded ATT study.')
+            return
+          }
           if (configuration.specification === 'predictors') {
             const { preparePredictorSynthetic } = await import('@/data/predictorSyntheticInput')
             const input = await preparePredictorSynthetic(source, profile, prepared, configuration, study.outcome.column, study.treatment.column, () => session.current(current))
@@ -1478,6 +1513,24 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
         }
         case 'panel-intervention': {
           if (prepared.kind !== 'prepared-panel') { dispatch({ type: 'run-failed', detail: 'Prepare a balanced long panel before running the panel intervention estimator.' }); return }
+          if (configuration.primary === 'sunAbraham') {
+            if(sunPanel.kind!=='ready'){dispatch({type:'run-failed',detail:sunPanel.kind==='failed'?sunPanel.detail:'Wait for the adoption cohorts to be read.'});return}
+            const materialized={value:sunPanel.matrix}
+            const input=sunAbrahamInput(materialized.value,configuration)
+            if(!input.ok){dispatch({type:'run-failed',detail:input.error});return}
+            const evidence=await analysis.runSunAbraham(input.value.values,input.value.model)
+            if(!session.current(current))return
+            if(!evidence.ok){dispatch({type:'run-failed',detail:describeAnalysisWorkerProblem(evidence.error)});return}
+            const labels=evidence.value.times.map(t=>materialized.value.periods.find(p=>p.code===t)?.label)
+            if(!isNonEmpty(labels)||labels.some(l=>l===undefined)){dispatch({type:'run-failed',detail:'The returned periods do not match the source labels.'});return}
+            const timeLabels=labels.filter((l):l is string=>l!==undefined)
+            if(!isNonEmpty(timeLabels))return
+            const columns:NonEmptyArray<StudyVariable>=[study.outcome,study.treatment]
+            const run={kind:'panel-intervention-run',configuration,evidence:evidence.value,timeLabels,sourcePeriods:materialized.value.periods} as const
+            const estimate=causalEstimateFrom(study,identification,run)
+            finish(estimate===null?null:{...identity,...run,method:methodIdOf(configuration.kind),columns,estimate},'The Sun–Abraham result does not match the recorded ATT study.')
+            return
+          }
           if (configuration.primary === 'staggered') {
             if(panelBinding===null) {dispatch({type:'run-failed',detail:'Select panel unit, time, outcome and treatment columns.'});return}
             const { materializePanelInWorker } = await import('@/data/client')
@@ -1750,20 +1803,20 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
               ? { kind: 'logistic', model: logistic, bootstrap: drawn(configuration.uncertainty) } as const
               : { kind: 'boosted', model: boostedCommand(chosen.grid, chosen.searched) } as const
             const evidence = await analysis.runPropensityWeighting(design.value.values, matrix.rowCount, design.value.columnCount,
-              { ...shared, scale: configuration.scale, fit })
+              { ...shared, target: study.estimand.kind === 'average-treatment-effect-on-treated' ? 'att' : 'ate', scale: configuration.scale, fit })
             if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
             record({ kind: 'propensity-weighting-run', configuration, evidence: evidence.value })
             return
           }
           if (configuration.kind === 'propensity-matching') {
             const evidence = await analysis.runPropensityMatching(design.value.values, matrix.rowCount, design.value.columnCount,
-              { ...shared, model: treatmentModel(chosen) })
+              { ...shared, target: study.estimand.kind === 'average-treatment-effect-on-treated' ? 'att' : 'ate', model: treatmentModel(chosen) })
             if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
             record({ kind: 'propensity-matching-run', configuration, evidence: evidence.value })
             return
           }
           const evidence = await analysis.runDoublyRobust(design.value.values, matrix.rowCount, design.value.columnCount,
-            { ...shared, model: logistic, bootstrap: drawn(configuration.uncertainty) })
+            { ...shared, target: study.estimand.kind === 'average-treatment-effect-on-treated' ? 'att' : 'ate', model: logistic, bootstrap: drawn(configuration.uncertainty) })
           if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
           record({ kind: 'doubly-robust-run', configuration, evidence: evidence.value })
           return
@@ -2017,7 +2070,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
               )}
               {categoricalChecklist}
               <p className={cn(fieldHint, 'm-0 max-w-[65ch]')}>
-                {`The score is fitted on the identified adjustment set as supplied. Declare categorical covariates before the run, and read the fitted scores with the result: a score at zero or one leaves a row with no counterpart in the other arm.${configuration.model === 'boosted' ? ` The search scores ${boostedCandidateCount(configuration.boosted)} candidates by held-out ROC AUC across ${configuration.boosted.splits} folds, then refits the one it chose, and reports no bootstrap interval.` : ''}`}
+                {`The score is fitted on the identified adjustment set as supplied. Declare categorical covariates before the run, and read the fitted scores with the result: extreme scores can indicate unstable weights or poor matches, so inspect treatment overlap.${configuration.model === 'boosted' ? ` The search scores ${boostedCandidateCount(configuration.boosted)} candidates by held-out ROC AUC across ${configuration.boosted.splits} folds, then refits the one it chose, and reports no bootstrap interval.` : ''}`}
               </p>
             </SettingsStep>
             {configuration.kind === 'propensity-weighting' && (
@@ -2147,8 +2200,10 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             </SettingsStep>
           </div>
         )
-      case 'synthetic-control':
-        if (configuration.specification === 'predictors') return <PredictorSyntheticControls configuration={configuration} onChange={configure} source={source} profile={profile} prepared={prepared} treatment={study?.treatment.column ?? null} />
+      case 'synthetic-control': {
+        const selector=prepared.kind==='prepared-panel'?<SegmentedControl className="justify-self-start" ariaLabel="Synthetic-control specification" value={configuration.specification==='ridge-augmented'?'ridge-augmented':'predictors'} onChange={specification=>configure(specification==='ridge-augmented'?ridgeConfigurationForPanel(panelPreflight.kind==='ready'?panelPreflight.layout:null):defaultPredictorSyntheticConfiguration())} options={[{value:'predictors',label:'Predictor balance'},{value:'ridge-augmented',label:'Ridge augmentation',disabled:panelPreflight.kind==='pending',title:panelPreflight.kind==='pending'?'Checking the treatment pattern before preparing the comparison.':undefined}]}/>:null
+        if(configuration.specification==='ridge-augmented')return <div className="grid gap-6">{selector}<RidgeAugmentedControls configuration={configuration} onChange={configure} source={source} profile={profile} prepared={prepared}/></div>
+        if (configuration.specification === 'predictors') return <div className="grid gap-6">{selector}<PredictorSyntheticControls configuration={configuration} onChange={configure} source={source} profile={profile} prepared={prepared} treatment={study?.treatment.column ?? null} /></div>
         return (
           <div className={stepsStack}>
             <SettingsStep number={1} title="Mark the intervention">
@@ -2191,16 +2246,18 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             </SettingsStep>
           </div>
         )
+      }
       case 'panel-intervention':
         return (
           <div className={stepsStack}>
             <SettingsStep number={configuration.primary === 'did' ? undefined : 1} title="Choose the method" className="[column-span:all]">
               <p className={cn(fieldHint, 'm-0 max-w-[65ch]')}>Choose the method before fitting. Two-period regression and DR require one period before and one after adoption. Conventional DiD can also compare averages across multiple pre- and post-periods.</p>
-              <SegmentedControl className="justify-self-start" ariaLabel="Panel method" value={configuration.primary === 'adjusted' ? configuration.specification.kind : configuration.primary ?? 'syntheticDid'} onChange={(primary) => configure(primary === 'staggered' ? {kind:'panel-intervention',primary:'staggered',covariates:[],specification:defaultStaggeredSpecification,clustering:{kind:'unit'}} : primary === 'regression' || primary === 'doublyRobust'
+              <SegmentedControl className="justify-self-start" ariaLabel="Panel method" value={configuration.primary === 'adjusted' ? configuration.specification.kind : configuration.primary ?? 'syntheticDid'} onChange={(primary) => configure(primary === 'sunAbraham' ? defaultSunAbraham : primary === 'staggered' ? {kind:'panel-intervention',primary:'staggered',covariates:[],specification:defaultStaggeredSpecification,clustering:{kind:'unit'}} : primary === 'regression' || primary === 'doublyRobust'
                 ? { kind: 'panel-intervention', primary: 'adjusted', covariates: [], specification: primary === 'regression' ? { kind: 'regression' } : { kind: 'doublyRobust', folds: 2, seed: 1234, trimming: 0.01, normalization: 'in-sample' } }
-                : { kind: 'panel-intervention', primary, placeboReplications: 100, seed: 0 })} options={[{ value: 'did', label: 'Conventional' }, { value: 'regression', label: 'Two-period regression' }, { value: 'doublyRobust', label: 'Two-period DR' }, { value: 'syntheticDid', label: 'Synthetic' }, {value:'staggered',label:'Staggered adoption'}]} />
+                : { kind: 'panel-intervention', primary, placeboReplications: 100, seed: 0 })} options={[{ value: 'did', label: 'Conventional' }, { value: 'regression', label: 'Two-period regression' }, { value: 'doublyRobust', label: 'Two-period DR' }, { value: 'syntheticDid', label: 'Synthetic' }, {value:'staggered',label:'Staggered adoption'},{value:'sunAbraham',label:'Sun–Abraham'}]} />
               {prepared.kind==='prepared-panel'&&study!==null&&onOpenBacon!==undefined&&<div className="space-y-1"><button type="button" className={button('quiet')} disabled={job.kind==='running'||session.blocked} onClick={()=>onOpenBacon(study.outcome.column,study.treatment.column)}>Decompose the TWFE coefficient</button><p className={fieldHint}>Inspect the weighted comparisons in a two-way fixed-effects regression. This diagnostic does not estimate a separate ATT.</p></div>}
             </SettingsStep>
+            {configuration.primary === 'sunAbraham' && <SunAbrahamControls configuration={configuration} onChange={configure} panel={sunPanel} />}
             {configuration.primary === 'staggered' && <SettingsStep number={2} title="Compare cohorts">
               <StaggeredDidControls section="comparison" configuration={configuration} candidates={controlCandidates.filter(c=>prepared.kind!=='prepared-panel'||(c.id!==prepared.panel.unitColumn&&c.id!==prepared.panel.timeColumn))} clusterCandidates={profile.columns.filter(c=>c.id!==study?.treatment.column&&c.id!==study?.outcome.column&&(prepared.kind!=='prepared-panel'||(c.id!==prepared.panel.unitColumn&&c.id!==prepared.panel.timeColumn)))} onChange={configure} />
             </SettingsStep>}
@@ -2210,7 +2267,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             {configuration.primary === 'adjusted' && <SettingsStep number={2} title="Adjust for covariates">
               <AdjustedDidControls configuration={configuration} candidates={controlCandidates.filter(c => prepared.kind !== 'prepared-panel' || (c.id !== prepared.panel.unitColumn && c.id !== prepared.panel.timeColumn))} onChange={configure} />
             </SettingsStep>}
-            {configuration.primary !== 'did' && configuration.primary !== 'adjusted' && configuration.primary !== 'staggered' && <SettingsStep number={2} title="Report uncertainty">
+            {configuration.primary !== 'did' && configuration.primary !== 'adjusted' && configuration.primary !== 'staggered' && configuration.primary !== 'sunAbraham' && <SettingsStep number={2} title="Report uncertainty">
               <div className={fieldRow.two}>
                 <label className="block"><ParameterLabel className={fieldLabel} label="Placebo replications" help={ESTIMATION_PARAMETER_HELP.panelIntervention.placeboReplications} /><input type="number" min={2} max={2000} aria-label="Panel placebo replications" className={field('text', 'mt-1 w-full')} value={configuration.placeboReplications} onChange={(event) => configure({ ...configuration, placeboReplications: Math.max(2, Math.min(2000, Math.floor(Number(event.target.value) || 2))) })} /></label>
                 <label className="block"><ParameterLabel className={fieldLabel} label="Placebo seed" help={ESTIMATION_PARAMETER_HELP.panelIntervention.placeboSeed} /><input type="number" min={0} max={0xffff_ffff} aria-label="Panel placebo seed" className={field('text', 'mt-1 w-full')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.min(0xffff_ffff, Math.floor(Number(event.target.value) || 0))) })} /></label>
@@ -2512,8 +2569,8 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             {studyDataError !== null && <Alert tone="danger"><p className="m-0">The treatment and outcome columns could not be checked: {studyDataError}</p></Alert>}
             <JobNotice job={job} />
             <RunActions className="min-h-10" testId="estimation-run-row" running={job.kind === 'running'} onCancel={session.cancel} orbLabel="Estimator running">
-              <button type="button" className={button('signal', 'min-w-0')} disabled={job.kind === 'running' || session.blocked || !selectedEstimatorIsVisible || identification === null || eligibility === null || eligibility.kind === 'refused' || studyDataPending || studyDataError !== null || adjustmentDraftOpen || (configuration.kind === 'panel-intervention' && configuration.primary !== 'staggered' && panelPreflight.kind !== 'ready')} aria-busy={job.kind === 'running'} onClick={() => void execute()}>
-                {!selectedEstimatorIsVisible ? 'Choose a method' : studyDataPending ? 'Checking treatment and outcome…' : configuration.kind === 'panel-intervention' && configuration.primary !== 'staggered' && panelPreflight.kind === 'pending' ? 'Checking panel…' : runLabel(state.estimator)}
+              <button type="button" className={button('signal', 'min-w-0')} disabled={job.kind === 'running' || session.blocked || sunBlocked || !selectedEstimatorIsVisible || identification === null || eligibility === null || eligibility.kind === 'refused' || studyDataPending || studyDataError !== null || adjustmentDraftOpen || (configuration.kind === 'panel-intervention' && configuration.primary !== 'staggered' && configuration.primary !== 'sunAbraham' && panelPreflight.kind !== 'ready')} aria-busy={job.kind === 'running'} onClick={() => void execute()}>
+                {!selectedEstimatorIsVisible ? 'Choose a method' : studyDataPending ? 'Checking treatment and outcome…' : configuration.kind === 'panel-intervention' && configuration.primary !== 'staggered' && configuration.primary !== 'sunAbraham' && panelPreflight.kind === 'pending' ? 'Checking panel…' : runLabel(state.estimator)}
               </button>
             </RunActions>
             </div>
@@ -2569,8 +2626,8 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
         <h4 className="m-0 text-body font-medium text-ink">{visibleGroup.name}</h4>
         <p className="mb-0 mt-1 text-body text-muted">{visibleGroup.description}</p>
       </div>
-      {configuration.kind === 'panel-intervention' && configuration.primary !== 'staggered' && panelPreflight.kind === 'pending' && <p className="m-0 text-body text-muted" role="status">Checking panel structure and treatment timing…</p>}
-      {configuration.kind === 'panel-intervention' && configuration.primary !== 'staggered' && panelPreflight.kind === 'ready' && <section aria-label="Checked panel structure" className="space-y-2">
+      {configuration.kind === 'panel-intervention' && configuration.primary !== 'staggered' && configuration.primary !== 'sunAbraham' && panelPreflight.kind === 'pending' && <p className="m-0 text-body text-muted" role="status">Checking panel structure and treatment timing…</p>}
+      {configuration.kind === 'panel-intervention' && configuration.primary !== 'staggered' && configuration.primary !== 'sunAbraham' && panelPreflight.kind === 'ready' && <section aria-label="Checked panel structure" className="space-y-2">
         <p className="m-0 flex items-center gap-1.5 text-body text-ok"><Icon name="check_circle" size={16} />Panel structure checked</p>
         <MetricGrid label="Panel structure">
           <MetricTile size="compact" frame="cell" label="Treated / control units" value={formatWords(`${formatCount(panelPreflight.layout.treated.length).text} / ${formatCount(panelPreflight.layout.controls.length).text}`)} />
@@ -2579,7 +2636,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
         </MetricGrid>
       </section>}
       <MethodCaveats
-        methods={method.ok ? [method.value] : ESTIMATION_METHODS}
+        methods={method.ok ? [propensityMethodForTarget(configuration.kind==='synthetic-control'&&configuration.specification==='ridge-augmented'?ridgeMethodDefinition(method.value):method.value, study?.estimand.kind === 'average-treatment-effect-on-treated' ? 'att' : 'ate')] : ESTIMATION_METHODS}
         eligibility={eligibility}
       />
       </section>}

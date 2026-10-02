@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { absorbingAdoption } from './absorbingAdoption'
 import type { ColumnId } from './dataset'
 import { err, ok, type Result } from './dop'
 import type { PanelLongMatrix } from './panel'
@@ -112,25 +113,9 @@ export function staggeredInput(matrix: PanelLongMatrix, specification:StaggeredS
     }
     if (new Set(clusters).size < 2) return err('Clustered inference requires at least two clusters.')
   } else if (matrix.cluster !== undefined) return err('The materialized cluster column does not match unit-level clustering.')
-  const byUnit=new Map<string,Map<number,number>>()
-  for(let i=0;i<rows;i++) {
-    const unit=matrix.units[i]!,time=matrix.periodCodes[i]!,treatment=matrix.values[rows+i]!
-    if(treatment!==0&&treatment!==1) return err('Staggered DiD requires a binary treatment indicator in each period.')
-    const periods=byUnit.get(unit)??new Map<number,number>()
-    if(periods.has(time)) return err('The panel contains a repeated unit-period key.')
-    periods.set(time,treatment);byUnit.set(unit,periods)
-  }
-  const adoption=new Map<string,number|null>()
-  for(const [unit,periods] of byUnit) {
-    if(periods.size!==matrix.periods.length || matrix.periods.some(p=>!periods.has(p.code))) return err('Staggered DiD requires a balanced, complete panel.')
-    let first:number|null=null
-    for(const [time,treatment] of [...periods].sort(([a],[b])=>a-b)) {
-      if(treatment===1&&first===null) first=time
-      if(treatment===0&&first!==null) return err(`Treatment switches off for ${unit}. This method requires treatment to remain on after adoption.`)
-    }
-    adoption.set(unit,first)
-  }
-  if([...adoption.values()].every(g=>g===null)) return err('No unit adopts treatment in the observed panel.')
+  const derived=absorbingAdoption(matrix,'required')
+  if(!derived.ok)return derived
+  const adoption=derived.value
   const values=new Float64Array(rows*(columns-1))
   values.set(matrix.values.subarray(0,rows))
   values.set(matrix.values.subarray(2*rows),rows)

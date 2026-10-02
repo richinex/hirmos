@@ -215,6 +215,8 @@ pub struct WithinOls {
     /// The demeaned outcome and kept columns the fit used.
     pub within_outcome: Vec<f64>,
     pub within_design: DMatrix<f64>,
+    /// Every projected input column before source-specific rank decisions.
+    pub projected_design: DMatrix<f64>,
 }
 
 /// The group index of every row, and the number of groups, from labels that need not be dense.
@@ -356,6 +358,17 @@ fn within_fit(y: &[f64], x: &DMatrix<f64>, units: &[u64], times: Option<&[u64]>,
         None => (ye.clone(), xe.clone(), None),
         Some(times) => {
             let (time_index, period_count) = group_index(times);
+            // On a complete, equally weighted grid the two projections
+            // commute. Reuse the existing demean operation for exact
+            // two-way deviations, avoiding an unnecessary dummy-matrix SVD.
+            let balanced = normalized.is_none()
+                && unit_count.checked_mul(period_count) == Some(n)
+                && units.iter().zip(times).collect::<std::collections::BTreeSet<_>>().len() == n;
+            if balanced {
+                (demean(&ye, &time_index, period_count),
+                 map_columns(&xe, |values| demean(values, &time_index, period_count)),
+                 Some(period_count))
+            } else {
             let mut dummies = DMatrix::<f64>::zeros(n, period_count - 1);
             for (i, &period) in time_index.iter().enumerate() {
                 if period > 0 {
@@ -367,6 +380,7 @@ fn within_fit(y: &[f64], x: &DMatrix<f64>, units: &[u64], times: Option<&[u64]>,
                 crate::ols::Ols::fit(&dummies, &DVector::from_column_slice(values)).resid.iter().copied().collect()
             };
             (residualise(&ye), map_columns(&xe, residualise), Some(period_count))
+            }
         }
     };
     let kept = not_absorbed(&xd);
@@ -467,6 +481,7 @@ fn within_fit(y: &[f64], x: &DMatrix<f64>, units: &[u64], times: Option<&[u64]>,
         rsquared_within: 1.0 - within_ssr / within_tss,
         within_outcome: yd,
         within_design: design,
+        projected_design: xd,
     })
 }
 

@@ -209,3 +209,6 @@ pub mod panel_glm;
 pub mod panel_design;
 
 pub mod continuous_did;
+pub mod sun_abraham;
+pub mod sun_abraham_fit;
+pub mod augmented_synth;

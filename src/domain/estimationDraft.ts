@@ -34,6 +34,7 @@ export type PanelPreflightJob =
   | { readonly kind: 'not-required' }
   | { readonly kind: 'loading'; readonly binding: PanelBinding }
   | { readonly kind: 'ready'; readonly binding: PanelBinding; readonly matrix: PanelLongMatrix; readonly layout: PanelInterventionLayout }
+  | { readonly kind: 'layout-refused'; readonly binding: PanelBinding; readonly matrix: PanelLongMatrix; readonly problem: Extract<Extract<PanelInterventionPreflight, { readonly kind: 'refused' }>['problem'], { readonly kind: 'panel-layout' }> }
   | { readonly kind: 'refused'; readonly binding: PanelBinding; readonly problem: Extract<PanelInterventionPreflight, { readonly kind: 'refused' }>['problem'] }
 
 /** The identification the panel works from, with the estimator that fits it and fresh defaults for every estimator. */
@@ -70,6 +71,7 @@ export type EstimationEvent =
   | { readonly type: 'panel-preflight-not-required' }
   | { readonly type: 'panel-preflight-started'; readonly binding: PanelBinding }
   | { readonly type: 'panel-preflight-succeeded'; readonly binding: PanelBinding; readonly matrix: PanelLongMatrix; readonly layout: PanelInterventionLayout }
+  | { readonly type: 'panel-layout-refused'; readonly binding: PanelBinding; readonly matrix: PanelLongMatrix; readonly problem: Extract<Extract<PanelInterventionPreflight, { readonly kind: 'refused' }>['problem'], { readonly kind: 'panel-layout' }> }
   | { readonly type: 'panel-preflight-refused'; readonly binding: PanelBinding; readonly problem: Extract<PanelInterventionPreflight, { readonly kind: 'refused' }>['problem'] }
   | { readonly type: 'study-data-preflight-not-required' }
   | { readonly type: 'study-data-preflight-started'; readonly binding: StudyDataBinding }
@@ -87,6 +89,8 @@ export const stepEstimationDraft = (state: EstimationDraft, event: EstimationEve
     case 'panel-preflight-started': return { ...state, panelPreflight: { kind: 'loading', binding: event.binding } }
     case 'panel-preflight-succeeded': return state.panelPreflight.kind === 'loading' && samePanelBinding(state.panelPreflight.binding, event.binding)
       ? { ...state, panelPreflight: { kind: 'ready', binding: event.binding, matrix: event.matrix, layout: event.layout } } : state
+    case 'panel-layout-refused': return state.panelPreflight.kind === 'loading' && samePanelBinding(state.panelPreflight.binding, event.binding)
+      ? { ...state, panelPreflight: { kind: 'layout-refused', binding: event.binding, matrix: event.matrix, problem: event.problem } } : state
     case 'panel-preflight-refused': return state.panelPreflight.kind === 'loading' && samePanelBinding(state.panelPreflight.binding, event.binding)
       ? { ...state, panelPreflight: { kind: 'refused', binding: event.binding, problem: event.problem } } : state
     case 'study-data-preflight-not-required': return { ...state, studyDataPreflight: { kind: 'not-required' } }

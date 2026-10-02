@@ -1264,7 +1264,8 @@ const PROPENSITY_WEIGHTING: MethodDefinition = {
   id: PROPENSITY_WEIGHTING_METHOD_ID,
   name: 'Inverse propensity weighting',
   family: 'estimation',
-  summary: 'Fit the propensity score on the adjustment set, then reweight the sample by the inverse probability of treatment. Weights may be stabilized by the marginal treatment prevalence.',
+  summary: 'Fit the propensity score on the adjustment set. For ATE, weight both arms by inverse probabilities. For ATT, weight controls by the odds of treatment and compare separate weighted means. Stabilization rescales weights within each arm.',
+  // The expression below describes the ATE variant; the summary distinguishes ATT.
   summaryTex: {
     tex: String.raw`\mathrm{ATE} = \frac{1}{N}\sum_i\left(\frac{T_i Y_i}{e(X_i)} - \frac{(1-T_i) Y_i}{1 - e(X_i)}\right),\quad e(X) = P(T{=}1 \mid X)`,
     plain: 'ATE = (1/N) Σ [ T·Y / e(X) − (1−T)·Y / (1 − e(X)) ], where e(X) = P(T=1 | X)',
@@ -1305,7 +1306,8 @@ const PROPENSITY_MATCHING: MethodDefinition = {
   id: PROPENSITY_MATCHING_METHOD_ID,
   name: 'Propensity-score matching',
   family: 'estimation',
-  summary: 'Pair every row with its nearest neighbour on the fitted propensity score from the opposite arm, then average the paired differences over the whole sample.',
+  summary: 'Match on the fitted propensity score. For ATE, average opposite-arm matched differences over all rows. For ATT, average treated-to-control matched differences over treated rows.',
+  // The expression below describes the ATE variant; the summary distinguishes ATT.
   summaryTex: {
     tex: String.raw`\mathrm{ATE} = \frac{1}{N}\sum_i (2T_i - 1)\bigl(Y_i - Y_{j_m(i)}\bigr)`,
     plain: 'ATE = (1/N) Σ (2T − 1)(Y − Y_jm), where jm is the nearest neighbour on the score from the other arm',
@@ -1335,8 +1337,8 @@ const PROPENSITY_MATCHING: MethodDefinition = {
     {
       id: caveatId('matching-average-not-treated'),
       category: 'interpretation',
-      requirement: 'Pairs are averaged over every row, so the estimand is the average effect rather than the effect on the treated.',
-      consequenceIfUnmet: 'An average effect is read as an effect on the treated.',
+      requirement: 'The recorded study target determines the averaging population: all rows for ATE, or treated rows for ATT.',
+      consequenceIfUnmet: 'A result averaged over one population is incorrectly interpreted as an effect for another.',
       sources: [FACURE_CH5('the matching estimator')],
     },
   ],
@@ -1346,7 +1348,8 @@ const DOUBLY_ROBUST: MethodDefinition = {
   id: DOUBLY_ROBUST_METHOD_ID,
   name: 'Doubly robust estimation',
   family: 'estimation',
-  summary: 'Combine propensity weighting with outcome regression fitted separately in each arm. Under the identification and regularity assumptions, the estimator is consistent if either the propensity model or the outcome regressions are correctly specified.',
+  summary: 'Combine a propensity model with outcome regression. ATE uses outcome regressions in both arms; ATT uses the control-outcome regression and treatment-odds correction. Under the identification and regularity assumptions, consistency requires either the propensity model or the relevant outcome model to be correct.',
+  // The expression below describes the ATE variant; the summary distinguishes ATT.
   summaryTex: {
     tex: String.raw`\mathrm{ATE} = \frac{1}{N}\sum_i\left(\frac{T_i\bigl(Y_i - \hat\mu_1(X_i)\bigr)}{e(X_i)} + \hat\mu_1(X_i)\right) - \frac{1}{N}\sum_i\left(\frac{(1-T_i)\bigl(Y_i - \hat\mu_0(X_i)\bigr)}{1 - e(X_i)} + \hat\mu_0(X_i)\right)`,
     plain: 'ATE = (1/N) Σ [ T(Y − μ1(X)) / e(X) + μ1(X) ] − (1/N) Σ [ (1−T)(Y − μ0(X)) / (1 − e(X)) + μ0(X) ]',
@@ -1376,7 +1379,7 @@ const DOUBLY_ROBUST: MethodDefinition = {
     {
       id: caveatId('aipw-arm-regressions'),
       category: 'functional-form',
-      requirement: 'The outcome model is a linear regression fitted within each arm on the same design.',
+      requirement: 'ATE fits a linear outcome regression in each arm. ATT fits the control-outcome regression and evaluates it at treated covariate values.',
       consequenceIfUnmet: 'The linear regressions may miss nonlinear outcome relationships; consistency then depends on a correctly specified propensity model.',
       sources: [FACURE_CH5('the doubly robust estimator in code')],
     },
@@ -2205,11 +2208,11 @@ const PANEL_INTERVENTION: MethodDefinition = {
   id: PANEL_INTERVENTION_METHOD_ID,
   name: 'Panel difference-in-differences',
   family: 'estimation',
-  summary: 'Estimate average treatment effects on treated units. Staggered adoption estimates group-time effects and event-time, cohort and calendar averages. Conventional, two-period regression, two-period cross-fitted doubly robust and synthetic DiD use the shared-adoption design.',
+  summary: 'Estimate average treatment effects on treated units. Staggered adoption estimates group-time effects and event-time, cohort and calendar averages. Sun–Abraham estimates cohort-by-event-time interactions and averages effects over supported non-reference cohorts. Conventional, two-period regression, two-period cross-fitted doubly robust and synthetic DiD use the shared-adoption design.',
   caveats: [
     {
       id: caveatId('panel-balanced-layout'), category: 'sampling-structure',
-      requirement: 'The prepared panel has one observation per unit and period on a complete grid. Shared-adoption methods require a common adoption period; staggered DiD permits different adoption cohorts. Treatment is absorbing: units remain treated after adoption.',
+      requirement: 'The prepared panel has one observation per unit and period on a complete grid. Shared-adoption methods require a common adoption period; staggered DiD and Sun–Abraham permit different adoption cohorts. Sun–Abraham can use an unbalanced panel. Treatment is absorbing: units remain treated after adoption.',
       consequenceIfUnmet: 'The implemented weighting system does not define the requested comparison.',
       sources: [ARKHANGELSKY_2021, CALLAWAY_SANTANNA_2021, synthdid('R/utils.R#panel.matrices')],
     },
@@ -2233,9 +2236,9 @@ const PANEL_INTERVENTION: MethodDefinition = {
     },
     {
       id: caveatId('panel-pre-fit'), category: 'finite-sample',
-      requirement: 'Synthetic DiD needs pre-period variation to fit weights. The implemented regression and doubly robust specifications require one pre-treatment and one post-treatment period, with adequate covariate support. Doubly robust DiD also needs treatment overlap within its folds.',
+      requirement: 'Synthetic DiD needs pre-period variation to fit weights. The implemented regression and doubly robust specifications require one pre-treatment and one post-treatment period, with adequate covariate support. Doubly robust DiD also needs treatment overlap within its folds. Sun–Abraham requires reference periods and comparison cohorts; selected reference cohorts remain in the fit but have no estimated treatment interactions.',
       consequenceIfUnmet: 'The selected specification cannot be fitted even when the panel grid is valid and another DiD method is available.',
-      sources: [ARKHANGELSKY_2021, ABADIE_2021, synthdid('R/solver.R; R/synthdid.R')],
+      sources: [ARKHANGELSKY_2021, ABADIE_2021, synthdid('R/solver.R; R/synthdid.R'), paper('Estimating dynamic treatment effects in event studies with heterogeneous treatment effects (Sun and Abraham, 2021)', 'Journal of Econometrics; reference cohort and relative-period normalizations')],
     },
     {
       id: caveatId('panel-no-interval'), category: 'finite-sample',

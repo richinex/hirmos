@@ -1,6 +1,7 @@
 import {countRegressionEvidenceSchema,sameCountRequest} from '@/domain/countRegression'
 import {panelRegressionEvidenceSchema,baconEvidenceSchema,sameSpecification} from '@/domain/panelRegression'
 import { z } from 'zod'
+import { sunAbrahamEvidenceSchema, ridgeAugmentedEvidenceSchema } from '@/domain/remixExtensions'
 import { predictorSyntheticEvidenceSchema, samePredictorSyntheticRequest } from '@/domain/predictorSyntheticControl'
 import { causalForestEvidenceSchema, sameCausalForestTarget, causalForestSettingsMatch } from '@/domain/causalForest'
 import { sameStructuralModel } from '@/domain/structuralImpact'
@@ -335,13 +336,13 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
         fixedEffects: command.fixedEffects,
       }
     case 'propensity-weighting':
-      return { kind: 'propensityWeighting', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, scale: command.scale, fit: command.fit }
+      return { kind: 'propensityWeighting', target: command.target, rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, scale: command.scale, fit: command.fit }
     case 'propensity-matching':
-      return { kind: 'propensityMatching', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, model: command.model }
+      return { kind: 'propensityMatching', target: command.target, rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, model: command.model }
     case 'propensity-grid-slice':
       return { kind: 'propensityGridSlice', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, learningRate: command.learningRate, maxDepth: command.maxDepth, nEstimators: command.nEstimators, splits: command.splits, minSamplesLeaf: command.minSamplesLeaf, minSamplesSplit: command.minSamplesSplit, seed: command.seed }
     case 'doubly-robust':
-      return { kind: 'doublyRobust', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, model: command.model, bootstrap: command.bootstrap }
+      return { kind: 'doublyRobust', target: command.target, rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, model: command.model, bootstrap: command.bootstrap }
     case 'continuous-gps':
       return { kind: 'continuousGps', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, scale: command.scale, bootstrap: command.bootstrap }
     case 'frontdoor-two-stage':
@@ -423,6 +424,8 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
     case 'panel-intervention':
       return { kind: 'panelIntervention', rows: command.rows, units: command.units, times: command.times, placeboReplications: command.placeboReplications, seed: command.seed, primary: command.primary ?? 'syntheticDid' }
     case 'count-regression': return {kind:'countRegression',request:command.model}
+    case 'sun-abraham': return {kind:'sunAbraham',request:command.model}
+    case 'ridge-augmented-synthetic': return {kind:'ridgeAugmentedSynthetic',request:command.model}
     case 'panel-regression': return {kind:'panelRegression',request:command.model}
     case 'bacon': return {kind:'bacon',request:command.model}
     case 'staggered-did': return {kind:'staggeredDid',request:command.model}
@@ -749,6 +752,7 @@ self.onmessage = (message: MessageEvent<unknown>) => {
       }
       case 'propensity-weighting': {
         const result = parsePropensityWeightingEvidence(decoded)
+        if (result.ok && result.value.target !== command.target) { fail(command.request, { kind: 'worker-protocol-failed', detail: 'The propensity result reports a different target from the request.' }); return }
         if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
         emit({ kind: 'propensity-weighting-succeeded', request: command.request, result: result.value })
         return
@@ -761,12 +765,14 @@ self.onmessage = (message: MessageEvent<unknown>) => {
       }
       case 'propensity-matching': {
         const result = parsePropensityMatchingEvidence(decoded)
+        if (result.ok && result.value.target !== command.target) { fail(command.request, { kind: 'worker-protocol-failed', detail: 'The propensity result reports a different target from the request.' }); return }
         if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
         emit({ kind: 'propensity-matching-succeeded', request: command.request, result: result.value })
         return
       }
       case 'doubly-robust': {
         const result = parseDoublyRobustEvidence(decoded)
+        if (result.ok && result.value.target !== command.target) { fail(command.request, { kind: 'worker-protocol-failed', detail: 'The propensity result reports a different target from the request.' }); return }
         if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
         emit({ kind: 'doubly-robust-succeeded', request: command.request, result: result.value })
         return
@@ -956,6 +962,18 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         if(!wrapper.success){fail(command.request,{kind:'worker-protocol-failed',detail:wrapper.error.message});return}
         if(!sameCountRequest(wrapper.data.evidence.request,command.model)){fail(command.request,{kind:'worker-protocol-failed',detail:'The count regression result differs from the requested specification.'});return}
         emit({kind:'count-regression-succeeded',request:command.request,result:wrapper.data.evidence});return
+      }
+      case 'sun-abraham': {
+        const result=z.object({kind:z.literal('sunAbraham'),evidence:sunAbrahamEvidenceSchema}).strict().safeParse(decoded)
+        if(!result.success){fail(command.request,{kind:'worker-protocol-failed',detail:result.error.message});return}
+        if(!sameSpecification(result.data.evidence.request,command.model)){fail(command.request,{kind:'worker-protocol-failed',detail:'The event-study result does not match its request.'});return}
+        emit({kind:'sun-abraham-succeeded',request:command.request,result:result.data.evidence});return
+      }
+      case 'ridge-augmented-synthetic': {
+        const result=z.object({kind:z.literal('ridgeAugmentedSynthetic'),evidence:ridgeAugmentedEvidenceSchema}).strict().safeParse(decoded)
+        if(!result.success){fail(command.request,{kind:'worker-protocol-failed',detail:result.error.message});return}
+        if(!sameSpecification(result.data.evidence.request,command.model)){fail(command.request,{kind:'worker-protocol-failed',detail:'The synthetic-control result does not match its request.'});return}
+        emit({kind:'ridge-augmented-synthetic-succeeded',request:command.request,result:result.data.evidence});return
       }
       case 'panel-regression': {
         const result=z.object({kind:z.literal('panelRegression'),evidence:panelRegressionEvidenceSchema}).strict().safeParse(decoded)

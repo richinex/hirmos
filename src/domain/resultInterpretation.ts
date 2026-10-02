@@ -253,8 +253,10 @@ export function resultScaleLine(run: EstimationRunArtifact, study: StudySpecific
   const outcome = plainName(study.outcome.name)
   switch (run.kind) {
     case 'sharp-rd-run': return `Local difference in ${outcome} at the assignment cutoff, not an average across the prepared population.`
-    case 'backdoor-linear-run':
-    case 'double-ml-run': return run.estimate.effect.kind === 'byGroup'
+    case 'backdoor-linear-run': return `Fitted difference in ${outcome} between ${treatment} = 1 and ${treatment} = 0.`
+    case 'double-ml-run':
+      if (run.configuration.kind === 'dml-irm') return `Contrast in ${outcome} between ${treatment} = 1 and ${treatment} = 0.`
+      return run.estimate.effect.kind === 'byGroup'
       ? `Difference in ${outcome} per 1-unit increase in ${treatment}, within each ${plainName(run.estimate.effect.modifier)} group.`
       : `Difference in ${outcome} per 1-unit increase in ${treatment}.`
     case 'causal-forest-run': return run.evidence.target.kind === 'binary-average' || run.evidence.target.kind === 'binary-conditional'
@@ -271,15 +273,16 @@ export function resultScaleLine(run: EstimationRunArtifact, study: StudySpecific
     case 'bayesian-gaussian-run': return `Difference in expected ${outcome} with ${treatment} set to 1 rather than 0.`
     case 'ardl-run': return `Long-run difference in ${outcome} per 1-unit increase in ${treatment}.`
     case 'vecm-run': return `Long-run relationship between ${outcome} and ${treatment}.`
+    case 'ridge-augmented-synthetic-run': return `Average observed-minus-synthetic ${outcome} over the post-treatment periods for the selected treated unit.`
     case 'predictor-synthetic-control-run': return `Observed ${outcome} minus its synthetic-control outcome for the selected treated unit, summed over the selected post-intervention periods.`
     case 'synthetic-control-run':
     case 'causal-impact-run': return `Observed ${outcome} minus its estimated no-intervention outcome per ${stepLabel}.`
-    case 'panel-intervention-run': return run.evidence.kind==='staggeredDid'?'Average of supported post-adoption event-time ATT estimates.':`Average difference over treated units and post-adoption periods.`
+    case 'panel-intervention-run': return run.evidence.kind==='sunAbraham'?'Average of supported post-treatment cohort-by-event-time effects, weighted by treated observations.':run.evidence.kind==='staggeredDid'?'Average of supported post-adoption event-time ATT estimates.':`Average difference over treated units and post-adoption periods.`
     case 'discrete-bn-run': return `Difference in expected ${outcome} in the high rather than low ${treatment} state.`
     case 'binary-ett-run': return `Expected ${outcome} under treatment minus no treatment among treated rows.`
-    case 'propensity-weighting-run': return `Difference in ${outcome} between the arms, with the sample reweighted by the inverse probability of treatment.`
-    case 'propensity-matching-run': return `Average difference in ${outcome} between each row and its nearest neighbour on the propensity score from the other arm.`
-    case 'doubly-robust-run': return `Difference in ${outcome} between the arms, combining the propensity score with an outcome regression fitted in each arm.`
+    case 'propensity-weighting-run': return run.evidence.target === 'att' ? `Difference in ${outcome} among treated rows, comparing the treated mean with the treatment-odds-weighted control mean.` : `Difference in ${outcome} between the arms, with the sample reweighted by the inverse probability of treatment.`
+    case 'propensity-matching-run': return run.evidence.target === 'att' ? `Average difference in ${outcome} between treated rows and their nearest control neighbours on the propensity score.` : `Average difference in ${outcome} between each row and its nearest neighbour on the propensity score from the other arm.`
+    case 'doubly-robust-run': return run.evidence.target === 'att' ? `Difference in ${outcome} among treated rows, combining the control-outcome regression with treatment-odds correction.` : `Difference in ${outcome} between the arms, combining the propensity score with an outcome regression fitted in each arm.`
     case 'continuous-gps-run': return `Difference in ${outcome} per 1-unit increase in ${treatment}, each row weighted by the conditional density of the treatment it received.`
     case 'causal-effects-run': {
       const treatmentTime = run.configuration.treatmentLag === 0 ? 't' : `t−${run.configuration.treatmentLag}`
@@ -291,6 +294,7 @@ export function resultScaleLine(run: EstimationRunArtifact, study: StudySpecific
 
 /** The result headline may be narrower than the study's general estimand when a design has its own target. */
 export function resultHeadline(run: EstimationRunArtifact, study: StudySpecification): string {
+  if (run.kind === 'ridge-augmented-synthetic-run') return `Average post-intervention gap in ${plainName(study.outcome.name)} for the treated unit`
   if (run.kind === 'predictor-synthetic-control-run') return `Cumulative post-intervention gap in ${plainName(study.outcome.name)} for the treated unit`
   if (run.kind === 'panel-intervention-run') return `Average post-adoption difference in ${plainName(study.outcome.name)}`
   const treatment = plainName(study.treatment.name)
@@ -312,8 +316,10 @@ export function resultHeadline(run: EstimationRunArtifact, study: StudySpecifica
 
 /** Describe the evidence shape without presenting repeated panel cells as independent observations. */
 export function resultSampleLine(run: EstimationRunArtifact): string {
+  if (run.kind === 'ridge-augmented-synthetic-run') return `One treated unit and ${run.evidence.request.donors.length} donor units; ${run.evidence.request.prePeriods} pre-treatment periods`
   if (run.kind === 'predictor-synthetic-control-run') return `One treated unit and ${run.evidence.donors.length} donor units; ${run.evidence.fitPeriods.length} fitting periods and ${run.estimate.effect.kind === 'path' ? run.estimate.effect.values.length : 0} selected post-intervention periods` 
   if (run.kind !== 'panel-intervention-run') return `n = ${formatCount(run.estimate.sample.observations).text}`
+  if(run.evidence.kind==='sunAbraham') return `${run.evidence.observations} retained observations in ${run.evidence.clusters} unit clusters`
   if(run.evidence.kind==='staggeredDid') return `${run.evidence.units.length} retained units across ${run.evidence.times.length} periods; event-time support is reported separately`
   const treatedCells = run.evidence.treatedUnits * run.evidence.nPost
   return `${run.evidence.units.length} units × ${run.evidence.times.length} periods; the average covers ${treatedCells} treated-unit periods after adoption`
@@ -354,7 +360,7 @@ export function interpretEstimationResult(run: EstimationRunArtifact, study: Stu
       const effect = estimate.effect.kind === 'additive' ? estimate.effect.value : Number.NaN
       const opening = accountingOpening(run)
       const statements: NonEmptyArray<InterpretationStatement> = [
-        { kind: 'magnitude', text: `${opening}, a 1-unit higher level of ${plainName(study.treatment.name)} is associated with ${change(effect, study.outcome.name)} on average ${targetPopulation(study)}.${absorbedSentence(run)}` },
+        { kind: 'magnitude', text: `${opening}, setting ${plainName(study.treatment.name)} to 1 rather than 0 is associated with ${change(effect, study.outcome.name)} on average ${targetPopulation(study)}.${study.estimand.kind === 'average-treatment-effect-on-treated' ? ' This ATT reading assumes the same treatment contrast for every row; the regression includes no treatment interactions.' : ''}${absorbedSentence(run)}` },
         additiveIntervalForOutcome(estimate.interval, study.outcome.name),
         { kind: 'qualification', text: run.configuration.fixedEffects.kind !== 'none'
           ? 'Fixed effects account for additive differences in the selected groups. A causal interpretation requires the remaining treatment variation to be unrelated to unmeasured causes of the outcome, conditional on the specification. Fixed effects do not automatically remove time-varying confounding or bias from inappropriate adjustment. The linear model and a common treatment slope must also suit the question.'
@@ -368,17 +374,17 @@ export function interpretEstimationResult(run: EstimationRunArtifact, study: Stu
       const effect = estimate.effect.kind === 'additive' ? estimate.effect.value : Number.NaN
       const opening = accountingOpening(run)
       const method = run.kind === 'propensity-weighting-run'
-        ? 'The sample is reweighted by the inverse probability of treatment.'
+        ? (run.evidence.target === 'att' ? 'Before stabilization, treated rows have weight 1 and control rows are weighted by the odds of treatment. Separate weighted means target the treatment contrast among treated rows.' : 'The sample is reweighted by the inverse probability of treatment.')
         : run.kind === 'propensity-matching-run'
-          ? 'Each row is paired with its nearest neighbour on the propensity score from the other arm, and the pairs are averaged over every row.'
-          : 'The propensity score is combined with an outcome regression fitted in each arm, so only one of the two models has to be correct.'
+          ? (run.evidence.target === 'att' ? 'Each treated row is paired with its nearest control neighbour on the propensity score. The matched differences are averaged over treated rows. When controls are equally near, the first control in prepared row order is used; reordering tied controls can change the estimate.' : 'Each row is paired with its nearest neighbour on the propensity score from the other arm, and the pairs are averaged over every row. When candidates are equally near, the first candidate in prepared row order is used; reordering tied candidates can change the estimate.')
+          : (run.evidence.target === 'att' ? 'The treatment odds are combined with an outcome regression fitted to control rows. The estimator is consistent if either nuisance model is correct, under the identification assumptions.' : 'The propensity score is combined with an outcome regression fitted in each arm, so only one of the two models has to be correct.')
       const stopped = run.kind === 'doubly-robust-run'
         ? (run.evidence.converged ? '' : ' The treatment model stopped before its own convergence rule was met, so read the estimate with that in mind.')
         : (treatmentModelStoppedEarly(run.evidence.treatmentModel) ? ' The treatment model stopped before its own convergence rule was met, so read the estimate with that in mind.' : '')
       return { kind: 'result-interpretation', statements: [
         { kind: 'magnitude', text: `${opening}, setting ${plainName(study.treatment.name)} to 1 rather than 0 is associated with ${change(effect, study.outcome.name)} on average ${targetPopulation(study)}. ${method}${stopped}` },
         additiveIntervalForOutcome(estimate.interval, study.outcome.name),
-        { kind: 'qualification', text: 'This counts as a total effect only when the recorded adjustment variables include all important shared causes of treatment and outcome, and every row could have ended up in either group. If a fitted score is close to zero or one, that row has no match in the other group, so the estimate depends on a few rows with large weights.' },
+        { kind: 'qualification', text: run.evidence.target === 'att' ? 'A causal interpretation requires no unmeasured confounding and comparable control rows for treated covariate values. Limited overlap can produce large treatment-odds weights or poor matches.' : 'A causal interpretation requires no unmeasured confounding and overlap between treatment groups. Extreme fitted scores can produce large weights or poor matches; they do not alone establish a lack of overlap.' },
       ] }
     }
     case 'continuous-gps-run': {
@@ -493,6 +499,11 @@ export function interpretEstimationResult(run: EstimationRunArtifact, study: Stu
         { kind: 'qualification', text: 'Each series must become stable after taking one change. The selected lag pattern, trend settings, and one-relationship structure must be appropriate, and the relationship must remain stable. This should be interpreted causally only if the study design separately establishes the direction and accounts for common causes.' },
       ] }
     }
+    case 'ridge-augmented-synthetic-run': return {kind:'result-interpretation',statements:[
+      {kind:'magnitude',text:'The estimate is the average post-treatment gap between the observed outcome and its ridge-augmented synthetic control. Ridge augmentation corrects pre-treatment outcome imbalance and can assign negative donor weights.'},
+      estimate.interval.kind==='none'?noInterval(estimate.interval.reason):intervalStatement(estimate.interval,{kind:'additive'}),
+      {kind:'qualification',text:'A causal interpretation requires the donor outcomes to represent the treated unit’s outcome without intervention, with no spillovers or other changes affecting the comparison. Jackknife intervals keep the selected lambda fixed during refits.'},
+    ]}
     case 'predictor-synthetic-control-run': {
       const average = estimate.effect.kind === 'path' ? estimate.effect.aggregate.average : Number.NaN
       return { kind: 'result-interpretation', statements: [
@@ -515,6 +526,11 @@ export function interpretEstimationResult(run: EstimationRunArtifact, study: Stu
       ] }
     }
     case 'panel-intervention-run': {
+      if(run.evidence.kind==='sunAbraham') return {kind:'result-interpretation',statements:[
+        {kind:'magnitude',text:'The headline averages supported post-treatment cohort-by-event-time effects, weighted by their treated-observation support. Event-time and cohort averages are reported separately.'},
+        estimate.interval.kind==='none'?noInterval(estimate.interval.reason):intervalStatement(estimate.interval,{kind:'additive'}),
+        {kind:'qualification',text:'A causal interpretation requires parallel untreated trends, no anticipation and no interference between units. Pointwise intervals treat units as independent clusters.'},
+      ]}
       if(run.evidence.kind==='staggeredDid') return {kind:'result-interpretation',statements:[
         {kind:'magnitude',text:`The headline is the equal-weight average of supported post-adoption event-time effects. Each post-adoption effect compares the outcome in that period with ${staggeredBaseline(run.evidence.specification.anticipation)}, for the treated cohort against the comparison group. Group-time ATT, cohort averages and calendar averages are reported separately.`},
         estimate.interval.kind==='none'?noInterval(estimate.interval.reason):intervalStatement(estimate.interval,{kind:'additive'}),

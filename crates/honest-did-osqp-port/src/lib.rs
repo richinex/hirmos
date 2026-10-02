@@ -16,6 +16,13 @@ pub struct Solution {
 /// Solve a dense convex QP with the CVXR 1.9.2 default OSQP settings.
 /// P is the full symmetric Hessian in 1/2 x'Px + q'x; constraints are l <= Ax <= u.
 pub fn solve(p: &[Vec<f64>], q: &[f64], a: &[Vec<f64>], lower: &[f64], upper: &[f64]) -> Result<Solution, &'static str> {
+    solve_with(p,q,a,lower,upper,Settings::Cvxr)
+}
+
+/// Source-specific settings, not one universal uncertainty/optimization preset.
+#[derive(Clone,Copy,Debug)]
+pub enum Settings { Cvxr, Augsynth }
+pub fn solve_with(p: &[Vec<f64>], q: &[f64], a: &[Vec<f64>], lower: &[f64], upper: &[f64], source:Settings) -> Result<Solution, &'static str> {
     let n=q.len(); let m=a.len();
     if n==0 || n>i32::MAX as usize || m>i32::MAX as usize || p.len()!=n
         || p.iter().any(|r|r.len()!=n || r.iter().any(|v|!v.is_finite()))
@@ -42,8 +49,11 @@ pub fn solve(p: &[Vec<f64>], q: &[f64], a: &[Vec<f64>], lower: &[f64], upper: &[
     unsafe {
         let mut settings:api::OSQPSettings=core::mem::zeroed();
         api::osqp_set_default_settings(&mut settings);
-        settings.verbose=0;settings.eps_abs=1e-5;settings.eps_rel=1e-5;
-        settings.max_iter=10000;settings.polishing=1;settings.adaptive_rho_interval=50;
+        settings.verbose=0;settings.adaptive_rho_interval=50;
+        match source {
+            Settings::Cvxr=>{settings.eps_abs=1e-5;settings.eps_rel=1e-5;settings.max_iter=10000;settings.polishing=1;},
+            Settings::Augsynth=>{settings.eps_abs=1e-8;settings.eps_rel=1e-8;settings.max_iter=4000;settings.polishing=0;settings.check_dualgap=1;settings.time_limit=1e10;},
+        }
         let mut solver=core::ptr::null_mut();
         let setup=api::osqp_setup(&mut solver,&pm,q.as_ptr(),&am,lower.as_ptr(),upper.as_ptr(),m as i32,n as i32,&settings);
         if setup!=0 || solver.is_null(){if !solver.is_null(){api::osqp_cleanup(solver);}return Err("OSQP setup failed");}

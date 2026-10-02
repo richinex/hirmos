@@ -1,6 +1,8 @@
 import { z } from 'zod'
 import { predictorSyntheticConfigurationSchema, predictorSyntheticEvidenceSchema, predictorSyntheticCatalogSchema, predictorSyntheticRecordMatches, predictorSyntheticEstimateMatches } from './predictorSyntheticControl'
 import { causalForestConfigurationSchema, causalForestEvidenceSchema, causalForestTarget, sameCausalForestTarget, causalForestSettingsMatch } from './causalForest'
+import { ridgeRecordMatches } from './ridgeAugmented'
+import { sunAbrahamRecordMatches } from './sunAbraham'
 import { staggeredRecordMatches, staggeredConfigurationSchema } from './staggeredDid'
 import { sharpRdConfigurationSchema, parseSharpRdEvidence, sharpRdRecordMatches } from './sharpRd'
 import { EMPTY_ROOT_CAUSE, rootCauseWorkspaceSchema, type RootCauseWorkspace } from './rootCauseAnalysis'
@@ -296,7 +298,7 @@ const upgradeStationarityTransformRecord = (value: ParsedEnvelope['stationarity'
  */
 const upgradeEstimationRunRecord = (record: Record<string, unknown>): Record<string, unknown> => {
   // A run saved before covariate encodings were declarable entered every column as a number.
-  const value = Reflect.get(record, 'encodings') === undefined ? { ...record, encodings: {} } : record
+  let value = Reflect.get(record, 'encodings') === undefined ? { ...record, encodings: {} } : record
   const estimate = Reflect.get(value, 'estimate')
   let upgradedEstimate = estimate
 
@@ -323,8 +325,22 @@ const upgradeEstimationRunRecord = (record: Record<string, unknown>): Record<str
     }
   }
 
+  const legacyConfiguration = Reflect.get(value, 'configuration')
+  const legacyEvidence = Reflect.get(value, 'evidence')
+  if (typeof legacyConfiguration === 'object' && legacyConfiguration !== null && Reflect.get(legacyConfiguration, 'primary') === 'sunAbraham' && Reflect.get(legacyConfiguration, 'referenceCohorts') === undefined && typeof legacyEvidence === 'object' && legacyEvidence !== null) {
+    const request = Reflect.get(legacyEvidence, 'request')
+    const references = typeof request === 'object' && request !== null ? Reflect.get(request, 'referenceCohorts') : undefined
+    if (Array.isArray(references) && references.length === 0) value = { ...value, configuration: { ...legacyConfiguration, referenceCohorts: [] } }
+  }
   const configuration = Reflect.get(value, 'configuration')
-  const evidence = Reflect.get(value, 'evidence')
+  const rawEvidence = Reflect.get(value, 'evidence')
+  const propensityRun = ['propensity-weighting-run', 'propensity-matching-run', 'doubly-robust-run'].includes(String(Reflect.get(value, 'kind')))
+  const historicAte = typeof upgradedEstimate === 'object' && upgradedEstimate !== null
+    && typeof Reflect.get(upgradedEstimate, 'estimand') === 'object' && Reflect.get(upgradedEstimate, 'estimand') !== null
+    && Reflect.get(Reflect.get(upgradedEstimate, 'estimand'), 'kind') === 'average-treatment-effect'
+  const evidence = propensityRun && historicAte && typeof rawEvidence === 'object' && rawEvidence !== null && Reflect.get(rawEvidence, 'target') === undefined
+    ? { ...rawEvidence, target: 'ate' } : rawEvidence
+  if (evidence !== rawEvidence) value = { ...value, evidence }
   // An adjusted regression saved before the error process was a choice: its covariance name
   // becomes the error treatment, and its evidence records that no ARMA fit was made.
   if (Reflect.get(value, 'kind') === 'backdoor-linear-run'
@@ -411,7 +427,7 @@ const upgradeEstimationRunRecord = (record: Record<string, unknown>): Record<str
   if (Reflect.get(value, 'kind') === 'panel-intervention-run'
     && typeof configuration === 'object' && configuration !== null
     && typeof evidence === 'object' && evidence !== null
-    && Reflect.get(evidence, 'kind') !== 'panelDid' && Reflect.get(evidence, 'kind') !== 'panelAdjusted' && Reflect.get(evidence,'kind') !== 'staggeredDid') {
+    && Reflect.get(evidence, 'kind') !== 'panelDid' && Reflect.get(evidence, 'kind') !== 'panelAdjusted' && Reflect.get(evidence,'kind') !== 'staggeredDid' && Reflect.get(evidence,'kind') !== 'sunAbraham') {
     return {
       ...value,
       estimate: upgradedEstimate,
@@ -565,6 +581,16 @@ export function parseSnapshotValue(value: unknown): Result<PersistedProject, Sna
   const studyDraft: StudyDesignDraft = { ...EMPTY_STUDY_DRAFT, ...storedDraft }
   const estimationRuns = parsed.data.estimationRuns.map((run) => upgradeEstimationRunRecord(run))
   for (const run of estimationRuns) {
+    if (['propensity-weighting-run', 'propensity-matching-run', 'doubly-robust-run'].includes(String(run.kind))) {
+      const study = parsed.data.studies.find(s => s.id === run.study)
+      const target = typeof run.evidence === 'object' && run.evidence !== null ? Reflect.get(run.evidence, 'target') : null
+      const estimand = typeof study?.estimand === 'object' && study.estimand !== null ? Reflect.get(study.estimand, 'kind') : null
+      if (target !== (estimand === 'average-treatment-effect-on-treated' ? 'att' : estimand === 'average-treatment-effect' ? 'ate' : null)) return err({ kind: 'invalid-snapshot', detail: 'The saved propensity result does not match its study target.' })
+    }
+    if(run.kind==='ridge-augmented-synthetic-run'){
+      const study=parsed.data.studies.find(s=>s.id===run.study),identification=parsed.data.identifications.find(i=>i.id===run.identification)
+      if(!ridgeRecordMatches(run,study)||identification?.study!==run.study||prepared.value===null||Reflect.get(prepared.value,'id')!==run.preparedDataset)return err({kind:'invalid-snapshot',detail:'The saved ridge-augmented result does not match its ATT study, specification or prepared panel.'})
+    }
     if (run.kind === 'predictor-synthetic-control-run') {
       const configuration = predictorSyntheticConfigurationSchema.safeParse(run.configuration)
       const evidence = predictorSyntheticEvidenceSchema.safeParse(run.evidence)
@@ -593,6 +619,11 @@ export function parseSnapshotValue(value: unknown): Result<PersistedProject, Sna
       if (evidence.data.fixedEffects.kind !== expected || evidence.data.errorModel.kind !== (errors === 'classical' || errors === 'hac' ? 'neweyWest' : errors)) {
         return err({ kind: 'invalid-snapshot', detail: 'The saved adjusted regression result does not match its fixed effects or uncertainty specification.' })
       }
+    }
+    if(run.kind==='panel-intervention-run' && ((typeof run.evidence==='object'&&run.evidence!==null&&Reflect.get(run.evidence,'kind')==='sunAbraham') || (typeof run.configuration==='object'&&run.configuration!==null&&Reflect.get(run.configuration,'primary')==='sunAbraham'))) {
+      const study=parsed.data.studies.find(s=>s.id===run.study)
+      const identification=parsed.data.identifications.find(i=>i.id===run.identification)
+      if(!sunAbrahamRecordMatches(run,study)||identification?.study!==run.study||prepared.value===null||Reflect.get(prepared.value,'id')!==run.preparedDataset) return err({kind:'invalid-snapshot',detail:'The saved Sun–Abraham result does not match its ATT study, specification or prepared panel.'})
     }
     if(run.kind==='panel-intervention-run' && ((typeof run.evidence==='object'&&run.evidence!==null&&Reflect.get(run.evidence,'kind')==='staggeredDid') || (typeof run.configuration==='object'&&run.configuration!==null&&Reflect.get(run.configuration,'primary')==='staggered'))) {
       const study=parsed.data.studies.find(candidate=>candidate.id===run.study)
