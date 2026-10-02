@@ -379,8 +379,7 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
         <ChapterHeading id="counterfactual-title" className="mb-2">Counterfactuals</ChapterHeading>
         <p className={chapterIntro}>Counterfactual reasoning examines what would have occurred if an action or condition had differed, given the actual outcome. It involves considering a parallel scenario for the same individual, unit, or system. In this context, a causal model is used to estimate the counterfactual outcome. The result depends on the chosen model and its underlying assumptions.</p>
       </div>
-      <section className={panel('p-(--panel-space)')} aria-labelledby="counterfactual-setup-title">
-        <h3 id="counterfactual-setup-title" className={cn(sectionTitle, 'mb-6 mt-0')}>Structural counterfactual</h3>
+      <section className={panel('p-(--panel-space)')} aria-label="Structural counterfactual">
         {identified.length === 0 ? (
           <p className="m-0 text-body text-faint">Identify a study first.</p>
         ) : (
@@ -499,7 +498,6 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
               </SettingsStep>
             )}
             </div>
-            {method.ok && <p className={cn(fieldHint, 'mb-0 mt-8 max-w-[65ch]')}>{method.value.summary}</p>}
             <div className={cn(actionGap, 'grid gap-3')}>
             {eligibility !== null && <EligibilityView eligibility={eligibility} subject="this study" />}
             <JobNotice job={job} />

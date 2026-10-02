@@ -18,7 +18,7 @@ import { ESTIMATION_PARAMETER_HELP } from '@/domain/parameterHelp'
 import { Select } from '@/components/ui/Select'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { Orb } from '@/components/ui/Orb'
-import { actionGap, button, field, fieldHint, fieldLabel, fieldRow, panel, stepsStack } from '@/components/ui/recipes'
+import { actionGap, button, field, fieldLabel, fieldRow, panel, stepsStack } from '@/components/ui/recipes'
 import { SettingsStep } from '@/components/ui/SettingsStep'
 import { cn } from '@/lib/utils'
 import { useRunActivity } from '@/lib/useRunActivity'
@@ -137,9 +137,7 @@ export function InterruptedSeriesPanel(props: TimeSeriesPanelProps & { readonly 
       <TimeSeriesHeading />
       <section className={panel('p-(--panel-space)')} aria-label="Time-series setup">
         {props.selector}
-        <h3 className="mb-1 mt-3 text-body font-medium text-ink">Interrupted series</h3>
-        <p className={`${fieldHint} m-0 max-w-[65ch]`}>{TIME_SERIES_METHODS.interrupted.summary}</p>
-        <fieldset disabled={job.kind === 'running'} className="m-0 mt-8 grid min-w-0 gap-6 border-0 p-0">
+        <fieldset disabled={job.kind === 'running'} className="m-0 mt-6 grid min-w-0 gap-6 border-0 p-0">
           <legend className="sr-only">Interrupted series specification</legend>
           <div className={stepsStack}>
             <SettingsStep number={1} title="Choose the series">

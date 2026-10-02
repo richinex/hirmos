@@ -142,8 +142,6 @@ function LongRunModel({ model, selector, ...props }: Props & { readonly model: M
       <TimeSeriesHeading />
       <section className={panel('p-(--panel-space)')} aria-label="Time-series setup">
         {selector}
-        <h3 className="mb-0 mt-3 text-body font-medium text-ink">{model === 'ardl' ? 'ARDL long-run relationship' : 'Vector error-correction model'}</h3>
-        <p className={`${fieldHint} m-0 mt-1 max-w-[65ch]`}>{model === 'ardl' ? 'Estimate how an outcome relates to its own earlier values and to current and earlier values of another series.' : 'Estimate long-run equilibrium relationships and how changes in the series respond to departures from them.'}</p>
         {controls}
         <span role="status" className="sr-only">{job.kind === 'running' ? `Fitting ${model.toUpperCase()}…` : ''}</span>
         <JobNotice job={job} />

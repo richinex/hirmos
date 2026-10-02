@@ -19,7 +19,7 @@ import { useChartTheme } from '@/charts/theme'
 import { LagListField } from '@/components/ui/LagListField'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { Select } from '@/components/ui/Select'
-import { actionGap, button, field, fieldHint, fieldLabel, fieldRow, label, num, panel, sectionTitle, stepsStack, well } from '@/components/ui/recipes'
+import { actionGap, button, field, fieldLabel, fieldRow, label, num, panel, sectionTitle, stepsStack, well } from '@/components/ui/recipes'
 import { SettingsStep } from '@/components/ui/SettingsStep'
 import { cn } from '@/lib/utils'
 import {
@@ -152,12 +152,10 @@ export function CountSeriesCard({ source, profile, prepared, artifacts, onArtifa
   }
 
   return (
-    <section className="flex flex-col gap-5" aria-labelledby="count-series-title">
+    <section className="flex flex-col gap-5" aria-label="Negative-binomial count model">
       <section className={panel('p-(--panel-space)')} aria-label="Time-series setup">
       {selector}
-      <h3 id="count-series-title" className="mb-0 mt-3 text-body font-medium text-ink">Negative-binomial count model</h3>
-      <p className={`${fieldHint} mb-0 mt-1 max-w-[65ch]`}>Fit a count model and search the selected range for a temporary, fading or persistent change.</p>
-      <fieldset disabled={job.kind === 'running'} className="m-0 mt-8 min-w-0 border-0 p-0"><legend className="sr-only">Count model specification</legend>
+      <fieldset disabled={job.kind === 'running'} className="m-0 mt-6 min-w-0 border-0 p-0"><legend className="sr-only">Count model specification</legend>
         <div className={stepsStack}>
           <SettingsStep number={1} title="Fit the count model">
             <label className="block max-w-md"><span className={fieldLabel}>Count series</span><Select className={field('text', 'mt-1')} value={outcome ?? ''} onChange={(event) => setOutcome(event.target.value === '' ? null : event.target.value as ColumnId)}><option value="">Choose series</option>{columns.map((column) => <option key={column.id} value={column.id}>{column.name}</option>)}</Select></label>

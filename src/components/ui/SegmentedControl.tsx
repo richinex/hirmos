@@ -314,7 +314,9 @@ export function SegmentedControl<V extends string>({ value, onChange, options, a
 
   const dragEnabled = !wrap && !disabled && variant === 'track'
   // A setting (the track form) that does not already fill its row stretches on a narrow panel; view switches and chip grids keep their width.
-  const narrowFill = form === 'track' && !fill
+  // On a narrow panel a setting spans the row, and so does a short view switch: two or three tabs left
+  // at one end read as unfinished. A longer row of tabs keeps its natural width and scrolls.
+  const narrowFill = !fill && (form === 'track' || (form === 'line' && options.length <= 3))
 
   const knobElement = form === 'wrap' || knob === null || layout === null ? null : (
     <span
@@ -383,7 +385,7 @@ export function SegmentedControl<V extends string>({ value, onChange, options, a
         dragEnabled && 'touch-pan-y',
         fill ? 'flex w-full' : form === 'line' ? 'flex' : 'inline-flex',
         // On a narrow panel a setting spans the row, so the choice reads as one bar rather than a stub.
-        narrowFill && '@max-md/panel:flex @max-md/panel:w-full',
+        narrowFill && '@max-md/panel:flex @max-md/panel:w-full @max-md/panel:max-w-full',
         className,
       )}
     >

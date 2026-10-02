@@ -1439,12 +1439,10 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun: recordRu
         <p className={chapterIntro}>Use survival analysis when the outcome is the time until an event. Fit an event-time distribution, compare two observed groups during follow-up, or estimate transitions between states. A row with no observed event by the end of follow-up is right-censored at its recorded duration. These analyses do not require a DAG and are not added to the causal-estimation ledger.</p>
       </div>
 
-      <section className={panel('p-(--panel-space)')} aria-labelledby="survival-setup-title">
-        <h3 id="survival-setup-title" className={cn(sectionTitle, 'mb-4 mt-0')}>{type.name}</h3>
+      <section className={panel('p-(--panel-space)')} aria-label="Survival setup">
         <div className="grid grid-cols-1 gap-8">
           <div>
             <SegmentedControl variant="line" size="sm" ariaLabel="Survival analysis type" value={draft.kind} onChange={selectDraft} options={[{ value: 'right-censored', label: 'Parametric' }, { value: 'nonparametric', label: 'Kaplan–Meier' }, { value: 'start-stop', label: 'Start–stop' }, { value: 'cox-regression', label: 'Cox regression' }, { value: 'aalen', label: 'Aalen regression' }, { value: 'survival-forest', label: 'Survival forest' }, { value: 'penalized-aft', label: 'Penalised AFT' }, { value: 'two-group', label: 'Compare groups' }, { value: 'multi-state', label: 'Multi-state' }]} />
-            <p className={cn(fieldHint, 'mt-3 max-w-[65ch]')}>{type.summary}</p>
           </div>
           <div className="grid max-w-4xl items-start gap-6 @md/panel:grid-cols-2">{draftControls}</div>
           {covariateControls}

@@ -96,8 +96,8 @@ export function ArdlModelPanel(props: TimeSeriesPanelProps & {readonly selector:
   return <WorkbenchLayout id="time-series-ardl" bottom={{trigger: { label: 'History', icon: 'history' }, title:`Time-series runs (${runs.length})`,defaultSize:150,body:<TimeSeriesHistory entries={runs} onDelete={run=>props.onDeleteRun(run.id)} />}}
     inspector={{trigger: { label: 'Requirements', icon: 'contract' }, title:'Data and method requirements',body:<TimeSeriesRequirements method={TIME_SERIES_METHODS.ardl} prepared={props.prepared} source={props.source.name} />}}
     stage={<section className="@container/panel flex flex-col gap-5"><TimeSeriesHeading /><section className={panel('p-(--panel-space)')} aria-label="Time-series setup">
-      {props.selector}<h3 className="mb-1 mt-3 text-body font-medium text-ink">Autoregressive distributed lag model</h3><p className={`${fieldHint} m-0 max-w-[65ch]`}>Estimate how an outcome relates to its earlier values and to current and earlier values of other series.</p>
-      <fieldset disabled={job.kind==='running'} className="m-0 mt-8 min-w-0 border-0 p-0"><legend className="sr-only">ARDL specification</legend>
+      {props.selector}
+      <fieldset disabled={job.kind==='running'} className="m-0 mt-6 min-w-0 border-0 p-0"><legend className="sr-only">ARDL specification</legend>
         <div className={stepsStack}>
           <SettingsStep number={1} title="Choose the series">
             <label className="block max-w-md"><span className={fieldLabel}>Outcome series</span><Select className={field('text','mt-1')} value={outcome??''} onChange={e=>setOutcome(columns.find(c=>c.id===e.target.value)?.id??null)}><option value="">Choose outcome</option>{columns.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</Select></label>

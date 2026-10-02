@@ -1869,6 +1869,11 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
         )}
         <p className={literal('mb-0 mt-3 break-all text-micro text-faint')}>Dataset version {prepared.id.slice(0, 8)}</p>
       </section>
+      {/* The family the stage is showing, named and described here rather than above its methods. */}
+      <section aria-labelledby="discovery-family-title">
+        <h3 id="discovery-family-title" className="m-0 text-body font-medium text-ink">{visibleGroup.name}</h3>
+        <p className="mb-0 mt-1 text-body text-muted">{visibleGroup.description}</p>
+      </section>
       {selectedMethodIsVisible
         ? <MethodCaveats methods={[method]} eligibility={eligibility} />
         : <p className="m-0 text-body text-faint">Select a method from this family to review its requirements.</p>}
@@ -1894,12 +1899,8 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
             disabled={job.kind === 'running'}
             options={DISCOVERY_METHOD_GROUPS.map((group) => ({ value: group.id, label: DISCOVERY_GROUP_LABELS[group.id], title: group.name }))}
           />
-          <div className="mb-2 mt-3">
-            <h4 className="m-0 text-body font-medium text-ink">{visibleGroup.name}</h4>
-            <p className="mb-0 mt-0.5 max-w-[65ch] text-label text-faint">{visibleGroup.description}</p>
-          </div>
           <RadioList frame="none"
-            className="mt-1"
+            className="mt-4"
             legend="Discovery method"
             legendHidden
             value={configuration.kind}
