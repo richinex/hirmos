@@ -271,6 +271,7 @@ export function resultScaleLine(run: EstimationRunArtifact, study: StudySpecific
     case 'bayesian-gaussian-run': return `Difference in expected ${outcome} with ${treatment} set to 1 rather than 0.`
     case 'ardl-run': return `Long-run difference in ${outcome} per 1-unit increase in ${treatment}.`
     case 'vecm-run': return `Long-run relationship between ${outcome} and ${treatment}.`
+    case 'predictor-synthetic-control-run': return `Observed ${outcome} minus its synthetic-control outcome for the selected treated unit, summed over the selected post-intervention periods.`
     case 'synthetic-control-run':
     case 'causal-impact-run': return `Observed ${outcome} minus its estimated no-intervention outcome per ${stepLabel}.`
     case 'panel-intervention-run': return run.evidence.kind==='staggeredDid'?'Average of supported post-adoption event-time ATT estimates.':`Average difference over treated units and post-adoption periods.`
@@ -290,6 +291,7 @@ export function resultScaleLine(run: EstimationRunArtifact, study: StudySpecific
 
 /** The result headline may be narrower than the study's general estimand when a design has its own target. */
 export function resultHeadline(run: EstimationRunArtifact, study: StudySpecification): string {
+  if (run.kind === 'predictor-synthetic-control-run') return `Cumulative post-intervention gap in ${plainName(study.outcome.name)} for the treated unit`
   if (run.kind === 'panel-intervention-run') return `Average post-adoption difference in ${plainName(study.outcome.name)}`
   const treatment = plainName(study.treatment.name)
   const outcome = plainName(study.outcome.name)
@@ -310,6 +312,7 @@ export function resultHeadline(run: EstimationRunArtifact, study: StudySpecifica
 
 /** Describe the evidence shape without presenting repeated panel cells as independent observations. */
 export function resultSampleLine(run: EstimationRunArtifact): string {
+  if (run.kind === 'predictor-synthetic-control-run') return `One treated unit and ${run.evidence.donors.length} donor units; ${run.evidence.fitPeriods.length} fitting periods and ${run.estimate.effect.kind === 'path' ? run.estimate.effect.values.length : 0} selected post-intervention periods` 
   if (run.kind !== 'panel-intervention-run') return `n = ${formatCount(run.estimate.sample.observations).text}`
   if(run.evidence.kind==='staggeredDid') return `${run.evidence.units.length} retained units across ${run.evidence.times.length} periods; event-time support is reported separately`
   const treatedCells = run.evidence.treatedUnits * run.evidence.nPost
@@ -488,6 +491,14 @@ export function interpretEstimationResult(run: EstimationRunArtifact, study: Stu
         { kind: 'magnitude', text: `The series provide evidence of one long-run equilibrium relationship, even though each changes over time. In that relationship, ${plainName(study.treatment.name)} being 1 unit higher corresponds to ${plainName(study.outcome.name)} being ${relativeLevel(effect)}.` },
         noInterval('No confidence interval is available for this long-run coefficient.'),
         { kind: 'qualification', text: 'Each series must become stable after taking one change. The selected lag pattern, trend settings, and one-relationship structure must be appropriate, and the relationship must remain stable. This should be interpreted causally only if the study design separately establishes the direction and accounts for common causes.' },
+      ] }
+    }
+    case 'predictor-synthetic-control-run': {
+      const average = estimate.effect.kind === 'path' ? estimate.effect.aggregate.average : Number.NaN
+      return { kind: 'result-interpretation', statements: [
+        { kind: 'magnitude', text: `Over the selected post-intervention periods, observed ${plainName(study.outcome.name)} averaged ${gap(average)} the synthetic-control outcome for the treated unit.` },
+        noInterval('This predictor-based fit does not report an uncertainty interval.'),
+        { kind: 'qualification', text: 'A causal interpretation requires the synthetic control to approximate the treated unit’s outcome without intervention. Inspect pre-intervention fit and predictor balance, and consider whether spillovers or other changes affect the comparison.' },
       ] }
     }
     case 'synthetic-control-run': {

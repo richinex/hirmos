@@ -1,3 +1,5 @@
+import { PredictorSyntheticControls } from './PredictorSyntheticControls'
+import { PredictorSyntheticResult } from './PredictorSyntheticResult'
 import { RunDetails } from '@/components/ui/RunDetails'
 import { EvidenceTable } from '@/components/table/EvidenceTable'
 import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
@@ -498,6 +500,7 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
             : { label: 'Chow break', value: formatP(evidence.chow[1], { withLabel: false }), context: <Metadata><span>F {formatStatistic('raw', evidence.chow[0]).text}</span><span>split after row {run.configuration.breakIndex}</span></Metadata> },
         ]
       }
+      case 'predictor-synthetic-control-run': return [{ label: 'Pre-intervention outcome MSPE', value: formatStatistic('raw', run.evidence.outcomeMspe) }, { label: 'Donor units', value: formatCount(run.evidence.donors.length) }, { label: 'Predictor summaries', value: formatCount(run.evidence.balance.length) }]
       case 'synthetic-control-run': {
         const { evidence } = run
         const donorNames = run.columns.slice(2).map((variable) => variable.name)
@@ -759,7 +762,7 @@ const ResultCard = memo(function ResultCard({ run, study, current, stepLabel, on
   const [ghostId, setGhostId] = useState('')
   const ghosts = others.filter((other) => other.id !== run.id && other.estimate.effect.kind === 'path')
   const ghostRun = ghosts.find((other) => String(other.id) === ghostId) ?? null
-  const chart = useMemo(() => (estimate.effect.kind === 'path'
+  const chart = useMemo(() => (estimate.effect.kind === 'path' && run.kind !== 'predictor-synthetic-control-run'
     ? impactPathOption({
       outcome: study.outcome.name,
       before: run.kind === 'causal-impact-run' ? preInterventionPoints(run.evidence.preInterventionPath) : [],
@@ -915,6 +918,7 @@ const ResultCard = memo(function ResultCard({ run, study, current, stepLabel, on
       {run.kind === 'causal-impact-run' && run.evidence.kind !== 'causalImpact' && <BayesianImpactResult evidence={run.evidence} columnNames={run.columns.map(column => column.name)} />}
       {run.kind === 'sharp-rd-run' && <SharpRdResult evidence={run.evidence} running={run.columns[0].name} outcome={study.outcome.name} />}
       {run.kind === 'synthetic-control-run' ? <SyntheticControlEvidenceDetails run={run} /> : null}
+      {run.kind === 'predictor-synthetic-control-run' ? <PredictorSyntheticResult run={run} outcome={study.outcome.name} /> : null}
       {run.kind === 'panel-intervention-run' ? <PanelEvidenceDetails run={run} /> : null}
     </>
   )
@@ -1427,6 +1431,19 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           return
         }
         case 'synthetic-control': {
+          if (configuration.specification === 'predictors') {
+            const { preparePredictorSynthetic } = await import('@/data/predictorSyntheticInput')
+            const input = await preparePredictorSynthetic(source, profile, prepared, configuration, study.outcome.column, study.treatment.column, () => session.current(current))
+            if (!session.current(current)) return
+            if (!input.ok) { dispatch({ type: 'run-failed', detail: input.error }); return }
+            const result = await analysis.runPredictorSyntheticControl(input.value.values, input.value.model)
+            if (!session.current(current)) return
+            if (!result.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(result.error) }); return }
+            const run = { kind: 'predictor-synthetic-control-run', configuration, evidence: result.value, catalog: input.value.catalog, columns: input.value.columns } as const
+            const estimate = causalEstimateFrom(study, identification, run)
+            finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind), estimate } as EstimationRunArtifact, 'The synthetic-control result does not match the recorded treated-unit comparison or has missing post-intervention predictions.')
+            return
+          }
           const donors = prepared.columns.filter((column) => configuration.donors.includes(column) && column !== study.outcome.column && column !== study.treatment.column)
           const donorVariables: StudyVariable[] = donors.map((column) => ({ node: study.outcome.node, column, name: profile.columns.find((candidate) => candidate.id === column)?.name ?? String(column) }))
           const columns: NonEmptyArray<StudyVariable> = [study.treatment, study.outcome, ...donorVariables]
@@ -2117,6 +2134,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           </div>
         )
       case 'synthetic-control':
+        if (configuration.specification === 'predictors') return <PredictorSyntheticControls configuration={configuration} onChange={configure} source={source} profile={profile} prepared={prepared} treatment={study?.treatment.column ?? null} />
         return (
           <div className={stepsStack}>
             <SettingsStep number={1} title="Mark the intervention">
@@ -2468,7 +2486,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
                     const definition = methodDefinition(methodIdOf(id))
                     const candidateEligibility = eligibilityByEstimator.get(id)
                     return definition.ok && candidateEligibility !== undefined
-                      ? [{ value: id, label: definition.value.name, hint: id === 'panel-intervention' && candidateEligibility.kind === 'refused' ? 'Review the selected panel method and its requirements below.' : eligibilityHint(candidateEligibility), disabled: candidateEligibility.kind === 'refused' && id !== 'panel-intervention', title: candidateEligibility.kind === 'refused' ? `${definition.value.name}: ${candidateEligibility.violations[0]?.evidence ?? 'a requirement is not met'}` : undefined }]
+                      ? [{ value: id, label: definition.value.name, hint: id === 'panel-intervention' && candidateEligibility.kind === 'refused' ? 'Review the selected panel method and its requirements below.' : eligibilityHint(candidateEligibility), disabled: candidateEligibility.kind === 'refused' && id !== 'panel-intervention' && !(id === 'synthetic-control' && prepared.kind === 'prepared-panel'), title: candidateEligibility.kind === 'refused' ? `${definition.value.name}: ${candidateEligibility.violations[0]?.evidence ?? 'a requirement is not met'}` : undefined }]
                       : []
                   })}
                 />
@@ -2482,11 +2500,11 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             {selectedEstimatorIsVisible && eligibility !== null && <EligibilityView eligibility={eligibility} subject="this study" />}
             {studyDataError !== null && <Alert tone="danger"><p className="m-0">The treatment and outcome columns could not be checked: {studyDataError}</p></Alert>}
             <JobNotice job={job} />
-            <div className="flex items-center gap-3">
-              <button type="button" className={button('signal')} disabled={job.kind === 'running' || session.blocked || !selectedEstimatorIsVisible || identification === null || eligibility === null || eligibility.kind === 'refused' || studyDataPending || studyDataError !== null || adjustmentDraftOpen || (configuration.kind === 'panel-intervention' && configuration.primary !== 'staggered' && panelPreflight.kind !== 'ready')} aria-busy={job.kind === 'running'} onClick={() => void execute()}>
+            <div className="flex min-h-10 flex-nowrap items-center gap-3" data-testid="estimation-run-row">
+              <button type="button" className={button('signal', 'shrink-0 whitespace-nowrap')} disabled={job.kind === 'running' || session.blocked || !selectedEstimatorIsVisible || identification === null || eligibility === null || eligibility.kind === 'refused' || studyDataPending || studyDataError !== null || adjustmentDraftOpen || (configuration.kind === 'panel-intervention' && configuration.primary !== 'staggered' && panelPreflight.kind !== 'ready')} aria-busy={job.kind === 'running'} onClick={() => void execute()}>
                 {!selectedEstimatorIsVisible ? 'Choose a method' : studyDataPending ? 'Checking treatment and outcome…' : configuration.kind === 'panel-intervention' && configuration.primary !== 'staggered' && panelPreflight.kind === 'pending' ? 'Checking panel…' : `Run ${lowerFirst(describeEstimator(state.estimator))}`}
               </button>
-              {job.kind === 'running' && <><Orb state="solving" aria-label="Estimator running" /><button type="button" className={button('quiet')} onClick={session.cancel}>Cancel run</button></>}
+              {job.kind === 'running' && <><Orb state="solving" aria-label="Estimator running" /><button type="button" className={button('quiet', 'shrink-0 whitespace-nowrap')} onClick={session.cancel}>Cancel run</button></>}
             </div>
             </div>
           </>

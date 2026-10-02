@@ -111,6 +111,7 @@ pub fn score_forest_tuning(batch: &str, index: usize) -> Result<String, JsValue>
 mod missingness;
 mod staggered_did;
 mod bacon;
+mod predictor_synthetic_control;
 mod panel_regression;
 mod count_regression;
 mod calendar;
@@ -1083,6 +1084,7 @@ pub fn run_analysis(
         AnalysisCommand::PanelAdjusted { rows, columns, units, times, specification } => panel_adjusted(values, rows, columns, &units, &times, specification),
         AnalysisCommand::CountRegression { request } => count_regression::run(values, request).map(|evidence| AnalysisResult::CountRegression { evidence }),
         AnalysisCommand::StaggeredDid { request } => staggered_did::run(values, request).map(|evidence| AnalysisResult::StaggeredDid { evidence }),
+        AnalysisCommand::PredictorSyntheticControl { request } => predictor_synthetic_control::run(values, request).map(|evidence| AnalysisResult::PredictorSyntheticControl { evidence }),
         AnalysisCommand::Bacon { request } => bacon::run(values, request).map(|evidence| AnalysisResult::Bacon { evidence }),
         AnalysisCommand::PanelRegression { request } => panel_regression::run(values, request).map(|evidence| AnalysisResult::PanelRegression { evidence }),
         AnalysisCommand::PanelIntervention {

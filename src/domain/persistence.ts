@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { predictorSyntheticConfigurationSchema, predictorSyntheticEvidenceSchema, predictorSyntheticCatalogSchema, predictorSyntheticRecordMatches, predictorSyntheticEstimateMatches } from './predictorSyntheticControl'
 import { causalForestConfigurationSchema, causalForestEvidenceSchema, causalForestTarget, sameCausalForestTarget, causalForestSettingsMatch } from './causalForest'
 import { staggeredRecordMatches, staggeredConfigurationSchema } from './staggeredDid'
 import { sharpRdConfigurationSchema, parseSharpRdEvidence, sharpRdRecordMatches } from './sharpRd'
@@ -563,6 +564,16 @@ export function parseSnapshotValue(value: unknown): Result<PersistedProject, Sna
   const studyDraft: StudyDesignDraft = { ...EMPTY_STUDY_DRAFT, ...storedDraft }
   const estimationRuns = parsed.data.estimationRuns.map((run) => upgradeEstimationRunRecord(run))
   for (const run of estimationRuns) {
+    if (run.kind === 'predictor-synthetic-control-run') {
+      const configuration = predictorSyntheticConfigurationSchema.safeParse(run.configuration)
+      const evidence = predictorSyntheticEvidenceSchema.safeParse(run.evidence)
+      const catalog = predictorSyntheticCatalogSchema.safeParse(run.catalog)
+      const columns = z.array(z.object({ column: z.string().min(1).transform(v => brand<string, 'ColumnId'>(v)), name: z.string().min(1) }).strict()).min(1).safeParse(run.columns)
+      const studyRecord = parsed.data.studies.find(s => s.id === run.study)
+      const studyFields = z.object({ estimand: z.object({ kind: z.literal('average-treatment-effect-on-treated') }), outcome: z.object({ column: z.string().min(1).transform(v => brand<string, 'ColumnId'>(v)) }) }).safeParse(studyRecord)
+      const identification = parsed.data.identifications.find(i => i.id === run.identification)
+      if (!configuration.success || !evidence.success || !catalog.success || !columns.success || !studyFields.success || identification?.study !== run.study || prepared.value === null || Reflect.get(prepared.value, 'id') !== run.preparedDataset || !predictorSyntheticRecordMatches(configuration.data, evidence.data, catalog.data, columns.data, studyFields.data.outcome.column) || !predictorSyntheticEstimateMatches(run.estimate, configuration.data, evidence.data) || columns.data.some(c => !profile?.columns.some(p => p.id === c.column && p.name === c.name))) return err({ kind: 'invalid-snapshot', detail: 'The saved predictor-based synthetic control does not match its treated-unit study, prepared panel or fitting specification.' })
+    }
     if (run.kind === 'backdoor-linear-run') {
       const configuration = backdoorLinearConfigurationSchema.safeParse(run.configuration)
       const evidence = backdoorLinearEvidenceSchema.safeParse(run.evidence)

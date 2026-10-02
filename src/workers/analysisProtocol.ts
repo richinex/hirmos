@@ -1,6 +1,7 @@
 import { countRegressionRequestSchema, countRegressionEvidenceSchema, type CountRegressionRequest, type CountRegressionEvidence } from '@/domain/countRegression'
 import {panelRegressionRequestSchema,panelRegressionEvidenceSchema,baconRequestSchema,baconEvidenceSchema,type PanelRegressionRequest,type PanelRegressionEvidence,type BaconRequest,type BaconEvidence} from '@/domain/panelRegression'
 import { z } from 'zod'
+import { predictorSyntheticRequestSchema, predictorSyntheticEvidenceSchema, type PredictorSyntheticRequest, type PredictorSyntheticEvidence } from '@/domain/predictorSyntheticControl'
 import { causalForestConfigurationSchema, causalForestEvidenceSchema, causalForestTargetSchema, type CausalForestConfiguration, type CausalForestEvidence, type CausalForestTarget } from '@/domain/causalForest'
 import { staggeredRequestSchema, staggeredEvidenceSchema, type StaggeredRequest, type StaggeredEvidence } from '@/domain/staggeredDid'
 import { structuralModelSchema, type StructuralModel } from '@/domain/structuralImpact'
@@ -1029,6 +1030,12 @@ export type AnalysisWorkerCommand =
       readonly breakIndex: number | null
     }
   | {
+      readonly kind: 'predictor-synthetic-control'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly model: PredictorSyntheticRequest
+    }
+  | {
       readonly kind: 'synthetic-control'
       readonly request: WorkerRequestId
       readonly values: Float64Array
@@ -1366,6 +1373,7 @@ export type AnalysisWorkerEvent =
   | { readonly kind: 'gcm-influence-succeeded'; readonly request: WorkerRequestId; readonly result: GcmInfluenceEvidence }
   | { readonly kind: 'ardl-model-succeeded'; readonly request: WorkerRequestId; readonly result: ArdlModelEvidence }
   | { readonly kind: 'vecm-succeeded'; readonly request: WorkerRequestId; readonly result: VecmEvidence }
+  | { readonly kind: 'predictor-synthetic-control-succeeded'; readonly request: WorkerRequestId; readonly result: PredictorSyntheticEvidence }
   | { readonly kind: 'synthetic-control-succeeded'; readonly request: WorkerRequestId; readonly result: SyntheticControlEvidence }
   | { readonly kind: 'count-regression-succeeded'; readonly request: WorkerRequestId; readonly result: CountRegressionEvidence }
   | {readonly kind:'panel-regression-succeeded';readonly request:WorkerRequestId;readonly result:PanelRegressionEvidence}
@@ -2280,6 +2288,7 @@ const commandSchema = z.discriminatedUnion('kind', [
     significance: z.number().int().min(0).max(2),
     breakIndex: z.number().int().nonnegative().nullable(),
   }).strict(),
+  z.object({kind:z.literal('predictor-synthetic-control'),request:requestSchema,values:z.instanceof(Float64Array),model:predictorSyntheticRequestSchema}).strict(),
   z.object({
     kind: z.literal('synthetic-control'),
     request: requestSchema,
@@ -2603,6 +2612,7 @@ const eventSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('gcm-influence-succeeded'), request: requestSchema, result: gcmInfluenceEvidenceSchema }).strict(),
   z.object({ kind: z.literal('ardl-model-succeeded'), request: requestSchema, result: ardlModelEvidenceSchema }).strict(),
   z.object({ kind: z.literal('vecm-succeeded'), request: requestSchema, result: vecmEvidenceSchema }).strict(),
+  z.object({kind:z.literal('predictor-synthetic-control-succeeded'),request:requestSchema,result:predictorSyntheticEvidenceSchema}).strict(),
   z.object({ kind: z.literal('synthetic-control-succeeded'), request: requestSchema, result: syntheticControlEvidenceSchema }).strict(),
   z.object({kind:z.literal('count-regression-succeeded'),request:requestSchema,result:countRegressionEvidenceSchema}).strict(),
   z.object({kind:z.literal('panel-regression-succeeded'),request:requestSchema,result:panelRegressionEvidenceSchema}).strict(),
@@ -2673,6 +2683,7 @@ export function parseAnalysisWorkerCommand(value: unknown): Result<AnalysisWorke
   if (parsed.data.kind === 'granger-ssr-f' && parsed.data.values.length !== parsed.data.rows * 2) {
     return err({ kind: 'invalid-command', detail: 'The Granger matrix must contain exactly two columns.' })
   }
+  if (parsed.data.kind === 'predictor-synthetic-control' && parsed.data.values.length !== parsed.data.model.rows * parsed.data.model.columnNames.length) return err({kind:'invalid-command',detail:'Synthetic-control matrix dimensions disagree.'})
   if (parsed.data.kind === 'count-regression' && parsed.data.values.length !== parsed.data.model.rows * parsed.data.model.columns) return err({kind:'invalid-command',detail:'Count regression matrix dimensions disagree.'})
   if ((parsed.data.kind === 'panel-regression'||parsed.data.kind==='bacon') && parsed.data.values.length!==parsed.data.model.rows*parsed.data.model.columns) return err({kind:'invalid-command',detail:'Panel analysis matrix dimensions disagree.'})
   if (parsed.data.kind === 'staggered-did' && parsed.data.values.length !== parsed.data.model.rows * parsed.data.model.columns) return err({kind:'invalid-command',detail:'Staggered DiD matrix dimensions disagree.'})
@@ -2986,6 +2997,9 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
   if (parsed.data.kind === 'vecm-succeeded') {
     const result = vecmEvidenceSchema.safeParse(parsed.data.result)
     return result.success ? ok({ kind: 'vecm-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
+  }
+  if (parsed.data.kind === 'predictor-synthetic-control-succeeded') {
+    return ok({kind:'predictor-synthetic-control-succeeded',request:request.value,result:parsed.data.result})
   }
   if (parsed.data.kind === 'synthetic-control-succeeded') {
     const result = syntheticControlEvidenceSchema.safeParse(parsed.data.result)

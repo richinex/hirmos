@@ -34,6 +34,7 @@ mod lapack_dgelsd;
 mod lapack_dgesdd;
 mod lapack_dsyevd;
 mod lapack_lu;
+pub mod r_nelder_mead;
 mod slsqp;
 mod nelder_mead;
 mod least_squares;

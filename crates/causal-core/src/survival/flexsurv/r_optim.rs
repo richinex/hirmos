@@ -10,6 +10,12 @@ const STEP_REDUCTION: f64 = 0.2;
 const ACCEPTANCE_TOLERANCE: f64 = 0.0001;
 const RELATIVE_CHANGE_TEST: f64 = 10.0;
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum ROptimArithmetic {
+    Separate,
+    PinnedArm,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct ROptimControl {
     absolute_tolerance: f64,
@@ -18,6 +24,7 @@ pub struct ROptimControl {
     derivative_steps: Vec<f64>,
     parameter_scales: Vec<f64>,
     function_scale: f64,
+    arithmetic: ROptimArithmetic,
 }
 
 impl ROptimControl {
@@ -30,7 +37,17 @@ impl ROptimControl {
             derivative_steps: vec![1e-3; parameter_count],
             parameter_scales: vec![1.0; parameter_count],
             function_scale: 1.0,
+            arithmetic: ROptimArithmetic::Separate,
         }
+    }
+
+    /// Same optimizer and defaults, with the contraction recipe verified
+    /// against R 4.5.1's pinned ARM GCC build. Existing oracles keep their
+    /// original arithmetic rather than silently changing their trajectories.
+    pub fn bfgs_pinned_arm_defaults(parameter_count: NonZeroUsize) -> Self {
+        let mut control = Self::bfgs_defaults(parameter_count);
+        control.arithmetic = ROptimArithmetic::PinnedArm;
+        control
     }
 
     pub fn new(
@@ -48,6 +65,7 @@ impl ROptimControl {
             derivative_steps,
             parameter_scales,
             function_scale,
+            arithmetic: ROptimArithmetic::Separate,
         };
         validate_control(&control)?;
         Ok(control)
@@ -92,6 +110,32 @@ pub struct ROptimResult {
     pub iterations: usize,
     /// Base R returns zero on convergence and one when `maxit` is reached.
     pub convergence: usize,
+}
+
+/// Optional diagnostics from the same BFGS loop used by production callers.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ROptimEvent {
+    Gradient {
+        iteration: usize,
+        parameters: Vec<f64>,
+        values: Vec<f64>,
+    },
+    Trial {
+        iteration: usize,
+        step: f64,
+        value: f64,
+        threshold: f64,
+        accepted: bool,
+    },
+    Curvature {
+        iteration: usize,
+        value: f64,
+        update: bool,
+    },
+    Progress {
+        iteration: usize,
+        enough: bool,
+    },
 }
 
 /// Base R `optimHess` with an analytic score function.
@@ -289,6 +333,7 @@ fn vmmin<F, G>(
     control: &ROptimControl,
     objective: &mut F,
     gradient: &mut G,
+    mut trace: Option<&mut Vec<ROptimEvent>>,
 ) -> Result<ROptimResult, ROptimError>
 where
     F: FnMut(&[f64]) -> f64,
@@ -311,6 +356,10 @@ where
     }
 
     let parameter_count = initial.len();
+    let add_product = |acc: f64, left: f64, right: f64| match control.arithmetic {
+        ROptimArithmetic::Separate => acc + left * right,
+        ROptimArithmetic::PinnedArm => left.mul_add(right, acc),
+    };
     let mut parameters = initial
         .iter()
         .zip(&control.parameter_scales)
@@ -336,6 +385,13 @@ where
     let mut function_count = 1;
     let mut gradient_count = 1;
     let mut gradient_values = gradient(&parameters, control, objective)?;
+    if let Some(events) = trace.as_mut() {
+        events.push(ROptimEvent::Gradient {
+            iteration: 1,
+            parameters: parameters.clone(),
+            values: gradient_values.clone(),
+        });
+    }
     let mut iterations = 1;
     let mut last_restart = gradient_count;
 
@@ -360,23 +416,32 @@ where
         for row in 0..parameter_count {
             let mut value = 0.0;
             for column in 0..=row {
-                value -= inverse_hessian[row * parameter_count + column] * gradient_values[column];
+                value = add_product(
+                    value,
+                    -inverse_hessian[row * parameter_count + column],
+                    gradient_values[column],
+                );
             }
             for column in (row + 1)..parameter_count {
-                value -= inverse_hessian[column * parameter_count + row] * gradient_values[column];
+                value = add_product(
+                    value,
+                    -inverse_hessian[column * parameter_count + row],
+                    gradient_values[column],
+                );
             }
             direction[row] = value;
-            projected_gradient += value * gradient_values[row];
+            projected_gradient = add_product(projected_gradient, value, gradient_values[row]);
         }
 
         if projected_gradient < 0.0 {
-            let mut step_length = 1.0;
+            let mut step_length: f64 = 1.0;
             let mut accepted;
             let mut value = minimum;
             loop {
                 count = 0;
                 for index in 0..parameter_count {
-                    parameters[index] = old_parameters[index] + step_length * direction[index];
+                    parameters[index] =
+                        add_product(old_parameters[index], step_length, direction[index]);
                     if RELATIVE_CHANGE_TEST + old_parameters[index]
                         == RELATIVE_CHANGE_TEST + parameters[index]
                     {
@@ -388,9 +453,21 @@ where
                 if count < parameter_count {
                     value = scaled_value(&parameters, control, objective);
                     function_count += 1;
-                    accepted = value.is_finite()
-                        && value
-                            <= minimum + projected_gradient * step_length * ACCEPTANCE_TOLERANCE;
+                    let threshold = add_product(
+                        minimum,
+                        projected_gradient * step_length,
+                        ACCEPTANCE_TOLERANCE,
+                    );
+                    accepted = value.is_finite() && value <= threshold;
+                    if let Some(events) = trace.as_mut() {
+                        events.push(ROptimEvent::Trial {
+                            iteration: iterations,
+                            step: step_length,
+                            value,
+                            threshold,
+                            accepted,
+                        });
+                    }
                     if !accepted {
                         step_length *= STEP_REDUCTION;
                     }
@@ -403,6 +480,12 @@ where
             let enough = value > control.absolute_tolerance
                 && (value - minimum).abs()
                     > control.relative_tolerance * (minimum.abs() + control.relative_tolerance);
+            if let Some(events) = trace.as_mut() {
+                events.push(ROptimEvent::Progress {
+                    iteration: iterations,
+                    enough,
+                });
+            }
             if !enough {
                 count = parameter_count;
                 minimum = value;
@@ -413,39 +496,71 @@ where
                 gradient_values = gradient(&parameters, control, objective)?;
                 gradient_count += 1;
                 iterations += 1;
+                if let Some(events) = trace.as_mut() {
+                    events.push(ROptimEvent::Gradient {
+                        iteration: iterations,
+                        parameters: parameters.clone(),
+                        values: gradient_values.clone(),
+                    });
+                }
 
                 let mut first_curvature = 0.0;
                 for index in 0..parameter_count {
                     direction[index] *= step_length;
                     old_gradient[index] = gradient_values[index] - old_gradient[index];
-                    first_curvature += direction[index] * old_gradient[index];
+                    first_curvature =
+                        add_product(first_curvature, direction[index], old_gradient[index]);
                 }
 
+                if let Some(events) = trace.as_mut() {
+                    events.push(ROptimEvent::Curvature {
+                        iteration: iterations,
+                        value: first_curvature,
+                        update: first_curvature > 0.,
+                    });
+                }
                 if first_curvature > 0.0 {
                     let mut transformed_gradient = vec![0.0; parameter_count];
                     let mut second_curvature = 0.0;
                     for row in 0..parameter_count {
                         let mut value = 0.0;
                         for column in 0..=row {
-                            value += inverse_hessian[row * parameter_count + column]
-                                * old_gradient[column];
+                            value = add_product(
+                                value,
+                                inverse_hessian[row * parameter_count + column],
+                                old_gradient[column],
+                            );
                         }
                         for column in (row + 1)..parameter_count {
-                            value += inverse_hessian[column * parameter_count + row]
-                                * old_gradient[column];
+                            value = add_product(
+                                value,
+                                inverse_hessian[column * parameter_count + row],
+                                old_gradient[column],
+                            );
                         }
                         transformed_gradient[row] = value;
-                        second_curvature += value * old_gradient[row];
+                        second_curvature = add_product(second_curvature, value, old_gradient[row]);
                     }
 
                     let scale = 1.0 + second_curvature / first_curvature;
                     for row in 0..parameter_count {
                         for column in 0..=row {
+                            let numerator = match control.arithmetic {
+                                ROptimArithmetic::Separate => {
+                                    scale * direction[row] * direction[column]
+                                        - transformed_gradient[row] * direction[column]
+                                        - direction[row] * transformed_gradient[column]
+                                }
+                                ROptimArithmetic::PinnedArm => {
+                                    let first = (scale * direction[row]).mul_add(
+                                        direction[column],
+                                        -(transformed_gradient[row] * direction[column]),
+                                    );
+                                    (-direction[row]).mul_add(transformed_gradient[column], first)
+                                }
+                            };
                             inverse_hessian[row * parameter_count + column] +=
-                                (scale * direction[row] * direction[column]
-                                    - transformed_gradient[row] * direction[column]
-                                    - direction[row] * transformed_gradient[column])
-                                    / first_curvature;
+                                numerator / first_curvature;
                         }
                     }
                 } else {
@@ -504,6 +619,7 @@ where
         control,
         &mut objective,
         &mut |parameters, control, _| analytic_gradient(parameters, control, &mut gradient),
+        None,
     )
 }
 
@@ -520,5 +636,24 @@ where
         control,
         &mut objective,
         &mut |parameters, control, objective| numerical_gradient(parameters, control, objective),
+        None,
+    )
+}
+
+pub fn r_optim_bfgs_numeric_trace<F>(
+    initial: &[f64],
+    control: &ROptimControl,
+    mut objective: F,
+    trace: &mut Vec<ROptimEvent>,
+) -> Result<ROptimResult, ROptimError>
+where
+    F: FnMut(&[f64]) -> f64,
+{
+    vmmin(
+        initial,
+        control,
+        &mut objective,
+        &mut |parameters, control, objective| numerical_gradient(parameters, control, objective),
+        Some(trace),
     )
 }

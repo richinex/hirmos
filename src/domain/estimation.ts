@@ -288,7 +288,10 @@ export interface VecmConfiguration {
   readonly breakIndex: number | null
 }
 
-export interface SyntheticControlConfiguration {
+import { defaultPredictorSyntheticConfiguration, predictorSyntheticRecordMatches, type PredictorSyntheticConfiguration, type PredictorSyntheticEvidence, type PredictorSyntheticCatalog } from './predictorSyntheticControl'
+export type SyntheticControlConfiguration = OutcomeHistorySyntheticConfiguration | PredictorSyntheticConfiguration
+export interface OutcomeHistorySyntheticConfiguration {
+  readonly specification?: 'outcome-history'
   readonly kind: 'synthetic-control'
   readonly start: InterventionStart
   readonly donors: readonly ColumnId[]
@@ -665,6 +668,7 @@ export const defaultConfiguration = (estimator: EstimatorId, prepared: PreparedD
     case 'ardl-pss': return { kind: estimator, maxLag: 4, trend: 'ct', case: 4 }
     case 'vecm': return { kind: estimator, maxLags: 4, deterministic: 'co', significance: 95, breakIndex: null }
     case 'synthetic-control': {
+      if (prepared.kind === 'prepared-panel') return defaultPredictorSyntheticConfiguration()
       const affected = affectedColumns(study)
       return {
         kind: estimator,
@@ -2051,6 +2055,7 @@ interface RunIdentity {
 }
 
 export type EstimationRunArtifact =
+  | Omit<RunIdentity, 'columns'> & { readonly kind: 'predictor-synthetic-control-run'; readonly method: typeof SYNTHETIC_CONTROL_METHOD_ID; readonly configuration: PredictorSyntheticConfiguration; readonly evidence: PredictorSyntheticEvidence; readonly catalog: PredictorSyntheticCatalog; readonly columns: NonEmptyArray<Pick<StudyVariable, 'column' | 'name'>> }
   | RunIdentity & { readonly kind: 'causal-forest-run'; readonly method: typeof CAUSAL_FOREST_METHOD_ID; readonly configuration: CausalForestConfiguration; readonly evidence: CausalForestEvidence }
   | RunIdentity & { readonly kind: 'sharp-rd-run'; readonly method: typeof SHARP_RD_METHOD_ID; readonly configuration: SharpRdConfiguration; readonly evidence: SharpRdEvidence }
   | RunIdentity & { readonly kind: 'backdoor-linear-run'; readonly method: typeof BACKDOOR_LINEAR_REGRESSION_METHOD_ID; readonly configuration: BackdoorLinearConfiguration; readonly evidence: BackdoorLinearEvidence }
@@ -2066,7 +2071,7 @@ export type EstimationRunArtifact =
   | RunIdentity & { readonly kind: 't-learner-run'; readonly method: typeof T_LEARNER_METHOD_ID; readonly configuration: TLearnerConfiguration; readonly evidence: TLearnerEvidence | CrossFittedTLearnerEvidence }
   | RunIdentity & { readonly kind: 'ardl-run'; readonly method: typeof ARDL_PSS_METHOD_ID; readonly configuration: ArdlConfiguration; readonly evidence: ArdlEvidence }
   | RunIdentity & { readonly kind: 'vecm-run'; readonly method: typeof VECM_METHOD_ID; readonly configuration: VecmConfiguration; readonly evidence: VecmEvidence }
-  | RunIdentity & { readonly kind: 'synthetic-control-run'; readonly method: typeof SYNTHETIC_CONTROL_METHOD_ID; readonly configuration: SyntheticControlConfiguration; readonly evidence: SyntheticControlEvidence }
+  | RunIdentity & { readonly kind: 'synthetic-control-run'; readonly method: typeof SYNTHETIC_CONTROL_METHOD_ID; readonly configuration: OutcomeHistorySyntheticConfiguration; readonly evidence: SyntheticControlEvidence }
   | RunIdentity & { readonly kind: 'panel-intervention-run'; readonly method: typeof PANEL_INTERVENTION_METHOD_ID; readonly configuration: PanelInterventionConfiguration; readonly evidence: PanelInterventionEvidence; readonly timeLabels: NonEmptyArray<string> }
   | RunIdentity & { readonly kind: 'negbin-nuts-run'; readonly method: typeof NEGBIN_NUTS_METHOD_ID; readonly configuration: NegbinNutsConfiguration; readonly evidence: NegbinNutsEvidence }
   | RunIdentity & { readonly kind: 'bayesian-gaussian-run'; readonly method: typeof BAYESIAN_GAUSSIAN_METHOD_ID; readonly configuration: BayesianGaussianConfiguration; readonly evidence: BayesianGaussianEvidence }
@@ -2209,6 +2214,9 @@ const reported = (evidence: string): TargetVerdict => ({ kind: 'reported', evide
 const notReported = (evidence: string): TargetVerdict => ({ kind: 'not-reported', evidence })
 
 function targetCompatibility(estimand: Estimand, configuration: EstimatorConfiguration): TargetVerdict {
+  if (configuration.kind === 'synthetic-control' && configuration.specification === 'predictors') return estimand.kind === 'average-treatment-effect-on-treated'
+    ? reported('This comparison estimates the effect for the selected treated unit over the selected post-intervention periods.')
+    : notReported('Predictor-based synthetic control targets the treated unit. Record an ATT study before running this comparison.')
   if (configuration.kind === 'causal-forest') return causalForestTarget(estimand) === null
     ? notReported('Causal forest does not report a cutoff-local effect or the configured grouped-effect target. Choose an average or a conditional effect at each row’s covariate values.')
     : reported('The forest reports the treatment target and population recorded in Study design.')
@@ -2595,6 +2603,20 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
       break
     }
     case 'synthetic-control': {
+      if (configuration.specification === 'predictors') {
+        if (!panel) violate('synthetic-panel-layout', 'Prepare a long panel with unit and period keys.')
+        else if (configuration.treatedUnit === null || configuration.donorUnits.length < 2 || new Set(configuration.donorUnits).size !== configuration.donorUnits.length || configuration.donorUnits.includes(configuration.treatedUnit)) violate('synthetic-panel-layout', 'Choose one treated unit and at least two distinct donor units.')
+        else satisfy('synthetic-panel-layout', 'The selected treated unit is compared with donor units from the prepared panel.')
+        const predictorCount = configuration.predictors.length + configuration.special.length
+        if (predictorCount === 0 || configuration.predictors.some(id => !prepared.columns.includes(id)) || configuration.special.some(p => !prepared.columns.includes(p.column))) violate('synthetic-pre-period', 'Choose at least one prepared predictor.')
+        else if (configuration.interventionPeriod === null || configuration.fitPeriods.length < 2 || configuration.predictors.length > 0 && configuration.predictorPeriods.length === 0 || configuration.special.some(p => p.periods.length === 0) || [...configuration.fitPeriods, ...configuration.predictorPeriods, ...configuration.special.flatMap(p => p.periods)].some(p => p >= configuration.interventionPeriod!) || !configuration.plotPeriods.some(p => p >= configuration.interventionPeriod!)) violate('synthetic-pre-period', 'Choose pre-intervention predictor and fitting periods, and at least one post-intervention plot period.')
+        else if (configuration.selection.kind === 'supplied' && (configuration.selection.weights.length !== predictorCount || !configuration.selection.weights.some(w => w > 0))) violate('synthetic-pre-period', 'Supply a non-negative weight for every predictor, with at least one positive weight.')
+        else satisfy('synthetic-pre-period', `${configuration.fitPeriods.length} pre-intervention periods fit the donor weights; ${predictorCount} predictor summaries define the balance criterion.`)
+        leave('synthetic-donors-untreated', 'The treatment indicator is checked before fitting. Donors must not be affected by the intervention or its spillovers.')
+        leave('synthetic-convex-hull', 'Inspect predictor balance and pre-intervention outcome fit. Donor weights are non-negative and sum to one.')
+        leave('synthetic-no-interval', 'This predictor-based fit reports point estimates and optimization diagnostics, without an uncertainty interval.')
+        break
+      }
       if (!timeSeries) violate('synthetic-panel-layout', 'Synthetic control needs rows ordered by period. This prepared dataset holds independent rows.')
       else satisfy('synthetic-panel-layout', `Rows are a regular ${prepared.sampling.frequency} series; the outcome column is the treated unit and the chosen columns the donors.`)
       if (configuration.donors.length === 0) violate('synthetic-panel-layout', 'Choose at least one donor column.')
@@ -2835,7 +2857,8 @@ export function causalEstimateFrom(
     | { readonly kind: 't-learner-run'; readonly configuration: TLearnerConfiguration; readonly evidence: TLearnerEvidence | CrossFittedTLearnerEvidence }
     | { readonly kind: 'ardl-run'; readonly configuration: ArdlConfiguration; readonly evidence: ArdlEvidence }
     | { readonly kind: 'vecm-run'; readonly configuration: VecmConfiguration; readonly evidence: VecmEvidence }
-    | { readonly kind: 'synthetic-control-run'; readonly configuration: SyntheticControlConfiguration; readonly evidence: SyntheticControlEvidence }
+    | { readonly kind: 'predictor-synthetic-control-run'; readonly configuration: PredictorSyntheticConfiguration; readonly evidence: PredictorSyntheticEvidence; readonly catalog: PredictorSyntheticCatalog; readonly columns: NonEmptyArray<Pick<StudyVariable, 'column' | 'name'>> }
+    | { readonly kind: 'synthetic-control-run'; readonly configuration: OutcomeHistorySyntheticConfiguration; readonly evidence: SyntheticControlEvidence }
     | { readonly kind: 'panel-intervention-run'; readonly configuration: PanelInterventionConfiguration; readonly evidence: PanelInterventionEvidence }
     | { readonly kind: 'negbin-nuts-run'; readonly configuration: NegbinNutsConfiguration; readonly evidence: NegbinNutsEvidence }
     | { readonly kind: 'bayesian-gaussian-run'; readonly configuration: BayesianGaussianConfiguration; readonly evidence: BayesianGaussianEvidence }
@@ -2844,6 +2867,22 @@ export function causalEstimateFrom(
     | { readonly kind: 'causal-effects-run'; readonly configuration: CausalEffectsConfiguration; readonly evidence: CausalEffectsEvidence; readonly graphVariables: readonly (StudyVariable | null)[] }
     | { readonly kind: 'causal-impact-run'; readonly configuration: CausalImpactConfiguration; readonly evidence: CausalImpactEvidence },
 ): CausalEstimate | null {
+  if (run.kind === 'predictor-synthetic-control-run') {
+    if (study.estimand.kind !== 'average-treatment-effect-on-treated' || !predictorSyntheticRecordMatches(run.configuration, run.evidence, run.catalog, run.columns, study.outcome.column)) return null
+    const points: TimeEffectPoint[] = []
+    for (let i = 0; i < run.evidence.plotPeriods.length; i++) {
+      const step = run.evidence.plotPeriods[i]!
+      if (step < run.configuration.interventionPeriod!) continue
+      const counterfactual = run.evidence.synthetic[i], effect = run.evidence.gaps[i]
+      if (counterfactual == null || effect == null) return null
+      points.push({ step, actual: run.evidence.observed[i]!, counterfactual, lower: counterfactual, upper: counterfactual, effect })
+    }
+    if (!isNonEmpty(points)) return null
+    const cumulative = points.reduce((sum, point) => sum + point.effect, 0)
+    return { kind: 'causal-estimate', estimand: study.estimand, effect: { kind: 'path', values: points, aggregate: { cumulative, average: cumulative / points.length } },
+      interval: { kind: 'none', reason: 'The predictor-based synthetic-control fit does not report an uncertainty interval.' }, standardError: null, adjustment: { kind: 'none' },
+      sample: { observations: run.evidence.plotPeriods.length, parameters: run.evidence.donorWeights.length, degreesOfFreedom: null } }
+  }
   if (run.kind === 'sharp-rd-run') {
     if (study.estimand.kind !== 'local-cutoff-effect' || identification.result.kind !== 'cutoff-design' || study.estimand.cutoff !== run.evidence.cutoff) return null
     const { robust, observations } = run.evidence

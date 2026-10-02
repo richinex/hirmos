@@ -1,6 +1,7 @@
 import {countRegressionEvidenceSchema,sameCountRequest} from '@/domain/countRegression'
 import {panelRegressionEvidenceSchema,baconEvidenceSchema,sameSpecification} from '@/domain/panelRegression'
 import { z } from 'zod'
+import { predictorSyntheticEvidenceSchema, samePredictorSyntheticRequest } from '@/domain/predictorSyntheticControl'
 import { causalForestEvidenceSchema, sameCausalForestTarget, causalForestSettingsMatch } from '@/domain/causalForest'
 import { sameStructuralModel } from '@/domain/structuralImpact'
 import { ardlModelResponseSchema } from '@/domain/ardlModel'
@@ -413,6 +414,8 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
       return { kind: 'rootCauseChecks', request: command.model }
     case 'vecm':
       return { kind: 'vecm', rows: command.rows, columns: command.columns, endogenous: command.endogenous, maxLags: command.maxLags, deterministic: command.deterministic, significance: command.significance, breakIndex: command.breakIndex, forecastSteps: command.forecastSteps ?? null }
+    case 'predictor-synthetic-control':
+      return {kind:'predictorSyntheticControl',request:command.model}
     case 'synthetic-control':
       return { kind: 'syntheticControl', rows: command.rows, columns: command.columns, treated: command.treated, donors: command.donors, nPre: command.nPre, crossFitFolds: command.crossFitFolds, alpha: command.alpha }
     case 'panel-intervention':
@@ -926,6 +929,13 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         const result = vecmEvidenceSchema.safeParse(decoded)
         if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
         emit({ kind: 'vecm-succeeded', request: command.request, result: result.data })
+        return
+      }
+      case 'predictor-synthetic-control': {
+        const result=z.object({kind:z.literal('predictorSyntheticControl'),evidence:predictorSyntheticEvidenceSchema}).strict().safeParse(decoded)
+        if(!result.success){fail(command.request,{kind:'worker-protocol-failed',detail:z.prettifyError(result.error)});return}
+        if(!samePredictorSyntheticRequest(result.data.evidence.request,command.model)){fail(command.request,{kind:'worker-protocol-failed',detail:'The synthetic-control result differs from the requested specification.'});return}
+        emit({kind:'predictor-synthetic-control-succeeded',request:command.request,result:result.data.evidence})
         return
       }
       case 'synthetic-control': {

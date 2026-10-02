@@ -7,6 +7,11 @@
 
 use core::fmt;
 
+mod gemm;
+
+#[cfg(test)]
+pub(crate) mod benchmarks;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Transpose {
     None,
@@ -679,8 +684,55 @@ pub(crate) fn dgemm(
     c: &mut [f64],
     ldc: usize,
 ) -> Result<(), BlasError> {
+    dgemm_impl(
+        transa, transb, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc, false,
+    )
+}
+
+/// Ordered fused accumulation for the pinned ARM oracle. Shares DGEMM's
+/// dimension and buffer validation; reference-recipe callers are unchanged.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn dgemm_fused(
+    transa: Transpose,
+    transb: Transpose,
+    m: usize,
+    n: usize,
+    k: usize,
+    alpha: f64,
+    a: &[f64],
+    lda: usize,
+    b: &[f64],
+    ldb: usize,
+    beta: f64,
+    c: &mut [f64],
+    ldc: usize,
+) -> Result<(), BlasError> {
+    dgemm_impl(
+        transa, transb, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc, true,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn dgemm_impl(
+    transa: Transpose,
+    transb: Transpose,
+    m: usize,
+    n: usize,
+    k: usize,
+    alpha: f64,
+    a: &[f64],
+    lda: usize,
+    b: &[f64],
+    ldb: usize,
+    beta: f64,
+    c: &mut [f64],
+    ldc: usize,
+    fused_updates: bool,
+) -> Result<(), BlasError> {
     let nota = transa == Transpose::None;
     let notb = transb == Transpose::None;
+    #[cfg(test)]
+    benchmarks::record(transa, transb, m, n, k);
     let nrowa = if nota { m } else { k };
     let nrowb = if notb { k } else { n };
     if lda < nrowa.max(1) {
@@ -737,6 +789,33 @@ pub(crate) fn dgemm(
         return Ok(());
     }
 
+    if fused_updates {
+        for j in 0..n {
+            for i in 0..m {
+                let mut value = 0.;
+                for l in 0..k {
+                    let ai = if nota {
+                        matrix_index(i, l, lda)
+                    } else {
+                        matrix_index(l, i, lda)
+                    };
+                    let bi = if notb {
+                        matrix_index(l, j, ldb)
+                    } else {
+                        matrix_index(j, l, ldb)
+                    };
+                    value = a[ai].mul_add(b[bi], value);
+                }
+                let ci = matrix_index(i, j, ldc);
+                c[ci] = if beta == 0. {
+                    alpha * value
+                } else {
+                    alpha * value + beta * c[ci]
+                };
+            }
+        }
+        return Ok(());
+    }
     match (transa, transb) {
         (Transpose::None, Transpose::None) => {
             for j in 0..n {
@@ -758,20 +837,7 @@ pub(crate) fn dgemm(
             }
         }
         (Transpose::Transpose, Transpose::None) => {
-            for j in 0..n {
-                for i in 0..m {
-                    let mut temp = 0.0;
-                    for l in 0..k {
-                        temp += a[matrix_index(l, i, lda)] * b[matrix_index(l, j, ldb)];
-                    }
-                    let ci = matrix_index(i, j, ldc);
-                    c[ci] = if beta == 0.0 {
-                        alpha * temp
-                    } else {
-                        alpha * temp + beta * c[ci]
-                    };
-                }
-            }
+            gemm::transposed_product(m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
         }
         (Transpose::None, Transpose::Transpose) => {
             for j in 0..n {
@@ -1484,6 +1550,72 @@ mod tests {
                     assert_close(
                         &c[matrix_index(0, j, ldc)..matrix_index(0, j, ldc) + m],
                         &expected[matrix_index(0, j, ldc)..matrix_index(0, j, ldc) + m],
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn contiguous_gemm_preserves_reference_accumulation_bits() {
+        for (m, n, k) in [(1, 1, 1), (7, 5, 9), (65, 17, 63)] {
+            for transb in [Transpose::None, Transpose::Transpose] {
+                let lda = m + 3;
+                let ldb = if transb == Transpose::None {
+                    k + 2
+                } else {
+                    n + 2
+                };
+                let ldc = m + 1;
+                let a: Vec<f64> = (0..lda * k).map(|i| (i as f64 * 0.31).sin()).collect();
+                let b: Vec<f64> = (0..ldb * if transb == Transpose::None { n } else { k })
+                    .map(|i| (i as f64 * 0.17).cos())
+                    .collect();
+                for beta in [0.0, 1.0, -0.5] {
+                    let mut expected = vec![0.37; ldc * n];
+                    let mut actual = expected.clone();
+                    let alpha = 0.73;
+                    for j in 0..n {
+                        for i in 0..m {
+                            expected[i + j * ldc] = if beta == 0.0 {
+                                0.0
+                            } else if beta != 1.0 {
+                                beta * expected[i + j * ldc]
+                            } else {
+                                expected[i + j * ldc]
+                            };
+                        }
+                        for l in 0..k {
+                            let temp = alpha
+                                * b[if transb == Transpose::None {
+                                    l + j * ldb
+                                } else {
+                                    j + l * ldb
+                                }];
+                            for i in 0..m {
+                                expected[i + j * ldc] += temp * a[i + l * lda];
+                            }
+                        }
+                    }
+                    dgemm(
+                        Transpose::None,
+                        transb,
+                        m,
+                        n,
+                        k,
+                        alpha,
+                        &a,
+                        lda,
+                        &b,
+                        ldb,
+                        beta,
+                        &mut actual,
+                        ldc,
+                    )
+                    .unwrap();
+                    assert_eq!(
+                        actual.iter().map(|v| v.to_bits()).collect::<Vec<_>>(),
+                        expected.iter().map(|v| v.to_bits()).collect::<Vec<_>>()
                     );
                 }
             }

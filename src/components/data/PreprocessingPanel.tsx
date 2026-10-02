@@ -1002,6 +1002,23 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
         )}
       </div>
 
+      {/* The action closes the numbered steps it saves, ahead of the optional diagnostics. */}
+      <JobNotice job={preparation.job} />
+      {action.kind === 'blocked' ? <div id="preparation-requirement" className="mt-3"><Alert tone="info" live={false}>{action.reason}</Alert></div> : null}
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          className={button('signal')}
+          disabled={action.kind !== 'ready'}
+          aria-describedby={action.kind === 'blocked' ? 'preparation-requirement' : undefined}
+          aria-busy={preparation.job.kind === 'running'}
+          onClick={() => void createPreparedVersion()}
+        >
+          Create prepared dataset version
+        </button>
+        {preparation.job.kind === 'running' && <button type="button" className={button('quiet')} onClick={preparation.cancel}>Cancel preparation</button>}
+      </div>
+
       {preparedTimeSeries !== null && <PreparedSeriesPreview key={preparedTimeSeries.id} source={source} profile={profile} prepared={preparedTimeSeries} />}
 
       {(preparedCurrent !== null || timeSeriesSelected) && (
@@ -1172,22 +1189,6 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
         </section>
       )}
 
-      <JobNotice job={preparation.job} />
-      {action.kind === 'blocked' ? <div id="preparation-requirement" className="mt-3"><Alert tone="info" live={false}>{action.reason}</Alert></div> : null}
-      <div className="sticky bottom-3 z-(--z-sticky) ml-auto mt-4 flex w-fit max-w-full flex-wrap items-center justify-end gap-2">
-        {preparation.job.kind === 'running' && <button type="button" className={button('quiet', 'bg-panel')} onClick={preparation.cancel}>Cancel preparation</button>}
-        <button
-          type="button"
-          // It floats over the panel as the reader scrolls, so it carries the double shadow whatever its state.
-          className={button('signal', 'float disabled:shadow-(--shadow-float)')}
-          disabled={action.kind !== 'ready'}
-          aria-describedby={action.kind === 'blocked' ? 'preparation-requirement' : undefined}
-          aria-busy={preparation.job.kind === 'running'}
-          onClick={() => void createPreparedVersion()}
-        >
-          Create prepared dataset version
-        </button>
-      </div>
     </section>
   )
 }

@@ -2673,6 +2673,7 @@ dependencies = [
  "libm",
  "nalgebra",
  "puruspe",
+ "qd",
  "regex",
  "rustfft",
  "sha1",

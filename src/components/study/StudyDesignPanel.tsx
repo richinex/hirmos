@@ -9,6 +9,7 @@ import { useId, useMemo, useState } from 'react'
 import { useJob } from '@/analysis/JobsProvider'
 import { useWorkflow } from '@/components/WorkflowProvider'
 import { JobNotice } from '@/components/ui/JobNotice'
+import { Orb } from '@/components/ui/Orb'
 import type { RunActivity } from '@/domain/activity'
 import { useRunActivity } from '@/lib/useRunActivity'
 import { literatureOf, MethodCaveats, RequirementsFold } from '@/components/MethodCaveats'
@@ -602,16 +603,18 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
         <JobNotice job={job} />
         {choiceProblem !== null && <Alert tone="danger" className="mt-3">{choiceProblem}</Alert>}
         {adjustmentChoice !== null && <AdjustmentSetChoicePanel study={adjustmentChoice.study} evidence={adjustmentChoice.evidence} onChoose={(choice) => recordIdentification(adjustmentChoice.study, adjustmentChoice.evidence, choice)} />}
-        <button
-          type="button"
-          className={button('signal', 'mt-4')}
-          disabled={!readiness.ok || adjustmentChoice !== null || session.blocked || job.kind === 'running'}
-          aria-busy={state.job.kind === 'running'}
-          onClick={state.job.kind === 'running' ? undefined : () => void execute()}
-        >
-          Identify the effect
-        </button>
-        {job.kind === 'running' && <button type="button" className={button('quiet', 'mt-4')} onClick={session.cancel}>Cancel identification</button>}
+        <div className="mt-4 flex items-center gap-3">
+          <button
+            type="button"
+            className={button('signal')}
+            disabled={!readiness.ok || adjustmentChoice !== null || session.blocked || job.kind === 'running'}
+            aria-busy={state.job.kind === 'running'}
+            onClick={state.job.kind === 'running' ? undefined : () => void execute()}
+          >
+            Identify the effect
+          </button>
+          {job.kind === 'running' && <><Orb state="solving" aria-label="Identification running" /><button type="button" className={button('quiet')} onClick={session.cancel}>Cancel run</button></>}
+        </div>
       </section>
 
       {newestRecorded !== null && (

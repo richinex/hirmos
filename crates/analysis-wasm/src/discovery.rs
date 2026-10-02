@@ -1872,6 +1872,7 @@ mod tests {
             | AnalysisCommand::DmlRefutationBatch { .. }
             | AnalysisCommand::ArdlPss { .. }
             | AnalysisCommand::Vecm { .. }
+            | AnalysisCommand::PredictorSyntheticControl { .. }
             | AnalysisCommand::SyntheticControl { .. }
             | AnalysisCommand::PanelIntervention { .. }
             | AnalysisCommand::LinearScmCounterfactual { .. }

@@ -156,7 +156,7 @@ fn calendar_bins(
 }
 
 // pandas/_libs/groupby.pyx::group_sum and ::group_mean use this Kahan update.
-fn compensated_sum(values: &[f64]) -> f64 {
+pub(crate) fn compensated_sum(values: &[f64]) -> f64 {
     let mut sum = 0.0;
     let mut compensation = 0.0;
     for &value in values {
@@ -169,6 +169,98 @@ fn compensated_sum(values: &[f64]) -> f64 {
         sum = next;
     }
     sum
+}
+
+/// Correctly rounded sum of finite, nonnegative binary64 inputs using an
+/// expansion of nonoverlapping partials. Unlike Kahan summation, this keeps
+/// every addition residual, including halfway cases. Used for Synth's
+/// predictor normalization; pandas aggregation retains its original recipe.
+/// Adapted from CPython 3.13.0 `Modules/mathmodule.c::math_fsum`, limited to
+/// finite nonnegative inputs and returning `None` for invalid input/overflow.
+/// Copyright (c) 2001-2024 Python Software Foundation; All Rights Reserved.
+/// See `oracle/synth/CPYTHON-LICENSE` for the retained license agreement.
+pub(crate) fn rounded_nonnegative_sum(values: &[f64]) -> Option<f64> {
+    let mut partials = Vec::<f64>::new();
+    for &value in values {
+        if !value.is_finite() || value < 0. {
+            return None;
+        }
+        let mut high = value;
+        let mut retained = 0;
+        for j in 0..partials.len() {
+            let mut low = partials[j];
+            if high.abs() < low.abs() {
+                std::mem::swap(&mut high, &mut low);
+            }
+            let next = high + low;
+            let residual = low - (next - high);
+            if residual != 0. {
+                partials[retained] = residual;
+                retained += 1;
+            }
+            high = next;
+        }
+        if !high.is_finite() {
+            return None;
+        }
+        partials.truncate(retained);
+        if high != 0. {
+            partials.push(high);
+        }
+    }
+    let mut high = partials.pop().unwrap_or(0.);
+    let mut residual = 0.;
+    while let Some(low) = partials.pop() {
+        let next = high + low;
+        residual = low - (next - high);
+        high = next;
+        if residual != 0. {
+            break;
+        }
+    }
+    if let Some(&low) = partials.last() {
+        if (residual < 0. && low < 0.) || (residual > 0. && low > 0.) {
+            let twice = residual * 2.;
+            let next = high + twice;
+            if next - high == twice {
+                high = next;
+            }
+        }
+    }
+    Some(high)
+}
+
+#[cfg(test)]
+mod rounded_sum_tests {
+    use super::rounded_nonnegative_sum;
+
+    #[test]
+    fn preserves_rounding_residuals_and_halfway_direction() {
+        assert_eq!(rounded_nonnegative_sum(&[1.; 6]), Some(6.));
+        assert_eq!(rounded_nonnegative_sum(&[1. / 6.; 6]), Some(1.));
+        assert_eq!(rounded_nonnegative_sum(&[1., 2_f64.powi(-53)]), Some(1.));
+        assert_eq!(
+            rounded_nonnegative_sum(&[1., 2_f64.powi(-53), 2_f64.powi(-54)]),
+            Some(f64::from_bits(1_f64.to_bits() + 1))
+        );
+        assert_eq!(
+            rounded_nonnegative_sum(&[2_f64.powi(-54), 2_f64.powi(-53), 1.]),
+            Some(f64::from_bits(1_f64.to_bits() + 1))
+        );
+        assert_eq!(rounded_nonnegative_sum(&[]), Some(0.));
+    }
+
+    #[test]
+    fn refuses_invalid_inputs_and_overflow() {
+        for values in [
+            vec![-1.],
+            vec![f64::NAN],
+            vec![f64::INFINITY],
+            vec![f64::MAX, f64::MAX],
+        ] {
+            assert_eq!(rounded_nonnegative_sum(&values), None);
+        }
+    }
 }
 
 fn aggregate(values: &[f64], method: Aggregation) -> f64 {

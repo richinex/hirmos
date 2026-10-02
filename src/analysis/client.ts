@@ -1224,6 +1224,11 @@ export function runVecm(values: Float64Array, rows: number, columns: number, des
   return post('vecm-succeeded', { kind: 'vecm', request, values, rows, columns, ...design }, values)
 }
 
+export function runPredictorSyntheticControl(values:Float64Array,model:import('@/domain/predictorSyntheticControl').PredictorSyntheticRequest):Promise<Result<import('@/domain/predictorSyntheticControl').PredictorSyntheticEvidence,AnalysisWorkerProblem>> {
+  const request=newWorkerRequestId()
+  return post('predictor-synthetic-control-succeeded',{kind:'predictor-synthetic-control',request,values,model},values)
+}
+
 export function runSyntheticControl(values: Float64Array, rows: number, columns: number, design: { readonly treated: number; readonly donors: readonly number[]; readonly nPre: number; readonly crossFitFolds: number; readonly alpha: number }): Promise<SyntheticOutcome> {
   const request = newWorkerRequestId()
   return post('synthetic-control-succeeded', { kind: 'synthetic-control', request, values, rows, columns, ...design }, values)

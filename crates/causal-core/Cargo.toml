@@ -23,6 +23,8 @@ rustfft = { version = "=6.4.1", default-features = false }
 sha1 = "=0.10.7"
 spec_math = "0.1.6"
 
+qd = "=0.8.0"
+
 [dev-dependencies]
 proptest = "1"
 serde = { version = "1", features = ["derive"] }

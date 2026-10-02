@@ -1584,6 +1584,7 @@ pub(crate) enum AnalysisCommand {
         cross_fit_folds: usize,
         alpha: f64,
     },
+    PredictorSyntheticControl { request: crate::predictor_synthetic_control::Request },
     PanelAdjusted {
         rows: usize, columns: usize, units: Vec<String>, times: Vec<i64>, specification: AdjustedDidSpecification,
     },
@@ -3403,6 +3404,7 @@ pub(crate) enum AnalysisResult {
         conformal_band: SyntheticPredictionBandEvidence,
         gaussian_band: SyntheticPredictionBandEvidence,
     },
+    PredictorSyntheticControl { evidence: crate::predictor_synthetic_control::Evidence },
     SharpRd {
         cutoff: f64,
         target: String,

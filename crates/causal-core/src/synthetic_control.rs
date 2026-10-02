@@ -6,6 +6,11 @@
 
 use nalgebra::{DMatrix, DVector};
 
+pub mod synth;
+pub mod ipop;
+pub mod dataprep;
+mod statistics;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SyntheticControlError {
     EmptyDesign,

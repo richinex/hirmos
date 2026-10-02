@@ -10,7 +10,8 @@ export const flowControl = zoomControl
 /**
  * The control strip every React Flow canvas carries: zoom in, zoom out and fit, then whatever the
  * canvas adds after them. A column at the canvas's right on a desktop; on a phone a centred row
- * along its foot, where a column would sit over the cards. Rendered inside the ReactFlow element,
+ * along its foot, where a column would sit over the cards. The row takes its own width, since a panel
+ * centred by `left: 50%` would otherwise shrink to half the canvas, and scrolls rather than wraps. Rendered inside the ReactFlow element,
  * so it reads the canvas's own viewport.
  */
 export function FlowControls({ fit, fitLabel = 'Fit the canvas', children }: {
@@ -21,8 +22,8 @@ export function FlowControls({ fit, fitLabel = 'Fit the canvas', children }: {
   const { fitView, zoomIn, zoomOut } = useReactFlow()
   const isMobile = useIsMobile()
   return (
-    <Panel position={isMobile ? 'bottom-center' : 'bottom-right'} className={isMobile ? '!mx-0 !my-2' : '!m-2'} style={isMobile ? { transform: 'translateX(-50%)', maxWidth: 'calc(100vw - 2rem)' } : undefined}>
-      <div className={cn('flex overflow-hidden rounded-lg border border-hair bg-panel/95 backdrop-blur', isMobile ? 'flex-row flex-wrap justify-center' : 'flex-col')} role="toolbar" aria-label="Canvas">
+    <Panel position={isMobile ? 'bottom-center' : 'bottom-right'} className={isMobile ? '!mx-0 !my-2' : '!m-2'} style={isMobile ? { transform: 'translateX(-50%)', width: 'max-content', maxWidth: 'calc(100vw - 2rem)' } : undefined}>
+      <div className={cn('flex overflow-hidden rounded-lg border border-hair bg-panel/95 backdrop-blur', isMobile ? 'flex-row overflow-x-auto [scrollbar-width:none]' : 'flex-col')} role="toolbar" aria-label="Canvas">
         <ZoomButtons onIn={() => void zoomIn({ duration: 160 })} onOut={() => void zoomOut({ duration: 160 })} onFit={() => void fitView({ ...fit, duration: 220 })} fitLabel={fitLabel} />
         {children}
       </div>
