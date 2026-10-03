@@ -115,6 +115,7 @@ mod bacon;
 mod predictor_synthetic_control;
 mod panel_regression;
 mod remix_extensions;
+mod surrogate;
 mod count_regression;
 mod calendar;
 
@@ -171,6 +172,9 @@ pub fn run_analysis(
         );
     };
     let result = match command {
+        AnalysisCommand::SurrogatePath { request } => surrogate::path(request).map(|evidence| AnalysisResult::SurrogatePath { evidence }),
+        AnalysisCommand::SurrogateDiagnostics { request } => surrogate::diagnose(request).map(|evidence| AnalysisResult::SurrogateDiagnostics { evidence }),
+        AnalysisCommand::Surrogate { request } => surrogate::run(request).map(|evidence| AnalysisResult::Surrogate { evidence }),
         AnalysisCommand::GcmEffects { request } => gcm_effects::run(request, values, &progress)
             .map(|evidence| AnalysisResult::GcmEffects { evidence }),
         AnalysisCommand::GcmInfluence { request } => gcm_influence::run(request, values, &progress)

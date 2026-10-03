@@ -34,13 +34,11 @@
    3. STATUS IS ITS OWN RAMP. ok / info / warn / danger, for machine state only — never category, never
       the answer. Tokenised so each carries a per-theme variant and exactly one meaning.
 
-   4. MOTION HAS ONE CURVE AND FOUR DURATIONS. Arrivals ease out on cubic-bezier(0.2, 0.7, 0.2, 1) at
-      150ms (colour, hover), 200ms (`.pop`, a surface entering) or 280ms (`.rise`). Loops are LINEAR
-      on a 0.9s period: `.jobflow-run` marches, `.pulse-live` breathes. The split is not decoration.
-      The four are named once, as --motion-fast, --motion-base, --motion-slow and --motion-loop, and
-      every class and utility reads them, so a duration is a token the way a colour is.
-      An ease-out is shaped for something that starts fast and settles, so a loop built on it lurches
-      at the seam where it restarts; linear has no seam.
+   4. MOTION USES SHARED TOKENS. Arrivals and feedback share the house ease-out.
+      Fast, base and slow durations cover controls and surfaces. Named exceptions cover canvas
+      navigation, rearrangement, progress and theme changes. Travelling indicators stay linear;
+      the alternating status pulse eases at its turning points. Reduced motion removes movement,
+      not status feedback. JavaScript canvas movement reads the same tokens through lib/motion.ts.
 
    5. TYPE IS THREE FACES ON A RHYTHM. Roboto Slab, a slab serif, for headings: it reads at a distance
       and has an industrial but friendly voice. Lato, a humanist sans, in its two weights for everything
@@ -288,8 +286,8 @@ button:not([role='combobox']):not(:disabled):not([aria-disabled='true']):active,
 
 @media (prefers-reduced-motion: no-preference) {
   html[data-theme-transition]::view-transition-group(root) {
-    animation-duration: 520ms;
-    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+    animation-duration: var(--motion-theme);
+    animation-timing-function: var(--motion-theme-ease);
   }
   /* The outgoing frame is a backdrop, not a participant: animating it too would double the work. */
   html[data-theme-transition]::view-transition-old(root) {
@@ -367,20 +365,28 @@ button:not([role='combobox']):not(:disabled):not([aria-disabled='true']):active,
 :root[data-theme="dark"] .mac-terminal-title { color: #B4B4B4; }
 
 @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-/* The house durations. Read by the classes below, by `duration-(--motion-*)` utilities, and by the
-   landing choreography; nowhere else states a number. */
+/* Shared durations, including intentional exceptions. Canvas tokens also feed JavaScript.
+   Landing-only reveal/draw/stagger tokens live in landing.css. */
 :root {
   --motion-fast: 150ms;
   --motion-base: 200ms;
   --motion-slow: 280ms;
   --motion-loop: 0.9s;
+  --motion-canvas-zoom: 160ms;
+  --motion-canvas-fit: 220ms;
+  --motion-canvas-arrange: 320ms;
+  --motion-progress: 500ms;
+  --motion-theme: 520ms;
+  --motion-theme-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-skeleton: 1.4s;
+  --motion-sweep: 1.8s;
 }
-.rise { animation: rise var(--motion-slow) cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.rise { animation: rise var(--motion-slow) var(--default-transition-timing-function) both; }
 
 /* One entrance for every floating surface (Rnd panels, dialogs, drawer), using the same sharp easing as
    `rise` — a settle, not a bounce, which would read wrong on a technical instrument. */
 @keyframes pop { from { opacity: 0; transform: translateY(8px) scale(0.99); } to { opacity: 1; transform: none; } }
-.pop { animation: pop var(--motion-base) cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.pop { animation: pop var(--motion-base) var(--default-transition-timing-function) both; }
 
 /* The segmented control's knob moves each edge on its own clock, set by the component in --segment-left and --segment-right. */
 .segment-knob {
@@ -397,10 +403,8 @@ button:not([role='combobox']):not(:disabled):not([aria-disabled='true']):active,
 
 /* "Working" — a live status dot, or a placeholder standing in for content that has not arrived.
    The house loop period is 0.9s, set by the dash march above; `alternate` at 0.45s completes the round
-   trip in the same time, so every repeating thing in the app breathes together. LOOPS ARE LINEAR here;
-   the cubic-bezier house curve is for arrivals, and easing a loop makes it lurch.
-   This replaces Tailwind's `animate-pulse`, which ran 2s on its own curve and was the only motion in the
-   app outside the documented vocabulary. */
+   trip in the same time. Unlike a travelling dash, the pulse reverses direction, so ease-in-out
+   softens its turning points. */
 @keyframes pulse-live { to { opacity: 0.45; } }
 .pulse-live { animation: pulse-live calc(var(--motion-loop) / 2) ease-in-out infinite alternate; }
 
@@ -414,7 +418,7 @@ button:not([role='combobox']):not(:disabled):not([aria-disabled='true']):active,
 .skeleton {
   background: linear-gradient(90deg, var(--color-line) 25%, var(--color-hair) 50%, var(--color-line) 75%);
   background-size: 200% 100%;
-  animation: skeleton-sweep 1.4s linear infinite;
+  animation: skeleton-sweep var(--motion-skeleton) linear infinite;
 }
 @media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
 
@@ -436,7 +440,7 @@ button:not([role='combobox']):not(:disabled):not([aria-disabled='true']):active,
   left: -48px;
   width: 48px;
   background: linear-gradient(90deg, transparent, color-mix(in srgb, white 55%, transparent), transparent);
-  animation: bar-sweep 1.8s linear infinite;
+  animation: bar-sweep var(--motion-sweep) linear infinite;
 }
 .bar-live > .bar-live__fill { position: relative; height: 100%; }
 .bar-live > .bar-live__fill::after {
@@ -462,7 +466,7 @@ button[aria-busy="true"]::after {
   left: -48px;
   width: 48px;
   background: linear-gradient(90deg, transparent, currentColor, transparent);
-  animation: bar-sweep 1.8s linear infinite;
+  animation: bar-sweep var(--motion-sweep) linear infinite;
 }
 @media (prefers-reduced-motion: reduce) { button[aria-busy="true"]::after { animation: none; left: 0; width: 100%; opacity: 0.5; } }
 
@@ -587,10 +591,10 @@ button[aria-busy="true"]::after {
 .smart-truncate__layers::before { content: attr(data-text); position: absolute; inset: 0; display: block; min-width: 0; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: clip; pointer-events: none; }
 .smart-truncate__text { display: block; position: relative; z-index: 1; min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 .smart-truncate__sensor { grid-column: 2; grid-row: 1; inline-size: 0; block-size: 100%; container-type: size; container-name: smart-truncate; position: relative; pointer-events: none; }
-.smart-truncate__fade { position: absolute; top: 0; right: 0; inline-size: var(--smart-truncate-fade-width); block-size: 1lh; opacity: 0; background: linear-gradient(to right, color-mix(in srgb, var(--smart-truncate-surface) 0%, transparent), var(--smart-truncate-surface) 80%); transition: opacity var(--motion-fast); }
+.smart-truncate__fade { position: absolute; top: 0; right: 0; inline-size: var(--smart-truncate-fade-width); block-size: 1lh; opacity: 0; background: linear-gradient(to right, color-mix(in srgb, var(--smart-truncate-surface) 0%, transparent), var(--smart-truncate-surface) 80%); transition: opacity var(--motion-fast) var(--default-transition-timing-function); }
 @container smart-truncate (min-height: 1.5lh) { .smart-truncate__fade { opacity: 1; } }
 
-.seam { position: relative; background: var(--color-line); transition: background-color var(--motion-fast); }
+.seam { position: relative; background: var(--color-line); transition: background-color var(--motion-fast) var(--default-transition-timing-function); }
 .seam::before { content: ''; position: absolute; inset: 0 -4px; }
 .seam-h::before { inset: -4px 0; }
 .seam:hover, .seam[data-separator="active"] { background: var(--color-edge); }
@@ -614,7 +618,7 @@ button[aria-busy="true"]::after {
 .log-fade[data-clipped-top='1'] { --fade-top: 18px; }
 .log-fade[data-clipped-bottom='1'] { --fade-bottom: 18px; }
 /* cmdk publishes its list height; animate it on the house curve. */
-.cmdk-list { height: var(--cmdk-list-height); transition: height var(--motion-fast) cubic-bezier(0.2, 0.7, 0.2, 1); }
+.cmdk-list { height: var(--cmdk-list-height); transition: height var(--motion-fast) var(--default-transition-timing-function); }
 
 /* Radial stage vignette behind the transparent graph canvas — theme-aware, restores the "lit field"
    depth from v1 so the plot floats rather than sitting flat against a solid panel. */
@@ -682,7 +686,7 @@ button[aria-busy="true"]::after {
   transform: translateX(calc(-1 * var(--smart-truncate-fade-width)));
   opacity: 0;
   background: linear-gradient(to right, color-mix(in srgb, var(--smart-truncate-surface) 0%, transparent), var(--smart-truncate-surface) 80%);
-  transition: opacity var(--motion-fast) cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition: opacity var(--motion-fast) var(--default-transition-timing-function);
 }
 @container smart-truncate (min-height: 1.5lh) {
   .smart-truncate__fade { opacity: 1; }

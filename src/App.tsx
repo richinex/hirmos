@@ -488,7 +488,7 @@ function App() {
     if (chapter === 'estimation') return workflow.kind === 'profiled' && workflow.prepared !== null
     if (chapter === 'sensitivity') return hasSensitivitySource
     if (chapter === 'counterfactual') return workflow.kind === 'profiled' && workflow.estimationRuns.length > 0
-    if (chapter === 'results') return workflow.kind === 'profiled' && (causalModelRunCount(workflow.rootCause) > 0 || workflow.estimationRuns.length > 0 || workflow.survivalRuns.length > 0 || workflow.timeSeriesRuns.length > 0 || workflow.countSeriesModels.length > 0)
+    if (chapter === 'results') return workflow.kind === 'profiled' && (causalModelRunCount(workflow.rootCause) > 0 || workflow.estimationRuns.length > 0 || workflow.survivalRuns.length > 0 || workflow.surrogateRuns.length > 0 || workflow.timeSeriesRuns.length > 0 || workflow.countSeriesModels.length > 0)
     return false
   }
 
@@ -513,14 +513,14 @@ function App() {
         : identifiedStudy ? 'done' : workflow.studies.length > 0 ? 'refused' : 'not-started'
       case 'estimation': return !prepared || workflow.kind !== 'profiled'
         ? 'locked'
-        : workflow.estimationRuns.length > 0 || workflow.timeSeriesRuns.some(isRegressionDesignRun) ? 'done' : 'not-started'
+        : workflow.estimationRuns.length > 0 || workflow.surrogateRuns.length > 0 || workflow.timeSeriesRuns.some(isRegressionDesignRun) ? 'done' : 'not-started'
       case 'sensitivity': return !hasSensitivitySource
         ? 'locked'
         : workflow.sensitivityRuns.length > 0 ? 'done' : 'not-started'
       case 'counterfactual': return workflow.kind !== 'profiled' || workflow.estimationRuns.length === 0
         ? 'locked'
         : workflow.counterfactualRuns.length > 0 ? 'done' : 'not-started'
-      case 'results': return workflow.kind !== 'profiled' || (causalModelRunCount(workflow.rootCause) + workflow.estimationRuns.length + workflow.survivalRuns.length + workflow.timeSeriesRuns.length + workflow.countSeriesModels.length === 0) ? 'locked' : 'done'
+      case 'results': return workflow.kind !== 'profiled' || (causalModelRunCount(workflow.rootCause) + workflow.estimationRuns.length + workflow.survivalRuns.length + workflow.surrogateRuns.length + workflow.timeSeriesRuns.length + workflow.countSeriesModels.length === 0) ? 'locked' : 'done'
       default: return chapter
     }
   }
@@ -1052,6 +1052,9 @@ function App() {
                         identifications={workflow.identifications}
                         runs={workflow.estimationRuns}
                         designRuns={workflow.timeSeriesRuns}
+                        surrogateRuns={workflow.surrogateRuns}
+                        onSurrogateRun={(run) => dispatch({type:'surrogate-run-created',run})}
+                        onDeleteSurrogateRun={(run) => dispatch({type:'surrogate-run-deleted',run})}
                         onDesignRun={(run) => dispatch({ type: 'time-series-run-created', run })}
                         onDeleteDesignRun={(run) => dispatch({ type: 'time-series-run-deleted', run })}
                         sensitivityRuns={workflow.sensitivityRuns}
@@ -1145,6 +1148,7 @@ function App() {
                         sensitivityRuns={workflow.sensitivityRuns}
                         counterfactualRuns={workflow.counterfactualRuns}
                         survivalRuns={workflow.survivalRuns}
+                        surrogateRuns={workflow.surrogateRuns}
                         timeSeriesRuns={workflow.timeSeriesRuns}
                         countSeriesModels={workflow.countSeriesModels}
                         rootCauseRuns={workflow.rootCause.runs}

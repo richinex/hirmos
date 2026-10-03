@@ -56,8 +56,8 @@ export function MetricTile({ label, value, context, help, size = 'default', fram
   return (
     <div data-size={size} className={cn('@container metric-tile', frame === 'card' ? 'metric-card' : 'bg-well', size === 'compact' ? 'px-3 py-2.5' : 'px-4 py-3', className)}>
       {help === undefined
-        ? <span className={labelCn('metric-card-label block text-muted')}>{label}</span>
-        : <span className={labelCn('metric-card-label flex items-center gap-1.5 text-muted')}>{label}<ParameterHelp label={label} help={help} /></span>}
+        ? <span className={labelCn('metric-card-label block min-h-5 text-muted')}>{label}</span>
+        : <span className={labelCn('metric-card-label flex min-h-5 items-center gap-1.5 text-muted')}>{label}<ParameterHelp label={label} help={help} /></span>}
       <div ref={values} className="metric-card-values">
         <p data-length={length} className={cn('metric-card-number mb-0 mt-1 font-semibold leading-none tracking-tight text-ink', figure, '@max-[9rem]:text-title')} title={value.exact || value.srText}><FigureParts value={value} /></p>
         {context && <p className={num('metric-card-context mb-0 mt-1 text-body text-bone [overflow-wrap:anywhere]')}>{context}</p>}
@@ -97,7 +97,7 @@ export function IntervalFigure({ sentence, estimate, lower, upper, type, scale, 
   const se = standardError === undefined ? null : formatEstimate(standardError, scale, { precision: { kind: 'significant', digits: 2 } }).text
   return (
     <figure className="m-0" data-testid={testId}>
-      <figcaption className="text-title text-ink">{sentence}</figcaption>
+      <figcaption className="text-title leading-7 text-ink">{sentence}</figcaption>
       <p className={cn('mb-0 mt-1 text-metric font-semibold leading-none tracking-tight', accent ? 'text-signal-text' : 'text-ink')} title={figure.exact}>
         <span className="sr-only">{figure.srText}</span>
         <span aria-hidden className={num()}>

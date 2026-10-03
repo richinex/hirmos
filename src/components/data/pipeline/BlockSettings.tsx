@@ -1,11 +1,12 @@
 import { Metadata } from '@/components/ui/Metadata'
-import { lazy, Suspense, useEffect, useRef } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { Icon } from '@/components/Icon'
 import { Alert } from '@/components/ui/Alert'
 import { Orb } from '@/components/ui/Orb'
 import { Select } from '@/components/ui/Select'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
-import { button, caption, field, fieldLabel, iconControl, literal, num } from '@/components/ui/recipes'
+import { button, caption, chip, field, fieldHint, fieldLabel, iconControl, label as labelText, literal, num } from '@/components/ui/recipes'
+import { ParameterLabel } from '@/components/ui/ParameterLabel'
 import { blockSql, calendarShareName, calendarWindowDays, conditionWithTest, measureWithFunction, type AggregateFunction, type AggregateMeasure, type CalendarWindow, type JoinKind, type PipelineBlock, type PipelineBlockId, type PipelineNode, type RowCondition, type RowTest } from '@/domain/pipeline'
 import type { PreviewColumn } from '@/data/pipeline'
 import { CALENDAR_TIME_INTERPRETATIONS } from '@/domain/timeInterpretation'
@@ -50,6 +51,8 @@ export function BlockSettings({ node, inputColumns, inputNames, onChange }: {
   const conditionsKeys = useRowKeys(`${node.id}:conditions`, rowsOf('conditions'))
   const renamesKeys = useRowKeys(`${node.id}:renames`, rowsOf('renames'))
   const columnsKeys = useRowKeys(`${node.id}:columns`, rowsOf('columns'))
+  // Where a clicked column name goes: the expression edited last, at its caret.
+  const caret = useRef<{ readonly index: number; readonly start: number; readonly end: number } | null>(null)
   const keysKeys = useRowKeys(`${node.id}:keys`, rowsOf('keys'))
   const measuresKeys = useRowKeys(`${node.id}:measures`, rowsOf('measures'))
   const sortKeys = useRowKeys(`${node.id}:sort`, rowsOf('sort'))
@@ -108,18 +111,32 @@ export function BlockSettings({ node, inputColumns, inputNames, onChange }: {
       </div>
     )
     case 'derive-columns': return (
+      <div className="flex flex-col gap-4">
       <Rows label="New columns" onAdd={() => onChange({ ...block, columns: [...block.columns, { name: '', expression: '' }] })} addLabel="Add a column">
         {block.columns.map((column, index) => (
-          <div key={columnsKeys.at(index)} className="grid grid-cols-[1fr_auto] gap-1.5">
-            <div className="grid gap-1.5">
-              <input aria-label={`Derived column ${index + 1} name`} className={field('mono')} value={column.name} placeholder="name" onChange={(event) => onChange({ ...block, columns: block.columns.map((c, i) => i === index ? { ...c, name: event.target.value } : c) })} />
-              <input aria-label={`Derived column ${index + 1} expression`} className={field('mono')} value={column.expression} placeholder="expression, for example population / 1000" onChange={(event) => onChange({ ...block, columns: block.columns.map((c, i) => i === index ? { ...c, expression: event.target.value } : c) })} />
+          <div key={columnsKeys.at(index)} className="space-y-2 pb-2">
+            <div className="flex items-end gap-1.5">
+              <label className="block min-w-0 flex-1"><span className={labelText('text-muted')}>Name</span>
+                <input aria-label={`Derived column ${index + 1} name`} className={field('mono', 'mt-1')} value={column.name} placeholder="population_thousands" onChange={(event) => onChange({ ...block, columns: block.columns.map((c, i) => i === index ? { ...c, name: event.target.value } : c) })} />
+              </label>
+              <span className="self-end pb-0.5"><RemoveRow label={`Remove derived column ${index + 1}`} index={index} onRemove={() => { columnsKeys.removed(index); onChange({ ...block, columns: block.columns.filter((_, i) => i !== index) }) }} /></span>
             </div>
-            <RemoveRow label={`Remove derived column ${index + 1}`} index={index} onRemove={() => { columnsKeys.removed(index); onChange({ ...block, columns: block.columns.filter((_, i) => i !== index) }) }} />
+            <label className="block"><ParameterLabel className={labelText('text-muted')} label="Expression" help="An expression in DuckDB's SQL over the input's columns." />
+              <textarea aria-label={`Derived column ${index + 1} expression`} rows={3} spellCheck={false} autoComplete="off" className={field('mono', 'mt-1 min-h-20 resize-y rounded-lg leading-snug')} value={column.expression} placeholder="population / 1000" onSelect={(event) => { caret.current = { index, start: event.currentTarget.selectionStart, end: event.currentTarget.selectionEnd } }} onChange={(event) => { caret.current = { index, start: event.target.selectionStart, end: event.target.selectionEnd }; onChange({ ...block, columns: block.columns.map((c, i) => i === index ? { ...c, expression: event.target.value } : c) }) }} />
+            </label>
           </div>
         ))}
-        <p className={caption('m-0')}>An expression in DuckDB's SQL over the input's columns: {firstInputColumns.length === 0 ? 'wire an input in to see them' : firstInputColumns.map((column) => column.name).join(', ')}.</p>
       </Rows>
+        {firstInputColumns.length === 0
+          ? <p className={fieldHint}>Wire an input in to see its columns.</p>
+          : block.columns.length > 0 && <div><ParameterLabel className={fieldLabel} label="Input columns" help="Click a column to insert it at the cursor, in the expression edited last." />
+            <ColumnInserter columns={firstInputColumns.map((column) => column.name)} onInsert={(name) => {
+              const at = caret.current !== null && caret.current.index < block.columns.length ? caret.current : { index: block.columns.length - 1, start: block.columns.at(-1)!.expression.length, end: block.columns.at(-1)!.expression.length }
+              const text = sqlColumnName(name)
+              caret.current = { index: at.index, start: at.start + text.length, end: at.start + text.length }
+              onChange({ ...block, columns: block.columns.map((c, i) => i === at.index ? { ...c, expression: c.expression.slice(0, at.start) + text + c.expression.slice(at.end) } : c) })
+            }} /></div>}
+      </div>
     )
     case 'calendar-events': {
       const days = calendarWindowDays(block.window)
@@ -356,5 +373,26 @@ function RemoveRow({ label, index, onRemove }: { readonly label: string; readonl
     >
       <Icon name="delete" size={14} />
     </button>
+  )
+}
+
+/** A bare identifier stays as typed; any other name is double-quoted, with inner quotes doubled. */
+function sqlColumnName(name: string): string {
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ? name : `"${name.replaceAll('"', '""')}"`
+}
+
+function ColumnInserter({ columns, onInsert }: { readonly columns: readonly string[]; readonly onInsert: (name: string) => void }) {
+  const [filter, setFilter] = useState('')
+  const shown = columns.filter((name) => name.toLocaleLowerCase().includes(filter.toLocaleLowerCase()))
+  return (
+    <div className="mt-1 space-y-1.5">
+      {columns.length > 12 && <input aria-label="Filter columns to insert" placeholder="Filter columns" className={field('text', 'py-1')} value={filter} onChange={(event) => setFilter(event.target.value)} />}
+      <div className="flex max-h-28 flex-wrap gap-1 overflow-auto" role="group" aria-label="Insert a column">
+        {shown.map((name) => (
+          <button key={name} type="button" className={chip('font-mono text-label transition-colors hover:border-edge hover:bg-well')} title={`Insert ${name}`} onMouseDown={(event) => event.preventDefault()} onClick={() => onInsert(name)}>{name}</button>
+        ))}
+        {shown.length === 0 && <span className={caption()}>No columns match.</span>}
+      </div>
+    </div>
   )
 }

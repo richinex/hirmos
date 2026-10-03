@@ -1,9 +1,9 @@
-import { Metadata } from '@/components/ui/Metadata'
 import { BlockToolbar } from './BlockToolbar'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '@/components/Icon'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { Alert } from '@/components/ui/Alert'
+import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { TapNote, Tooltip } from '@/components/ui/Tooltip'
 import { button, caption, chromeAction, label, literal, num } from '@/components/ui/recipes'
 import { isNumericDuckDbType, type PreviewCell } from '@/domain/dataset'
@@ -230,7 +230,7 @@ function PipelineEditor({ onPrepared, onCancelEditing, controller }: Props & { r
     </div>
   )
 
-  const outputNotice = completeProblem === null ? null : <div id="pipeline-output-problem"><Alert tone="warn" live={false} testId="pipeline-incomplete">{completeProblem}</Alert></div>
+  const outputNotice = completeProblem === null ? null : <p id="pipeline-output-problem" data-testid="pipeline-incomplete" className="m-0 flex items-start gap-1.5 text-body text-warn"><Icon name="warning" size={16} className="mt-0.5 shrink-0" />{completeProblem}</p>
   const inspector = selectedNode === null
     ? (
       <div className="space-y-3">
@@ -254,7 +254,7 @@ function PipelineEditor({ onPrepared, onCancelEditing, controller }: Props & { r
           <div>
             <span className={label('block text-muted')}>Files</span>
             <ul className="m-0 mt-1 list-none space-y-0.5 p-0">
-              {files.map((input) => <li key={input.alias} className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 py-1 text-body"><span className={literal('min-w-0 text-ink [overflow-wrap:anywhere]')}>{input.alias}</span><span className="text-micro text-faint">{formatBytes(input.bytes)}</span><span className="col-span-2 min-w-0 text-micro text-muted [overflow-wrap:anywhere]">{input.fileName}</span></li>)}
+              {files.map((input) => <li key={input.alias} className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 py-1 text-body"><span className={literal('min-w-0 text-ink [overflow-wrap:anywhere]')}>{input.alias}</span><span className="text-micro text-faint">{formatBytes(input.bytes)}</span>{input.fileName.replace(/\.[^.]+$/, '') !== input.alias && <span className="col-span-2 min-w-0 text-micro text-muted [overflow-wrap:anywhere]">{input.fileName}</span>}</li>)}
             </ul>
           </div>
         )}
@@ -321,7 +321,7 @@ function PipelineEditor({ onPrepared, onCancelEditing, controller }: Props & { r
         stagePadding={false}
         stageScroll={false}
         inspector={{
-          title: selectedNode === null ? 'Pipeline' : blockLabel(selectedNode.block.kind),
+          title: selectedNode === null ? 'Pipeline' : 'Block settings',
           body: (
             <div className="flex min-w-0 flex-col gap-4">
               <div role="group" aria-label="Pipeline actions" className={cn('grid gap-2', onCancelEditing === undefined ? 'grid-cols-1' : 'grid-cols-2')}>
@@ -362,15 +362,28 @@ function Inspector({ node, index, outcomes, viewOf, files, choosing, onChooseFil
   const heldAlias = node.block.kind === 'input' && node.block.file.kind === 'chosen' ? node.block.file.alias : null
   const held = heldAlias === null ? null : files.find((input) => input.alias === heldAlias) ?? null
   const picker = useRef<HTMLInputElement>(null)
+  const [tab, setTab] = useState<'settings' | 'columns' | 'sql'>('settings')
+  const ran = outcome?.kind === 'ran' ? outcome : null
+  const hasSettings = node.block.kind !== 'input' && node.block.kind !== 'output'
+  const tabs = [...(hasSettings ? ['settings' as const] : []), ...(ran !== null ? ['columns' as const] : []), ...(sql !== null ? ['sql' as const] : [])]
+  const shownTab = tabs.includes(tab) ? tab : tabs[0] ?? 'settings'
+  const subtitle = node.block.kind === 'input' ? '' : summarise(node.block)
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4">
+      <section aria-labelledby="block-settings-title">
+        <h3 id="block-settings-title" className="mb-1 mt-0 text-body font-medium text-ink">{blockLabel(node.block.kind)}</h3>
+        {subtitle !== '' && <p className={literal('m-0 text-label text-muted [overflow-wrap:anywhere]')}>{subtitle}</p>}
+      </section>
       {node.block.kind === 'input' && <InputFileField held={held} choosing={choosing} />}
       {!(node.block.kind === 'input' && node.block.file.kind === 'empty') && !(node.block.kind === 'output' && outcome?.kind === 'waiting') && <BlockStatus outcome={outcome} running={running !== null} />}
-      {outcome?.kind === 'ran' && (
-        <details className="group/schema">
-          <summary className={label('flex cursor-pointer list-none items-center gap-1 text-muted hover:text-ink')}><Metadata><span><Icon name="chevron_right" size={14} className="transition-transform group-open/schema:rotate-90" /> Columns</span><span>{outcome.columns.length}</span></Metadata></summary>
-          <ul className="m-0 mt-1.5 list-none space-y-0.5 p-0" data-testid="block-schema">
-            {outcome.columns.map((column) => (
+      {tabs.length > 1 && <SegmentedControl size="sm" fill ariaLabel="Block inspector" value={shownTab} onChange={setTab} options={[
+        ...(hasSettings ? [{ value: 'settings' as const, label: <span className="flex items-center gap-1.5"><Icon name="tune" size={14} />Settings</span> }] : []),
+        ...(ran !== null ? [{ value: 'columns' as const, label: <span className="flex items-center gap-1.5"><Icon name="view_column" size={14} />Columns</span> }] : []),
+        ...(sql !== null ? [{ value: 'sql' as const, label: <span className="flex items-center gap-1.5"><Icon name="code" size={14} />SQL</span> }] : []),
+      ]} />}
+      {shownTab === 'columns' && ran !== null && (
+          <ul className="m-0 list-none space-y-0.5 p-0" data-testid="block-schema">
+            {ran.columns.map((column) => (
               <li key={column.name} className="flex items-center gap-1.5 text-body">
                 {held === null || held.format === 'parquet' || held.format === 'duckdb-export-file'
                   ? <TypeGlyph type={column.type} />
@@ -380,8 +393,9 @@ function Inspector({ node, index, outcomes, viewOf, files, choosing, onChooseFil
               </li>
             ))}
           </ul>
-        </details>
       )}
+      {shownTab === 'sql' && sql !== null && <pre className={cn(literal(), 'm-0 overflow-x-auto rounded-md border border-hair bg-well px-2.5 py-2 text-label leading-relaxed text-bone')} data-testid="block-sql">{sql}</pre>}
+      {shownTab === 'settings' && <>
       <BlockSettings node={node} inputColumns={inputColumns} inputNames={inputNames} onChange={onChange} />
       {(outcome?.kind === 'ran' || outcome?.kind === 'failed') && outcome.stdout !== undefined && outcome.stdout.length > 0 && (
         <div>
@@ -389,12 +403,7 @@ function Inspector({ node, index, outcomes, viewOf, files, choosing, onChooseFil
           <pre className={cn(literal(), 'mt-1 max-h-48 overflow-auto rounded-md border border-hair bg-well px-2.5 py-2 text-label leading-relaxed text-bone')} data-testid="block-stdout">{outcome.stdout}</pre>
         </div>
       )}
-      {sql !== null && (
-        <details className="group/sql">
-          <summary className={label('flex cursor-pointer list-none items-center gap-1 text-muted hover:text-ink')}><Icon name="chevron_right" size={14} className="transition-transform group-open/sql:rotate-90" /> As SQL</summary>
-          <pre className={cn(literal(), 'mt-2 overflow-x-auto rounded-md border border-hair bg-well px-2.5 py-2 text-label leading-relaxed text-bone')} data-testid="block-sql">{sql}</pre>
-        </details>
-      )}
+      </>}
       {removable && (
         <div className={cn('grid gap-2 pt-3', node.block.kind === 'input' ? 'grid-cols-2' : 'grid-cols-1')}>
           {node.block.kind === 'input'
@@ -416,6 +425,9 @@ function Inspector({ node, index, outcomes, viewOf, files, choosing, onChooseFil
 const FILE_ACCEPT = '.csv,.tsv,.parquet,text/csv,text/tab-separated-values'
 
 /** The file an input card holds, or the prompt to choose one; choosing and replacing are actions in the footer. */
+/** One label column for every detail list in the block panel, so values align from list to list. */
+const detailList = 'm-0 grid grid-cols-[4.5rem_minmax(0,1fr)] items-baseline gap-x-3 gap-y-1 text-body'
+
 function InputFileField({ held, choosing }: {
   readonly held: SqlPreparationInput | null
   readonly choosing: { readonly kind: 'idle' } | { readonly kind: 'busy' } | { readonly kind: 'refused'; readonly detail: string }
@@ -425,10 +437,10 @@ function InputFileField({ held, choosing }: {
       {held === null
         ? <p className={caption('m-0')}>Select a CSV, TSV, or Parquet file, then connect it to the next block to continue processing.</p>
         : (
-          <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-body">
-            <dt className="text-muted">File</dt><dd className={literal('m-0 truncate text-ink')} title={held.fileName}>{held.fileName}</dd>
-            <dt className="text-muted">Size</dt><dd className={num('m-0 text-ink')}>{formatBytes(held.bytes)}</dd>
-            <dt className="text-muted">Table</dt><dd className={literal('m-0 text-ink')}>{held.alias}</dd>
+          <dl className={detailList}>
+            <dt className="text-label text-faint">File</dt><dd className={literal('m-0 truncate text-ink')} title={held.fileName}>{held.fileName}</dd>
+            <dt className="text-label text-faint">Size</dt><dd className={num('m-0 text-ink')}>{formatBytes(held.bytes)}</dd>
+            <dt className="text-label text-faint">Table</dt><dd className={literal('m-0 text-ink')}>{held.alias}</dd>
           </dl>
         )}
       {choosing.kind === 'refused' && <Alert tone="danger"><p className="m-0">{choosing.detail}</p></Alert>}
@@ -441,7 +453,12 @@ function BlockStatus({ outcome, running }: { readonly outcome: BlockOutcome | un
   if (running) return <p className={caption('m-0')} data-testid="block-status">Running.</p>
   if (outcome === undefined) return <p className={caption('m-0')} data-testid="block-status">Not run yet.</p>
   switch (outcome.kind) {
-    case 'ran': return <p className={cn(label('m-0 text-muted'), num())} data-testid="block-status"><Metadata><span>{formatCount(outcome.rowCount).text} {outcome.rowCount === 1 ? 'row' : 'rows'}</span><span>{outcome.columns.length} {outcome.columns.length === 1 ? 'column' : 'columns'}</span></Metadata></p>
+    case 'ran': return (
+      <dl className={detailList} data-testid="block-status" aria-label="Block output">
+        <dt className="text-label text-faint">Rows</dt><dd className={num('m-0 text-ink')}>{formatCount(outcome.rowCount).text}</dd>
+        <dt className="text-label text-faint">Columns</dt><dd className={num('m-0 text-ink')}>{formatCount(outcome.columns.length).text}</dd>
+      </dl>
+    )
     case 'waiting': return <p className={caption('m-0')} data-testid="block-status">Not run yet: {outcome.detail}.</p>
     case 'skipped': return <p className={caption('m-0')} data-testid="block-status">Not run: a block before it failed.</p>
     case 'failed': return <Alert tone="danger" testId="block-status"><p className="m-0">{outcome.detail}</p></Alert>

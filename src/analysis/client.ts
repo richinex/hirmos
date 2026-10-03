@@ -1376,3 +1376,19 @@ export function resolveMissingnessInWorker(values: Float64Array, rows: number, c
 }
 import type { SharpRdEvidence } from '@/domain/sharpRd'
 import type { AdjustedDidSpecification } from '@/domain/adjustedDid'
+
+export function runSurrogate(model:import('@/domain/surrogate').SurrogateRequest):Promise<Result<import('@/domain/surrogate').SurrogateEvidence,AnalysisWorkerProblem>> {
+  const request=newWorkerRequestId()
+  const values=new Float64Array(0)
+  return post('surrogate-succeeded',{kind:'surrogate',request,values,model},values)
+}
+
+export function runSurrogateDiagnostics(model:import('@/domain/surrogateDiagnostics').SurrogateDiagnosticRequest):Promise<Result<import('@/domain/surrogateDiagnostics').SurrogateDiagnosticEvidence,AnalysisWorkerProblem>> {
+  const request=newWorkerRequestId(),values=new Float64Array(0)
+  return post('surrogate-diagnostics-succeeded',{kind:'surrogate-diagnostics',request,values,model},values)
+}
+
+export function runSurrogatePath(model:import('@/domain/surrogatePath').SurrogatePathRequest):Promise<Result<import('@/domain/surrogatePath').SurrogatePathEvidence,AnalysisWorkerProblem>> {
+  const request = newWorkerRequestId(), values = new Float64Array(0)
+  return post('surrogate-path-succeeded',{kind:'surrogate-path',request,values,model},values)
+}

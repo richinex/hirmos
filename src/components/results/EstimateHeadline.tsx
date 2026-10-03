@@ -106,7 +106,7 @@ export function EstimateHeadline({ estimate, sentence, scaleLine, sampleLine, st
   if (estimate.effect.kind === 'byGroup') {
     return (
       <figure className="m-0" data-testid={testId}>
-        <figcaption className="text-title text-ink">{sentence}</figcaption>
+        <figcaption className="text-title leading-7 text-ink">{sentence}</figcaption>
         <GroupEffectTable effect={estimate.effect} interval={estimate.interval} observations={estimate.sample.observations} />
         <p className={label('mb-0 mt-2 text-muted')}>{scaleLine}</p>
       </figure>
@@ -115,7 +115,7 @@ export function EstimateHeadline({ estimate, sentence, scaleLine, sampleLine, st
   if (estimate.effect.kind === 'perRow') {
     return (
       <figure className="m-0" data-testid={testId}>
-        <figcaption className="text-title text-ink">{sentence}</figcaption>
+        <figcaption className="text-title leading-7 text-ink">{sentence}</figcaption>
         <RowEffectTable effect={estimate.effect} />
         {estimate.interval.kind !== 'none' && <p className="mb-0 mt-2 text-body text-muted">
           The {formatPercent(estimate.interval.level, { precision: 0 }).text} confidence interval for the average effect is {formatStatistic('raw', estimate.interval.lower).text} to {formatStatistic('raw', estimate.interval.upper).text}.
@@ -152,7 +152,7 @@ export function EstimateHeadline({ estimate, sentence, scaleLine, sampleLine, st
     : ''
   return (
     <figure className="m-0" data-testid={testId}>
-      <figcaption className="text-title text-ink">{sentence}</figcaption>
+      <figcaption className="text-title leading-7 text-ink">{sentence}</figcaption>
       <p className={num(`mb-0 mt-1 text-metric font-semibold leading-none tracking-tight ${accent ? 'text-signal-text' : 'text-ink'}`)} title={figure.exact}><FigureParts value={figure} /></p>
       <p className={num('mb-0 mt-1 text-body text-bone')}><Metadata>{span.length > 0 && <span>{span}</span>}{interval === null ? <span>No interval</span> : <span>[{interval.bounds.lower}, {interval.bounds.upper}] <span className="text-ink">{interval.typeLabel}</span></span>}<span>{sampleLine}</span></Metadata></p>
       {estimate.interval.kind === 'none' && <p className="mb-0 mt-1 text-body text-muted">{estimate.interval.reason}</p>}

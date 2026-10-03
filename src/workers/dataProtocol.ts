@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import {categoricalMembershipSchema,type CategoricalMembership} from '@/domain/sampleMembership'
 import { columnDeclarationsSchema, type ColumnDeclarations } from '@/domain/fileReading'
 import { timeInterpretationSchema, timePreviewSchema, type TimeInterpretation, type TimePreview } from '@/domain/timeInterpretation'
 import { calendarRequestSchema, type CalendarRequest } from '@/domain/calendar'
@@ -37,6 +38,7 @@ export type DataWorkerCommand =
     }
   | {
       readonly kind: 'materialize-numeric'
+      readonly membership?: CategoricalMembership
       readonly request: ImportRequestId
       readonly file: File
       readonly profile: DatasetProfile
@@ -60,6 +62,7 @@ export type DataWorkerCommand =
     }
   | {
       readonly kind: 'summarize-columns'
+      readonly categoryColumn?: ColumnId
       readonly request: ImportRequestId
       readonly file: File
       readonly profile: DatasetProfile
@@ -110,6 +113,7 @@ const commandSchema = z.discriminatedUnion('kind', [
   }).strict(),
   z.object({
     kind: z.literal('materialize-numeric'),
+    membership: categoricalMembershipSchema.optional(),
     request: requestSchema,
     file: z.instanceof(File),
     profile: z.unknown(),
@@ -133,6 +137,7 @@ const commandSchema = z.discriminatedUnion('kind', [
   }).strict(),
   z.object({
     kind: z.literal('summarize-columns'),
+    categoryColumn: z.string().optional(),
     request: requestSchema,
     file: z.instanceof(File),
     profile: z.unknown(),
@@ -301,7 +306,9 @@ export function parseDataWorkerCommand(value: unknown): Result<DataWorkerCommand
     }
   }
   case 'summarize-columns': {
-    return ok({ kind: 'summarize-columns', request: request.value, file: data.file, profile: profile.value })
+    const categoryColumn=data.categoryColumn===undefined?undefined:known.get(data.categoryColumn)
+    if(data.categoryColumn!==undefined && categoryColumn===undefined)return err({kind:'invalid-command',detail:'The category column is outside the supplied profile.'})
+    return ok({ kind: 'summarize-columns', request: request.value, file: data.file, profile: profile.value, categoryColumn })
   }
   case 'preview-window': {
     const bind = (column: string): ColumnId | null => known.get(column) ?? null
@@ -326,10 +333,12 @@ export function parseDataWorkerCommand(value: unknown): Result<DataWorkerCommand
     return ok({ kind: 'profile-column', request: request.value, file: data.file, profile: profile.value, columnId: column.id })
   }
   case 'materialize-numeric': {
+    if(data.membership!==undefined && !data.columnIds.includes(data.membership.column))return err({kind:'invalid-command',detail:'The membership column must be included in the materialized columns.'})
     const columns = bindColumns(known, data.columnIds)
     if (!columns.ok) return columns
     return ok({
       kind: 'materialize-numeric',
+      membership:data.membership,
       request: request.value,
       file: data.file,
       profile: profile.value,

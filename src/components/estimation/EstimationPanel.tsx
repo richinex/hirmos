@@ -910,7 +910,7 @@ const ResultCard = memo(function ResultCard({ run, study, current, stepLabel, on
         </div>
       )}
       {run.kind === 'backdoor-linear-run' && (
-        <p className="mb-0 mt-3 text-body text-muted">
+        <p className="mb-0 mt-3 max-w-[75ch] text-body text-muted">
           {estimate.interval.kind === 'confidence' && (estimate.interval.lower > 0 || estimate.interval.upper < 0) ? 'The interval excludes zero.' : 'The interval includes zero: the data do not rule out no effect.'}{' '}
           {run.configuration.errors.kind === 'arma'
             ? <>For comparison, least squares gives <span className={num('text-bone')}>{formatStatistic('raw', run.evidence.estimate).text}</span> with a Newey–West interval of <span className={num('text-bone')}>{intervalText({ ...estimate, effect: { kind: 'additive', value: run.evidence.estimate, unit: '' }, interval: { kind: 'confidence', level: run.evidence.level, lower: run.evidence.hacInterval[0], upper: run.evidence.hacInterval[1] } })}</span>.</>

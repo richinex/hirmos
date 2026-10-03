@@ -1,3 +1,4 @@
+import { surrogateRunMatchesProfile, type SurrogateRun, type SurrogateRunId } from './surrogateRun'
 import { assertNever, brand, err, ok, type Brand, type NonEmptyArray, type Result } from './dop'
 import type { DatasetProfile, DatasetProfileProblem, SourcePersistence } from './dataset'
 import { fileReading, NO_DECLARATIONS, type FileReading } from './fileReading'
@@ -136,6 +137,7 @@ export type Workflow =
       readonly sensitivityRuns: readonly SensitivityRunArtifact[]
       readonly counterfactualRuns: readonly CounterfactualRunArtifact[]
       /** Standalone time-to-event analyses; these do not depend on a causal study or estimate. */
+      readonly surrogateRuns: readonly SurrogateRun[]
       readonly survivalRuns: readonly SurvivalRunArtifact[]
       readonly timeSeriesRuns: readonly TimeSeriesRun[]
       readonly rootCause: RootCauseWorkspace
@@ -188,6 +190,8 @@ export type WorkflowEvent =
   | { readonly type: 'estimation-run-deleted'; readonly run: EstimationRunId }
   | { readonly type: 'sensitivity-run-deleted'; readonly run: SensitivityRunId }
   | { readonly type: 'counterfactual-run-deleted'; readonly run: CounterfactualRunId }
+  | { readonly type: 'surrogate-run-created'; readonly run: SurrogateRun }
+  | { readonly type: 'surrogate-run-deleted'; readonly run: SurrogateRunId }
   | { readonly type: 'survival-run-created'; readonly run: SurvivalRunArtifact }
   | { readonly type: 'survival-run-deleted'; readonly run: SurvivalRunId }
   | { readonly type: 'time-series-run-created'; readonly run: TimeSeriesRun }
@@ -328,6 +332,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
           estimationRuns: snapshot.estimationRuns,
           sensitivityRuns: snapshot.sensitivityRuns,
           counterfactualRuns: snapshot.counterfactualRuns,
+          surrogateRuns: snapshot.surrogateRuns,
           survivalRuns: snapshot.survivalRuns,
           timeSeriesRuns: snapshot.timeSeriesRuns,
           rootCause: snapshot.rootCause,
@@ -386,6 +391,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
           estimationRuns: [],
           sensitivityRuns: [],
           counterfactualRuns: [],
+          surrogateRuns: [],
           survivalRuns: [],
           timeSeriesRuns: [],
           rootCause: EMPTY_ROOT_CAUSE,
@@ -538,6 +544,10 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
       if (event.type === 'counterfactual-run-deleted') {
         return { ...state, counterfactualRuns: state.counterfactualRuns.filter((run) => run.id !== event.run) }
       }
+      if (event.type === 'surrogate-run-created' && surrogateRunMatchesProfile(event.run, state.profile)) {
+        return { ...state, surrogateRuns: [...state.surrogateRuns, event.run] }
+      }
+      if (event.type === 'surrogate-run-deleted') return { ...state, surrogateRuns: state.surrogateRuns.filter(run => run.id !== event.run) }
       if (event.type === 'survival-run-created'
         && state.prepared !== null
         && event.run.preparedDataset === state.prepared.id) {

@@ -1,3 +1,6 @@
+import {surrogatePathRequestSchema,surrogatePathEvidenceSchema,type SurrogatePathRequest,type SurrogatePathEvidence} from '@/domain/surrogatePath'
+import {surrogateDiagnosticRequestSchema,surrogateDiagnosticEvidenceSchema,type SurrogateDiagnosticRequest,type SurrogateDiagnosticEvidence} from '@/domain/surrogateDiagnostics'
+import { surrogateRequestSchema, surrogateEvidenceSchema, type SurrogateRequest, type SurrogateEvidence } from '@/domain/surrogate'
 import { countRegressionRequestSchema, countRegressionEvidenceSchema, type CountRegressionRequest, type CountRegressionEvidence } from '@/domain/countRegression'
 import { sunAbrahamRequestSchema, sunAbrahamEvidenceSchema, ridgeAugmentedRequestSchema, ridgeAugmentedEvidenceSchema, type SunAbrahamRequest, type SunAbrahamEvidence, type RidgeAugmentedRequest, type RidgeAugmentedEvidence } from '@/domain/remixExtensions'
 import {panelRegressionRequestSchema,panelRegressionEvidenceSchema,baconRequestSchema,baconEvidenceSchema,type PanelRegressionRequest,type PanelRegressionEvidence,type BaconRequest,type BaconEvidence} from '@/domain/panelRegression'
@@ -1060,6 +1063,9 @@ export type AnalysisWorkerCommand =
       readonly model: CountRegressionRequest
     }
   | {readonly kind:'sun-abraham';readonly request:WorkerRequestId;readonly values:Float64Array;readonly model:SunAbrahamRequest}
+  | {readonly kind:'surrogate-path';readonly request:WorkerRequestId;readonly values:Float64Array;readonly model:SurrogatePathRequest}
+  | {readonly kind:'surrogate-diagnostics';readonly request:WorkerRequestId;readonly values:Float64Array;readonly model:SurrogateDiagnosticRequest}
+  | {readonly kind:'surrogate';readonly request:WorkerRequestId;readonly values:Float64Array;readonly model:SurrogateRequest}
   | {readonly kind:'ridge-augmented-synthetic';readonly request:WorkerRequestId;readonly values:Float64Array;readonly model:RidgeAugmentedRequest}
   | {readonly kind:'panel-regression';readonly request:WorkerRequestId;readonly values:Float64Array;readonly model:PanelRegressionRequest}
   | {readonly kind:'bacon';readonly request:WorkerRequestId;readonly values:Float64Array;readonly model:BaconRequest}
@@ -1386,6 +1392,9 @@ export type AnalysisWorkerEvent =
   | { readonly kind: 'synthetic-control-succeeded'; readonly request: WorkerRequestId; readonly result: SyntheticControlEvidence }
   | { readonly kind: 'count-regression-succeeded'; readonly request: WorkerRequestId; readonly result: CountRegressionEvidence }
   | {readonly kind:'sun-abraham-succeeded';readonly request:WorkerRequestId;readonly result:SunAbrahamEvidence}
+  | {readonly kind:'surrogate-path-succeeded';readonly request:WorkerRequestId;readonly result:SurrogatePathEvidence}
+  | {readonly kind:'surrogate-diagnostics-succeeded';readonly request:WorkerRequestId;readonly result:SurrogateDiagnosticEvidence}
+  | {readonly kind:'surrogate-succeeded';readonly request:WorkerRequestId;readonly result:SurrogateEvidence}
   | {readonly kind:'ridge-augmented-synthetic-succeeded';readonly request:WorkerRequestId;readonly result:RidgeAugmentedEvidence}
   | {readonly kind:'panel-regression-succeeded';readonly request:WorkerRequestId;readonly result:PanelRegressionEvidence}
   | {readonly kind:'bacon-succeeded';readonly request:WorkerRequestId;readonly result:BaconEvidence}
@@ -2320,6 +2329,9 @@ const commandSchema = z.discriminatedUnion('kind', [
     kind: z.literal('count-regression'), request: requestSchema, values:z.instanceof(Float64Array),model:countRegressionRequestSchema,
   }).strict(),
   z.object({kind:z.literal('sun-abraham'),request:requestSchema,values:z.instanceof(Float64Array),model:sunAbrahamRequestSchema}).strict(),
+  z.object({kind:z.literal('surrogate-path'),request:requestSchema,values:z.instanceof(Float64Array).refine(v=>v.length===0),model:surrogatePathRequestSchema}).strict(),
+  z.object({kind:z.literal('surrogate-diagnostics'),request:requestSchema,values:z.instanceof(Float64Array).refine(v=>v.length===0),model:surrogateDiagnosticRequestSchema}).strict(),
+  z.object({kind:z.literal('surrogate'),request:requestSchema,values:z.instanceof(Float64Array).refine(v=>v.length===0),model:surrogateRequestSchema}).strict(),
   z.object({kind:z.literal('ridge-augmented-synthetic'),request:requestSchema,values:z.instanceof(Float64Array),model:ridgeAugmentedRequestSchema}).strict(),
   z.object({kind:z.literal('panel-regression'),request:requestSchema,values:z.instanceof(Float64Array),model:panelRegressionRequestSchema}).strict(),
   z.object({kind:z.literal('bacon'),request:requestSchema,values:z.instanceof(Float64Array),model:baconRequestSchema}).strict(),
@@ -2634,6 +2646,9 @@ const eventSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('synthetic-control-succeeded'), request: requestSchema, result: syntheticControlEvidenceSchema }).strict(),
   z.object({kind:z.literal('count-regression-succeeded'),request:requestSchema,result:countRegressionEvidenceSchema}).strict(),
   z.object({kind:z.literal('sun-abraham-succeeded'),request:requestSchema,result:sunAbrahamEvidenceSchema}).strict(),
+  z.object({kind:z.literal('surrogate-path-succeeded'),request:requestSchema,result:surrogatePathEvidenceSchema}).strict(),
+  z.object({kind:z.literal('surrogate-diagnostics-succeeded'),request:requestSchema,result:surrogateDiagnosticEvidenceSchema}).strict(),
+  z.object({kind:z.literal('surrogate-succeeded'),request:requestSchema,result:surrogateEvidenceSchema}).strict(),
   z.object({kind:z.literal('ridge-augmented-synthetic-succeeded'),request:requestSchema,result:ridgeAugmentedEvidenceSchema}).strict(),
   z.object({kind:z.literal('panel-regression-succeeded'),request:requestSchema,result:panelRegressionEvidenceSchema}).strict(),
   z.object({kind:z.literal('bacon-succeeded'),request:requestSchema,result:baconEvidenceSchema}).strict(),
@@ -3034,6 +3049,9 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
     return result.success ? ok({ kind: 'sharp-rd-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
   if (parsed.data.kind === 'count-regression-succeeded') return ok({...parsed.data,request:request.value})
+  if (parsed.data.kind === 'surrogate-path-succeeded') return ok({...parsed.data,request:request.value})
+  if (parsed.data.kind === 'surrogate-diagnostics-succeeded') return ok({...parsed.data,request:request.value})
+  if (parsed.data.kind === 'surrogate-succeeded') return ok({...parsed.data,request:request.value})
   if (parsed.data.kind === 'sun-abraham-succeeded'||parsed.data.kind === 'ridge-augmented-synthetic-succeeded') return ok({...parsed.data,request:request.value})
   if (parsed.data.kind === 'panel-regression-succeeded'||parsed.data.kind==='bacon-succeeded') return ok({...parsed.data,request:request.value})
   if (parsed.data.kind === 'staggered-did-succeeded') return ok({...parsed.data,request:request.value})

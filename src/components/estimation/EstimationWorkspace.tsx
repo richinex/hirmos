@@ -1,3 +1,5 @@
+import {SurrogatePanel} from './SurrogatePanel'
+import type {SurrogateRun,SurrogateRunId} from '@/domain/surrogateRun'
 import {useCallback,useEffect,useState,type ComponentProps} from 'react'
 import {EstimationPanel} from './EstimationPanel'
 import {RegressionDesignControls,RegressionDesignSummary} from './RegressionDesignControls'
@@ -15,15 +17,19 @@ import type {RunActivity} from '@/domain/activity'
 import type {TimeSeriesRun,TimeSeriesRunId} from '@/domain/timeSeries'
 
 type Props = ComponentProps<typeof EstimationPanel> & {
+  readonly surrogateRuns: readonly SurrogateRun[]
+  readonly onSurrogateRun: (run:SurrogateRun)=>void
+  readonly onDeleteSurrogateRun: (id:SurrogateRunId)=>void
   readonly designRuns: readonly TimeSeriesRun[]
   readonly onDesignRun: (run: TimeSeriesRun) => void
   readonly onDeleteDesignRun: (id: TimeSeriesRunId) => void
 }
 
 /** Selection is a supported specification; the numerical routes keep their existing contracts. */
-export function EstimationWorkspace({designRuns,onDesignRun,onDeleteDesignRun,...props}: Props) {
-  const [view,setView] = useState<'effects'|'designs'>(() =>
-    props.identifications.some(record => identificationAllowsEstimation(record.result.kind)) ? 'effects' : 'designs')
+export function EstimationWorkspace({designRuns,onDesignRun,onDeleteDesignRun,surrogateRuns,onSurrogateRun,onDeleteSurrogateRun,...props}: Props) {
+  const [view,setView] = useState<'effects'|'designs'|'surrogates'>(() =>
+    surrogateRuns.length > 0 && props.runs.length === 0 && designRuns.length === 0 ? 'surrogates'
+      : props.identifications.some(record => identificationAllowsEstimation(record.result.kind)) ? 'effects' : 'designs')
   const [busy,setBusy] = useState(false)
   const design=useTimeSeriesDraft(props.prepared.id,state=>state.regressionDesign)
   const draft=useTimeSeriesDraft(props.prepared.id,state=>state.panelRegression)
@@ -66,8 +72,9 @@ export function EstimationWorkspace({designRuns,onDesignRun,onDeleteDesignRun,..
   const report=props.onActivity
   const onActivity=useCallback((activity:RunActivity|null)=>{setBusy(activity!==null);report?.(activity)},[report])
   const selector=<SegmentedControl variant="line" size="sm" ariaLabel="Estimation workspace" value={view} disabled={busy} onChange={setView}
-    options={[{value:'effects',label:'Effect estimation'},{value:'designs',label:'Regression designs'}]}/>
+    options={[{value:'effects',label:'Effect estimation'},{value:'designs',label:'Regression designs'},{value:'surrogates',label:'Two-sample surrogates'}]}/>
   const analysisSelector=<RegressionDesignControls design={design} panel={props.prepared.kind==='prepared-panel'} busy={busy} countReadiness={countReadiness} onChange={selectDesign}/>
+  if(view==='surrogates')return <SurrogatePanel source={props.source} profile={props.profile} selector={selector} runs={surrogateRuns} onRun={onSurrogateRun} onDeleteRun={onDeleteSurrogateRun} onActivity={onActivity}/>
   if(view==='effects')return <EstimationPanel {...props} selector={selector} onActivity={onActivity} onOpenBacon={openBacon}/>
   switch(design.kind){
     case 'count-event-study':

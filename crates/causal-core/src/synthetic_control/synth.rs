@@ -481,7 +481,7 @@ mod tests {
     #[test]
     fn regression_start_stages_match_pinned_r_exactly() {
         let root: serde_json::Value =
-            serde_json::from_str(include_str!("../../oracle/synth/fixtures/full-fit.json"))
+            serde_json::from_str(include_str!("../../tests/fixtures/synth-full-fit.json"))
                 .unwrap();
         let case = &root["cases"][0];
         let e = &case["exact"];

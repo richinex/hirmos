@@ -1,3 +1,4 @@
+import {categoricalMembershipSchema,type CategoricalMembership} from '@/domain/sampleMembership'
 import * as duckdb from '@duckdb/duckdb-wasm'
 import { fileRelation } from './fileRelation'
 import { fileReading } from '@/domain/fileReading'
@@ -335,6 +336,7 @@ const setValid = (validity: Uint8Array, index: number): void => {
 const selectedNumericColumns = (
   profile: DatasetProfile,
   requestedColumnIds: NonEmptyArray<string>,
+  membership?: CategoricalMembership,
 ): Result<NonEmptyArray<PhysicalColumnProfile>, NumericMaterializationProblem> => {
   const selected: PhysicalColumnProfile[] = []
   const seen = new Set<string>()
@@ -343,7 +345,7 @@ const selectedNumericColumns = (
     seen.add(id)
     const column = profile.columns.find((candidate) => candidate.id === id)
     if (!column) return err({ kind: 'column-not-found', id })
-    if (!isNumericDuckDbType(column.duckdbType)) return err({ kind: 'non-numeric-column', name: column.name, duckdbType: column.duckdbType })
+    if (column.id!==membership?.column && !isNumericDuckDbType(column.duckdbType)) return err({ kind: 'non-numeric-column', name: column.name, duckdbType: column.duckdbType })
     selected.push(column)
   }
   return isNonEmpty(selected) ? ok(selected) : err({ kind: 'materialization-failed', detail: 'No numeric columns were selected.' })
@@ -398,12 +400,20 @@ export async function materializeNumericColumns(
   source: SelectedSource,
   profile: DatasetProfile,
   requestedColumnIds: NonEmptyArray<string>,
+  membership?: CategoricalMembership,
 ): Promise<Result<NullableNumericMatrix, NumericMaterializationProblem>> {
-  const selected = selectedNumericColumns(profile, requestedColumnIds)
+  if(membership!==undefined && (!categoricalMembershipSchema.safeParse(membership).success || !requestedColumnIds.includes(membership.column)))
+    return err({kind:'materialization-failed',detail:'Choose disjoint, non-empty sample categories and include their membership column.'})
+  const selected = selectedNumericColumns(profile, requestedColumnIds, membership)
   if (!selected.ok) return selected
-  const projections = selected.value.map((column, index) =>
-    `CAST(${sqlIdentifier(column.name)} AS DOUBLE) AS ${sqlIdentifier(`hirmos_numeric_${index}`)}`,
-  )
+  const projections = selected.value.map((column, index) => {
+    const name=sqlIdentifier(column.name)
+    // Reuse the preview's exact categorical comparison and SQL escaping. Preserve nulls and all rows.
+    const expression=membership!==undefined && column.id===membership.column
+      ? `CASE WHEN ${name} IS NULL THEN NULL WHEN ${filterClause(column.name,{kind:'one-of',column:column.id,values:membership.experimental})} THEN 1 WHEN ${filterClause(column.name,{kind:'one-of',column:column.id,values:membership.observational})} THEN 0 ELSE 2 END`
+      : `CAST(${name} AS DOUBLE)`
+    return `CAST((${expression}) AS DOUBLE) AS ${sqlIdentifier(`hirmos_numeric_${index}`)}`
+  })
   return withSource(
     source,
     profile,
@@ -1013,7 +1023,7 @@ const CATEGORY_LIMIT = 30
 const SUMMARY_BINS = 16
 
 /** One `SUMMARIZE` pass for distinct counts and extremes, then a bucket query per numeric column and a value count per low-cardinality column. */
-export async function summarizeColumns(source: SelectedSource, profile: DatasetProfile): Promise<Result<DatasetSummary, DatasetSummaryProblem>> {
+export async function summarizeColumns(source: SelectedSource, profile: DatasetProfile, categoryColumn?: import('@/domain/dataset').ColumnId): Promise<Result<DatasetSummary, DatasetSummaryProblem>> {
   return withSource<DatasetSummary, DatasetSummaryProblem>(
     source,
     profile,
@@ -1034,7 +1044,7 @@ export async function summarizeColumns(source: SelectedSource, profile: DatasetP
         : null
       const columns: ColumnSummary[] = []
       let histograms = 0
-      for (const column of profile.columns) {
+      for (const column of profile.columns.filter(c=>categoryColumn===undefined||c.id===categoryColumn)) {
         const row = byName.get(column.name)
         if (row === undefined) return err({ kind: 'summary-failed', detail: `SUMMARIZE returned no row for ${column.name}.` })
         const present = scalarNumber(counts?.get(row) ?? 0, 'count')
@@ -1077,14 +1087,14 @@ export async function summarizeColumns(source: SelectedSource, profile: DatasetP
               counts: binCounts,
             }
           }
-        } else if (!isNumericDuckDbType(column.duckdbType) && present > 0 && distinctCount <= CATEGORY_LIMIT) {
+        } else if (!isNumericDuckDbType(column.duckdbType) && present > 0 && (distinctCount <= CATEGORY_LIMIT || column.id===categoryColumn)) {
           const top = await connection.query(`
             SELECT CAST(${name} AS VARCHAR) AS value, count(*) AS n
             FROM ${relation}
             WHERE ${name} IS NOT NULL
             GROUP BY value
             ORDER BY n DESC, value ASC
-            LIMIT ${CATEGORY_LIMIT}
+            ${column.id===categoryColumn?'':`LIMIT ${CATEGORY_LIMIT}`}
           `)
           const valueVector = top.getChild('value')
           const countVector = top.getChild('n')

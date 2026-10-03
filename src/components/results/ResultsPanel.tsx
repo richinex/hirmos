@@ -1,3 +1,5 @@
+import {SurrogateResult} from '@/components/estimation/SurrogateResult'
+import type {SurrogateRun} from '@/domain/surrogateRun'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { useMemo, useState } from 'react'
 import { TimeSeriesRunResult } from '@/components/time-series/TimeSeriesRunResult'
@@ -190,6 +192,7 @@ function Manifest({ manifest, stepLabel }: { readonly manifest: ResultManifest; 
 }
 
 type ResultView =
+  | {readonly kind:'surrogates'}
   | { readonly kind: 'root-cause' }
   | { readonly kind: 'time-series' }
   | { readonly kind: 'regression-designs' }
@@ -202,11 +205,12 @@ const initialResultView = (
   hasTimeSeries: boolean,
   hasRootCause: boolean,
   hasDesigns: boolean,
+  hasSurrogates: boolean,
 ): ResultView => estimationRuns.length > 0
   ? { kind: 'estimation', selected: estimationRuns.at(-1)?.id ?? null, compareWith: null }
   : survivalRuns.length > 0 ? { kind: 'survival', selected: survivalRuns.at(-1)?.id ?? null }
   : hasDesigns ? { kind: 'regression-designs' } : hasTimeSeries ? { kind: 'time-series' }
-  : hasRootCause ? { kind: 'root-cause' } : { kind: 'survival', selected: null }
+  : hasSurrogates ? {kind:'surrogates'} : hasRootCause ? { kind: 'root-cause' } : { kind: 'survival', selected: null }
 
 const availableResultView = (
   view: ResultView,
@@ -215,9 +219,11 @@ const availableResultView = (
   hasTimeSeries: boolean,
   hasRootCause: boolean,
   hasDesigns: boolean,
+  hasSurrogates: boolean,
 ): ResultView => {
-  const available = initialResultView(estimationRuns, survivalRuns, hasTimeSeries, hasRootCause, hasDesigns)
+  const available = initialResultView(estimationRuns, survivalRuns, hasTimeSeries, hasRootCause, hasDesigns, hasSurrogates)
   switch (view.kind) {
+    case 'surrogates': return hasSurrogates ? view : available
     case 'root-cause': return hasRootCause ? view : available
     case 'time-series': return hasTimeSeries ? view : available
     case 'regression-designs': return hasDesigns ? view : available
@@ -240,6 +246,7 @@ const availableResultView = (
 
 const resultIntroduction = (view: ResultView): string => {
   switch (view.kind) {
+    case 'surrogates': return 'Review long-term effect estimates, sample definitions and recorded identifying assumptions.'
     case 'regression-designs': return 'Review regression event-time coefficients, interaction contrasts and the comparisons underlying a two-way fixed-effects coefficient. Their causal interpretation depends on the study design and identifying assumptions.'
     case 'root-cause': return 'Review the attributed changes, uncertainty and assumed causal model. Anomaly scores describe how unusual an observation is; contributions to a mean change use the target variable’s units.'
     case 'time-series': return 'Review count-model scans and long-run relationships fitted to the prepared series. These results do not by themselves estimate the effect of an intervention.'
@@ -249,7 +256,7 @@ const resultIntroduction = (view: ResultView): string => {
   }
 }
 
-export function ResultsPanel({ source, profile, prepared, stationarity, documents, studies, identifications, estimationRuns, sensitivityRuns, counterfactualRuns, survivalRuns, timeSeriesRuns, countSeriesModels, rootCauseRuns, gcmEffects, gcmInfluences }: {
+export function ResultsPanel({ source, profile, prepared, stationarity, documents, studies, identifications, estimationRuns, sensitivityRuns, counterfactualRuns, survivalRuns, surrogateRuns, timeSeriesRuns, countSeriesModels, rootCauseRuns, gcmEffects, gcmInfluences }: {
   readonly source: SelectedSource
   readonly profile: DatasetProfile
   readonly prepared: PreparedDatasetArtifact
@@ -261,6 +268,7 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
   readonly sensitivityRuns: readonly SensitivityRunArtifact[]
   readonly counterfactualRuns: readonly CounterfactualRunArtifact[]
   readonly survivalRuns: readonly SurvivalRunArtifact[]
+  readonly surrogateRuns: readonly SurrogateRun[]
   readonly timeSeriesRuns: readonly TimeSeriesRun[]
   readonly countSeriesModels: readonly CountSeriesModelArtifact[]
   readonly rootCauseRuns: readonly RootCauseRun[]
@@ -269,17 +277,19 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
 }) {
   const designRuns = timeSeriesRuns.filter(isRegressionDesignRun)
   const temporalRuns = timeSeriesRuns.filter(run => !isRegressionDesignRun(run))
+  const hasSurrogates = surrogateRuns.length > 0
   const hasDesigns = designRuns.length > 0
   const hasTimeSeries = temporalRuns.length + countSeriesModels.length > 0
   const hasRootCause = rootCauseRuns.length + gcmEffects.length + gcmInfluences.length > 0
-  const [view, setView] = useState<ResultView>(() => initialResultView(estimationRuns, survivalRuns, hasTimeSeries, hasRootCause, hasDesigns))
-  const activeView = availableResultView(view, estimationRuns, survivalRuns, hasTimeSeries, hasRootCause, hasDesigns)
+  const [view, setView] = useState<ResultView>(() => initialResultView(estimationRuns, survivalRuns, hasTimeSeries, hasRootCause, hasDesigns, hasSurrogates))
+  const activeView = availableResultView(view, estimationRuns, survivalRuns, hasTimeSeries, hasRootCause, hasDesigns, hasSurrogates)
   const stepLabel = prepared.kind === 'prepared-time-series' ? frequencyUnit(prepared.sampling.frequency) : prepared.kind === 'prepared-panel' ? 'panel row' : 'row'
   const inputs = useMemo(() => ({ source, profile, prepared, stationarity, documents, studies, identifications, sensitivityRuns, counterfactualRuns }), [counterfactualRuns, documents, identifications, prepared, profile, sensitivityRuns, source, stationarity, studies])
   const studyOf = (candidate: EstimationRunArtifact) => studies.find((study) => study.id === candidate.study)
 
   const selectFamily = (kind: ResultView['kind']) => {
     switch (kind) {
+      case 'surrogates': setView({kind}); return
       case 'root-cause': setView({ kind }); return
       case 'time-series': setView({ kind }); return
       case 'regression-designs': setView({ kind }); return
@@ -291,6 +301,7 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
 
   const body = (() => {
     switch (activeView.kind) {
+      case 'surrogates': return <div className="space-y-4">{surrogateRuns.map(run=><SurrogateResult key={run.id} run={run} profile={profile}/>)}</div>
       case 'root-cause': return <div className="space-y-6">
         {[...rootCauseRuns].reverse().map((run) => <article key={run.id}><div className="mb-2 flex flex-wrap items-baseline justify-between gap-2 text-label text-muted"><span>{run.comparison.name}</span><time>{formatTime(run.createdAt)}</time></div><RootCauseRunResult run={run} /></article>)}
         {[...gcmEffects].reverse().map(run => <GcmEffectResult key={run.id} run={run} />)}
@@ -330,6 +341,7 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
 
   const bottom = (() => {
     switch (activeView.kind) {
+      case 'surrogates': return undefined
       case 'root-cause': return undefined
       case 'time-series': return undefined
       case 'regression-designs': return undefined
@@ -348,6 +360,7 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
   })()
 
   const families: { value: ResultView['kind']; label: string }[] = [
+    ...(hasSurrogates ? [{value:'surrogates' as const,label:'Two-sample surrogates'}] : []),
     ...(hasRootCause ? [{ value: 'root-cause' as const, label: 'Causal model analysis' }] : []),
     ...(estimationRuns.length > 0 ? [{ value: 'estimation' as const, label: 'Causal estimates' }] : []),
     ...(hasDesigns ? [{ value: 'regression-designs' as const, label: 'Regression designs' }] : []),

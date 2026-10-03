@@ -88,7 +88,9 @@ const decimalsFor = (value: number, precision: Precision): number => {
 const significantDecimals = (value: number, digits: number): number => {
   if (value === 0 || !Number.isFinite(value)) return 0
   const magnitude = Math.floor(Math.log10(Math.abs(value)))
-  return Math.max(0, Math.min(6, digits - 1 - magnitude))
+  const decimals = Math.max(0, Math.min(6, digits - 1 - magnitude))
+  // Rounding can carry into the next power of ten (0.009998 to 0.0100); that figure needs one decimal fewer.
+  return decimals > 0 && Number(Math.abs(value).toFixed(decimals)) >= 10 ** (magnitude + 1) ? decimals - 1 : decimals
 }
 
 /** A value that rounds to zero at the shown precision carries no sign: never "−0.00". */

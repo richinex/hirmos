@@ -239,7 +239,6 @@ test('declaring on the pipeline input card rereads the file: the card and its pr
   await page.locator('[data-testid^="block-input-"]').last().locator('p').first().click()
   await page.getByLabel('File for this card').setInputFiles({ name: 'patients.csv', mimeType: 'text/csv', buffer: Buffer.from(YES_NO) })
   await page.locator('[data-testid^="block-input-"]').last().getByText(/4 rows/).waitFor({ timeout: 60_000 })
-  await page.locator('summary').filter({ hasText: 'Columns' }).first().click()
   const row = (name: string) => page.getByTestId('block-schema').locator('li').filter({ has: page.getByRole('combobox', { name: `Read ${name} as`, exact: true }) })
   // Two declarations back to back, as a reader setting several columns makes them.
   for (const name of ['death', 'dnr1']) {

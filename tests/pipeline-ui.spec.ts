@@ -27,7 +27,7 @@ const giveFile = async (page: Page, id: string, file: { name: string; mimeType: 
   // behind an open sheet it is aria-hidden and no longer found by role.
   const phone = await page.getByRole('group', { name: 'Panes' }).count() > 0
   await block(page, id).click({ position: { x: 20, y: 8 } })
-  if (phone) await expect(page.getByRole('dialog', { name: 'Input file' })).toBeVisible()
+  if (phone) await expect(page.getByRole('dialog', { name: 'Block settings' })).toBeVisible()
   await page.getByLabel('File for this card').setInputFiles(file)
   if (phone) {
     await expect(block(page, id)).toContainText(/rows,|failed/, { timeout: 30_000 })
@@ -104,7 +104,7 @@ test.describe('pipeline canvas', () => {
     await expect(block(page, filter)).toContainText('population ≥ 300000')
     await expect(block(page, filter)).toContainText('3 rows, 3 columns')
     await expect(page.getByRole('region', { name: 'Filter rows' }).getByRole('table').locator('tbody tr')).toHaveCount(3)
-    await page.getByText('As SQL').click()
+    await page.getByRole('radiogroup', { name: 'Block inspector' }).getByRole('radio', { name: 'SQL', exact: true }).click({ force: true })
     await expect(page.getByTestId('block-sql')).toHaveText('SELECT * FROM "cities" WHERE "population" >= 300000')
 
     await wire(page, filter, 'output')
@@ -493,10 +493,10 @@ test('keeps the pipeline canvas inside a phone viewport, fills the stage, and pa
   // A tap on a block brings its settings up as a sheet, and the bar shows which pane is open; a second tap on
   // the same block, its selection unchanged, brings the sheet up again.
   // Behind the open sheet the bar is aria-hidden, so its opener is read by attribute rather than by role.
-  const opener = page.locator('[aria-label="Panes"] button', { hasText: 'Input file' })
+  const opener = page.locator('[aria-label="Panes"] button', { hasText: 'Block settings' })
   for (let tap = 0; tap < 2; tap++) {
     await block(page, 'input-1').click({ position: { x: 20, y: 8 } })
-    await expect(page.getByRole('dialog', { name: 'Input file' })).toBeVisible()
+    await expect(page.getByRole('dialog', { name: 'Block settings' })).toBeVisible()
     await expect(opener).toHaveAttribute('aria-expanded', 'true')
     await page.keyboard.press('Escape')
     await expect(page.locator('[data-vaul-overlay]')).toHaveCount(0)

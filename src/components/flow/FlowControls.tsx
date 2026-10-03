@@ -1,3 +1,4 @@
+import { canvasMotion } from '@/lib/motion'
 import type { ReactNode } from 'react'
 import { Panel, useReactFlow, type FitViewOptions } from '@xyflow/react'
 import { ZoomButtons, zoomControl } from '@/components/ui/ZoomButtons'
@@ -24,7 +25,7 @@ export function FlowControls({ fit, fitLabel = 'Fit the canvas', children }: {
   return (
     <Panel position={isMobile ? 'bottom-center' : 'bottom-right'} className={isMobile ? '!mx-0 !my-2' : '!m-2'} style={isMobile ? { transform: 'translateX(-50%)', width: 'max-content', maxWidth: 'calc(100vw - 2rem)' } : undefined}>
       <div className={cn('flex overflow-hidden rounded-lg border border-hair bg-panel/95 backdrop-blur', isMobile ? 'flex-row overflow-x-auto [scrollbar-width:none]' : 'flex-col')} role="toolbar" aria-label="Canvas">
-        <ZoomButtons onIn={() => void zoomIn({ duration: 160 })} onOut={() => void zoomOut({ duration: 160 })} onFit={fit === undefined ? undefined : () => void fitView({ ...fit, duration: 220 })} fitLabel={fitLabel} />
+        <ZoomButtons onIn={() => void zoomIn(canvasMotion('zoom'))} onOut={() => void zoomOut(canvasMotion('zoom'))} onFit={fit === undefined ? undefined : () => void fitView({ ...fit, ...canvasMotion('fit') })} fitLabel={fitLabel} />
         {children}
       </div>
     </Panel>

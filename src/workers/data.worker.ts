@@ -58,7 +58,7 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         return
       }
       case 'materialize-numeric': {
-        const result = await materializeNumericColumns(source.value, command.profile, command.columnIds)
+        const result = await materializeNumericColumns(source.value, command.profile, command.columnIds, command.membership)
         if (!result.ok) {
           emit({ kind: 'materialization-failed', request: command.request, problem: result.error })
           return
@@ -86,7 +86,7 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         return
       }
       case 'summarize-columns': {
-        const result = await summarizeColumns(source.value, command.profile)
+        const result = await summarizeColumns(source.value, command.profile, command.categoryColumn)
         emit(result.ok
           ? { kind: 'summary-succeeded', request: command.request, summary: result.value }
           : { kind: 'summary-failed', request: command.request, problem: result.error })

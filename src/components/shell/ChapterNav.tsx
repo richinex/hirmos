@@ -44,7 +44,7 @@ function BusyBar({ chapter, className }: { readonly chapter: ChapterId; readonly
   return (
     <span aria-hidden className={cn('bar-live absolute h-[2px] rounded-full bg-rail-dim', className)}>
       <span
-        className="bar-live__fill block origin-left rounded-full bg-rail-signal transition-transform duration-500 ease-[cubic-bezier(0.2,0.7,0.2,1)]"
+        className="bar-live__fill block origin-left rounded-full bg-rail-signal transition-transform duration-(--motion-progress)"
         style={{ transform: `scaleX(${fraction})` }}
       />
     </span>
@@ -213,7 +213,7 @@ export function ChapterNav({ chapters, active, open, onOpen, onClose, onNavigate
       style={drag === null ? undefined : { translate: `${drag.offset}px 0`, transition: 'none' }}
       onClickCapture={(event) => { slide.clickGuard(event) }}
       className={cn(
-        'dashboard-sidebar relative z-(--z-overlay) w-[76px] shrink-0 transition-[translate] duration-(--motion-base) ease-[cubic-bezier(0.2,0.7,0.2,1)] motion-reduce:transition-none',
+        'dashboard-sidebar relative z-(--z-overlay) w-[76px] shrink-0 transition-[translate] duration-(--motion-base) motion-reduce:transition-none',
         '@max-md/shell:absolute @max-md/shell:inset-y-0 @max-md/shell:left-0 @max-md/shell:w-[264px] @max-md/shell:touch-pan-y @max-md/shell:will-change-transform',
         open ? '@max-md/shell:translate-x-0' : '@max-md/shell:-translate-x-full',
       )}
@@ -231,7 +231,7 @@ export function ChapterNav({ chapters, active, open, onOpen, onClose, onNavigate
       <nav
         aria-label="Workspace sections"
         className={cn(
-          'absolute left-0 top-[84px] flex max-h-[calc(100%-84px-72px)] flex-col overflow-hidden bg-rail text-rail-ink [--scroll-thumb:var(--color-rail-faint)] transition-[width] duration-(--motion-base) ease-[cubic-bezier(0.2,0.7,0.2,1)] motion-reduce:transition-none',
+          'absolute left-0 top-[84px] flex max-h-[calc(100%-84px-72px)] flex-col overflow-hidden bg-rail text-rail-ink [--scroll-thumb:var(--color-rail-faint)] transition-[width] duration-(--motion-base) motion-reduce:transition-none',
           CORNER,
           lobeOpen ? LOBE_OPEN : RAIL,
         )}
@@ -270,7 +270,7 @@ export function ChapterNav({ chapters, active, open, onOpen, onClose, onNavigate
                       <span
                         aria-hidden
                         className={cn(
-                          'flex min-w-0 items-baseline gap-2 overflow-hidden transition-[width,margin,opacity] duration-(--motion-base) ease-[cubic-bezier(0.2,0.7,0.2,1)] motion-reduce:transition-none',
+                          'flex min-w-0 items-baseline gap-2 overflow-hidden transition-[width,margin,opacity] duration-(--motion-base) motion-reduce:transition-none',
                           lobeOpen ? 'ml-[18px] w-[150px] opacity-100' : 'ml-0 w-0 opacity-0',
                         )}
                       >
@@ -298,7 +298,7 @@ export function ChapterNav({ chapters, active, open, onOpen, onClose, onNavigate
       {project !== null && (
       <div
         className={cn(
-          'absolute bottom-3 left-2 flex h-10 items-center overflow-hidden rounded-full bg-rail text-rail-ink transition-[width] duration-(--motion-base) ease-[cubic-bezier(0.2,0.7,0.2,1)] motion-reduce:transition-none',
+          'absolute bottom-3 left-2 flex h-10 items-center overflow-hidden rounded-full bg-rail text-rail-ink transition-[width] duration-(--motion-base) motion-reduce:transition-none',
           lobeOpen ? 'w-[248px]' : 'w-10',
         )}
       >

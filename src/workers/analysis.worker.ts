@@ -1,3 +1,6 @@
+import {surrogatePathEvidenceSchema,surrogatePathMatches} from '@/domain/surrogatePath'
+import {surrogateDiagnosticEvidenceSchema,surrogateDiagnosticMatches} from '@/domain/surrogateDiagnostics'
+import { surrogateEvidenceSchema, surrogateEvidenceMatchesRequest } from '@/domain/surrogate'
 import {countRegressionEvidenceSchema,sameCountRequest} from '@/domain/countRegression'
 import {panelRegressionEvidenceSchema,baconEvidenceSchema,sameSpecification} from '@/domain/panelRegression'
 import { z } from 'zod'
@@ -425,6 +428,9 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
       return { kind: 'panelIntervention', rows: command.rows, units: command.units, times: command.times, placeboReplications: command.placeboReplications, seed: command.seed, primary: command.primary ?? 'syntheticDid' }
     case 'count-regression': return {kind:'countRegression',request:command.model}
     case 'sun-abraham': return {kind:'sunAbraham',request:command.model}
+    case 'surrogate-path': return {kind:'surrogatePath',request:command.model}
+    case 'surrogate-diagnostics': return {kind:'surrogateDiagnostics',request:command.model}
+    case 'surrogate': return {kind:'surrogate',request:command.model}
     case 'ridge-augmented-synthetic': return {kind:'ridgeAugmentedSynthetic',request:command.model}
     case 'panel-regression': return {kind:'panelRegression',request:command.model}
     case 'bacon': return {kind:'bacon',request:command.model}
@@ -968,6 +974,24 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         if(!result.success){fail(command.request,{kind:'worker-protocol-failed',detail:result.error.message});return}
         if(!sameSpecification(result.data.evidence.request,command.model)){fail(command.request,{kind:'worker-protocol-failed',detail:'The event-study result does not match its request.'});return}
         emit({kind:'sun-abraham-succeeded',request:command.request,result:result.data.evidence});return
+      }
+      case 'surrogate-path': {
+        const result=z.object({kind:z.literal('surrogatePath'),evidence:surrogatePathEvidenceSchema}).strict().safeParse(decoded)
+        if(!result.success){fail(command.request,{kind:'worker-protocol-failed',detail:result.error.message});return}
+        if(!surrogatePathMatches(result.data.evidence,command.model)){fail(command.request,{kind:'worker-protocol-failed',detail:'The surrogate path does not match its request.'});return}
+        emit({kind:'surrogate-path-succeeded',request:command.request,result:result.data.evidence});return
+      }
+      case 'surrogate-diagnostics': {
+        const result=z.object({kind:z.literal('surrogateDiagnostics'),evidence:surrogateDiagnosticEvidenceSchema}).strict().safeParse(decoded)
+        if(!result.success){fail(command.request,{kind:'worker-protocol-failed',detail:result.error.message});return}
+        if(!surrogateDiagnosticMatches(result.data.evidence,command.model)){fail(command.request,{kind:'worker-protocol-failed',detail:'The surrogate diagnostic does not match its request.'});return}
+        emit({kind:'surrogate-diagnostics-succeeded',request:command.request,result:result.data.evidence});return
+      }
+      case 'surrogate': {
+        const result=z.object({kind:z.literal('surrogate'),evidence:surrogateEvidenceSchema}).strict().safeParse(decoded)
+        if(!result.success){fail(command.request,{kind:'worker-protocol-failed',detail:result.error.message});return}
+        if(!surrogateEvidenceMatchesRequest(result.data.evidence,command.model)){fail(command.request,{kind:'worker-protocol-failed',detail:'The surrogate result does not match its request.'});return}
+        emit({kind:'surrogate-succeeded',request:command.request,result:result.data.evidence});return
       }
       case 'ridge-augmented-synthetic': {
         const result=z.object({kind:z.literal('ridgeAugmentedSynthetic'),evidence:ridgeAugmentedEvidenceSchema}).strict().safeParse(decoded)

@@ -10,7 +10,8 @@ export function RidgeAugmentedResult({evidence:e,sourcePeriods,outcome}:{readonl
   const theme=useChartTheme()
   const labels=useMemo(()=>new Map(sourcePeriods.map(p=>[p.code,p.label])),[sourcePeriods])
   // Two panels on one period axis, as in the other stacked plots: linked pointers and one range slider.
-  const PANEL=200,GAP=44,TOP=40,BOTTOM=100
+  // The slider takes the bottom 6–24px; axis labels need about 20px above it with an 8px gap.
+  const PANEL=200,GAP=44,TOP=40,BOTTOM=56
   const height=TOP+2*PANEL+GAP+BOTTOM
   const chart=useMemo(()=>{
     const periods=e.periods.map(t=>periodLabel(t,labels)),event=periods[e.request.prePeriods]

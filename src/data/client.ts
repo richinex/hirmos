@@ -263,12 +263,14 @@ export function materializeNumericColumnsInWorker(
   file: File,
   profile: DatasetProfile,
   columnIds: NonEmptyArray<ColumnId>,
+  membership?: import('@/domain/sampleMembership').CategoricalMembership,
 ): Promise<MaterializationOutcome> {
   const request = newImportRequestId()
   return new Promise((resolve) => {
     pending.set(request, { kind: 'materialization', profile, resolve })
     const command: DataWorkerCommand = {
       kind: 'materialize-numeric',
+      membership,
       request,
       file,
       profile,
@@ -336,11 +338,11 @@ export function profileColumnInWorker(
   })
 }
 
-export function summarizeColumnsInWorker(file: File, profile: DatasetProfile): Promise<SummaryOutcome> {
+export function summarizeColumnsInWorker(file: File, profile: DatasetProfile, categoryColumn?: ColumnId): Promise<SummaryOutcome> {
   const request = newImportRequestId()
   return new Promise((resolve) => {
     pending.set(request, { kind: 'summary', profile, resolve })
-    const command: DataWorkerCommand = { kind: 'summarize-columns', request, file, profile }
+    const command: DataWorkerCommand = { kind: 'summarize-columns', request, file, profile, categoryColumn }
     try {
       dataWorker().postMessage(command)
     } catch (cause: unknown) {

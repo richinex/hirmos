@@ -1,3 +1,4 @@
+import { canvasMotion } from '@/lib/motion'
 import { createPortal } from 'react-dom'
 import { escapeFor, pushLayer } from '@/lib/dismissal'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -215,8 +216,6 @@ const ANCHOR_CLEAR = 5.5
 const FIT_VIEW = { padding: 0.18, maxZoom: 1 } as const
 /** Above this many cards the role placement is skipped and ELK's layered layout stays: the role constraints grow with the graph and the drawing stops reading as a book diagram. */
 const ROLE_LAYOUT_LIMIT = 60
-/** How long the cards take to move to a new layout. */
-const ARRANGE_MS = 320
 /** The point just above the card's top edge, where a self-loop leaves and re-enters. */
 const topPoint = (node: InternalNode) => {
   const centre = centreOf(node)
@@ -404,7 +403,7 @@ function RefitOnResize({ host, layoutKey }: { readonly host: React.RefObject<HTM
   const nodeCount = useStore(store => store.nodes.length)
   useEffect(() => {
     if (!initialized) return
-    const timer = window.setTimeout(() => { void fitView({ ...FIT_VIEW, duration: 160 }) }, 60)
+    const timer = window.setTimeout(() => { void fitView({ ...FIT_VIEW, ...canvasMotion('zoom') }) }, 60)
     return () => window.clearTimeout(timer)
   }, [fitView, initialized, layoutKey, nodeCount])
   useEffect(() => {
@@ -417,7 +416,7 @@ function RefitOnResize({ host, layoutKey }: { readonly host: React.RefObject<HTM
       if (box === undefined || (Math.abs(box.width - last.width) < 2 && Math.abs(box.height - last.height) < 2)) return
       last = { width: box.width, height: box.height }
       window.clearTimeout(timer)
-      timer = window.setTimeout(() => { void fitView({ ...FIT_VIEW, duration: 160 }) }, 80)
+      timer = window.setTimeout(() => { void fitView({ ...FIT_VIEW, ...canvasMotion('zoom') }) }, 80)
     })
     observer.observe(element)
     return () => { observer.disconnect(); window.clearTimeout(timer) }
@@ -481,7 +480,7 @@ function CanvasControls({ onTidy, orientation, onToggleOrientation, viewLocked, 
           className={control}
           title="Tidy: Lay out the variables again from left to right in causal order and fit the view. Any positions you dragged will be replaced, but the connections remain unchanged."
           aria-label="Tidy graph"
-          onClick={() => { onTidy(); window.setTimeout(() => void fitView({ ...FIT_VIEW, duration: 220 }), 30) }}
+          onClick={() => { onTidy(); window.setTimeout(() => void fitView({ ...FIT_VIEW, ...canvasMotion('fit') }), 30) }}
         >
           <Icon name="auto_awesome_mosaic" size={14} />
         </button>
@@ -782,7 +781,8 @@ export function DagCanvas({
       return from !== undefined && (Math.abs(from.x - node.position.x) > 0.5 || Math.abs(from.y - node.position.y) > 0.5)
     })
 
-    if (!moved || reducedMotion) {
+    const { duration } = canvasMotion('arrange')
+    if (!moved || reducedMotion || duration === 0) {
       setNodes([...targets])
       if (moved) setRearrangements((count) => count + 1)
       return
@@ -790,7 +790,7 @@ export function DagCanvas({
 
     const began = performance.now()
     const step = (now: number) => {
-      const t = Math.min(1, (now - began) / ARRANGE_MS)
+      const t = Math.min(1, (now - began) / duration)
       const eased = 1 - Math.pow(1 - t, 3)
       setNodes(targets.map((node) => {
         const from = starts.get(node.id) ?? node.position

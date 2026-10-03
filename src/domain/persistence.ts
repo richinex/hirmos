@@ -1,3 +1,4 @@
+import { surrogateRunSchema, surrogateRunMatchesProfile, type SurrogateRun } from './surrogateRun'
 import { z } from 'zod'
 import { predictorSyntheticConfigurationSchema, predictorSyntheticEvidenceSchema, predictorSyntheticCatalogSchema, predictorSyntheticRecordMatches, predictorSyntheticEstimateMatches } from './predictorSyntheticControl'
 import { causalForestConfigurationSchema, causalForestEvidenceSchema, causalForestTarget, sameCausalForestTarget, causalForestSettingsMatch } from './causalForest'
@@ -67,6 +68,7 @@ export interface PersistedProject {
   readonly estimationRuns: readonly EstimationRunArtifact[]
   readonly sensitivityRuns: readonly SensitivityRunArtifact[]
   readonly counterfactualRuns: readonly CounterfactualRunArtifact[]
+  readonly surrogateRuns: readonly SurrogateRun[]
   readonly survivalRuns: readonly SurvivalRunArtifact[]
   readonly timeSeriesRuns: readonly TimeSeriesRun[]
   readonly rootCause: RootCauseWorkspace
@@ -89,7 +91,7 @@ export const headerOf = (snapshot: PersistedProject): SavedProjectHeader => ({
   savedAt: snapshot.savedAt,
   sourceName: snapshot.source?.name ?? null,
   cachedSource: snapshot.profile !== null && snapshot.profile.source.persistence.kind === 'cached-locally' ? snapshot.profile.source.fingerprint : null,
-  estimationRuns: snapshot.estimationRuns.length,
+  estimationRuns: snapshot.estimationRuns.length + snapshot.surrogateRuns.length,
 })
 
 const describeSource = (source: SelectedSource): SourceDescriptor => ({
@@ -109,7 +111,7 @@ export function snapshotWorkflow(workflow: Workflow, savedAt: string): Persisted
       if (workflow.restore !== null) return null
       return {
         kind: 'hirmos-project', version: 1, savedAt, origin: workflow.origin, project: workflow.project, source: null, profile: null, prepared: null, stationarity: null,
-        grangerEvidence: [], countSeriesModels: [], discoveryRuns: [], dagDocuments: [], dagChecks: [], interventionQueries: [], studyDraft: EMPTY_STUDY_DRAFT, studies: [], identifications: [], estimationRuns: [], sensitivityRuns: [], counterfactualRuns: [], survivalRuns: [], timeSeriesRuns: [], rootCause: EMPTY_ROOT_CAUSE,
+        grangerEvidence: [], countSeriesModels: [], discoveryRuns: [], dagDocuments: [], dagChecks: [], interventionQueries: [], studyDraft: EMPTY_STUDY_DRAFT, studies: [], identifications: [], estimationRuns: [], sensitivityRuns: [], counterfactualRuns: [], surrogateRuns: [], survivalRuns: [], timeSeriesRuns: [], rootCause: EMPTY_ROOT_CAUSE,
       }
     case 'sql-inputs-chosen':
     case 'pipeline-opened':
@@ -141,6 +143,7 @@ export function snapshotWorkflow(workflow: Workflow, savedAt: string): Persisted
         estimationRuns: workflow.estimationRuns,
         sensitivityRuns: workflow.sensitivityRuns,
         counterfactualRuns: workflow.counterfactualRuns,
+        surrogateRuns: workflow.surrogateRuns,
         survivalRuns: workflow.survivalRuns,
         timeSeriesRuns: workflow.timeSeriesRuns,
         rootCause: workflow.rootCause,
@@ -230,6 +233,7 @@ const envelopeSchema = z.object({
   estimationRuns: z.array(artifact),
   sensitivityRuns: z.array(artifact.superRefine((run,ctx)=>{if(run.kind==='honest-did-run'){const parsed=honestRunSchema.safeParse(run);if(!parsed.success)ctx.addIssue({code:'custom',message:z.prettifyError(parsed.error)})}})),
   counterfactualRuns: z.array(artifact),
+  surrogateRuns: z.array(surrogateRunSchema).default([]),
   survivalRuns: z.array(artifact).default([]),
   timeSeriesRuns: z.array(timeSeriesRunSchema).default([]),
   rootCause: rootCauseWorkspaceSchema.default(EMPTY_ROOT_CAUSE),
@@ -577,6 +581,8 @@ export function parseSnapshotValue(value: unknown): Result<PersistedProject, Sna
   }
   // Granger moved from the Discovery Lab to the data diagnostics; a run recorded there by an earlier build has no reader now.
   const discoveryRuns = parsed.data.discoveryRuns.filter((run) => Reflect.get(run, 'kind') !== 'granger-ssr-f-run')
+  if (parsed.data.surrogateRuns.some(run => profile === null || !surrogateRunMatchesProfile(run, profile)))
+    return err({kind:'invalid-snapshot',detail:'A surrogate run does not match its source profile.'})
   const storedDraft = parsed.data.studyDraft as Partial<StudyDesignDraft>
   const studyDraft: StudyDesignDraft = { ...EMPTY_STUDY_DRAFT, ...storedDraft }
   const estimationRuns = parsed.data.estimationRuns.map((run) => upgradeEstimationRunRecord(run))

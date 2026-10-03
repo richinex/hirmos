@@ -41,7 +41,7 @@ details[open] > .disclosure-summary > .disclosure-hide { display: inline-flex; }
    stretches the title row for the whole row of cards and every meta line and footer sits on one line across
    the row. Aligned that way, the footer needs no rule to mark it. Engines without subgrid lay the card out
    on its own rows and lose only the cross-card alignment. */
-.dashboard .example-card { display: grid; grid-template-rows: auto 1fr auto auto; row-gap: 1rem; min-width: 0; padding: 1.5rem; background: var(--color-panel); border-radius: 12px; box-shadow: var(--shadow-lift); transition: box-shadow 150ms; }
+.dashboard .example-card { display: grid; grid-template-rows: auto 1fr auto auto; row-gap: 1rem; min-width: 0; padding: 1.5rem; background: var(--color-panel); border-radius: 12px; box-shadow: var(--shadow-lift); transition: box-shadow var(--motion-fast) var(--default-transition-timing-function); }
 @supports (grid-template-rows: subgrid) {
   .dashboard .example-card { grid-template-rows: subgrid; grid-row: span 4; }
 }

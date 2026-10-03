@@ -57,11 +57,11 @@
    the reduced-motion rule below collapses it to the final frame. The slot's bottom padding keeps
    descenders inside the clip, and the negative margin gives that room back to the layout. */
 .landing-slot { display: inline-block; overflow: hidden; vertical-align: bottom; padding-bottom: .12em; margin-bottom: -.12em; }
-.landing-slot-word { display: inline-block; transform: translateY(120%); animation: landing-slot-in var(--motion-reveal) cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: calc(var(--slot) * var(--motion-stagger)); }
+.landing-slot-word { display: inline-block; transform: translateY(120%); animation: landing-slot-in var(--motion-reveal) var(--default-transition-timing-function) both; animation-delay: calc(var(--slot) * var(--motion-stagger)); }
 @keyframes landing-slot-in { to { transform: translateY(0); } }
 .landing-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin-top: 2.25rem; }
 /* The one action: the complement as a fill under dark ink, lit from above. Height from line-height. */
-.landing-primary { display: inline-flex; align-items: center; justify-content: center; line-height: 3rem; border-radius: 999px; padding: 0 1.5rem; background-color: var(--color-signal); background-image: linear-gradient(to bottom, rgb(255 255 255 / .16), rgb(255 255 255 / 0)); box-shadow: inset 0 1px 0 rgb(255 255 255 / .35), 0 1px 1px rgb(0 0 0 / .12); color: var(--color-signal-ink); font-size: var(--text-title); font-weight: 700; transition: background-color var(--motion-fast), transform var(--motion-fast); }
+.landing-primary { display: inline-flex; align-items: center; justify-content: center; line-height: 3rem; border-radius: 999px; padding: 0 1.5rem; background-color: var(--color-signal); background-image: linear-gradient(to bottom, rgb(255 255 255 / .16), rgb(255 255 255 / 0)); box-shadow: inset 0 1px 0 rgb(255 255 255 / .35), 0 1px 1px rgb(0 0 0 / .12); color: var(--color-signal-ink); font-size: var(--text-title); font-weight: 700; transition: background-color var(--motion-fast) var(--default-transition-timing-function), transform var(--motion-fast) var(--default-transition-timing-function); }
 .landing-primary:hover { color: var(--color-signal-ink); background-color: var(--color-signal-hover); }
 /* These anchors are drawn as controls, not prose links, so they opt out of the base underline. */
 .landing-wordmark, .landing-primary { text-decoration: none; }
@@ -98,7 +98,7 @@
 .evidence-figure svg { width: 100%; height: auto; margin-top: 1rem; overflow: visible; }
 .evidence-figure circle { fill: var(--color-panel); stroke: var(--color-edge); stroke-width: 1.5; }
 .evidence-figure text { fill: var(--color-bone); font-family: var(--font-mono); font-size: 11px; text-anchor: middle; }
-.evidence-link { fill: none; stroke-width: 2.1; stroke-linecap: round; stroke-dasharray: 6 7; animation: evidence-flow 1.8s linear infinite; }
+.evidence-link { fill: none; stroke-width: 2.1; stroke-linecap: round; stroke-dasharray: 6 7; animation: evidence-flow var(--motion-sweep) linear infinite; }
 @keyframes evidence-flow { to { stroke-dashoffset: -13px; } }
 .evidence-link--one { stroke: color-mix(in srgb, var(--color-info) 70%, var(--color-muted)); }
 .evidence-link--two { stroke: color-mix(in srgb, var(--color-signal) 72%, var(--color-muted)); }

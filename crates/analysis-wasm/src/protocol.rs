@@ -1016,6 +1016,9 @@ pub(crate) enum IdentifiedDiscreteResult {
     deny_unknown_fields
 )]
 pub(crate) enum AnalysisCommand {
+    SurrogatePath { request: crate::surrogate::PathRequest },
+    SurrogateDiagnostics { request: crate::surrogate::DiagnosticRequest },
+    Surrogate { request: crate::surrogate::Request },
     CountRegression { request: crate::count_regression::Request },
     StaggeredDid { request: crate::staggered_did::Request },
     Bacon { request: crate::bacon::Request },
@@ -2660,6 +2663,9 @@ pub(crate) enum DagFalsificationEvidence {
     rename_all_fields = "camelCase"
 )]
 pub(crate) enum AnalysisResult {
+    SurrogatePath { evidence: crate::surrogate::PathEvidence },
+    SurrogateDiagnostics { evidence: crate::surrogate::DiagnosticEvidence },
+    Surrogate { evidence: crate::surrogate::Evidence },
     CountRegression { evidence: crate::count_regression::Evidence },
     StaggeredDid { evidence: crate::staggered_did::Evidence },
     Bacon { evidence: crate::bacon::Evidence },
