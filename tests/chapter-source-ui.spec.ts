@@ -46,7 +46,11 @@ async function validateSaved(page: Page, snapshot: unknown) {
   expect(valid.ok,JSON.stringify(valid)).toBe(true)
 }
 
+// Leaving for the project list saves the open project, so the reload cannot land inside the autosave delay.
 async function reopenResult(page: Page, file: string) {
+  // Export closes the mobile navigation. Reopen it through the same controls as a reader.
+  await chapter(page, /^Projects/)
+  await expect(page.getByText('1 estimate', { exact: true })).toBeVisible()
   await page.reload()
   await page.getByRole('button', { name: /^Open Chapter/ }).click()
   await expect(page.getByRole('heading', { name: 'Choose the data file again' })).toBeVisible()
@@ -54,6 +58,8 @@ async function reopenResult(page: Page, file: string) {
   await chapter(page, /Estimation/)
   await expect(page.getByText('Current estimate', { exact: true }).first()).toBeVisible()
 }
+
+const methodLabel = { 'Regression':'Two-period regression', 'Doubly robust':'Two-period DR' } as const
 
 for (const method of ['Regression','Doubly robust'] as const) {
   test(`source chapter ${method} DiD through controls, plot and saved result`, async ({ page },info) => {
@@ -70,10 +76,10 @@ for (const method of ['Regression','Doubly robust'] as const) {
     await chapter(page,/Estimation/)
     await page.getByRole('radio',{ name:/^Interventions/ }).click()
     await page.getByRole('radio',{ name:/Panel difference-in-differences/ }).click()
-    await page.getByRole('radio',{ name:method,exact:true }).click()
+    await page.getByRole('radio',{ name:methodLabel[method],exact:true }).click()
     await page.getByRole('group',{ name:'DiD covariates' }).getByRole('checkbox',{ name:'A',exact:true }).check()
     if (method === 'Doubly robust') await page.getByRole('spinbutton',{ name:'DiD folds',exact:true }).fill('5')
-    await page.getByRole('button',{ name:/^Run panel difference-in-differences/i }).click()
+    await page.getByRole('button',{ name:'Run panel DiD',exact:true }).click()
     await expect(page.getByText('Current estimate',{ exact:true }).first()).toBeVisible({ timeout:60_000 })
     await expect(page.getByTestId('did-group-means').first()).toBeVisible()
     await capture(page,info,`chapter-${method.replaceAll(' ','-')}.png`)
@@ -82,8 +88,8 @@ for (const method of ['Regression','Doubly robust'] as const) {
     const run = saved.estimationRuns[0]
     expect(run.evidence.kind).toBe('panelAdjusted')
     expect(run.estimate.estimand.kind).toBe('average-treatment-effect-on-treated')
-    expect(run.evidence.estimate).toBeCloseTo(method === 'Regression' ? 290.53750263095316 : 314.7959088653215,6)
-    expect(run.evidence.standardError).toBeCloseTo(method === 'Regression' ? 59.77346090819873 : 44.386926615015476,6)
+    expect(run.evidence.estimate).toBeCloseTo(method === 'Regression' ? 290.53750263095316 : 314.7960332262636,6)
+    expect(run.evidence.standardError).toBeCloseTo(method === 'Regression' ? 59.77346090819873 : 44.383424896944305,6)
     await reopenResult(page, 'chapter-did-covariates.csv')
   })
 }
@@ -140,7 +146,7 @@ test('source chapter conventional DiD runs from upload to exported result', asyn
   await page.getByRole('radio', { name: /^Interventions/ }).click()
   await page.getByRole('radio', { name: /Panel difference-in-differences/ }).click()
   await page.getByRole('radio', { name: 'Conventional', exact: true }).click()
-  await page.getByRole('button', { name: /^Run panel difference-in-differences/i }).click()
+  await page.getByRole('button', { name: 'Run panel DiD', exact: true }).click()
   await expect(page.getByText('Current estimate', { exact: true }).first()).toBeVisible({ timeout: 60_000 })
   await capture(page, info, 'chapter-did.png')
   const saved = await exportProject(page)
@@ -160,6 +166,14 @@ test('source chapter Bayesian impact runs from upload with explicit controls and
   test.setTimeout(240_000)
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
+  // Hold the 100,000-draw request so the second run stays in flight until it is cancelled.
+  await page.addInitScript(() => {
+    const post = Worker.prototype.postMessage
+    Worker.prototype.postMessage = function (message: unknown, options?: Transferable[] | StructuredSerializeOptions) {
+      if (typeof message === 'object' && message !== null && 'kind' in message && message.kind === 'bayesian-causal-impact' && 'draws' in message && message.draws === 100000) return
+      post.call(this, message, Array.isArray(options) ? { transfer: options } : options)
+    }
+  })
   await upload(page, 'Chapter Bayesian impact', 'chapter-impact.csv')
   await page.getByRole('radio', { name: /Regular time series/ }).click()
   await choose(page, 'Time column', 'time')

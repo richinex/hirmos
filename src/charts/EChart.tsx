@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { EChartsCoreOption, EChartsType } from 'echarts/core'
 import { EMPTY_ZOOM_HISTORY, popZoom, pushZoom, rangeOf, WHOLE_AXIS, type ZoomHistory, type ZoomTarget } from './zoomHistory'
 import { visibleWindow, type VisibleWindow } from './window'
+import { withAxisTicks } from './grammar'
 
 /**
  * The one chart host. The registry loads lazily on first mount so chart code stays out of the initial
@@ -73,7 +74,7 @@ export function EChart({ option, label, className = 'h-[260px]', style, testId, 
       const mount = () => {
         const instance = createChart(element)
         chart.current = instance
-        instance.setOption(latestOption.current, { notMerge: true })
+        instance.setOption(withAxisTicks(latestOption.current), { notMerge: true })
         if (latest.current.wanted !== undefined) applyZoom(instance, latest.current.wanted ?? WHOLE_AXIS, true)
         if (selectsRange(latestOption.current) && finePointer()) takeBrushCursor(instance)
         instance.on('datazoom', () => latest.current.onWindow?.(visibleWindow(instance)))
@@ -119,7 +120,7 @@ export function EChart({ option, label, className = 'h-[260px]', style, testId, 
   useEffect(() => {
     const instance = chart.current
     if (instance === null) return
-    instance.setOption(option, { notMerge: true })
+    instance.setOption(withAxisTicks(option), { notMerge: true })
     // Replacing options (for example on a theme change) must not discard the controlled window.
     // Restoring it is silent: only a user's zoom should notify the other linked charts.
     if (latest.current.wanted !== undefined) applyZoom(instance, latest.current.wanted ?? WHOLE_AXIS, true)

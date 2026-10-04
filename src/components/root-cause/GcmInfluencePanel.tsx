@@ -8,7 +8,7 @@ import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { Select } from '@/components/ui/Select'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { EvidenceTable, type EvidenceColumn } from '@/components/table/EvidenceTable'
-import { button, chapterIntro, field, fieldLabel, fieldHint, iconControl, panel, sectionTitle, resultSurface, resultTitle } from '@/components/ui/recipes'
+import { button, chapterIntroSingle, field, fieldLabel, fieldHint, iconControl, panel, sectionTitle, resultSurface, resultTitle } from '@/components/ui/recipes'
 import { ExpandableChart } from '@/charts/ExpandableChart'
 import { absoluteShares, influenceBars, influenceGraph } from '@/charts/gcmInfluence'
 import { useChartTheme } from '@/charts/theme'
@@ -140,7 +140,7 @@ export function GcmInfluencePanel(props: Props) {
     <section><h3 className="m-0 text-body font-medium">Sampling</h3><p className={fieldHint}>The model generates observations to approximate each contribution. Sampling can produce small negative estimates. This analysis does not report confidence intervals.</p></section>
   </div>
   return <WorkbenchLayout id="root-cause" inspector={{ trigger: { label: 'Requirements', icon: 'contract' }, title: 'Data and method requirements', body: requirements }} bottom={{ trigger: { label: 'History', icon: 'history' }, title: `Run history (${props.runs.length})`, defaultCollapsed: true, body: <History runs={props.runs} selected={latest?.id} onSelect={setSelected} onDelete={props.onDelete} /> }} stage={<section className="@container/panel flex flex-col gap-5">
-    <div><ChapterHeading className="mb-2">Causal model analysis</ChapterHeading><p className={chapterIntro}>Explain variation in an outcome using the recorded causal graph.</p></div>
+    <div><ChapterHeading className="mb-2">Causal model analysis</ChapterHeading><p className={chapterIntroSingle}>Explain variation in an outcome using the recorded causal graph.</p></div>
     <section className={panel('p-(--panel-space)')} aria-label="Causal influence setup">
       <div className="mb-6"><GraphDetails name={props.name} graph={props.graph} disabled={busy} onOpen={props.onGraph} /></div>
       <div className="mb-4">{props.navigation}</div>

@@ -316,13 +316,13 @@ export function resultHeadline(run: EstimationRunArtifact, study: StudySpecifica
 
 /** Describe the evidence shape without presenting repeated panel cells as independent observations. */
 export function resultSampleLine(run: EstimationRunArtifact): string {
-  if (run.kind === 'ridge-augmented-synthetic-run') return `One treated unit and ${run.evidence.request.donors.length} donor units; ${run.evidence.request.prePeriods} pre-treatment periods`
-  if (run.kind === 'predictor-synthetic-control-run') return `One treated unit and ${run.evidence.donors.length} donor units; ${run.evidence.fitPeriods.length} fitting periods and ${run.estimate.effect.kind === 'path' ? run.estimate.effect.values.length : 0} selected post-intervention periods` 
+  if (run.kind === 'ridge-augmented-synthetic-run') return `One treated unit and ${formatCount(run.evidence.request.donors.length).text} donor units; ${formatCount(run.evidence.request.prePeriods).text} pre-treatment periods`
+  if (run.kind === 'predictor-synthetic-control-run') return `One treated unit and ${formatCount(run.evidence.donors.length).text} donor units; ${formatCount(run.evidence.fitPeriods.length).text} fitting periods and ${formatCount(run.estimate.effect.kind === 'path' ? run.estimate.effect.values.length : 0).text} selected post-intervention periods` 
   if (run.kind !== 'panel-intervention-run') return `n = ${formatCount(run.estimate.sample.observations).text}`
-  if(run.evidence.kind==='sunAbraham') return `${run.evidence.observations} retained observations in ${run.evidence.clusters} unit clusters`
-  if(run.evidence.kind==='staggeredDid') return `${run.evidence.units.length} retained units across ${run.evidence.times.length} periods; event-time support is reported separately`
+  if(run.evidence.kind==='sunAbraham') return `${formatCount(run.evidence.observations).text} retained observations in ${formatCount(run.evidence.clusters).text} unit clusters`
+  if(run.evidence.kind==='staggeredDid') return `${formatCount(run.evidence.units.length).text} retained units across ${formatCount(run.evidence.times.length).text} periods; event-time support is reported separately`
   const treatedCells = run.evidence.treatedUnits * run.evidence.nPost
-  return `${run.evidence.units.length} units × ${run.evidence.times.length} periods; the average covers ${treatedCells} treated-unit periods after adoption`
+  return `${formatCount(run.evidence.units.length).text} units × ${formatCount(run.evidence.times.length).text} periods; the average covers ${formatCount(treatedCells).text} treated-unit periods after adoption`
 }
 
 /**
@@ -759,6 +759,10 @@ export function interpretCounterfactualResult(run: CounterfactualRunArtifact, st
 /** Sensitivity procedures answer different questions; none is a second identification analysis. */
 export function interpretSensitivityResult(run: SensitivityRunArtifact): ResultInterpretation {
   switch (run.kind) {
+    case 'did-sensitivity-run':return {kind:'result-interpretation',statements:[
+      {kind:'qualification',text:'These bounds describe sensitivity of the treated-group effect to omitted variables under the specified outcome and Riesz confounding shares. The shares are assumptions, not estimates of unmeasured confounding.'},
+      {kind:'uncertainty',text:'Confidence bounds include sampling uncertainty. They do not establish that conditional parallel trends or the chosen confounding limits hold.'},
+    ]}
     case 'honest-did-run':return {kind:'result-interpretation',statements:[
       {kind:'qualification',text:'These confidence sets allow violations of parallel trends within the recorded restriction. They account for estimation error in both the pre-treatment and post-treatment estimates.'},
       {kind:'qualification',text:'Failure to reject pre-treatment differences does not establish parallel trends. The restriction is a substantive assumption, not a result of the pre-trend test.'},
@@ -782,7 +786,7 @@ export function interpretSensitivityResult(run: SensitivityRunArtifact): ResultI
       return { kind: 'result-interpretation', statements: [
         { kind: 'comparison', text: `Shuffling the treatment produced an average placebo estimate of ${number(run.evidence.placebo.refutedEffect)} across eight lighter refits. Those estimates ${placeboDifferent ? 'differ from zero' : 'are not distinguishable from zero'} at the 5% level (p = ${number(run.evidence.placebo.pValue)}); a useful placebo result is close to zero.` },
         { kind: 'comparison', text: `Adding independent noise variables changed the lighter-fit estimate by ${number(randomMovement)} on average across six refits. The shifts ${randomDifferent ? 'differ from zero' : 'are not distinguishable from zero'} at the 5% level (p = ${number(run.evidence.randomCommonCause.pValue)}).` },
-        { kind: 'magnitude', text: `Under the equal-strength confounding model, an unmeasured common cause would need to explain ${formatPercent(run.evidence.sensitivity.robustnessValue, { precision: 1 }).text} of the remaining variation in both treatment and outcome to move the estimate to zero. It would need ${formatPercent(run.evidence.sensitivity.robustnessValueCi, { precision: 1 }).text} to make the reported interval reach zero.` },
+        { kind: 'magnitude', text: `The robustness value is ${formatPercent(run.evidence.sensitivity.robustnessValue, { precision: 1 }).text} for the estimate and ${formatPercent(run.evidence.sensitivity.robustnessValueCi, { precision: 1 }).text} for the interval. These values use equal confounding shares for the outcome residual variation and the variation of the Riesz representer, which describes the treatment weighting. They are not percentages of treatment variance.` },
         { kind: 'qualification', text: 'The p-values describe the simulated refits. They do not test whether the causal graph is true. The confounding percentages apply to the equal-strength model shown here and do not cover every possible missing variable.' },
       ] }
     }

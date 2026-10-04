@@ -9,7 +9,8 @@ import { figureGrid, label, literal, num, sectionTitle } from '@/components/ui/r
 import { ShareBar } from '@/components/table/primitives'
 import type { ColumnProfile, ColumnProfileProblem, DatasetProfile, PhysicalColumnProfile } from '@/domain/dataset'
 import { assertNever } from '@/domain/dop'
-import { formatAbsent, formatCount, formatPercent, formatStatistic, formatWords, type Formatted } from '@/lib/format/number'
+import { describeColumnRole, type PreparedColumnRole } from '@/domain/preprocessing'
+import { formatAbsent, formatCount, formatPercent, formatStatistic, formatStored, formatWords, type Formatted } from '@/lib/format/number'
 import type { ColumnDescription } from './useColumnProfile'
 
 const describeProblem = (problem: ColumnProfileProblem): string => {
@@ -37,6 +38,15 @@ function StatList({ children }: { readonly children: React.ReactNode }) {
   return <dl className={figureGrid('m-0 grid-cols-2 @max-[300px]/inspector:grid-cols-1')}>{children}</dl>
 }
 
+/** Presence figures every summary opens with, whatever the column holds. */
+function PresenceStats({ profile, rowCount }: { readonly profile: Pick<ColumnProfile, 'count' | 'nullCount' | 'distinctCount'>; readonly rowCount: number }) {
+  return <>
+    <Stat name="Values" value={formatCount(profile.count)} />
+    <Stat name="Missing" value={formatPercent(profile.nullCount / rowCount, { numerator: profile.nullCount, denominator: rowCount })} tone={profile.nullCount > 0 ? 'warn' : 'muted'} />
+    <Stat name="Distinct" value={formatCount(profile.distinctCount)} />
+  </>
+}
+
 function NumericSummary({ column, profile, rowCount }: { readonly column: PhysicalColumnProfile; readonly profile: Extract<ColumnProfile, { readonly kind: 'numeric-column-profile' }>; readonly rowCount: number }) {
   const theme = useChartTheme()
   // The rules mark the mean and the median the list beside the chart prints, so the shape and the figures read together.
@@ -46,18 +56,15 @@ function NumericSummary({ column, profile, rowCount }: { readonly column: Physic
     nullCount: profile.nullCount,
     marks: [{ name: 'mean', value: profile.mean }, { name: 'median', value: profile.quartiles.median }],
   }, theme), [column.name, profile, theme])
-  const missing = formatPercent(profile.nullCount / rowCount, { numerator: profile.nullCount, denominator: rowCount })
   return (
     <>
       <StatList>
-        <Stat name="Values" value={formatCount(profile.count)} />
-        <Stat name="Missing" value={missing} tone={profile.nullCount > 0 ? 'warn' : 'muted'} />
-        <Stat name="Distinct" value={formatCount(profile.distinctCount)} />
+        <PresenceStats profile={profile} rowCount={rowCount} />
         <Stat name="Zeros" value={formatCount(profile.zeroCount)} tone="muted" />
         <Stat name="Mean" value={formatStatistic('mean', profile.mean)} />
         <Stat name="Std. deviation" value={profile.standardDeviation === null ? formatAbsent('unavailable') : formatStatistic('sd', profile.standardDeviation)} />
-        <Stat name="Minimum" value={formatStatistic('raw', profile.min)} />
-        <Stat name="Maximum" value={formatStatistic('raw', profile.max)} />
+        <Stat name="Minimum" value={formatStored(profile.min)} />
+        <Stat name="Maximum" value={formatStored(profile.max)} />
         <Stat name="Lower quartile" value={formatStatistic('raw', profile.quartiles.lower)} tone="muted" />
         <Stat name="Median" value={formatStatistic('raw', profile.quartiles.median)} />
         <Stat name="Upper quartile" value={formatStatistic('raw', profile.quartiles.upper)} tone="muted" />
@@ -72,14 +79,11 @@ function NumericSummary({ column, profile, rowCount }: { readonly column: Physic
 }
 
 function CategoricalSummary({ profile, rowCount }: { readonly profile: Extract<ColumnProfile, { readonly kind: 'categorical-column-profile' }>; readonly rowCount: number }) {
-  const missing = formatPercent(profile.nullCount / rowCount, { numerator: profile.nullCount, denominator: rowCount })
   const peak = Math.max(1, ...profile.top.map((entry) => entry.count))
   return (
     <>
       <StatList>
-        <Stat name="Values" value={formatCount(profile.count)} />
-        <Stat name="Missing" value={missing} tone={profile.nullCount > 0 ? 'warn' : 'muted'} />
-        <Stat name="Distinct" value={formatCount(profile.distinctCount)} />
+        <PresenceStats profile={profile} rowCount={rowCount} />
         <Stat name="Shown" value={formatWords(`top ${profile.top.length}`)} tone="muted" />
       </StatList>
       <div className="mt-3">
@@ -98,6 +102,19 @@ function CategoricalSummary({ profile, rowCount }: { readonly profile: Extract<C
   )
 }
 
+/**
+ * A key labels rows rather than measuring them, so its mean, spread and histogram say nothing.
+ * Its range prints as stored, as in the preview.
+ */
+function KeySummary({ profile, rowCount }: { readonly profile: Extract<ColumnProfile, { readonly kind: 'numeric-column-profile' }>; readonly rowCount: number }) {
+  return (
+    <StatList>
+      <PresenceStats profile={profile} rowCount={rowCount} />
+      <Stat name="Range" value={formatWords(`${formatStored(profile.min).text} to ${formatStored(profile.max).text}`)} />
+    </StatList>
+  )
+}
+
 function Skeleton() {
   return (
     <div aria-hidden className="space-y-3">
@@ -110,8 +127,9 @@ function Skeleton() {
 }
 
 /** The inspector body for the Data Studio: what one column contains, with its distribution. */
-export function ColumnProfilePane({ profile, column, description }: {
+export function ColumnProfilePane({ profile, column, description, role }: {
   readonly profile: DatasetProfile
+  readonly role: PreparedColumnRole
   readonly column: PhysicalColumnProfile | null
   readonly description: ColumnDescription
 }) {
@@ -125,16 +143,20 @@ export function ColumnProfilePane({ profile, column, description }: {
   }
   const failed = current && description.kind === 'failed'
   const shown = failed ? column : displayed?.column ?? column
+  const roleText = describeColumnRole(role)
   return (
     <div className="@container/inspector" aria-busy={!current || description.kind === 'loading'}>
       <div className="mb-3">
         <IdentityRow name={<h3 className="m-0 text-title font-medium text-ink">{shown.name}</h3>}>
           <span className={literal()}>{shown.duckdbType}</span>
           <span>{shown.nullable ? 'Nullable' : 'Not null'}</span>
+          {roleText !== null && <span>{roleText}</span>}
         </IdentityRow>
       </div>
       {failed ? <Alert tone="danger" title="Column profile refused">{describeProblem(description.problem)}</Alert>
         : displayed === null ? <Skeleton />
+        : displayed.profile.kind === 'numeric-column-profile' && role.kind !== 'value'
+          ? <KeySummary profile={displayed.profile} rowCount={profile.rowCount} />
         : displayed.profile.kind === 'numeric-column-profile'
           ? <NumericSummary column={displayed.column} profile={displayed.profile} rowCount={profile.rowCount} />
           : <CategoricalSummary profile={displayed.profile} rowCount={profile.rowCount} />}

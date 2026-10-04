@@ -13,6 +13,7 @@ import { rootCauseRequestSchema, rootCauseEvidenceSchema, type RootCauseRequest,
 import { rootCauseCheckRequestSchema, rootCauseChecksSchema, type RootCauseCheckRequest, type RootCauseChecks } from '@/domain/rootCauseAnalysis'
 import { ardlModelEvidenceSchema, ardlModelRequestSchema, type ArdlModelEvidence, type ArdlModelRequest } from '@/domain/ardlModel'
 import {honestRequestSchema,honestEvidenceSchema,type HonestRequest,type HonestEvidence} from '@/domain/honestDid'
+import {didSensitivityRequestSchema,didSensitivityEvidenceSchema,type DidSensitivityRequest,type DidSensitivityEvidence} from '@/domain/didSensitivity'
 import { aalenEvidenceSchema, forestEvidenceSchema, forestSettingsSchema, type AalenEvidence, type ForestEvidence, type ForestSettings } from '@/domain/survivalRegression'
 import { multicollinearityEvidenceSchema, parseMulticollinearityEvidence, type MulticollinearityEvidence } from '@/domain/multicollinearity'
 import { countSeriesInterventionScanEvidenceSchema, parseCountSeriesInterventionScanEvidence, type CountSeriesInterventionScanEvidence } from '@/domain/countSeries'
@@ -1013,6 +1014,7 @@ export type AnalysisWorkerCommand =
       readonly model: ArdlModelRequest
     }
   | {readonly kind:'honest-did';readonly request:WorkerRequestId;readonly values:Float64Array;readonly model:HonestRequest}
+  | {readonly kind:'did-sensitivity';readonly request:WorkerRequestId;readonly values:Float64Array;readonly rows:number;readonly columns:number;readonly units:readonly string[];readonly times:readonly number[];readonly model:DidSensitivityRequest}
   | {
       readonly kind: 'ardl-pss'
       readonly request: WorkerRequestId
@@ -1387,6 +1389,7 @@ export type AnalysisWorkerEvent =
   | { readonly kind: 'gcm-influence-succeeded'; readonly request: WorkerRequestId; readonly result: GcmInfluenceEvidence }
   | { readonly kind: 'ardl-model-succeeded'; readonly request: WorkerRequestId; readonly result: ArdlModelEvidence }
   | { readonly kind:'honest-did-succeeded';readonly request:WorkerRequestId;readonly result:HonestEvidence }
+  | { readonly kind:'did-sensitivity-succeeded';readonly request:WorkerRequestId;readonly result:DidSensitivityEvidence }
   | { readonly kind: 'vecm-succeeded'; readonly request: WorkerRequestId; readonly result: VecmEvidence }
   | { readonly kind: 'predictor-synthetic-control-succeeded'; readonly request: WorkerRequestId; readonly result: PredictorSyntheticEvidence }
   | { readonly kind: 'synthetic-control-succeeded'; readonly request: WorkerRequestId; readonly result: SyntheticControlEvidence }
@@ -2287,6 +2290,7 @@ const commandSchema = z.discriminatedUnion('kind', [
     model: ardlModelRequestSchema,
   }).strict(),
   z.object({kind:z.literal('honest-did'),request:requestSchema,values:z.instanceof(Float64Array),model:honestRequestSchema}).strict(),
+  z.object({kind:z.literal('did-sensitivity'),request:requestSchema,values:z.instanceof(Float64Array),rows:z.number().int().positive(),columns:z.number().int().min(3),units:z.array(z.string()),times:z.array(z.number().int()),model:didSensitivityRequestSchema}).strict(),
   z.object({
     kind: z.literal('ardl-pss'),
     request: requestSchema,
@@ -2641,6 +2645,7 @@ const eventSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('gcm-influence-succeeded'), request: requestSchema, result: gcmInfluenceEvidenceSchema }).strict(),
   z.object({ kind: z.literal('ardl-model-succeeded'), request: requestSchema, result: ardlModelEvidenceSchema }).strict(),
   z.object({kind:z.literal('honest-did-succeeded'),request:requestSchema,result:honestEvidenceSchema}).strict(),
+  z.object({kind:z.literal('did-sensitivity-succeeded'),request:requestSchema,result:didSensitivityEvidenceSchema}).strict(),
   z.object({ kind: z.literal('vecm-succeeded'), request: requestSchema, result: vecmEvidenceSchema }).strict(),
   z.object({kind:z.literal('predictor-synthetic-control-succeeded'),request:requestSchema,result:predictorSyntheticEvidenceSchema}).strict(),
   z.object({ kind: z.literal('synthetic-control-succeeded'), request: requestSchema, result: syntheticControlEvidenceSchema }).strict(),
@@ -3017,6 +3022,10 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
     const result=honestEvidenceSchema.safeParse(parsed.data.result)
     return result.success?ok({kind:'honest-did-succeeded',request:request.value,result:result.data}):err({kind:'invalid-event',detail:z.prettifyError(result.error)})
   }
+  if(parsed.data.kind==='did-sensitivity-succeeded'){
+    const result=didSensitivityEvidenceSchema.safeParse(parsed.data.result)
+    return result.success?ok({kind:'did-sensitivity-succeeded',request:request.value,result:result.data}):err({kind:'invalid-event',detail:z.prettifyError(result.error)})
+  }
   if (parsed.data.kind === 'root-cause-succeeded') {
     const result = rootCauseEvidenceSchema.safeParse(parsed.data.result)
     return result.success ? ok({ kind: 'root-cause-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
@@ -3057,6 +3066,7 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
   if (parsed.data.kind === 'staggered-did-succeeded') return ok({...parsed.data,request:request.value})
   if (parsed.data.kind === 'panel-intervention-succeeded') {
     const result = panelInterventionEvidenceSchema.safeParse(parsed.data.result)
+    if (result.success && result.data.kind === 'panelAdjusted' && result.data.inference.kind === 'crossFitted' && result.data.inference.propensityFit === undefined) return err({ kind: 'invalid-event', detail: 'A new DR DiD result must record the standardized propensity fit.' })
     return result.success ? ok({ kind: 'panel-intervention-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
   if (parsed.data.kind === 'negbin-nuts-succeeded') {

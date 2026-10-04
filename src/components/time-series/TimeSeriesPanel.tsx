@@ -19,7 +19,7 @@ import { Orb } from '@/components/ui/Orb'
 import { Select } from '@/components/ui/Select'
 import { ColumnChecklist } from '@/components/ui/ColumnChecklist'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
-import { actionGap, button, chapterIntro, field, fieldHint, fieldLabel, fieldRow, panel, sectionTitle, stepsStack } from '@/components/ui/recipes'
+import { actionGap, button, chapterIntroSingle, field, fieldHint, fieldLabel, fieldRow, panel, sectionTitle, stepsStack } from '@/components/ui/recipes'
 import { SettingsStep } from '@/components/ui/SettingsStep'
 import { cn } from '@/lib/utils'
 import { isNumericDuckDbType, type ColumnId, type DatasetProfile } from '@/domain/dataset'
@@ -50,7 +50,7 @@ type Props = TimeSeriesPanelProps
 export function TimeSeriesHeading() {
   return <div>
     <ChapterHeading className="mb-2">Time-series analysis</ChapterHeading>
-    <p className={chapterIntro} style={{ columnCount: 1 }}>Analyse how observations change over time and how current values relate to earlier values. Estimate short-run dynamics and long-run relationships between series.</p>
+    <p className={chapterIntroSingle}>Analyse how observations change over time and how current values relate to earlier values. Estimate short-run dynamics and long-run relationships between series.</p>
   </div>
 }
 

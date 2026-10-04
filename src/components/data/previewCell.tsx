@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import type { PreviewCell } from '@/domain/dataset'
 import { assertNever } from '@/domain/dop'
-import { formatAbsent } from '@/lib/format/number'
+import { formatAbsent, storedDigits } from '@/lib/format/number'
 
 /**
  * How a raw data preview shows a cell. The rule follows what pandas, DuckDB's shell, Polars, R's tibble
@@ -29,14 +29,11 @@ export const columnDecimals = (rows: readonly (readonly PreviewCell[] | null)[],
   return Math.min(decimals, 4)
 }
 
-const MINUS = '−'
-const plainDigits = (text: string): string => text.startsWith('-') ? `${MINUS}${text.slice(1)}` : text
-
 export const previewCellText = (cell: PreviewCell, decimals: number): string => {
   switch (cell.kind) {
     case 'null': return formatAbsent('unavailable', 'missing value').text
-    case 'number': return plainDigits(Number.isFinite(cell.value) ? cell.value.toFixed(decimals) : String(cell.value))
-    case 'integer': return plainDigits(cell.value)
+    case 'number': return storedDigits(Number.isFinite(cell.value) ? cell.value.toFixed(decimals) : String(cell.value))
+    case 'integer': return storedDigits(cell.value)
     case 'boolean': return cell.value ? 'true' : 'false'
     case 'temporal': return cell.value.replace('T', ' ').replace(/\.000Z$/, '').replace(/Z$/, '')
     case 'text': return cell.value

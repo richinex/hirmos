@@ -21,7 +21,7 @@ test('new survival regressions preserve covariates, validate settings, render an
     await page.getByRole('navigation', { name: 'Workspace sections' }).getByRole('button', { name: pattern }).click()
   }
   await chapter(/Survival analysis/)
-  const setup = page.locator('section[aria-labelledby="survival-setup-title"]')
+  const setup = page.getByRole('region', { name: 'Survival setup', exact: true })
   const choose = async (analysis: string) => setup.getByRole('radio', { name: analysis, exact: true }).click({ force: true })
   const run = () => setup.getByRole('button', { name: 'Run survival analysis' }).click()
   const checkEquation = async () => {

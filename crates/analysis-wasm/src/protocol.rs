@@ -61,8 +61,11 @@ pub(crate) enum DidNormalization { InSample, Population }
 #[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub(crate) enum AdjustedDidInference {
     IndependentErrors { degrees_of_freedom: usize, coefficients: Vec<f64>, standard_errors: Vec<f64>, intervals: Vec<[f64; 2]> },
-    CrossFitted { propensity: Vec<f64>, optimizer_status: Vec<PropensityStatus> },
+    CrossFitted { propensity: Vec<f64>, optimizer_status: Vec<PropensityStatus>, propensity_fit: DidPropensityFit },
 }
+#[derive(Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum DidPropensityFit { StandardizedLogisticV1 }
 #[derive(Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum PropensityStatus { ProjectedGradient, FunctionTolerance, IterationLimit, LineSearchFailed }
@@ -1031,6 +1034,7 @@ pub(crate) enum AnalysisCommand {
     RootCauseChecks { request: crate::root_cause_checks::Request },
     ArdlModel { rows: usize, columns: usize, model: crate::ardl_model::Request },
     HonestDid { model: crate::honest_did::Request },
+    DidSensitivity { rows: usize, columns: usize, units: Vec<String>, times: Vec<i64>, model: crate::did_sensitivity::Request },
     StationarityBattery,
     Multicollinearity {
         rows: usize,
@@ -2678,6 +2682,7 @@ pub(crate) enum AnalysisResult {
     RootCauseChecks { evidence: crate::root_cause_checks::Evidence },
     ArdlModel { evidence: crate::ardl_model::Evidence },
     HonestDid { evidence: crate::honest_did::Evidence },
+    DidSensitivity { evidence: crate::did_sensitivity::Evidence },
     DiscreteStateRefused {
         query: DiscreteStateQuery,
         node: usize,
@@ -3623,6 +3628,7 @@ pub(crate) enum AnalysisResult {
     },
     DmlRefutationBatch {
         observations: usize,
+        probe_design: &'static str,
         model: DmlModel,
         att: bool,
         seed: u32,

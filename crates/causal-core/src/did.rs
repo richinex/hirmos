@@ -2,7 +2,7 @@
 //! Cross-fitting reuses the existing sklearn folds, centered LAPACK regression,
 //! logistic optimizer and linear-score solver. Experimental scores are not implied.
 
-use crate::{dml, logistic, nprandom::Mt19937, sklearn_linear::fit_sklearn_linear_regression};
+use crate::{dml, logistic, metrics::StandardScaler, nprandom::Mt19937, sklearn_linear::fit_sklearn_linear_regression};
 use nalgebra::{DMatrix, DVector};
 
 #[derive(Debug, Clone, Copy)]
@@ -19,6 +19,7 @@ pub enum Error {
     MissingGroup,
     Regression,
     PropensityBoundary,
+    PropensityNotConverged { fold: usize },
     RequiresTwoPeriods,
 }
 
@@ -52,11 +53,11 @@ pub enum Violation {
 
 /// An executable plan can only be constructed after all readiness rules pass.
 pub struct Plan<'a> {
-    sample: &'a PairedSample,
-    folds: usize,
-    seed: u32,
-    trimming: f64,
-    normalization: Normalization,
+    pub(crate) sample: &'a PairedSample,
+    pub(crate) folds: usize,
+    pub(crate) seed: u32,
+    pub(crate) trimming: f64,
+    pub(crate) normalization: Normalization,
 }
 
 pub fn prepare(
@@ -107,9 +108,9 @@ pub fn prepare(
 /// One before/after pair per unit, constructed from the panel rather than accepted
 /// as arbitrary outcome levels. Baseline covariates follow the panel's unit order.
 pub struct PairedSample {
-    x: Vec<Vec<f64>>,
-    differences: Vec<f64>,
-    group: Vec<f64>,
+    pub(crate) x: Vec<Vec<f64>>,
+    pub(crate) differences: Vec<f64>,
+    pub(crate) group: Vec<f64>,
 }
 
 impl PairedSample {
@@ -154,7 +155,7 @@ pub struct Fit {
     pub propensity: Vec<f64>,
     pub psi_a: Vec<f64>,
     pub psi_b: Vec<f64>,
-    /// Non-converged propensity fits remain visible, matching sklearn's warning behavior.
+    /// Successful optimizer termination for each fold; unfinished fits return an error.
     pub propensity_termination: Vec<crate::lbfgsb::LbfgsbTermination>,
 }
 
@@ -235,7 +236,7 @@ pub fn fit(plan: &Plan<'_>) -> Result<Fit, Error> {
     let mut g0 = vec![0.0; n];
     let mut propensity = vec![0.0; n];
     let mut termination = Vec::with_capacity(folds);
-    for (train, test) in &splits {
+    for (fold, (train, test)) in splits.iter().enumerate() {
         let controls: Vec<_> = train.iter().copied().filter(|i| group[*i] == 0.0).collect();
         let predictors = DMatrix::from_fn(controls.len(), x[0].len(), |i, j| x[controls[i]][j]);
         let target =
@@ -249,10 +250,16 @@ pub fn fit(plan: &Plan<'_>) -> Result<Fit, Error> {
         .map_err(|_| Error::Regression)?;
         let train_x: Vec<_> = train.iter().map(|i| x[*i].clone()).collect();
         let train_d: Vec<_> = train.iter().map(|i| group[*i]).collect();
-        let classifier = logistic::fit_unpenalized(&train_x, &train_d, logistic::SKLEARN_DEFAULT_MAX_ITER);
+        // Scale using the training fold only. This changes coordinates, not the unpenalized model.
+        let scaler = StandardScaler::fit(&train_x);
+        let scaled_train = scaler.transform(&train_x);
+        let classifier = logistic::fit_unpenalized_with_tolerance(&scaled_train, &train_d, 10_000, 1e-10);
+        if matches!(classifier.termination, crate::lbfgsb::LbfgsbTermination::IterationLimit | crate::lbfgsb::LbfgsbTermination::LineSearchFailed) {
+            return Err(Error::PropensityNotConverged { fold: fold + 1 });
+        }
         termination.push(classifier.termination);
         let test_x: Vec<_> = test.iter().map(|i| x[*i].clone()).collect();
-        let probabilities = classifier.predict_probability(&test_x);
+        let probabilities = classifier.predict_probability(&scaler.transform(&test_x));
         for (&i, &probability) in test.iter().zip(&probabilities) {
             if !probability.is_finite() || probability < 1e-12 || probability > 1.0 - 1e-12 {
                 return Err(Error::PropensityBoundary);

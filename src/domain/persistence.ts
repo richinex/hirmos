@@ -24,6 +24,7 @@ import { tLearnerEvidenceSchema, crossFittedTLearnerEvidenceSchema, tLearnerConf
 import type { PreparedDatasetArtifact, StationarityEvidenceArtifact } from './preprocessing'
 import type { SensitivityRunArtifact } from './sensitivity'
 import {honestRunSchema,honestRunMatches} from './honestDid'
+import {didSensitivityRunSchema,didSensitivityRunMatches} from './didSensitivity'
 import { EMPTY_STUDY_DRAFT, type IdentificationArtifact, type StudyDesignDraft, type StudySpecification } from './study'
 import type { ProjectOrigin } from './projectOrigin'
 import type { Project, SelectedSource, Workflow } from './workflow'
@@ -231,7 +232,10 @@ const envelopeSchema = z.object({
   studies: z.array(artifact),
   identifications: z.array(artifact),
   estimationRuns: z.array(artifact),
-  sensitivityRuns: z.array(artifact.superRefine((run,ctx)=>{if(run.kind==='honest-did-run'){const parsed=honestRunSchema.safeParse(run);if(!parsed.success)ctx.addIssue({code:'custom',message:z.prettifyError(parsed.error)})}})),
+  sensitivityRuns: z.array(artifact.superRefine((run,ctx)=>{
+    const schema=run.kind==='honest-did-run'?honestRunSchema:run.kind==='did-sensitivity-run'?didSensitivityRunSchema:null
+    if(schema!==null){const parsed=schema.safeParse(run);if(!parsed.success)ctx.addIssue({code:'custom',message:z.prettifyError(parsed.error)})}
+  })),
   counterfactualRuns: z.array(artifact),
   surrogateRuns: z.array(surrogateRunSchema).default([]),
   survivalRuns: z.array(artifact).default([]),
@@ -701,6 +705,11 @@ export function parseSnapshotValue(value: unknown): Result<PersistedProject, Sna
     }
   }
   for(const record of parsed.data.sensitivityRuns){
+    if(record.kind==='did-sensitivity-run'){
+      const run=didSensitivityRunSchema.safeParse(record)
+      if(!run.success||!didSensitivityRunMatches(run.data,estimationRuns as unknown as PersistedProject['estimationRuns']))return err({kind:'invalid-snapshot',detail:'DiD sensitivity evidence does not match its saved two-period DR DiD source.'})
+      continue
+    }
     if(record.kind!=='honest-did-run')continue
     const run=honestRunSchema.safeParse(record)
     if(!run.success||!honestRunMatches(run.data,estimationRuns as unknown as PersistedProject['estimationRuns'],parsed.data.timeSeriesRuns))return err({kind:'invalid-snapshot',detail:'Parallel-trends sensitivity evidence does not match its saved event-study source.'})

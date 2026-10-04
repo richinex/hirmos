@@ -278,6 +278,7 @@ pub(crate) fn dml_refutation_batch(
         };
     Ok(AnalysisResult::DmlRefutationBatch {
         observations: rows,
+        probe_design: "full-sample-paired-folds",
         model,
         att,
         seed,

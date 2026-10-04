@@ -16,7 +16,7 @@ export type SensitivityEvent =
   | { readonly type: 'configured'; readonly configuration: SensitivityConfiguration }
 
 export function initialSensitivityDraft(estimates: readonly EstimationRunArtifact[], runs: readonly SensitivityRunArtifact[]): SensitivityDraft {
-  const latest = runs.filter(run=>run.kind!=='honest-did-run').at(-1) ?? null
+  const latest = runs.filter(run=>run.kind!=='honest-did-run'&&run.kind!=='did-sensitivity-run').at(-1) ?? null
   const probed = latest === null ? null : estimates.find(run => run.id === latest.estimationRun) ?? null
   const defaults = { 'linear-refutation': DEFAULT_REFUTATION, 'unobserved-confounding': DEFAULT_UNOBSERVED, 'dml-refutation': DEFAULT_DML_REFUTATION }
   return {

@@ -20,7 +20,7 @@ import type { RootCauseRun } from '@/domain/rootCauseAnalysis'
 import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
 import { Formula } from '@/components/ui/Formula'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
-import { button, chapterIntro, chip, label, literal, num, panel, statusText, table, td, th, tr, well } from '@/components/ui/recipes'
+import { button, chapterIntroFor, chip, label, literal, num, panel, statusText, table, td, th, tr, well } from '@/components/ui/recipes'
 import { RecordList, RecordRow } from '@/components/ui/RecordList'
 import { Select } from '@/components/ui/Select'
 import type { CounterfactualRunArtifact } from '@/domain/counterfactual'
@@ -183,7 +183,7 @@ function Manifest({ manifest, stepLabel }: { readonly manifest: ResultManifest; 
       </Section>
 
       <Section title="Sensitivity and counterfactuals">
-        <Row term="Sensitivity">{manifest.sensitivity.length === 0 ? 'none recorded' : manifest.sensitivity.map((probe) => probe.kind === 'honest-did-run' ? `parallel-trends sensitivity, ${probe.evidence.request.configuration.bounds.length} restriction bounds` : probe.kind === 'linear-refutation-run' ? `movement-only perturbations, no refuter p-values (placebo ${formatStatistic('raw', probe.evidence.placeboEffect).text}; subset ${formatStatistic('raw', probe.evidence.subsetEffect).text})` : probe.kind === 'dml-refutation-run' ? `DML mean-shift tests (placebo p ${formatP(probe.evidence.placebo.pValue, { withLabel: false }).text}; random covariate p ${formatP(probe.evidence.randomCommonCause.pValue, { withLabel: false }).text})` : `simulated-confounder movement grid ${probe.evidence.kappaT.length}×${probe.evidence.kappaY.length}, no p-value`).join('; ')}</Row>
+        <Row term="Sensitivity">{manifest.sensitivity.length === 0 ? 'none recorded' : manifest.sensitivity.map((probe) => probe.kind === 'did-sensitivity-run' ? `DiD omitted-variable sensitivity, ${probe.evidence.scenarios.length} scenarios` : probe.kind === 'honest-did-run' ? `parallel-trends sensitivity, ${probe.evidence.request.configuration.bounds.length} restriction bounds` : probe.kind === 'linear-refutation-run' ? `movement-only perturbations, no refuter p-values (placebo ${formatStatistic('raw', probe.evidence.placeboEffect).text}; subset ${formatStatistic('raw', probe.evidence.subsetEffect).text})` : probe.kind === 'dml-refutation-run' ? `DML mean-shift tests (placebo p ${formatP(probe.evidence.placebo.pValue, { withLabel: false }).text}; random covariate p ${formatP(probe.evidence.randomCommonCause.pValue, { withLabel: false }).text})` : `simulated-confounder movement grid ${probe.evidence.kappaT.length}×${probe.evidence.kappaY.length}, no p-value`).join('; ')}</Row>
         <Row term="Counterfactuals">{manifest.counterfactuals.length === 0 ? 'none recorded' : manifest.counterfactuals.map((counterfactual) => `model-implied ${counterfactual.evidence.interventions[0]} → ${counterfactual.evidence.interventions[1]} contrast: ${formatStatistic('raw', counterfactual.evidence.averageEffect).text}`).join('; ')}</Row>
       </Section>
       </div>
@@ -322,7 +322,7 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
           </div>
           {otherManifest !== null && manifest !== null && <section className={panel('p-(--panel-space)')} aria-label="Differences"><h3 className="mb-2 mt-0 text-faint text-label font-medium"><Metadata><span>Differences</span><span>{differences.length}</span></Metadata></h3>{differences.length === 0 ? <p className="m-0 text-body text-muted">The two runs share every recorded field.</p> : <div className="figure-strip overflow-x-auto"><table className={table}><thead><tr><th className={th()}>Field</th><th className={th()}>Selected</th><th className={th()}>Compared</th></tr></thead><tbody>{differences.map((difference) => <tr key={difference.field} className={tr()}><td className={td('text-ink')}>{difference.field}</td><td className={td('whitespace-normal text-muted')}>{difference.left}</td><td className={td('whitespace-normal text-muted')}>{difference.right}</td></tr>)}</tbody></table></div>}</section>}
           {manifest !== null && <Manifest manifest={manifest} stepLabel={stepLabel} />}
-          {manifest?.sensitivity.map(probe=>probe.kind==='honest-did-run'?<HonestDidResult key={probe.id} run={probe}/>:null)}
+          {manifest?.sensitivity.map(probe=>probe.kind==='honest-did-run'?<HonestDidResult key={probe.id} run={probe}/>:probe.kind==='did-sensitivity-run'?<DidSensitivityResult key={probe.id} run={probe} source={estimationRuns.find(r=>r.id===probe.estimationRun)}/>:null)}
         </>
       }
       case 'survival': {
@@ -371,5 +371,7 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
     ? <SegmentedControl variant="line" size="sm" ariaLabel="Result family" value={activeView.kind} onChange={selectFamily} options={families} />
     : null
 
-  return <WorkbenchLayout id="results" stage={<section aria-labelledby="results-title" className="@container/panel flex flex-col gap-5"><div><ChapterHeading id="results-title" className="mb-2">Results</ChapterHeading><p className={chapterIntro}>{resultIntroduction(activeView)}</p></div>{familyControl}{body}</section>} bottom={bottom} />
+  const intro = resultIntroduction(activeView)
+  return <WorkbenchLayout id="results" stage={<section aria-labelledby="results-title" className="@container/panel flex flex-col gap-5"><div><ChapterHeading id="results-title" className="mb-2">Results</ChapterHeading><p className={chapterIntroFor(intro)}>{intro}</p></div>{familyControl}{body}</section>} bottom={bottom} />
 }
+import {DidSensitivityResult} from '@/components/sensitivity/DidSensitivityPanel'

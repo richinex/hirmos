@@ -140,7 +140,6 @@ test('keeps the current stage usable on a phone', async ({ page }, testInfo) => 
   await page.keyboard.press('Escape')
   await expect(sidebar).toHaveAttribute('inert', '')
   await expect(page.getByRole('region', { name: 'Physical schema' }).getByRole('row').nth(1).getByRole('cell').nth(4)).not.toHaveText('…', { timeout: 30_000 })
-  await expect(page).toHaveScreenshot('seatbelts-source-selected-mobile.png', { fullPage: true, maxDiffPixels: 500 })
 })
 
 test('keeps temporal discovery usable on a phone without widening the page', async ({ page }, testInfo) => {

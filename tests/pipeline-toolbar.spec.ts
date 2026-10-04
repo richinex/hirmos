@@ -60,7 +60,15 @@ test('pane resizing preserves labels without shifting the canvas or nodes', asyn
     node: document.querySelector('[data-testid="block-output"]')!.getBoundingClientRect().top,
     transform: (document.querySelector('.react-flow__viewport') as HTMLElement).style.transform,
   }))
-  const before = await geometry()
+  // The canvas fits its view after mounting; take the baseline only once two readings agree.
+  let before = await geometry()
+  await expect.poll(async () => {
+    await page.waitForTimeout(250)
+    const next = await geometry()
+    const settled = JSON.stringify(next) === JSON.stringify(before)
+    before = next
+    return settled
+  }, { timeout: 10_000 }).toBe(true)
   const header = page.locator('.workbench-pane-header').filter({ has: page.locator('#pipeline-inspector-title') })
   const toolbarBox = (await toolbar.boundingBox())!
   const headerBox = (await header.boundingBox())!

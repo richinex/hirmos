@@ -5,6 +5,7 @@ import { describeSeriesTransform, type PreparedDatasetArtifact } from '@/domain/
 import { describeResampling } from '@/domain/resampling'
 import { describeSeasonalAdjustment } from '@/domain/seasonal'
 import { table, th, td, tr } from '@/components/ui/recipes'
+import { formatCount } from '@/lib/format/number'
 
 function structure(prepared: PreparedDatasetArtifact): string {
   switch (prepared.kind) {
@@ -20,12 +21,12 @@ export function PreparedDataSummary({ prepared, profile }: { readonly prepared: 
   const details = [
     prepared.kind === 'prepared-time-series' ? describeResampling(prepared.resampling, name) : null,
     describeSeasonalAdjustment(prepared.seasonalAdjustment, name),
-    prepared.kind === 'prepared-panel' ? `${prepared.panel.units.toLocaleString()} units × ${prepared.panel.periods.toLocaleString()} periods` : null,
+    prepared.kind === 'prepared-panel' ? `${formatCount(prepared.panel.units).text} units × ${formatCount(prepared.panel.periods).text} ${prepared.sampling.frequency} periods, keyed by ${name(prepared.panel.unitColumn)} and ${name(prepared.panel.timeColumn)}` : null,
   ].filter((detail): detail is string => detail !== null)
   const transforms = prepared.kind === 'prepared-time-series' ? prepared.seriesTransforms.filter(record => record.transform.kind !== 'levels') : []
   return <section aria-label="Prepared data" className="mb-5">
     <h3 className="m-0 flex items-center gap-2 text-body font-medium text-ink"><Icon name="table_view" size={16} />Prepared data</h3>
-    <p role="status" className="mb-0 mt-1 text-body text-muted">{structure(prepared)}, <span className="tabular-nums">{prepared.observations.toLocaleString()}</span> rows</p>
+    <p role="status" className="mb-0 mt-1 text-body text-muted">{structure(prepared)}, <span className="tabular-nums">{formatCount(prepared.observations).text}</span> rows</p>
     {(details.length > 0 || transforms.length > 0) && <details className="group mt-2">
       <summary className="flex cursor-pointer list-none items-center gap-1.5 text-body text-muted [&::-webkit-details-marker]:hidden">
         <Icon name="chevron_right" size={16} className="transition-transform group-open:rotate-90" />Preparation details

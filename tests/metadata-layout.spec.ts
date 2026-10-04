@@ -14,7 +14,7 @@ test('column identity and requirement tallies fit without repeated labels', asyn
     document.body.append(host)
     const caveats = Array.from({ length: 6 }, (_, i) => ({ id: `c${i}`, category: 'data', requirement: `Requirement ${i + 1}`, consequenceIfUnmet: 'Review the study.', sources: [] }))
     createRoot(host).render(h('div', { style: { maxWidth: 460 } },
-      h(ColumnProfilePane, { column: { id: 'month', name: 'month', duckdbType: 'BIGINT', nullable: false }, profile: { rowCount: 10 }, description: { kind: 'idle' } }),
+      h(ColumnProfilePane, { column: { id: 'month', name: 'month', duckdbType: 'BIGINT', nullable: false }, profile: { rowCount: 10 }, description: { kind: 'idle' }, role: { kind: 'value' } }),
       h(MethodCaveats, { methods: [{ id: 'example', name: 'DirectLiNGAM', summary: '', caveats }], eligibility: { kind: 'caution', satisfied: caveats.slice(0, 2).map(caveat => ({ kind: 'satisfied', caveat, evidence: '' })), unresolved: caveats.slice(2).map(caveat => ({ kind: 'unresolved', caveat, missingEvidence: '' })) } }),
     ))
   })

@@ -1,4 +1,5 @@
 import type { ChartTheme } from './theme'
+import { formatAxisTick } from '@/lib/format/number'
 
 /**
  * What every Hirmos chart shares: axis lines on `hair`, tick labels on `faint`, axis names on `muted`,
@@ -190,3 +191,34 @@ export const rangeSelection = (theme: ChartTheme, xAxisIndex: number | readonly 
     brushStyle: { borderWidth: 1, color: `${theme.signal}22`, borderColor: theme.signal },
   },
 })
+
+type Axis = Record<string, unknown>
+const NUMERIC_AXES = new Set(['value', 'log'])
+
+/** One axis with a numeric scale and no formatter of its own takes `formatAxisTick`; every other axis is returned as it was. */
+function tickedAxis(axis: unknown, fallback: string): unknown {
+  if (axis === null || typeof axis !== 'object') return axis
+  const record = axis as Axis
+  if (!NUMERIC_AXES.has(String(record.type ?? fallback))) return axis
+  const label = (record.axisLabel ?? {}) as Axis
+  if (label.formatter !== undefined) return axis
+  return { ...record, axisLabel: { ...label, formatter: formatAxisTick } }
+}
+
+const tickedAxes = (axes: unknown, fallback: string): unknown => Array.isArray(axes) ? axes.map(axis => tickedAxis(axis, fallback)) : tickedAxis(axes, fallback)
+
+/**
+ * ECharts writes a negative tick with a hyphen. Every option passes through here on its way to the
+ * chart, so each numeric axis that does not format its own labels shows a true minus. An unset type
+ * is ECharts' default: value for y, category for x.
+ */
+export function withAxisTicks<O extends object>(option: O): O {
+  const root = option as Record<string, unknown>
+  const base = root.baseOption
+  if (base !== null && typeof base === 'object') return { ...root, baseOption: withAxisTicks(base) } as O
+  return {
+    ...root,
+    ...(root.xAxis === undefined ? {} : { xAxis: tickedAxes(root.xAxis, 'category') }),
+    ...(root.yAxis === undefined ? {} : { yAxis: tickedAxes(root.yAxis, 'value') }),
+  } as O
+}

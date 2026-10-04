@@ -34,7 +34,7 @@ test('adjusted DiD worker preserves keyed alignment and pinned regression infere
   expect(result.reversed).toEqual(result.regression)
   expect(result.dr.specification.kind).toBe('doublyRobust')
   expect(result.dr.inference.optimizerStatus).toHaveLength(5)
-  expect(result.dr.estimate).toBeCloseTo(314.7959089,5)
+  expect(result.dr.estimate).toBeCloseTo(314.7960332262636,5)
 })
 
 test('sharp RD worker matches rdrobust and refuses non-sharp assignment', async ({ page }) => {

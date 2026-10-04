@@ -33,16 +33,22 @@ fn closs_grad(y: f64, raw: f64) -> (f64, f64) {
 pub const SKLEARN_DEFAULT_MAX_ITER: usize = 100;
 
 pub fn fit_logistic(x: &[Vec<f64>], y: &[f64], max_iter: usize) -> Logistic {
-    fit_with_penalty(x, y, true, max_iter)
+    fit_with_penalty(x, y, true, max_iter, 1e-4)
 }
 
 /// sklearn's LogisticRegression(penalty=None), retaining optimizer status. `max_iter` is the
 /// caller's because sklearn's own default of 100 is not what every caller asks for.
 pub fn fit_unpenalized(x: &[Vec<f64>], y: &[f64], max_iter: usize) -> Logistic {
-    fit_with_penalty(x, y, false, max_iter)
+    fit_with_penalty(x, y, false, max_iter, 1e-4)
 }
 
-fn fit_with_penalty(x: &[Vec<f64>], y: &[f64], penalized: bool, max_iter: usize) -> Logistic {
+/// The same unpenalized objective with an explicit projected-gradient tolerance.
+/// Other callers retain their oracle's defaults.
+pub fn fit_unpenalized_with_tolerance(x: &[Vec<f64>], y: &[f64], max_iter: usize, tolerance: f64) -> Logistic {
+    fit_with_penalty(x, y, false, max_iter, tolerance)
+}
+
+fn fit_with_penalty(x: &[Vec<f64>], y: &[f64], penalized: bool, max_iter: usize, tolerance: f64) -> Logistic {
     let n = x.len();
     let p = x[0].len();
     let l2 = if penalized { 1.0 / n as f64 } else { 0.0 };
@@ -54,7 +60,7 @@ fn fit_with_penalty(x: &[Vec<f64>], y: &[f64], penalized: bool, max_iter: usize)
         &vec![0i32; n_dof],
         10,
         64.0,
-        1e-4,
+        tolerance,
         50,
         max_iter,
         |w| {

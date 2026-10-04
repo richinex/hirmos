@@ -7,6 +7,7 @@ import { Select } from '@/components/ui/Select'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { button, caption, chip, field, fieldHint, fieldLabel, iconControl, label as labelText, literal, num } from '@/components/ui/recipes'
 import { ParameterLabel } from '@/components/ui/ParameterLabel'
+import { ColumnChecklist } from '@/components/ui/ColumnChecklist'
 import { blockSql, calendarShareName, calendarWindowDays, conditionWithTest, measureWithFunction, type AggregateFunction, type AggregateMeasure, type CalendarWindow, type JoinKind, type PipelineBlock, type PipelineBlockId, type PipelineNode, type RowCondition, type RowTest } from '@/domain/pipeline'
 import type { PreviewColumn } from '@/data/pipeline'
 import { CALENDAR_TIME_INTERPRETATIONS } from '@/domain/timeInterpretation'
@@ -213,33 +214,22 @@ export function BlockSettings({ node, inputColumns, inputNames, onChange }: {
     )
     case 'aggregate': return (
       <div className="space-y-3">
-        <div className="grid gap-1" role="group" aria-label="Group by">
-          <span className={fieldLabel}>Group by</span>
-          {firstInputColumns.map((column) => {
-            const checked = block.groupBy.includes(column.name)
-            return (
-              <label key={column.name} className="flex items-center gap-2 text-body text-ink">
-                <input type="checkbox" checked={checked} onChange={() => onChange({ ...block, groupBy: checked ? block.groupBy.filter((c) => c !== column.name) : [...block.groupBy, column.name] })} />
-                <span className={literal('truncate')}>{column.name}</span>
-              </label>
-            )
-          })}
-        </div>
+        <ColumnChecklist title="Group by" help="Rows with the same values in these columns become one output row." columns={firstInputColumns.map((column) => ({ id: column.name, name: column.name }))} selected={block.groupBy} onChange={(groupBy) => onChange({ ...block, groupBy })} />
         <Rows label="Measures" onAdd={() => onChange({ ...block, measures: [...block.measures, { function: 'count', as: 'n' }] })} addLabel="Add a measure">
           {block.measures.map((measure, index) => {
             const replace = (next: AggregateMeasure) => onChange({ ...block, measures: block.measures.map((m, i) => i === index ? next : m) })
             return (
-              <div key={measuresKeys.at(index)} className="grid grid-cols-[1fr_auto] gap-1.5">
-                <div className="grid grid-cols-2 gap-1.5">
-                  <Select aria-label={`Measure ${index + 1} function`} className={field('text')} value={measure.function} onChange={(event) => replace(measureWithFunction(measure, event.target.value as AggregateFunction, firstInputColumns[0]?.name ?? ''))}>
+              <div key={measuresKeys.at(index)} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-1.5 gap-y-2 pb-2">
+                <label className="block"><span className={labelText('text-muted')}>Function</span>
+                  <Select aria-label={`Measure ${index + 1} function`} className={field('text', 'mt-1')} value={measure.function} onChange={(event) => replace(measureWithFunction(measure, event.target.value as AggregateFunction, firstInputColumns[0]?.name ?? ''))}>
                     {AGGREGATE_OPTIONS}
                   </Select>
-                  {measure.function === 'count'
-                    ? <span className="self-center text-body text-faint">of rows</span>
-                    : <ColumnPick label={`Measure ${index + 1} column`} columns={firstInputColumns} value={measure.column} onChange={(column) => replace({ ...measure, column })} />}
-                  <input aria-label={`Measure ${index + 1} name`} className={field('mono', 'col-span-2')} value={measure.as} placeholder="result column" onChange={(event) => replace({ ...measure, as: event.target.value })} />
-                </div>
-                <RemoveRow label={`Remove measure ${index + 1}`} index={index} onRemove={() => { measuresKeys.removed(index); onChange({ ...block, measures: block.measures.filter((_, i) => i !== index) }) }} />
+                </label>
+                <span className="col-start-2 row-start-1 self-end pb-0.5"><RemoveRow label={`Remove measure ${index + 1}`} index={index} onRemove={() => { measuresKeys.removed(index); onChange({ ...block, measures: block.measures.filter((_, i) => i !== index) }) }} /></span>
+                {measure.function !== 'count' && <label className="col-start-1 block"><span className={labelText('text-muted')}>Column</span><div className="mt-1"><ColumnPick label={`Measure ${index + 1} column`} columns={firstInputColumns} value={measure.column} onChange={(column) => replace({ ...measure, column })} /></div></label>}
+                <label className="col-start-1 block"><span className={labelText('text-muted')}>Name</span>
+                  <input aria-label={`Measure ${index + 1} name`} className={field('mono', 'mt-1')} value={measure.as} placeholder="result column" onChange={(event) => replace({ ...measure, as: event.target.value })} />
+                </label>
               </div>
             )
           })}

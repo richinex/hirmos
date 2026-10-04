@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { formatCount } from '@/lib/format/number'
 import type { DagDocument, DagDocumentId, DagNodeId, DagOriginChoice, DagRevisionId, EditableDag } from './dag'
 import { analyseDagCausalFlow, describeDagCausalRole, type DagCausalFlow, type DagCausalRole } from './dagFlow'
 import { inspectDagStudyBinding, type DagStudyBindingProblem } from './dagValidation'
@@ -318,6 +319,9 @@ export function previewStudyBinding(draft: StudyDesignDraft, documents: readonly
   const ready = readyStudySpecification(draft, documents, prepared)
   if (ready.ok) return ready.value
   if (!DESIGN_PROBLEMS.has(ready.error.kind)) return null
+  // An unfinished assignment rationale must not change the selected target.
+  const targetPreview = readyStudySpecification({ ...draft, assignment: { kind: 'observed-choice', description: 'pending' } }, documents, prepared)
+  if (targetPreview.ok) return targetPreview.value
   // The preview only needs the binding, so the target falls back to the plain average while the modifier is unsettled.
   const filled = readyStudySpecification({ ...draft, estimand: 'average-treatment-effect', assignment: { kind: 'observed-choice', description: 'pending' } }, documents, prepared)
   return filled.ok ? filled.value : null
@@ -344,18 +348,18 @@ export const describeEstimand = (study: StudySpecification): string => {
   const effect = 'the total effect through every causal path, mediators included, on the additive scale'
   switch (study.estimand.kind) {
     case 'local-cutoff-effect': return `The additive treatment effect at ${study.estimand.running.name} = ${study.estimand.cutoff}, where treatment switches from 0 below the cutoff to 1 at or above it. This is not an average effect over all prepared rows.`
-    case 'average-treatment-effect': return `Average treatment effect of ${study.treatment.name} on ${study.outcome.name}: ${effect}, averaged over all ${study.population.observations} prepared rows.`
+    case 'average-treatment-effect': return `Average treatment effect of ${study.treatment.name} on ${study.outcome.name}: ${effect}, averaged over all ${formatCount(study.population.observations).text} prepared rows.`
     case 'average-treatment-effect-on-treated': return `Average treatment effect on the treated of ${study.treatment.name} on ${study.outcome.name}: ${effect}, averaged over prepared rows with ${study.treatment.name} = 1.`
     case 'average-treatment-effect-on-controls': return `Average the binary treatment contrast among rows with ${study.treatment.name} = 0.`
     case 'overlap-weighted-average-treatment-effect': return 'Average the binary treatment contrast with weights proportional to e(X)(1 − e(X)), where e(X) is the treatment probability given the covariates.'
     case 'average-partial-effect': return 'Average the conditional outcome-treatment covariance divided by conditional treatment variance. A causal slope interpretation requires unconfoundedness and the treatment model assumptions.'
     case 'variance-weighted-average-partial-effect': return 'Average conditional partial effects with weights proportional to conditional treatment variance. This is not an equally weighted population average.'
     case 'conditional-partial-effect-per-row': return 'Estimate the conditional outcome-treatment covariance divided by conditional treatment variance at each row’s covariate values. These are slopes, not arbitrary treatment contrasts.'
-    case 'conditional-average-treatment-effect': return `Conditional average treatment effect of ${study.treatment.name} on ${study.outcome.name}: ${effect}, averaged within each group of ${study.estimand.modifier.name} (${describeGrouping(study.estimand.grouping)}) over the ${study.population.observations} prepared rows.`
+    case 'conditional-average-treatment-effect': return `Conditional average treatment effect of ${study.treatment.name} on ${study.outcome.name}: ${effect}, averaged within each group of ${study.estimand.modifier.name} (${describeGrouping(study.estimand.grouping)}) over the ${formatCount(study.population.observations).text} prepared rows.`
     case 'conditional-average-treatment-effect-per-row': {
       const modifiers = study.estimand.modifiers.map((variable) => variable.name)
       const conditioned = modifiers.length === 0 ? 'the adjustment variables' : `the adjustment variables and ${modifiers.join(', ')}`
-      return `Conditional average treatment effect of ${study.treatment.name} on ${study.outcome.name} for each row: ${effect}, conditioned on the row's values of ${conditioned}, reported for every one of the ${study.population.observations} prepared rows.`
+      return `Conditional average treatment effect of ${study.treatment.name} on ${study.outcome.name} for each row: ${effect}, conditioned on the row's values of ${conditioned}, reported for every one of the ${formatCount(study.population.observations).text} prepared rows.`
     }
     default: return assertNever(study.estimand)
   }

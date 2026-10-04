@@ -6,6 +6,7 @@
 
 mod causal_forest;
 mod honest_did;
+mod did_sensitivity;
 mod network_query;
 mod conditional_gaussian_query;
 mod causal_forest_analysis;
@@ -1039,6 +1040,7 @@ pub fn run_analysis(
         ),
         AnalysisCommand::ArdlModel { rows, columns, model } => ardl_model::fit(values, rows, columns, model),
         AnalysisCommand::HonestDid { model } => honest_did::fit(model),
+        AnalysisCommand::DidSensitivity { rows, columns, units, times, model } => did_sensitivity::fit(values, rows, columns, &units, &times, model),
         AnalysisCommand::ArdlPss {
             rows,
             columns,

@@ -6,7 +6,8 @@ import { summariseWindow, type VisibleWindow } from '@/charts/window'
 import { FigureParts } from '@/components/ui/figures'
 import { caption, figureGrid, label, num } from '@/components/ui/recipes'
 import { isNumericDuckDbType, type PhysicalColumnProfile } from '@/domain/dataset'
-import { formatAbsent, formatCount, formatStatistic, type Formatted } from '@/lib/format/number'
+import { formatAbsent, formatCount, formatStatistic, formatStored, type Formatted } from '@/lib/format/number'
+import type { PreparedColumnRole } from '@/domain/preprocessing'
 import type { ColumnDescription, ColumnSeries } from './useColumnProfile'
 
 type DisplayedSeries = { readonly column: PhysicalColumnProfile; readonly series: ColumnSeries }
@@ -21,10 +22,13 @@ function Cell({ name, value }: { readonly name: string; readonly value: Formatte
 }
 
 const statistic = (value: number): Formatted => (Number.isNaN(value) ? formatAbsent('unavailable') : formatStatistic('raw', value))
+/** A minimum or maximum is a stored value, so a whole number reads as written. */
+const stored = (value: number): Formatted => (Number.isNaN(value) ? formatAbsent('unavailable') : formatStored(value))
 
 /** The bottom panel for the Data Studio: the selected numeric column in row order, with figures that follow the zoom. */
-export function ColumnSeriesPane({ column, description, stepLabel }: {
+export function ColumnSeriesPane({ column, description, stepLabel, role }: {
   readonly column: PhysicalColumnProfile | null
+  readonly role: PreparedColumnRole
   readonly description: ColumnDescription
   /** What one row means: "row" for independent observations, "observation" when the rows are ordered in time. */
   readonly stepLabel: string
@@ -53,6 +57,9 @@ export function ColumnSeriesPane({ column, description, stepLabel }: {
   if (!isNumericDuckDbType(column.duckdbType)) {
     return <p className="m-0 px-3 py-2 text-body text-faint">{column.name} is not numeric, so it has no series view. Its most frequent values are in the column profile.</p>
   }
+  if (role.kind !== 'value') {
+    return <p className="m-0 px-3 py-2 text-body text-faint">{column.name} is a key, so it has no series view. Its range is in the column profile.</p>
+  }
   if (current && description.kind === 'ready' && ready === null) return <p className="m-0 px-3 py-2 text-body text-faint">The numeric series could not be loaded.</p>
   if (option === null || series === null || summary === null || shown === null) return <div aria-hidden className="skeleton m-3 h-40 rounded-lg" />
   return (
@@ -64,9 +71,9 @@ export function ColumnSeriesPane({ column, description, stepLabel }: {
       {/* The figures describe what the chart shows: narrow the chart and they narrow with it. */}
       <dl aria-label={`Summary of ${shown.name}`} className={figureGrid('my-1.5 shrink-0 grid-cols-4')}>
         <Cell name="Shown" value={formatCount(summary.observed, { noun: `${stepLabel}s` })} />
-        <Cell name="Minimum" value={statistic(summary.min)} />
+        <Cell name="Minimum" value={stored(summary.min)} />
         <Cell name="Mean" value={statistic(summary.mean)} />
-        <Cell name="Maximum" value={statistic(summary.max)} />
+        <Cell name="Maximum" value={stored(summary.max)} />
       </dl>
       <EChart option={option} label={`${shown.name} in ${stepLabel} order`} className="min-h-[120px] flex-1" testId="column-series" window={window} onWindow={(window) => setZoom({ series, window })} />
     </div>

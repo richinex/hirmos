@@ -171,6 +171,14 @@ export const prose = (extra?: string): string => cn('max-w-[65ch] text-subtitle 
  *  beside a field is one thought and stays one column. */
 export const chapterIntro = prose('m-0 text-muted @3xl/panel:max-w-[calc(150ch+2rem)] [columns:45ch_2] gap-x-8 hyphens-none [orphans:2] [widows:2]')
 
+/** A chapter paragraph too short to split: two columns need four lines so each keeps two, and at the
+ *  widest stage a column holds about 73 characters, so a paragraph under about 290 characters (three
+ *  lines or fewer) would leave one line alone in the second column. It keeps the single-column measure. */
+export const chapterIntroSingle = prose('m-0 text-muted hyphens-none')
+
+/** The intro recipe for a paragraph whose text is chosen at run time: one column under the four-line threshold. */
+export const chapterIntroFor = (text: string): string => text.length < 290 ? chapterIntroSingle : chapterIntro
+
 /** Figures the reader compares down a column. `tabular-nums` fixes digit advance width, so a counter
  *  ticking 9 to 10 does not nudge what follows; kerning is off so the pair "11" keeps its advance. */
 export const num = (extra?: string): string => cn('font-sans tabular-nums [font-kerning:none]', extra)

@@ -3,6 +3,15 @@ import { expect, test } from '@playwright/test'
 test('stationarity tests only selected variables and can cancel and restart', async ({ page }, info) => {
   test.setTimeout(180_000)
   page.setDefaultTimeout(20_000)
+  // Hold the first stationarity request so that run stays in flight until it is cancelled.
+  await page.addInitScript(() => {
+    const post = Worker.prototype.postMessage
+    let held = false
+    Worker.prototype.postMessage = function (message: unknown, options?: Transferable[] | StructuredSerializeOptions) {
+      if (!held && typeof message === 'object' && message !== null && 'kind' in message && message.kind === 'stationarity-battery') { held = true; return }
+      post.call(this, message, Array.isArray(options) ? { transfer: options } : options)
+    }
+  })
   await page.goto('/app')
   await page.getByRole('textbox', { name: 'Project name' }).fill('Stationarity selection')
   await page.getByRole('button', { name: 'Create project' }).click()
@@ -32,11 +41,11 @@ test('stationarity tests only selected variables and can cancel and restart', as
   await expect(run).toBeDisabled()
   await selection.getByRole('checkbox', { name: 'x', exact: true }).check()
   await run.click()
-  await page.getByRole('button', { name: 'Cancel tests', exact: true }).click()
+  await page.getByRole('button', { name: 'Cancel run', exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('Stationarity tests cancelled')
   await expect(run).toBeEnabled()
   await run.click()
-  await expect(page.getByRole('button', { name: 'Cancel tests', exact: true })).toHaveCount(0, { timeout: 120_000 })
+  await expect(page.getByRole('button', { name: 'Cancel run', exact: true })).toHaveCount(0, { timeout: 120_000 })
   const result = page.getByRole('article', { name: 'Stationarity result for x', exact: true })
   await expect(result).toBeVisible()
   await expect(page.getByRole('article', { name: 'Stationarity result for y', exact: true })).toHaveCount(0)
@@ -54,7 +63,7 @@ test('stationarity tests only selected variables and can cancel and restart', as
   await expect(page.getByRole('article', { name: 'Stationarity result for y', exact: true })).toBeVisible({ timeout: 120_000 })
   await expect(result).toBeVisible()
   await run.click()
-  await expect(page.getByRole('button', { name: 'Cancel tests', exact: true })).toHaveCount(0, { timeout: 120_000 })
+  await expect(page.getByRole('button', { name: 'Cancel run', exact: true })).toHaveCount(0, { timeout: 120_000 })
   await expect(page.getByRole('article', { name: /^Stationarity result for/ })).toHaveCount(2)
   await page.getByRole('button', { name: 'Delete stationarity result for x', exact: true }).click()
   await expect(result).toHaveCount(0)

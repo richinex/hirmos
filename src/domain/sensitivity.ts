@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type {HonestRun} from './honestDid'
+import type {DidSensitivityRun} from './didSensitivity'
 import { assertNever, brand, err, ok, type Brand, type NonEmptyArray, type Result } from './dop'
 import { contemporaneousAdjustmentVariables, type EstimationRunArtifact, type EstimationRunId } from './estimation'
 import type { MethodId } from './methods'
@@ -96,6 +97,8 @@ const dmlRefutationOutcomeSchema = z.object({
 
 export const dmlRefutationEvidenceSchema = z.object({
   kind: z.literal('dmlRefutationBatch'),
+  // Absent only in saved runs from the former 1,000-row, unpaired probe design.
+  probeDesign: z.literal('full-sample-paired-folds').optional(),
   observations: z.number().int().positive(),
   model: z.enum(['plr', 'irm']),
   att: z.boolean(),
@@ -233,7 +236,7 @@ export type LegacySensitivityRunArtifact =
   | RunIdentity & { readonly kind: 'linear-refutation-run'; readonly configuration: RefutationConfiguration; readonly evidence: LinearRefutationEvidence; readonly refuters: NonEmptyArray<RefuterFact>; readonly diagnostics: NonEmptyArray<DiagnosticFact> }
   | RunIdentity & { readonly kind: 'unobserved-confounding-run'; readonly configuration: UnobservedConfiguration; readonly evidence: UnobservedConfoundingEvidence }
   | RunIdentity & { readonly kind: 'dml-refutation-run'; readonly configuration: DmlRefutationConfiguration; readonly evidence: DmlRefutationEvidence; readonly refuters: NonEmptyArray<RefuterFact> }
-export type SensitivityRunArtifact=LegacySensitivityRunArtifact|HonestRun
+export type SensitivityRunArtifact=LegacySensitivityRunArtifact|HonestRun|DidSensitivityRun
 export function sensitivityEstimationRun(run:SensitivityRunArtifact):EstimationRunId|null{
   return run.kind==='honest-did-run'?(run.source.kind==='estimation'?brand<string,'EstimationRunId'>(run.source.run):null):run.estimationRun
 }

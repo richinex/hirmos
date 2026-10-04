@@ -93,13 +93,15 @@ export function IntervalFigure({ sentence, estimate, lower, upper, type, scale, 
   readonly testId?: string
 }) {
   const figure = formatInterval(estimate, lower, upper, type, scale)
-  const point = figure.parts.filter((part) => part.kind !== 'qualifier')
+  // The point uses the same precision as prose and history. Interval width only rounds the bounds.
+  const pointFigure = formatEstimate(estimate, scale)
+  const point = pointFigure.parts
   const se = standardError === undefined ? null : formatEstimate(standardError, scale, { precision: { kind: 'significant', digits: 2 } }).text
   return (
     <figure className="m-0" data-testid={testId}>
       <figcaption className="text-title leading-7 text-ink">{sentence}</figcaption>
       <p className={cn('mb-0 mt-1 text-metric font-semibold leading-none tracking-tight', accent ? 'text-signal-text' : 'text-ink')} title={figure.exact}>
-        <span className="sr-only">{figure.srText}</span>
+        <span className="sr-only">{pointFigure.srText}; {figure.typeLabel}: {figure.bounds.lower} to {figure.bounds.upper}</span>
         <span aria-hidden className={num()}>
           {point.map((part, index) => part.kind === 'unit'
             ? <span key={index} className="text-display-sub font-medium text-bone">{part.text}</span>

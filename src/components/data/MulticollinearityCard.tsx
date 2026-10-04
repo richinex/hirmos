@@ -21,7 +21,7 @@ import {
 } from '@/domain/multicollinearity'
 import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
 import type { SelectedSource } from '@/domain/workflow'
-import { formatStatistic } from '@/lib/format/number'
+import { formatCount, formatStatistic } from '@/lib/format/number'
 import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
 
 type Availability =
@@ -157,7 +157,7 @@ export function MulticollinearityCard({ source, profile, prepared, onSelection }
       {selectionProblem !== null && <Alert tone="danger" className="mt-3"><p className="m-0">{selectionProblem}</p></Alert>}
       {result !== null && heatmap !== null && scatter !== null && (
         <div className="mt-4 space-y-4">
-          <p role="status" className="m-0 flex items-center gap-2 text-body text-muted"><Metadata><span><Icon name="check_circle" size={16} className="text-ok" /> {result.evidence.variables} variables</span><span>{result.evidence.observations.toLocaleString()} rows</span></Metadata></p>
+          <p role="status" className="m-0 flex items-center gap-2 text-body text-muted"><Metadata><span><Icon name="check_circle" size={16} className="text-ok" /> {result.evidence.variables} variables</span><span>{formatCount(result.evidence.observations).text} rows</span></Metadata></p>
           <div className="grid gap-4 @3xl/panel:grid-cols-2">
             <div className={well('p-(--panel-space)')}>
               <h5 className="m-0 text-body font-medium text-ink">Correlation groups</h5>

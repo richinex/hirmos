@@ -6,6 +6,12 @@ import { EvidenceTable, figureColumn } from '@/components/table/EvidenceTable'
 import { Alert } from '@/components/ui/Alert'
 import type { AdjustedDidEvidence } from '@/domain/adjustedDid'
 
+export function AdjustedDidConvergenceWarning({ evidence }: { readonly evidence: AdjustedDidEvidence }) {
+  return evidence.inference.kind === 'crossFitted' && evidence.inference.optimizerStatus.some(status => status === 'iteration-limit' || status === 'line-search-failed')
+    ? <Alert tone="warn" live={false}>At least one propensity fit did not converge. Review the covariates and treatment overlap before interpreting this result.</Alert>
+    : null
+}
+
 export function AdjustedDidResult({ evidence, labels, covariates }: { readonly evidence: AdjustedDidEvidence; readonly labels: readonly string[]; readonly covariates: readonly string[] }) {
   const theme = useChartTheme()
   const option = useMemo(() => ({
@@ -34,8 +40,8 @@ export function AdjustedDidResult({ evidence, labels, covariates }: { readonly e
         <Alert tone="info" live={false}>Classical Student-t inference assumes independent, homoskedastic errors. The interval is not clustered by unit.</Alert>
       </>
       : <>
+        {evidence.inference.propensityFit!==undefined&&<p className="m-0 text-body text-muted">Baseline covariates are centred and scaled within each training fold for the propensity regression. The same transformation is applied to that fold’s held-out units. Every propensity fit must converge before an estimate is reported.</p>}
         <EvidenceTable title="Propensity optimizer" rows={evidence.inference.optimizerStatus.map((status,index) => ({ fold:index+1,status }))} rowKey={row => String(row.fold)} noun="fold" empty="No fold diagnostics." columns={[{ id:'fold',header:'Fold',value:row => String(row.fold) },{ id:'status',header:'Termination',value:row => ({ 'projected-gradient':'Projected-gradient tolerance', 'function-tolerance':'Function tolerance', 'iteration-limit':'Iteration limit reached', 'line-search-failed':'Line search failed' })[row.status] }]} />
-        {evidence.inference.optimizerStatus.some(s => s === 'iteration-limit' || s === 'line-search-failed') && <Alert tone="warn" live={false}>At least one propensity fit did not converge. Review the covariates and treatment overlap before interpreting this result.</Alert>}
       </>}
   </div>
 }

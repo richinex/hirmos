@@ -61,7 +61,7 @@ import { assessStationarity, decisiveEvidence, describeStationarityAssessment, d
 import { seasonalPeriodOf } from '@/domain/seasonal'
 import type { SelectedSource } from '@/domain/workflow'
 import type { PreparedMatrix } from '@/data/prepared'
-import { formatP, formatStatistic } from '@/lib/format/number'
+import { formatCount, formatP, formatStatistic } from '@/lib/format/number'
 import type { PanelStructureEvidence } from '@/domain/panel'
 import type { MulticollinearitySelection } from '@/domain/multicollinearity'
 import {
@@ -1144,7 +1144,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                 <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                   <div className="min-w-0">
                     <h5 className="m-0 break-words text-body font-medium text-ink">{name}</h5>
-                    <p className="m-0 text-label text-faint">{result.observations.toLocaleString()} rows{preparedTimeSeries === null ? '' : `, ${describeSeriesTransform(seriesTransformFor(preparedTimeSeries.seriesTransforms, evidence.column))}`}</p>
+                    <p className="m-0 text-label text-faint">{formatCount(result.observations).text} rows{preparedTimeSeries === null ? '' : `, ${describeSeriesTransform(seriesTransformFor(preparedTimeSeries.seriesTransforms, evidence.column))}`}</p>
                   </div>
                   <StationarityVerdict assessment={evidence.assessment} transform={preparedTimeSeries === null ? { kind: 'levels' } : seriesTransformFor(preparedTimeSeries.seriesTransforms, evidence.column)} />
                   <button type="button" className={button('quiet')} aria-label={`Delete stationarity result for ${name}`} disabled={job.kind === 'running'} onClick={() => deleteDiagnostic(evidence.column)}><Icon name="delete" size={15} />Delete</button>

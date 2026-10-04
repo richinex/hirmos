@@ -614,8 +614,8 @@ pub(crate) fn panel_intervention_selected(
     }
 }
 
-pub(crate) fn panel_adjusted(values: &[f64], rows: usize, columns: usize, units: &[String], times: &[i64], specification: AdjustedDidSpecification) -> Result<AnalysisResult, String> {
-    use hirmos_causal_core::{did, did_regression, panel, lbfgsb::LbfgsbTermination};
+pub(crate) fn adjusted_panel(values: &[f64], rows: usize, columns: usize, units: &[String], times: &[i64]) -> Result<(hirmos_causal_core::panel::PanelMatrices, DMatrix<f64>), String> {
+    use hirmos_causal_core::panel;
     validate_dense_matrix("adjusted DiD", values, rows, columns)?;
     if columns < 2 || units.len() != rows || times.len() != rows { return Err("DiD needs aligned outcomes, treatment and unit/time keys.".into()); }
     let observations = (0..rows).map(|i| panel::PanelObservation { unit: units[i].clone(), time: times[i], outcome: values[i], treatment: values[rows+i] }).collect::<Vec<_>>();
@@ -628,6 +628,12 @@ pub(crate) fn panel_adjusted(values: &[f64], rows: usize, columns: usize, units:
         ordered.push(*index.get(&(unit.as_str(), *time)).ok_or("A panel unit/time key is missing.")?);
     }}
     let covariates = DMatrix::from_fn(rows, columns-2, |i,j| values[(j+2)*rows+ordered[i]]);
+    Ok((panel, covariates))
+}
+
+pub(crate) fn panel_adjusted(values: &[f64], rows: usize, columns: usize, units: &[String], times: &[i64], specification: AdjustedDidSpecification) -> Result<AnalysisResult, String> {
+    use hirmos_causal_core::{did, did_regression, lbfgsb::LbfgsbTermination};
+    let (panel, covariates) = adjusted_panel(values, rows, columns, units, times)?;
     let summary = did_regression::summarize(&panel).map_err(|_| "Observed panel group means could not be computed.")?;
     let group_means = [[summary.control.before,summary.control.after],[summary.treated.before,summary.treated.after]];
     let (estimate, standard_error, interval, inference) = match &specification {
@@ -651,6 +657,7 @@ pub(crate) fn panel_adjusted(values: &[f64], rows: usize, columns: usize, units:
                 did::Violation::InvalidTrimming { .. } => "Trimming must be greater than zero and less than one half.".to_owned(),
             }).collect::<Vec<_>>().join(" "))?;
             let fit = did::fit(&plan).map_err(|error| match error {
+                did::Error::PropensityNotConverged { .. } => "The propensity fit did not converge after training-fold scaling and strict optimization. No DiD estimate was recorded. Review covariate redundancy and treatment overlap.",
                 did::Error::Regression => "A cross-fitted outcome or propensity regression failed. Check covariate rank and fold sizes.",
                 did::Error::PropensityBoundary => "Estimated propensity reached a probability boundary. Check treatment overlap.",
                 did::Error::MissingGroup | did::Error::NonBinary => "DR DiD needs both treated and comparison units with binary assignment.",
@@ -663,7 +670,7 @@ pub(crate) fn panel_adjusted(values: &[f64], rows: usize, columns: usize, units:
                 LbfgsbTermination::IterationLimit => PropensityStatus::IterationLimit,
                 LbfgsbTermination::LineSearchFailed => PropensityStatus::LineSearchFailed,
             }).collect();
-            (fit.estimate.coef,fit.estimate.se,[fit.estimate.ci_low,fit.estimate.ci_high],AdjustedDidInference::CrossFitted { propensity: fit.propensity, optimizer_status })
+            (fit.estimate.coef,fit.estimate.se,[fit.estimate.ci_low,fit.estimate.ci_high],AdjustedDidInference::CrossFitted { propensity: fit.propensity, optimizer_status, propensity_fit: crate::protocol::DidPropensityFit::StandardizedLogisticV1 })
         }
     };
     Ok(AnalysisResult::PanelAdjusted { observations: rows, control_units: panel.n0, treated_units: panel.units.len()-panel.n0, n_pre:1,n_post:1,covariates:columns-2,

@@ -594,7 +594,7 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
         </div>
         <dl className="mb-0 mt-10 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-body" aria-label="Estimand and population">
           <dt className="text-faint">Estimand</dt>
-          <dd className="m-0 text-ink">{preview === null ? <Metadata><span>Average treatment effect</span><span>additive scale</span><span>total effect, mediators included</span></Metadata> : describeEstimand(preview)}</dd>
+          <dd className="m-0 text-ink">{preview === null || preview.estimand.kind !== state.draft.estimand ? 'Complete the selected target and graph binding to preview the estimand.' : describeEstimand(preview)}</dd>
           <dt className="text-faint">Population</dt>
           <dd className={num('m-0 text-ink')}>{state.draft.estimand === 'average-treatment-effect-on-treated' ? 'Treated rows (treatment = 1)' : `All ${formatCount(prepared.observations).text} rows`}</dd>
           <dt className="text-faint">Graph revision</dt>

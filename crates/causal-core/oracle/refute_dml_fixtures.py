@@ -51,7 +51,7 @@ def run_case(frame, estimator_kind, estimand_kind):
     ci = fitted.confint(level=0.95)
 
     rng = np.random.default_rng(7)
-    base = frame if len(frame) <= 1000 else frame.sample(n=1000, random_state=7)
+    base = frame
     sims = []
     for _ in range(8):
         shuffled = base.copy()
@@ -67,13 +67,17 @@ def run_case(frame, estimator_kind, estimand_kind):
     }
 
     rng = np.random.default_rng(11)
-    base = frame if len(frame) <= 1000 else frame.sample(n=1000, random_state=11)
+    base = frame
+    paired_folds = np.random.get_state()
     baseline = float(fit_model(base, light=True).coef[0])
+    after_baseline = np.random.get_state()
     sims = []
     for _ in range(6):
         augmented = base.copy()
         augmented["_random_cause"] = rng.standard_normal(len(augmented))
+        np.random.set_state(paired_folds)
         sims.append(float(fit_model(augmented, light=True, columns=backdoor_vars + ["_random_cause"]).coef[0]))
+    np.random.set_state(after_baseline)
     sims = np.asarray(sims, dtype=float)
     shifts = sims - baseline
     spread = float(shifts.std(ddof=1))

@@ -253,6 +253,42 @@ export function formatCount(n: number, opts: { readonly compact?: boolean; reado
   return assemble(parts, String(Math.round(n)), `${srSign(signed)}${grouped(n, 'en-GB', { maximumFractionDigits: 0 })}${opts.noun ? ` ${opts.noun}` : ''}`)
 }
 
+/** Stored digits as written, with a true minus sign: no grouping, so a year or an id reads as stored, and a wide integer kept as text keeps every digit. */
+export const storedDigits = (text: string): string => text.startsWith('-') ? `${MINUS}${text.slice(1)}` : text
+
+/** A stored number as the preview writes it: a whole number by storedDigits, a fraction as a raw statistic. */
+export function formatStored(value: number): Formatted {
+  if (!Number.isInteger(value)) return formatStatistic('raw', value)
+  return assemble([{ kind: 'digits', text: storedDigits(String(value)) }], String(value), `${srSign(value)}${Math.abs(value)}`)
+}
+
+/** A number the reader set, as they would write it: 0.01 not 0.0100, free of binary noise. */
+const asSet = (value: number): string => storedDigits(String(Number(value.toPrecision(12))))
+
+/** A proportion the reader set, in percent as they would write it: 0.02 is 2 and 0.025 is 2.5. */
+export const percentAsSet = (proportion: number): number => Number((proportion * 100).toPrecision(12))
+
+/** A setting such as a seed, a trimming threshold or a correlation, written as set. */
+export function formatSetting(value: number): Formatted {
+  if (!Number.isFinite(value)) return formatAbsent('unavailable')
+  const text = asSet(value)
+  return assemble([{ kind: 'digits', text }], String(value), text.replace('\u2212', 'minus '))
+}
+
+/** A setting such as a confounding share or a confidence level: written as set, never padded to fixed decimals (2%, 2.5%, 95%). */
+export function formatSetPercent(proportion: number): Formatted {
+  if (!Number.isFinite(proportion)) return formatAbsent('unavailable')
+  const text = `${asSet(proportion * 100)}%`
+  return assemble([{ kind: 'digits', text }], String(proportion), text.replace('\u2212', 'minus '))
+}
+
+/** A chart axis tick: grouped as ECharts groups it, with a true minus, and free of binary noise (0.3, not 0.30000000000000004). */
+export function formatAxisTick(value: number): string {
+  if (!Number.isFinite(value)) return String(value)
+  const clean = Number(value.toPrecision(12))
+  return `${clean < 0 ? MINUS : ''}${grouped(clean, defaultLocale(), { maximumFractionDigits: 12 })}`
+}
+
 /** Durations from milliseconds; the unit follows the magnitude, one unit per figure. */
 export function formatDuration(ms: number, opts: { readonly locale?: string } = {}): Formatted {
   if (!Number.isFinite(ms) || ms < 0) return formatAbsent('unavailable')

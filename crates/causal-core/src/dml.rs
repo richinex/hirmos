@@ -12,7 +12,7 @@ pub struct DmlResult {
     pub ci_low: f64,
     pub ci_high: f64,
     /// psi / mean(psi_a), the framework's normalised score.
-    scaled_psi: Vec<f64>,
+    pub(crate) scaled_psi: Vec<f64>,
     /// sqrt(sigma2 * nu2) and its influence function, DoubleML's confounding bias bound.
     max_bias: f64,
     psi_max_bias: Vec<f64>,
@@ -53,8 +53,19 @@ const Z975: f64 = 1.959963984540054;
 impl DmlResult {
     /// theta and CI bounds under equal confounding shares cf in outcome and treatment.
     fn bounds(&self, cf: f64, rho: f64) -> (f64, f64, f64, f64) {
+        self.sensitivity_bounds(cf, cf, rho, 0.95)
+    }
+
+    /// Caller validates shares, correlation and confidence level at the domain boundary.
+    pub(crate) fn sensitivity_bounds(
+        &self,
+        cf_y: f64,
+        cf_d: f64,
+        rho: f64,
+        level: f64,
+    ) -> (f64, f64, f64, f64) {
         let n = self.scaled_psi.len() as f64;
-        let strength = rho.abs() * (cf * (cf / (1.0 - cf))).sqrt();
+        let strength = rho.abs() * (cf_y * (cf_d / (1.0 - cf_d))).sqrt();
         let theta_lower = self.coef - strength * self.max_bias;
         let theta_upper = self.coef + strength * self.max_bias;
         let sigma = |sign: f64| -> f64 {
@@ -67,7 +78,7 @@ impl DmlResult {
                 / n;
             (gamma / n).sqrt()
         };
-        let quant = spec_math::cephes64::ndtri(0.95);
+        let quant = spec_math::cephes64::ndtri(level);
         let ci_lower = theta_lower - quant * sigma(-1.0);
         let ci_upper = theta_upper + quant * sigma(1.0);
         (theta_lower, theta_upper, ci_lower, ci_upper)
@@ -111,7 +122,7 @@ impl DmlResult {
 }
 
 /// max_bias and its influence function from the model's sensitivity elements.
-fn attach_sensitivity(
+pub(crate) fn attach_sensitivity(
     res: &mut DmlResult,
     psi_a: &[f64],
     psi_b: &[f64],
@@ -416,6 +427,20 @@ pub fn dml_irm(
         .map(|&m| m.clamp(trimming_threshold, 1.0 - trimming_threshold))
         .collect();
 
+    irm_from_predictions(y, d, &g0_hat, &g1_hat, &m_hat, att)
+}
+
+/// Shared score and sensitivity calculation. Propensities have already been trimmed.
+fn irm_from_predictions(
+    y: &[f64],
+    d: &[f64],
+    g0_hat: &[f64],
+    g1_hat: &[f64],
+    m_hat: &[f64],
+    att: bool,
+) -> DmlResult {
+    let n = y.len();
+
     let (weights, weights_bar): (Vec<f64>, Vec<f64>) = if att {
         let p = d.iter().sum::<f64>() / n as f64;
         (
@@ -467,4 +492,50 @@ pub fn dml_irm(
         });
     }
     res
+}
+
+#[cfg(test)]
+mod sensitivity_parity {
+    use super::*;
+
+    #[test]
+    fn rare_att_and_nsw_bounds_match_doubleml_with_identical_predictions() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(include_str!("../oracle/fixtures/dml_att_sensitivity.json"))
+                .unwrap();
+        for case in fixture["cases"].as_array().unwrap() {
+            let values =
+                |v: &serde_json::Value| -> Vec<f64> { serde_json::from_value(v.clone()).unwrap() };
+            let y = values(&case["y"]);
+            let d = values(&case["d"]);
+            let g0 = values(&case["predictions"]["ml_g0"]);
+            let g1 = values(&case["predictions"]["ml_g1"]);
+            let m: Vec<f64> = values(&case["predictions"]["ml_m"])
+                .into_iter()
+                .map(|v| v.clamp(0.01, 0.99))
+                .collect();
+            let result = irm_from_predictions(&y, &d, &g0, &g1, &m, true);
+            let check = |label: &str, got: f64, expected: f64| {
+                assert!(
+                    (got - expected).abs() <= 1e-9 * expected.abs().max(1.0),
+                    "{} {label}: {got} vs {expected}",
+                    case["name"]
+                );
+            };
+            check("coef", result.coef, case["coef"].as_f64().unwrap());
+            check("se", result.se, case["se"].as_f64().unwrap());
+            for expected in case["scenarios"].as_array().unwrap() {
+                let (lo, hi, ci_lo, ci_hi) =
+                    result.bounds(expected["share"].as_f64().unwrap(), 1.0);
+                for (key, got) in [
+                    ("theta_lower", lo),
+                    ("theta_upper", hi),
+                    ("ci_lower", ci_lo),
+                    ("ci_upper", ci_hi),
+                ] {
+                    check(key, got, expected[key].as_f64().unwrap());
+                }
+            }
+        }
+    }
 }

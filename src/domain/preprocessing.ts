@@ -63,6 +63,27 @@ export function frequencyUnit(frequency: Frequency): 'day' | 'week' | 'month' | 
   }
 }
 
+/** What a column is in a prepared dataset: a key that labels rows, or a value measured on them. */
+export type PreparedColumnRole =
+  | { readonly kind: 'unit-key' }
+  | { readonly kind: 'time-key'; readonly frequency: Frequency }
+  | { readonly kind: 'value' }
+
+export function preparedColumnRole(prepared: PreparedDatasetArtifact | null, column: ColumnId): PreparedColumnRole {
+  if (prepared === null || prepared.kind === 'prepared-cross-section') return { kind: 'value' }
+  if (prepared.kind === 'prepared-panel' && prepared.sampling.unitColumn === column) return { kind: 'unit-key' }
+  return prepared.sampling.timeColumn === column ? { kind: 'time-key', frequency: prepared.sampling.frequency } : { kind: 'value' }
+}
+
+export function describeColumnRole(role: PreparedColumnRole): string | null {
+  switch (role.kind) {
+    case 'unit-key': return 'Unit key'
+    case 'time-key': return `Time key, one row per ${frequencyUnit(role.frequency)}`
+    case 'value': return null
+    default: return assertNever(role)
+  }
+}
+
 export type SamplingDraft =
   | { readonly kind: 'unconfigured' }
   | { readonly kind: 'cross-sectional' }

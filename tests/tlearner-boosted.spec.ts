@@ -93,7 +93,7 @@ const runBoostedTLearner = async (page: Page, target: Target) => {
   await page.getByRole('textbox', { name: 'Tree depths', exact: true }).fill('1, 2')
   await page.getByRole('textbox', { name: 'Tree counts', exact: true }).fill('5, 10')
   await page.getByRole('spinbutton', { name: 'Tree seed', exact: true }).fill(String(oracle.seed))
-  await expect(page.getByText('8 candidates', { exact: true })).toBeVisible()
+  await expect(page.getByText(/^Grid search compares 8 candidates on all rows/)).toBeVisible()
   await page.getByRole('button', { name: /^Run T-learner/ }).click()
   await expect(page.getByText('Current estimate', { exact: true })).toBeVisible({ timeout: 120_000 })
   const saved = async () => page.evaluate(async (name) => {

@@ -8,7 +8,7 @@ import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { Select } from '@/components/ui/Select'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { EvidenceTable, type EvidenceColumn } from '@/components/table/EvidenceTable'
-import { button, chapterIntro, field, fieldLabel, fieldHint, iconControl, panel, sectionTitle, resultSurface, resultTitle } from '@/components/ui/recipes'
+import { button, chapterIntroSingle, field, fieldLabel, fieldHint, iconControl, panel, sectionTitle, resultSurface, resultTitle } from '@/components/ui/recipes'
 import { downloadText } from '@/data/bundleFiles'
 import { ExpandableChart } from '@/charts/ExpandableChart'
 import { runComparisonOption } from '@/charts/estimation/runComparison'
@@ -137,7 +137,7 @@ export function GcmEffectsPanel(props: Props) {
   return <WorkbenchLayout id="root-cause" inspector={{ trigger: { label: 'Requirements', icon: 'contract' }, title: 'Data and method requirements', body: requirements }}
     bottom={{ trigger: { label: 'History', icon: 'history' }, title: `Run history (${props.runs.length})`, defaultCollapsed: true, body: <History runs={props.runs} selected={latest?.id} onSelect={setSelected} onDelete={props.onDelete} /> }}
     stage={<section className="@container/panel flex flex-col gap-5">
-      <div><ChapterHeading className="mb-2">Causal model analysis</ChapterHeading><p className={chapterIntro}>Estimate intervention effects using the prepared data and the recorded causal graph.</p></div>
+      <div><ChapterHeading className="mb-2">Causal model analysis</ChapterHeading><p className={chapterIntroSingle}>Estimate intervention effects using the prepared data and the recorded causal graph.</p></div>
       <section className={panel('p-(--panel-space)')} aria-label="Intervention effects setup">
         <div className="mb-6"><GraphDetails name={props.name} graph={props.graph} disabled={busy} onOpen={props.onGraph} /></div>
         <div className="mb-4">{props.navigation}</div>

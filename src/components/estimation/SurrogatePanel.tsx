@@ -28,7 +28,7 @@ import { ColumnChecklist } from '@/components/ui/ColumnChecklist'
 import { RunActions } from '@/components/ui/RunActions'
 import { JobNotice } from '@/components/ui/JobNotice'
 import { Alert } from '@/components/ui/Alert'
-import { actionGap, button, chapterIntro, field, fieldLabel, fieldRow, panel, stepsStack } from '@/components/ui/recipes'
+import { actionGap, button, chapterIntroSingle, field, fieldLabel, fieldRow, panel, stepsStack } from '@/components/ui/recipes'
 import { SurrogateResult, surrogateLabels } from './SurrogateResult'
 
 interface Draft {
@@ -144,7 +144,7 @@ export function SurrogatePanel(props: {
       </ul>
       <ConfirmDialog open={pendingDelete !== null} title="Delete this surrogate run?" message="Recorded results cannot be restored." confirmLabel="Delete run" danger onConfirm={() => { if (pendingDelete !== null) props.onDeleteRun(pendingDelete.id) }} onClose={() => setPendingDelete(null)}/>
     </> }}
-    stage={<section className="@container/panel flex flex-col gap-5"><div><ChapterHeading className="mb-2">Estimation</ChapterHeading><p className={chapterIntro}>Estimate a long-term treatment effect by combining short-term experimental outcomes with an observational sample containing the long-term outcome.</p></div>
+    stage={<section className="@container/panel flex flex-col gap-5"><div><ChapterHeading className="mb-2">Estimation</ChapterHeading><p className={chapterIntroSingle}>Estimate a long-term treatment effect by combining short-term experimental outcomes with an observational sample containing the long-term outcome.</p></div>
     <section className={panel('p-(--panel-space)')} aria-label="Surrogate setup"><div className="mb-6">{props.selector}</div><fieldset disabled={busy} className="m-0 min-w-0 border-0 p-0"><legend className="sr-only">Surrogate specification</legend><div className={stepsStack}>
       <SettingsStep number={1} title="Define the two samples" help="Use the current source before preprocessing, with one row per independent unit. Combine files in the pipeline and choose a sample-membership column. For named categories, specify the values belonging to each sample. Other membership values are excluded and counted. No missing values are imputed and no incomplete rows are silently removed.">
         <div className={fieldRow.two}>{choose('Sample membership', draft.sample, sample => {const numeric=props.profile.columns.some(c=>c.id===sample&&isNumericDuckDbType(c.duckdbType));set({ sample,experimental:numeric?'1':'',observational:numeric?'0':'',experimentalCategories:[],observationalCategories:[] })},props.profile.columns)}</div>

@@ -118,7 +118,7 @@ for (const study of [
       Object.values(reference.bounds_case_3.critical_values.lower).forEach((value, i) => close(levels.boundsCritical[i]![0], Number(value), `critical lower ${i}`))
       Object.values(reference.bounds_case_3.critical_values.upper).forEach((value, i) => close(levels.boundsCritical[i]![1], Number(value), `critical upper ${i}`))
     }
-    const longRunTable = result.getByRole('table', { name: 'Long-run coefficients', exact: true })
+    const longRunTable = result.getByRole('table', { name: 'Long-run relationship', exact: true })
     await expect(longRunTable).toBeVisible()
     for (const [term, value] of Object.entries(reference.long_run.coefficients)) {
       const label = term === 'const' ? 'Constant' : term

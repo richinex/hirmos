@@ -2058,14 +2058,14 @@ const DML_REFUTATION: MethodDefinition = {
     {
       id: caveatId('dml-refutation-light-refits'),
       category: 'finite-sample',
-      requirement: 'Refits use 80 trees and two folds on at most 1,000 sampled rows; they check direction and scale.',
+      requirement: 'New refits use 80 trees and two folds on all retained rows. Random-common-cause refits reuse their baseline’s fold assignments. These are lighter fits than the main estimate.',
       consequenceIfUnmet: 'A refit’s shift is read with the main fit’s precision.',
       sources: [NESS_CH11('§11.5 refutation as simulated assumption violations'), hirmos('crates/causal-core/src/refute_dml.rs#fit_effect')],
     },
     {
       id: caveatId('dml-refutation-sensitivity-scenarios'),
       category: 'interpretation',
-      requirement: 'Bounds assume equal confounding shares of 2%, 5% and 10% in outcome and treatment; the robustness value is the share that moves the effect to zero.',
+      requirement: 'Bounds use equal confounding shares of 2%, 5% and 10% for outcome residual variation and variation of the Riesz representer. The robustness value is the equal share that moves the effect bound to zero.',
       consequenceIfUnmet: 'A bound is read as a probability.',
       sources: [CHERNOZHUKOV_OVB, econml('doc/spec/validation.rst#sensitivity-analysis')],
     },

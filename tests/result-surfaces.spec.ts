@@ -51,7 +51,7 @@ test('shared metrics and minimal evidence table in a fitted survival result', as
   const toggle = page.getByRole('button', { name: 'Expand section list' })
   if (await toggle.isVisible()) await toggle.click()
   await page.getByRole('navigation', { name: 'Workspace sections' }).getByRole('button', { name: /Survival analysis/ }).click()
-  const setup = page.locator('section[aria-labelledby="survival-setup-title"]')
+  const setup = page.getByRole('region', { name: 'Survival setup', exact: true })
   await setup.getByRole('radio', { name: 'Aalen regression', exact: true }).click({ force: true })
   await setup.getByRole('group', { name: 'Covariates', exact: true }).getByRole('checkbox', { name: 'age', exact: true }).check()
   await setup.getByRole('button', { name: 'Run survival analysis' }).click()

@@ -57,7 +57,7 @@ test('SQL files expose errors and allow cancelling a batch without running later
   await page.getByRole('textbox', { name: 'SQL file contents' }).fill('SELECT sum(sin(i::DOUBLE)) FROM range(1000000000) t(i); CREATE VIEW must_not_run AS SELECT 1;')
   await page.getByRole('button', { name: 'Run SQL', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Run SQL', exact: true })).toBeDisabled()
-  await page.getByRole('dialog').getByRole('button', { name: 'Cancel query', exact: true }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Cancel run', exact: true }).click()
   await expect(page.getByRole('dialog').getByRole('alert')).toBeVisible({ timeout: 30_000 })
   await page.getByRole('button', { name: 'Close sql file' }).click()
   await showSqlSource(page)

@@ -1,3 +1,4 @@
+import { formatCount } from '@/lib/format/number'
 import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { useMemo, useState } from 'react'
 import { ExpandableChart } from '@/charts/ExpandableChart'
@@ -33,7 +34,7 @@ export function RootCauseData({ graph, source, profile, prepared }: { readonly g
     {data.kind !== 'ready' && <button type="button" className={button('outline')} disabled={data.kind === 'loading'} onClick={() => void load()}>{data.kind === 'loading' ? 'Loading baseline data…' : 'Explore baseline data'}</button>}
     {data.kind === 'failed' && <p role="alert" className="text-warn">{data.detail}</p>}
     {data.kind === 'ready' && <>
-      <p className="text-muted">Each off-diagonal panel plots two variables across all {data.rows.toLocaleString()} observations. Diagonal panels show each variable’s distribution. These patterns describe association, not causal direction.</p>
+      <p className="text-muted">Each off-diagonal panel plots two variables across all {formatCount(data.rows).text} observations. Diagonal panels show each variable’s distribution. These patterns describe association, not causal direction.</p>
       <fieldset>
         <legend className="mb-2 font-medium">Variables to plot</legend>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">

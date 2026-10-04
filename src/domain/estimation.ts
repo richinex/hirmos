@@ -683,7 +683,7 @@ export const defaultConfiguration = (estimator: EstimatorId, prepared: PreparedD
       }
     }
     case 'sharp-rd': return { kind: estimator }
-    case 'panel-intervention': return { kind: estimator, placeboReplications: 100, seed: 0 }
+    case 'panel-intervention': return { kind: estimator, primary: 'did', placeboReplications: 100, seed: 0 }
     case 'negbin-nuts': return { kind: estimator, warmup: 500, samples: 1000, seed: 0 }
     case 'bayesian-gaussian': return { kind: estimator, warmup: 500, samples: 1000, seed: 41 }
     case 'discrete-bn-query': return { kind: estimator, bins: 3, equivalentSampleSize: DEFAULT_BDEU_EQUIVALENT_SAMPLE_SIZE }

@@ -45,7 +45,7 @@ test('series retains its chart through loading, stale replies and cached switche
     const columns = ['Alpha', 'Beta', 'Category'].map(name => ({ id: name, name, duckdbType: name === 'Category' ? 'VARCHAR' : 'DOUBLE', nullable: false, nullCount: 0 }))
     const ready = columns.map((column, i) => ({ kind: 'ready', column: column.id, profile: {}, series: i === 2 ? null : { column: column.id, values: new Float64Array(i === 0 ? [1, 2, 3] : [10, 20, 30]), missingCells: 0 } }))
     Object.assign(window, { renderSeries: (selected: number, status: string, reply = selected, key = 'first') => root.render(React.createElement(ColumnSeriesPane, {
-      key, column: columns[selected], stepLabel: 'row', description: status === 'ready' ? ready[reply] : { kind: status, column: columns[reply].id },
+      key, column: columns[selected], stepLabel: 'row', role: { kind: 'value' }, description: status === 'ready' ? ready[reply] : { kind: status, column: columns[reply].id },
     })) })
   })
   const render = (selected: number, status: string, reply = selected, key = 'first') => page.evaluate(({ selected, status, reply, key }) => {

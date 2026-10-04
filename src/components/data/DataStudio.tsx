@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
-import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
+import { preparedColumnRole, type PreparedDatasetArtifact } from '@/domain/preprocessing'
 import type { SelectedSource } from '@/domain/workflow'
 import { ColumnProfilePane } from './ColumnProfilePane'
 import { ColumnSeriesPane } from './ColumnSeriesPane'
@@ -31,6 +31,7 @@ export function DataStudio({ source, profile, prepared, onEditSource, onDeclare,
   const declare = (column: string, type: DeclaredType | null) => prepared === null ? onDeclare(column, type) : setPending({ column, type })
   const selected = profile.columns.find((column) => column.id === chosen) ?? profile.columns[0]
   const description = useColumnProfile(source, profile, selected.id)
+  const role = preparedColumnRole(prepared, selected.id)
   const stepLabel = prepared?.kind === 'prepared-time-series' ? 'observation' : prepared?.kind === 'prepared-panel' ? 'panel row' : 'row'
   return (
     <WorkbenchLayout
@@ -51,8 +52,8 @@ export function DataStudio({ source, profile, prepared, onEditSource, onDeclare,
           />
         </>
       )}
-      inspector={{ trigger: { label: 'Profile', icon: 'query_stats' }, title: 'Column profile', body: <>{prepared !== null && <PreparedDataSummary prepared={prepared} profile={profile} />}<ColumnProfilePane key={profile.id} profile={profile} column={selected} description={description} /></> }}
-      bottom={{ trigger: { label: 'Series', icon: 'show_chart' }, title: 'Series', body: <ColumnSeriesPane key={profile.id} column={selected} description={description} stepLabel={stepLabel} /> }}
+      inspector={{ trigger: { label: 'Profile', icon: 'query_stats' }, title: 'Column profile', body: <>{prepared !== null && <PreparedDataSummary prepared={prepared} profile={profile} />}<ColumnProfilePane key={profile.id} profile={profile} column={selected} description={description} role={role} /></> }}
+      bottom={{ trigger: { label: 'Series', icon: 'show_chart' }, title: 'Series', body: <ColumnSeriesPane key={profile.id} column={selected} description={description} stepLabel={stepLabel} role={role} /> }}
     />
   )
 }

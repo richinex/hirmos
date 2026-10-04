@@ -43,6 +43,7 @@ import { parsePandasResamplingEvidence } from '@/domain/resampling'
 import { ardlEvidenceSchema, bayesianGaussianEvidenceSchema, binaryEttEvidenceSchema, discreteBnEvidenceSchema, doubleMlEvidenceSchema, negbinNutsEvidenceSchema, panelInterventionEvidenceSchema, syntheticControlEvidenceSchema, tLearnerEvidenceSchema, crossFittedTLearnerEvidenceSchema, vecmEvidenceSchema } from '@/domain/estimation'
 import { parseDmlRefutationEvidence } from '@/domain/sensitivity'
 import {honestEvidenceSchema} from '@/domain/honestDid'
+import {didSensitivityEvidenceSchema} from '@/domain/didSensitivity'
 import { dynamicCounterfactualUncertaintyMatches, dynamicLinearScmEvidenceSchema, linearScmEvidenceSchema } from '@/domain/counterfactual'
 import { parseLinearRefutationEvidence, parseSeriesStructureEvidence, parseUnobservedConfoundingEvidence } from '@/domain/sensitivity'
 import { parseStationarityBattery } from '@/domain/stationarity'
@@ -410,6 +411,7 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
     case 'ardl-model':
       return { kind: 'ardlModel', rows: command.rows, columns: command.columns, model: command.model }
     case 'honest-did': return {kind:'honestDid',model:command.model}
+    case 'did-sensitivity': return {kind:'didSensitivity',rows:command.rows,columns:command.columns,units:command.units,times:command.times,model:command.model}
     case 'root-cause':
       return { kind: 'rootCause', request: command.model }
     case 'gcm-effects':
@@ -919,6 +921,11 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         const envelope=z.object({kind:z.literal('honestDid'),evidence:honestEvidenceSchema}).strict().safeParse(decoded)
         if(!envelope.success){fail(command.request,{kind:'worker-protocol-failed',detail:z.prettifyError(envelope.error)});return}
         emit({kind:'honest-did-succeeded',request:command.request,result:envelope.data.evidence});return
+      }
+      case 'did-sensitivity': {
+        const envelope=z.object({kind:z.literal('didSensitivity'),evidence:didSensitivityEvidenceSchema}).strict().safeParse(decoded)
+        if(!envelope.success){fail(command.request,{kind:'worker-protocol-failed',detail:z.prettifyError(envelope.error)});return}
+        emit({kind:'did-sensitivity-succeeded',request:command.request,result:envelope.data.evidence});return
       }
       case 'root-cause': {
         const result = rootCauseResponseSchema.safeParse(decoded)

@@ -1,6 +1,5 @@
 import { RunActions } from '@/components/ui/RunActions'
 import { RunDetails } from '@/components/ui/RunDetails'
-import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { Orb } from '@/components/ui/Orb'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -24,11 +23,11 @@ import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
 import { RadioList } from '@/components/ui/RadioList'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { ParameterLabel } from '@/components/ui/ParameterLabel'
-import { actionGap, button, chapterIntro, field, fieldHint, fieldLabel, label, literal, num, panel, sectionTitle, stepsStack, well } from '@/components/ui/recipes'
+import { actionGap, button, chapterIntro, field, fieldLabel, label, literal, num, panel, sectionTitle, stepsStack, well } from '@/components/ui/recipes'
 import { SettingsStep } from '@/components/ui/SettingsStep'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import { assertNever, type NonEmptyArray } from '@/domain/dop'
-import { adjustmentLabels, contemporaneousAdjustmentVariables, describeEstimator, type EstimationRunArtifact, type EstimationRunId } from '@/domain/estimation'
+import { contemporaneousAdjustmentVariables, describeEstimator, type EstimationRunArtifact, type EstimationRunId } from '@/domain/estimation'
 import { DATA_SUBSET_REFUTER_METHOD_ID, LJUNG_BOX_METHOD_ID, PLACEBO_REFUTER_METHOD_ID, RANDOM_COMMON_CAUSE_REFUTER_METHOD_ID,
   DML_REFUTATION_METHOD_ID,
   DML_SENSITIVITY_METHODS, REFUTER_METHODS, SENSITIVITY_DIAGNOSTIC_METHODS, SHAPIRO_WILK_METHOD_ID, UNOBSERVED_COMMON_CAUSE_METHOD_ID } from '@/domain/methods'
@@ -47,7 +46,8 @@ import {
 import { estimandSentence, type StudySpecification, type StudyVariable } from '@/domain/study'
 import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
 import type { SelectedSource } from '@/domain/workflow'
-import { formatCount, formatP, formatStatistic } from '@/lib/format/number'
+import { formatCount, formatP, formatStatistic, formatWords } from '@/lib/format/number'
+import { EvidenceTable } from '@/components/table/EvidenceTable'
 import { lowerFirst } from '@/lib/text'
 import { SENSITIVITY_PARAMETER_HELP } from '@/domain/parameterHelp'
 import { useRunActivity } from '@/lib/useRunActivity'
@@ -56,6 +56,9 @@ import { formatTime, formatTimestamp } from '@/lib/format/date'
 import { interpretSensitivityResult } from '@/domain/resultInterpretation'
 import { cn } from '@/lib/utils'
 import {HonestDidPanel} from './HonestDidPanel'
+import {DidSensitivityPanel} from './DidSensitivityPanel'
+import {didSensitivitySource} from '@/domain/didSensitivity'
+import { SensitivityAdjustment } from './SensitivityAdjustment'
 import type {TimeSeriesRun} from '@/domain/timeSeries'
 import type {LegacySensitivityRunArtifact} from '@/domain/sensitivity'
 
@@ -77,8 +80,14 @@ const refuterInterpretation = (fact: RefuterFact): string => {
       const distance = Math.abs(fact.refuted - reference)
       return `${fact.interpretation.reading} Absolute distance from the reference: ${formatStatistic('raw', distance).text}. No hypothesis-test p-value is reported.`
     }
-    case 'mean-shift-test':
-      return `${fact.interpretation.nullHypothesis} p ${formatP(fact.interpretation.pValue, { withLabel: false }).text}; ${fact.interpretation.pValue < fact.interpretation.alpha ? 'the simulated mean differs from zero at α = 0.05' : 'the procedure does not reject a zero simulated mean at α = 0.05'}.`
+    case 'mean-shift-test': {
+      const hypothesis = fact.id === 'placebo'
+        ? 'This test checks whether the average estimate after shuffling treatment assignments is zero.'
+        : fact.id === 'random-common-cause'
+          ? 'This test checks whether the average change after adding an independent random variable is zero.'
+          : fact.interpretation.nullHypothesis
+      return `${hypothesis} p ${formatP(fact.interpretation.pValue, { withLabel: false }).text}. At α = ${fact.interpretation.alpha}, the test ${fact.interpretation.pValue < fact.interpretation.alpha ? 'rejects' : 'does not reject'} this hypothesis.`
+    }
     default: return assertNever(fact.interpretation)
   }
 }
@@ -110,32 +119,21 @@ function DmlRefutationRecord({ run, study }: { readonly run: Extract<Sensitivity
   return (
     <>
       <h3 className="mb-1 mt-2 text-title font-medium text-ink">Double machine learning probe batch on {lowerFirst(estimandSentence(study))}</h3>
-      <p className="m-0 text-body text-muted">Main estimate <span className={num('text-ink')}>{formatStatistic('raw', evidence.mainEstimate).text}</span>. The placebo and random-common-cause probes use the same seeded stream in the recorded order.</p>
+      <p className="m-0 text-body text-muted">Main estimate <span className={num('text-ink')}>{formatStatistic('raw', evidence.mainEstimate).text}</span>. {evidence.probeDesign === 'full-sample-paired-folds' ? `The probes use all ${formatCount(evidence.observations).text} retained rows. The random-common-cause fits reuse their baseline’s fold assignments.` : 'This saved run used at most 1,000 sampled rows, with new fold assignments for each refit.'}</p>
       <ResultInterpretation interpretation={interpretSensitivityResult(run)} context="sensitivity-check" className="mt-3" />
-      <ul className="m-0 mt-3 list-none divide-y divide-hair border-y border-hair p-0" aria-label="Double machine learning probes">
+      <MetricGrid as="ul" className="m-0 mt-3" label="Double machine learning probes">
         {run.refuters.map((fact) => (
-          <li key={fact.id} className="py-2">
-            <span className={label('text-faint')}>{fact.id === 'placebo' ? 'Placebo treatment' : 'Random common cause'}</span>
-            <p className={num('mb-0 mt-1 text-body text-ink')}>{formatStatistic('raw', fact.original).text} → {formatStatistic('raw', fact.refuted).text}</p>
-            <p className="mb-0 mt-1 text-body text-muted">{refuterInterpretation(fact)}</p>
+          <li key={fact.id}>
+            <MetricTile label={fact.id === 'placebo' ? 'Placebo treatment' : 'Random common cause'} size="compact" frame="cell" className="h-full" value={formatWords(`${formatStatistic('raw', fact.original).text} → ${formatStatistic('raw', fact.refuted).text}`)} context={refuterInterpretation(fact)} />
           </li>
         ))}
-      </ul>
-      <div className="figure-strip mt-3 overflow-x-auto">
-        <table className="w-full border-collapse text-left text-table" aria-label="Confounding scenarios">
-          <thead className="text-faint">
-            <tr><th className="border-b border-hair px-2 py-1.5 font-normal">Confounding share</th><th className="border-b border-hair px-2 py-1.5 text-right font-normal">Effect bounds</th><th className="border-b border-hair px-2 py-1.5 text-right font-normal">Interval bounds</th></tr>
-          </thead>
-          <tbody>
-            {evidence.sensitivity.scenarios.map((scenario) => (
-              <tr key={scenario.confounding} className="border-b border-hair last:border-0">
-                <td className={num('px-2 py-1.5 text-ink')}>{Math.round(scenario.confounding * 100)}%</td>
-                <td className={num('px-2 py-1.5 text-right text-muted')}>{formatStatistic('raw', scenario.effectLower).text} to {formatStatistic('raw', scenario.effectUpper).text}</td>
-                <td className={num('px-2 py-1.5 text-right text-muted')}>{formatStatistic('raw', scenario.ciLower).text} to {formatStatistic('raw', scenario.ciUpper).text}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      </MetricGrid>
+      <div className="mt-3">
+        <EvidenceTable frame="none" title="Confounding scenarios" rows={evidence.sensitivity.scenarios} rowKey={(scenario) => String(scenario.confounding)} noun="scenario" empty="No confounding scenarios." columns={[
+          { id: 'share', header: 'Confounding share', value: (scenario) => scenario.confounding, format: (value) => `${Math.round(Number(value) * 100)}%` },
+          { id: 'effect', header: 'Effect bounds', align: 'right', value: (scenario) => scenario.effectLower, format: (_value, scenario) => `${formatStatistic('raw', scenario.effectLower).text} to ${formatStatistic('raw', scenario.effectUpper).text}` },
+          { id: 'interval', header: 'Interval bounds', align: 'right', value: (scenario) => scenario.ciLower, format: (_value, scenario) => `${formatStatistic('raw', scenario.ciLower).text} to ${formatStatistic('raw', scenario.ciUpper).text}` },
+        ]} />
       </div>
       <p className={num('mb-0 mt-2 text-body text-muted')}>Robustness value {formatStatistic('score', evidence.sensitivity.robustnessValue).text} (interval {formatStatistic('score', evidence.sensitivity.robustnessValueCi).text}): the equal confounding share that would move the effect, or its interval, to zero.</p>
     </>
@@ -179,26 +177,16 @@ function RefutationRecord({ run, study }: { readonly run: Extract<SensitivityRun
         ))}
       </MetricGrid>
       <span className={label('mt-4 block text-faint')}>Residual diagnostics</span>
-      <ul className="m-0 mt-1 list-none divide-y divide-hair border-y border-hair p-0" aria-label="Residual diagnostics">
-        {run.diagnostics.map((fact) => <li key={fact.id} className="py-2 text-body text-muted">{fact.reading}</li>)}
+      <ul className="m-0 mt-1 list-none space-y-1 p-0" aria-label="Residual diagnostics">
+        {run.diagnostics.map((fact) => <li key={fact.id} className="text-body text-muted">{fact.reading}</li>)}
       </ul>
-      <details className="mt-3 text-body">
-        <DisclosureSummary className="cursor-pointer text-ink">Ljung–Box by lag</DisclosureSummary>
-        <div className="figure-strip mt-2 overflow-x-auto">
-        <table className="w-full border-collapse text-table" aria-label="Ljung-Box by lag">
-          <thead><tr className="text-left"><th scope="col" className="px-2 py-1 text-label font-medium text-muted">Lag</th><th scope="col" className="px-2 py-1 text-right text-label font-medium text-muted">Q</th><th scope="col" className="px-2 py-1 text-right text-label font-medium text-muted">p</th></tr></thead>
-          <tbody>
-            {evidence.ljungBoxLags.map((lag, index) => (
-              <tr key={lag} className="border-t border-hair">
-                <td className={num('px-2 py-1 text-ink')}>{lag}</td>
-                <td className={num('px-2 py-1 text-right text-muted')}>{formatStatistic('raw', evidence.ljungBoxStatistics[index] ?? Number.NaN).text}</td>
-                <td className={num('px-2 py-1 text-right text-muted')}>{formatP(evidence.ljungBoxPValues[index] ?? Number.NaN, { withLabel: false }).text}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        </div>
-      </details>
+      <div className="mt-3">
+        <EvidenceTable frame="none" title="Ljung–Box by lag" rows={evidence.ljungBoxLags.map((lag, index) => ({ lag, q: evidence.ljungBoxStatistics[index] ?? Number.NaN, p: evidence.ljungBoxPValues[index] ?? Number.NaN }))} rowKey={(row) => String(row.lag)} noun="lag" empty="No Ljung–Box lags." columns={[
+          { id: 'lag', header: 'Lag', align: 'right', value: (row) => row.lag },
+          { id: 'q', header: 'Q', align: 'right', value: (row) => row.q, format: (value) => formatStatistic('raw', Number(value)).text },
+          { id: 'p', header: 'p', align: 'right', value: (row) => row.p, format: (value) => formatP(Number(value), { withLabel: false }).text },
+        ]} />
+      </div>
 
     </>
   )
@@ -327,8 +315,8 @@ function LegacySensitivityPanel({ source, profile, prepared, studies, estimation
           if (!result.ok) { fail(describeAnalysisWorkerProblem(result.error)); return }
           const evidence = result.value
           const refuters: NonEmptyArray<RefuterFact> = [
-            { id: 'placebo', method: DML_REFUTATION_METHOD_ID, original: evidence.placebo.originalEffect, refuted: evidence.placebo.refutedEffect, interpretation: { kind: 'mean-shift-test', nullHypothesis: 'Null: the mean estimate across permuted-treatment refits is zero.', pValue: evidence.placebo.pValue, alpha: 0.05 } },
-            { id: 'random-common-cause', method: DML_REFUTATION_METHOD_ID, original: evidence.randomCommonCause.originalEffect, refuted: evidence.randomCommonCause.refutedEffect, interpretation: { kind: 'mean-shift-test', nullHypothesis: 'Null: the mean shift after adding an independent random covariate is zero.', pValue: evidence.randomCommonCause.pValue, alpha: 0.05 } },
+            { id: 'placebo', method: DML_REFUTATION_METHOD_ID, original: evidence.placebo.originalEffect, refuted: evidence.placebo.refutedEffect, interpretation: { kind: 'mean-shift-test', nullHypothesis: 'This test checks whether the average estimate after shuffling treatment assignments is zero.', pValue: evidence.placebo.pValue, alpha: 0.05 } },
+            { id: 'random-common-cause', method: DML_REFUTATION_METHOD_ID, original: evidence.randomCommonCause.originalEffect, refuted: evidence.randomCommonCause.refutedEffect, interpretation: { kind: 'mean-shift-test', nullHypothesis: 'This test checks whether the average change after adding an independent random variable is zero.', pValue: evidence.randomCommonCause.pValue, alpha: 0.05 } },
           ]
           onRun({ ...identity, kind: 'dml-refutation-run', configuration, evidence, refuters })
           return
@@ -392,8 +380,7 @@ function LegacySensitivityPanel({ source, profile, prepared, studies, estimation
               )}
               {configuration.kind === 'dml-refutation' && (
                 <>
-                  <label className="block"><ParameterLabel className={fieldLabel} label="Fold seed" help={SENSITIVITY_PARAMETER_HELP.dmlRefutation.foldSeed} /><input type="number" min={0} aria-label="Batch fold seed" className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} /></label>
-                  <p className={cn(fieldHint, 'm-0 self-end @md/panel:col-span-2 @4xl/panel:col-span-3')}>Main fit, placebo, random common cause, then confounding bounds, all from this seed. Use the estimation run’s seed{estimation?.kind === 'double-ml-run' ? ` (${estimation.configuration.seed})` : ''} so the main fit repeats it.</p>
+                  <label className="block"><ParameterLabel className={fieldLabel} label="Fold seed" help={`${SENSITIVITY_PARAMETER_HELP.dmlRefutation.foldSeed} Main fit, placebo, random common cause, then confounding bounds, all from this seed. Use the estimation run’s seed${estimation?.kind === 'double-ml-run' ? ` (${estimation.configuration.seed})` : ''} so the main fit repeats it.`} /><input type="number" min={0} aria-label="Batch fold seed" className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} /></label>
                 </>
               )}
               {configuration.kind === 'unobserved-confounding' && (
@@ -469,7 +456,7 @@ function LegacySensitivityPanel({ source, profile, prepared, studies, estimation
         {estimation !== null && (
           <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-body" aria-label="Estimate under test">
             <dt className="text-faint">Estimator</dt><dd className="m-0 text-ink">{describeEstimator(estimation.configuration.kind)}</dd>
-            <dt className="text-faint">Adjustment set</dt><dd className="m-0 text-ink">{adjustmentLabels(estimation.estimate.adjustment).length === 0 ? 'None' : adjustmentLabels(estimation.estimate.adjustment).join(', ')}</dd>
+            <SensitivityAdjustment run={estimation} />
             <dt className="text-faint">Rows</dt><dd className={num('m-0 text-ink')}>{formatCount(estimation.estimate.sample.observations).text}</dd>
           </dl>
         )}
@@ -537,8 +524,22 @@ function RunRecord({ run }: { readonly run: LegacySensitivityRunArtifact }) {
         </dl>)
 }
 
+/** The tab to open on: the latest sensitivity run's, else the one that can test the latest estimate. */
+function openingTrack(runs:readonly SensitivityRunArtifact[],estimates:readonly EstimationRunArtifact[]):'estimation'|'parallelTrends'|'didOmitted'{
+  const run=runs.at(-1)
+  if(run?.kind==='did-sensitivity-run')return 'didOmitted'
+  if(run?.kind==='honest-did-run'||estimates.length===0)return 'parallelTrends'
+  if(run===undefined&&didSensitivitySource(estimates.at(-1)!)!==null)return 'didOmitted'
+  return 'estimation'
+}
+
 export function SensitivityPanel(props:Omit<React.ComponentProps<typeof LegacySensitivityPanel>,'runs'|'selector'>&{readonly runs:readonly SensitivityRunArtifact[];readonly designRuns:readonly TimeSeriesRun[]}){
-  const [track,setTrack]=useState<'estimation'|'parallelTrends'>(props.runs.at(-1)?.kind==='honest-did-run'||props.estimationRuns.length===0?'parallelTrends':'estimation')
-  const selector=<SegmentedControl variant="line" size="sm" ariaLabel="Sensitivity analysis" value={track} onChange={setTrack} options={[{value:'estimation',label:'Estimator probes'},{value:'parallelTrends',label:'Parallel trends'}]} />
-  return track==='parallelTrends'?<HonestDidPanel prepared={props.prepared} estimates={props.estimationRuns} designs={props.designRuns} runs={props.runs.filter(run=>run.kind==='honest-did-run')} onRun={props.onRun} onDelete={props.onDeleteRun} onActivity={props.onActivity} selector={selector} />:<LegacySensitivityPanel {...props} runs={props.runs.filter(run=>run.kind!=='honest-did-run')} selector={selector} />
+  const [track,setTrack]=useState(()=>openingTrack(props.runs,props.estimationRuns))
+  const selector=<SegmentedControl variant="line" size="sm" ariaLabel="Sensitivity analysis" value={track} onChange={setTrack} options={[{value:'estimation',label:'Estimator probes'},{value:'parallelTrends',label:'Parallel trends'},{value:'didOmitted',label:'DiD omitted variables'}]} />
+  switch(track){
+    case 'didOmitted':return <DidSensitivityPanel source={props.source} profile={props.profile} prepared={props.prepared} estimates={props.estimationRuns} runs={props.runs.filter(run=>run.kind==='did-sensitivity-run')} onRun={props.onRun} onDelete={props.onDeleteRun} onActivity={props.onActivity} selector={selector}/>
+    case 'parallelTrends':return <HonestDidPanel prepared={props.prepared} estimates={props.estimationRuns} designs={props.designRuns} runs={props.runs.filter(run=>run.kind==='honest-did-run')} onRun={props.onRun} onDelete={props.onDeleteRun} onActivity={props.onActivity} selector={selector}/>
+    case 'estimation':return <LegacySensitivityPanel {...props} runs={props.runs.filter(run=>run.kind!=='honest-did-run'&&run.kind!=='did-sensitivity-run')} selector={selector}/>
+    default:return assertNever(track)
+  }
 }

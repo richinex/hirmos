@@ -1,6 +1,6 @@
 //! The causal worker's DML refuter block ported 1:1: seeded light refits for the placebo and
-//! random-common-cause probes on a subsampled frame, sharing the worker's single global fold
-//! stream, plus DoubleML's confounding-share sensitivity bounds.
+//! random-common-cause probes on all retained rows. Random-common-cause fits share the
+//! baseline's fold assignments, plus DoubleML's confounding-share sensitivity bounds.
 
 use crate::dml::{dml_irm, dml_plr, DmlResult, SensitivityResult};
 use crate::nprandom::{Mt19937, NpRng};
@@ -71,25 +71,6 @@ pub fn worker_fit(study: &WorkerStudy, fold_stream: &mut Mt19937) -> DmlResult {
     }
 }
 
-/// pandas frame.sample(n=1000, random_state=seed): RandomState.permutation head, rows kept in
-/// draw order. Frames of 1000 rows or fewer pass through unchanged.
-fn subsample(study: &WorkerStudy, seed: u32) -> (Vec<Vec<f64>>, Vec<f64>, Vec<f64>) {
-    let n = study.y.len();
-    if n <= 1000 {
-        return (study.x.to_vec(), study.y.to_vec(), study.d.to_vec());
-    }
-    let rows: Vec<usize> = Mt19937::seeded(seed)
-        .permutation(n)
-        .into_iter()
-        .take(1000)
-        .collect();
-    (
-        rows.iter().map(|&i| study.x[i].clone()).collect(),
-        rows.iter().map(|&i| study.y[i]).collect(),
-        rows.iter().map(|&i| study.d[i]).collect(),
-    )
-}
-
 fn z_test(values: &[f64]) -> (f64, f64) {
     let k = values.len() as f64;
     let mean = values.iter().sum::<f64>() / k;
@@ -109,7 +90,7 @@ pub fn placebo_refute(
     fold_stream: &mut Mt19937,
 ) -> RefutationOutcome {
     let mut rng = NpRng::seeded(7);
-    let (bx, by, bd) = subsample(study, 7);
+    let (bx, by, bd) = (study.x, study.y, study.d);
     let sims: Vec<f64> = (0..8)
         .map(|_| {
             let shuffled = rng.permutation_of(&bd);
@@ -124,14 +105,15 @@ pub fn placebo_refute(
     }
 }
 
-/// A fresh random covariate must not move the estimate: 6 light refits against a light baseline
-/// on the same settings, with Generator(11) standard normal columns.
+/// Six independent-noise refits against a light baseline on all retained rows, using
+/// identical fold assignments and Generator(11) standard normal columns.
 pub fn random_common_cause_refute(
     study: &WorkerStudy,
     fold_stream: &mut Mt19937,
 ) -> RefutationOutcome {
     let mut rng = NpRng::seeded(11);
-    let (bx, by, bd) = subsample(study, 11);
+    let (bx, by, bd) = (study.x, study.y, study.d);
+    let paired_folds = fold_stream.clone();
     let baseline = fit_effect(study, &bx, &by, &bd, true, fold_stream);
     let sims: Vec<f64> = (0..6)
         .map(|_| {
@@ -143,7 +125,7 @@ pub fn random_common_cause_refute(
                     r
                 })
                 .collect();
-            fit_effect(study, &augmented, &by, &bd, true, fold_stream)
+            fit_effect(study, &augmented, &by, &bd, true, &mut paired_folds.clone())
         })
         .collect();
     let shifts: Vec<f64> = sims.iter().map(|s| s - baseline).collect();

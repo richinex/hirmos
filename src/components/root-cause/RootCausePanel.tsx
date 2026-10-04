@@ -1,3 +1,4 @@
+import { formatCount } from '@/lib/format/number'
 import { SettingsDisclosure } from '@/components/ui/SettingsDisclosure'
 import { useId, useRef, useState } from 'react'
 import { useJob } from '@/analysis/JobsProvider'
@@ -251,7 +252,7 @@ export function RootCausePanel(props: Props) {
     <section><h3 className="m-0 text-body font-medium text-ink">Fitted model</h3><p className={fieldHint}>{analysis === 'change' && changeFitting === 'automaticFull' ? 'Variables without parents use their observed distributions. For each remaining variable, cross-validation compares linear regression, quadratic regression where applicable, and gradient boosting. Whole-number outcomes use discrete additive noise. The selected model classes are retained across repeated estimates, using all observations.' : 'Variables without parents use half-normal distributions. Other variables use linear regressions with empirical noise.'}</p></section>
     <section><h3 className="m-0 text-body font-medium text-ink">Analysis data</h3><p className={fieldHint}>{analysis === 'intervention' ? 'The model is fitted to the analysis file. A shift changes the selected variable by the specified amount and samples its downstream variables again.' : 'The prepared dataset represents baseline behaviour. The analysis file must use the same variable definitions, units and transformations.'}</p></section>
     <section><h3 className="m-0 text-body font-medium text-ink">Uncertainty</h3><p className={fieldHint}>Intervals show the {Number(((1 - (replay?.upperQuantile ?? 0.95)) * 100).toPrecision(12))}th and {(replay?.upperQuantile ?? 0.95) * 100}th percentiles across refitted estimates. Anomaly contributions are scores, not changes in the target’s units.</p></section>
-    <section><h3 className="m-0 text-body font-medium text-ink">Prepared data</h3><dl className="m-0 mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-body"><dt className="text-faint">Source</dt><dd className="m-0 break-all text-ink">{props.source.name}</dd><dt className="text-faint">Rows</dt><dd className="m-0 tabular-nums text-ink">{props.prepared.observations.toLocaleString()}</dd></dl></section>
+    <section><h3 className="m-0 text-body font-medium text-ink">Prepared data</h3><dl className="m-0 mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-body"><dt className="text-faint">Source</dt><dd className="m-0 break-all text-ink">{props.source.name}</dd><dt className="text-faint">Rows</dt><dd className="m-0 tabular-nums text-ink">{formatCount(props.prepared.observations).text}</dd></dl></section>
   </div>
   if ((analysis === 'intrinsic' || analysis === 'arrows') && graph.ok) return <GcmInfluencePanel
     key={`${graph.value.dagRevision}-${analysis}`} analysis={analysis}

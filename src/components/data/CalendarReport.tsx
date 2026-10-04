@@ -1,3 +1,4 @@
+import { formatCount } from '@/lib/format/number'
 import { useEffect, useState } from 'react'
 import { EvidenceTable } from '@/components/table/EvidenceTable'
 import { Alert } from '@/components/ui/Alert'
@@ -71,7 +72,7 @@ function Coverage({ file, profile, column, unitColumn, interpretation = SOURCE_T
       <Alert tone={state.report.issues.length > 0 || state.report.missing > 0 ? 'warn' : 'ok'}>
         {state.report.issues.length > 0
           ? `${state.report.units - state.report.issues.length} of ${state.report.units} series checked. Resolve the date issues below to check the remaining series.`
-          : state.report.missing === 0 ? 'No interior calendar gaps found.' : `${state.report.missing.toLocaleString()} missing calendar ${state.report.missing === 1 ? 'period' : 'periods'} across ${state.report.ranges.toLocaleString()} ${state.report.ranges === 1 ? 'gap' : 'gaps'}.`}
+          : state.report.missing === 0 ? 'No interior calendar gaps found.' : `${formatCount(state.report.missing).text} missing calendar ${state.report.missing === 1 ? 'period' : 'periods'} across ${formatCount(state.report.ranges).text} ${state.report.ranges === 1 ? 'gap' : 'gaps'}.`}
       </Alert>
       {state.report.gaps.length > 0 && <EvidenceTable title="Missing periods" rows={state.report.gaps} columns={[
         ...(unitColumn === undefined ? [] : [{ id: 'unit', header: 'Unit', value: (row: Report['gaps'][number]) => row.unit }]),

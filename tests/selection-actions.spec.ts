@@ -17,7 +17,7 @@ test('survival shares select-all and clear actions without selecting reserved co
   const toggle = page.getByRole('button', { name: 'Expand section list' })
   if (await toggle.isVisible()) await toggle.click()
   await page.getByRole('navigation', { name: 'Workspace sections' }).getByRole('button', { name: /Survival analysis/ }).click()
-  const setup = page.locator('section[aria-labelledby="survival-setup-title"]')
+  const setup = page.getByRole('region', { name: 'Survival setup', exact: true })
   const covariates = setup.getByRole('group', { name: 'Covariates', exact: true })
   for (const analysis of ['Cox regression', 'Aalen regression', 'Survival forest']) {
     await setup.getByRole('radio', { name: analysis, exact: true }).check()

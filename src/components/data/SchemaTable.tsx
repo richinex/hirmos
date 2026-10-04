@@ -5,7 +5,7 @@ import { CategoryBar, cellPadding, countLine, DensityToggle, FacetPills, FilterF
 import { literal, num, table as tableCn, td, tr } from '@/components/ui/recipes'
 import { isNumericDuckDbType, type ColumnId, type ColumnSummary, type DatasetProfile } from '@/domain/dataset'
 import { assertNever } from '@/domain/dop'
-import { formatCount, formatPercent, formatStatistic } from '@/lib/format/number'
+import { formatCount, formatPercent, formatStored, storedDigits } from '@/lib/format/number'
 import { cn } from '@/lib/utils'
 import { columnReading, type DeclaredType } from '@/domain/fileReading'
 import { ColumnTypeText, ReadAsButton, TypeGlyph } from './ReadAs'
@@ -31,10 +31,11 @@ function Highlighted({ text, query }: { readonly text: string; readonly query: s
   return <>{text.slice(0, at)}<mark className="rounded-sm bg-well text-ink">{text.slice(at, at + query.length)}</mark>{text.slice(at + query.length)}</>
 }
 
+/** A range shows stored values the way the preview does; a whole number stays text, so a wide one keeps every digit. */
 const trimNumber = (raw: string): string => {
+  if (/^-?\d+$/.test(raw)) return storedDigits(raw)
   const value = Number(raw)
-  if (!Number.isFinite(value)) return raw
-  return Number.isInteger(value) ? formatCount(value).text : formatStatistic('raw', value).text
+  return Number.isFinite(value) ? formatStored(value).text : raw
 }
 
 const helper = createColumnHelper<SchemaRow>()

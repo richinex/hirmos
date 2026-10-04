@@ -33,7 +33,8 @@ import { useSunAbrahamPanel } from './useSunAbrahamPanel'
 import { SunAbrahamResult } from './SunAbrahamResult'
 import { defaultStaggeredSpecification, staggeredInput, recordedStaggeredAdjustment, staggeredAdjustmentDescriptions } from '@/domain/staggeredDid'
 import { AdjustedDidControls } from './AdjustedDidControls'
-import { AdjustedDidResult } from './AdjustedDidResult'
+import { didCovariateRestrictions, describeDidCovariateRole } from '@/domain/adjustedDid'
+import { AdjustedDidResult, AdjustedDidConvergenceWarning } from './AdjustedDidResult'
 import { describePanelDataProblem } from '@/domain/panel'
 import { TLearnerIntervals } from './TLearnerIntervals'
 import { Orb } from '@/components/ui/Orb'
@@ -547,16 +548,16 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
         if (evidence.kind === 'staggeredDid') return [
           {label:'Adjustment method',value:formatWords(staggeredAdjustmentDescriptions[recordedStaggeredAdjustment(evidence.specification).kind].label),context:'Group-time ATT estimation'},
           {label:'Cohorts',value:formatCount(evidence.cohorts.keys.length),context:'Distinct first-treatment periods'},
-          {label:'Retained units',value:formatCount(evidence.units.length),context:String(evidence.times.length)+' periods'},
+          {label:'Retained units',value:formatCount(evidence.units.length),context:`${formatCount(evidence.times.length).text} periods`},
           {label:'Overall ATT',value:formatWords('Dynamic aggregation'),context:'Equal average of supported nonnegative event-time effects'},
         ]
         if (evidence.kind === 'panelAdjusted') return [
           { label: 'Method', value: formatWords(evidence.specification.kind === 'regression' ? 'Regression DiD' : 'Doubly robust DiD'), context: 'Average effect on the treated group' },
-          { label: 'Panel layout', value: formatWords(`${evidence.treatedUnits} treated, ${evidence.controlUnits} comparison`), context: 'One before and one after period' },
+          panelLayoutTile(evidence, 'One before and one after period'),
         ]
         if (evidence.kind === 'panelDid') return [
           { label: 'Method', value: formatWords('Conventional difference-in-differences'), context: 'Change in treated outcomes minus change in comparison outcomes' },
-          { label: 'Panel layout', value: formatWords(`${evidence.treatedUnits} treated, ${evidence.controlUnits} comparison`), context: `${evidence.nPre} pre- and ${evidence.nPost} post-periods` },
+          panelLayoutTile(evidence, `${formatCount(evidence.nPre).text} pre- and ${formatCount(evidence.nPost).text} post-periods`),
         ]
         const topWeights = evidence.syntheticDid.omega
           .map((weight, index) => ({ weight, unit: evidence.units[index] ?? `control ${index + 1}` }))
@@ -565,7 +566,7 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
         const [heaviest, ...nextWeights] = topWeights
         return [
           { label: 'Synthetic DID', value: formatStatistic('raw', evidence.syntheticDid.estimate), context: <Metadata><span>chosen as the main result before fitting</span><span>DID {formatStatistic('raw', evidence.did.estimate).text}</span><span>synthetic control {formatStatistic('raw', evidence.syntheticControl.estimate).text}</span><span>{formatCount(evidence.nPost).text} post periods</span></Metadata> },
-          { label: 'Panel layout', value: formatWords(`${evidence.treatedUnits} treated, ${evidence.controlUnits} comparison`), context: `${evidence.units.length} units × ${evidence.times.length} periods` },
+          panelLayoutTile(evidence, `${formatCount(evidence.units.length).text} units × ${formatCount(evidence.times.length).text} periods`),
           heaviest === undefined
             ? { label: 'Largest comparison weight', value: formatWords('none'), context: 'no synthetic-DID unit weights' }
             : { label: 'Largest comparison weight', value: formatStatistic('score', heaviest.weight), context: <Metadata><span>unit {heaviest.unit}</span>{nextWeights.map(({ unit, weight }) => <span key={unit}>{unit} {formatStatistic('score', weight).text}</span>)}</Metadata> },
@@ -727,7 +728,16 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
   // The design-specific tiles say what stands in for an adjustment set; otherwise the set itself, counted when
   // long with its first names beneath. The identification record lists every one.
   const adjustmentTile = ((): { readonly value: Formatted; readonly preview: string | null } => {
-    if (run.kind === 'panel-intervention-run') return { value: formatWords(run.evidence.kind === 'sunAbraham' ? 'Cohort-by-event-time interactions' : run.evidence.kind === 'staggeredDid' ? 'Adoption-cohort comparisons' : 'Unit and time weights'), preview: null }
+    if (run.kind === 'panel-intervention-run') {
+      switch (run.evidence.kind) {
+        case 'sunAbraham': return { value: formatWords('Cohort-by-event-time interactions'), preview: null }
+        case 'staggeredDid': return { value: formatWords('Adoption-cohort comparisons'), preview: null }
+        case 'panelAdjusted': return { value: formatWords(run.evidence.specification.kind === 'doublyRobust' ? 'Baseline-covariate adjustment' : 'Covariate-adjusted regression'), preview: run.columns.slice(2).map(column => column.name).join(', ') || 'No covariates' }
+        case 'panelDid': return { value: formatWords('Treated and control changes'), preview: null }
+        case 'panelIntervention': return { value: formatWords('Unit and time weights'), preview: null }
+        default: return assertNever(run.evidence)
+      }
+    }
     if (run.kind === 'frontdoor-two-stage-run') {
       const stage = (columns: readonly number[]) => columns.length === 0 ? 'none' : columns.map((index) => run.columns[index]?.name ?? index).join(', ')
       return { value: formatWords(`stage 1: ${stage(run.evidence.firstStageAdjustment)}, stage 2: ${stage(run.evidence.secondStageAdjustment)}`), preview: null }
@@ -756,7 +766,7 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
         value={adjustmentValue}
         help={run.kind === 'panel-intervention-run' ? 'This design does not use a DAG adjustment set.' : undefined}
         context={run.kind === 'panel-intervention-run'
-          ? undefined
+          ? adjustmentTile.preview ?? undefined
           : declaredCategorical.length > 0
             ? `Categorical: ${namesInProse(declaredCategorical, (count) => `${count} variables`)}. One column per level.`
             : adjustmentTile.preview ?? restated?.context}
@@ -767,7 +777,7 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
 }
 
 /** Memoised: editing the form must not redraw the result, its diagnostics or its charts. */
-const ResultCard = memo(function ResultCard({ run, study, current, stepLabel, onDelete, others = [] }: { readonly others?: readonly EstimationRunArtifact[]; readonly run: EstimationRunArtifact; readonly study: StudySpecification; readonly current: boolean; readonly stepLabel: string; readonly onDelete?: (run: EstimationRunArtifact) => void }) {
+export const ResultCard = memo(function ResultCard({ run, study, current, stepLabel, onDelete, others = [] }: { readonly others?: readonly EstimationRunArtifact[]; readonly run: EstimationRunArtifact; readonly study: StudySpecification; readonly current: boolean; readonly stepLabel: string; readonly onDelete?: (run: EstimationRunArtifact) => void }) {
   const theme = useChartTheme()
   const estimate = run.estimate
   const adjustmentVariables = useMemo(() => contemporaneousAdjustmentVariables(estimate.adjustment) ?? [], [estimate.adjustment])
@@ -853,6 +863,7 @@ const ResultCard = memo(function ResultCard({ run, study, current, stepLabel, on
   }, [run, study.treatment.name, study.outcome.name, theme])
   const body = (
     <>
+      {run.kind === 'panel-intervention-run' && run.evidence.kind === 'panelAdjusted' && <AdjustedDidConvergenceWarning evidence={run.evidence} />}
       <div className="mt-3">
         {run.kind === 'causal-forest-run'
           ? <CausalForestResults evidence={run.evidence} outcome={study.outcome.name} columns={run.columns} />
@@ -1559,6 +1570,11 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             if (!session.current(current)) return
             if (!materialized.ok) { dispatch({ type: 'run-failed', detail: describePanelDataProblem(materialized.error) }); return }
             const matrix = materialized.value
+            const restrictions = didCovariateRestrictions(matrix, state.panelPreflight.layout, configuration.specification)
+            if (restrictions.length > 0) {
+              dispatch({ type: 'run-failed', detail: restrictions.map(item => `${profile.columns.find(column => column.id === item.column)?.name ?? item.column}: ${describeDidCovariateRole(item.role)}`).join(' ') })
+              return
+            }
             const evidence = await analysis.runAdjustedDid(matrix.values, matrix.rowCount, 2+configuration.covariates.length, matrix.units, matrix.periodCodes, configuration.specification)
             if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
             const columns: NonEmptyArray<StudyVariable> = [study.outcome, study.treatment, ...configuration.covariates.map(column => ({ column, node: study.outcome.node, name: profile.columns.find(c => c.id === column)?.name ?? String(column) }))]
@@ -1848,7 +1864,8 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
   }
 
   const latestRun = runs.at(-1) ?? null
-  const controlCandidates = study === null ? [] : profile.columns.filter((column) => prepared.columns.includes(column.id) && column.id !== study.outcome.column && column.id !== study.treatment.column)
+  const controlCandidates = useMemo(() => study === null ? [] : profile.columns.filter((column) => prepared.columns.includes(column.id) && column.id !== study.outcome.column && column.id !== study.treatment.column), [study, profile, prepared])
+  const didCandidates = useMemo(() => controlCandidates.filter(column => prepared.kind !== 'prepared-panel' || (column.id !== prepared.panel.unitColumn && column.id !== prepared.panel.timeColumn)), [controlCandidates, prepared])
   // A unit or cluster column identifies groups of rows; it cannot also be a regressor. A panel's own unit key comes first.
   const designColumns = new Set(identification !== null && 'adjustment' in identification.result ? identification.result.adjustment.variables.map((variable) => variable.column) : [])
   const panelUnit = prepared.kind === 'prepared-panel' ? profile.columns.find((column) => column.id === prepared.sampling.unitColumn) ?? null : null
@@ -2265,7 +2282,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
               <StaggeredDidControls section="reporting" configuration={configuration} candidates={controlCandidates.filter(c=>prepared.kind!=='prepared-panel'||(c.id!==prepared.panel.unitColumn&&c.id!==prepared.panel.timeColumn))} clusterCandidates={profile.columns.filter(c=>c.id!==study?.treatment.column&&c.id!==study?.outcome.column&&(prepared.kind!=='prepared-panel'||(c.id!==prepared.panel.unitColumn&&c.id!==prepared.panel.timeColumn)))} onChange={configure} />
             </SettingsStep>}
             {configuration.primary === 'adjusted' && <SettingsStep number={2} title="Adjust for covariates">
-              <AdjustedDidControls configuration={configuration} candidates={controlCandidates.filter(c => prepared.kind !== 'prepared-panel' || (c.id !== prepared.panel.unitColumn && c.id !== prepared.panel.timeColumn))} onChange={configure} />
+              <AdjustedDidControls configuration={configuration} candidates={didCandidates} onChange={configure} file={source.file} profile={profile} binding={panelBinding} />
             </SettingsStep>}
             {configuration.primary !== 'did' && configuration.primary !== 'adjusted' && configuration.primary !== 'staggered' && configuration.primary !== 'sunAbraham' && <SettingsStep number={2} title="Report uncertainty">
               <div className={fieldRow.two}>
@@ -2700,3 +2717,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
     </>
   )
 }
+
+/** The treated and comparison unit counts every two-group panel design reports. */
+const panelLayoutTile = (layout: { readonly treatedUnits: number; readonly controlUnits: number }, context: string) =>
+  ({ label: 'Panel layout', value: formatWords(`${formatCount(layout.treatedUnits).text} treated, ${formatCount(layout.controlUnits).text} comparison`), context })
