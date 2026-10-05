@@ -2,6 +2,8 @@ import { canvasMotion } from '@/lib/motion'
 import { createPortal } from 'react-dom'
 import { escapeFor, pushLayer } from '@/lib/dismissal'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createStore } from 'zustand/vanilla'
+import { useStore as useAppStore } from 'zustand'
 import {
   Background,
   BackgroundVariant,
@@ -68,12 +70,12 @@ import { dagPointerTarget, type ScreenTargetBox } from './dagPointerTarget'
 import { placeRouteLabels, routeLabelText, type RouteLabel } from './routeLabels'
 
 const SketchStroke = lazy(() => import('./SketchStroke'))
-type DrawingStyle = 'clean' | 'sketch'
+export type DrawingStyle = 'clean' | 'sketch'
 type VariableView = 'all' | 'connected'
 
 interface DagNodeData extends Record<string, unknown> {
   readonly name: string
-  readonly kind: 'observed' | 'latent'
+  readonly kind: 'observed' | 'latent' | 'derived'
   /** The variable's place relative to the bound treatment and outcome; null when nothing is bound. */
   readonly role: string | null
   readonly evidenceRole: 'none' | 'source' | 'target' | 'both'
@@ -86,10 +88,9 @@ interface DagNodeData extends Record<string, unknown> {
   readonly drawing: DrawingStyle
 }
 
-type CanvasNode = Node<DagNodeData, 'dagVariable'>
+export type CanvasNode = Node<DagNodeData, 'dagVariable'>
 
 interface DagEdgeData extends Record<string, unknown> {
-  readonly edge: DirectedDagEdge
   readonly route: DagRoute
   /** Severed by the intervention: an arrow into the set node. */
   readonly cut: boolean
@@ -97,7 +98,8 @@ interface DagEdgeData extends Record<string, unknown> {
   readonly labelPlacement: RouteLabel | null
 }
 
-type CanvasEdge = Edge<DagEdgeData, 'dagEdge'>
+export type DerivedCanvasEdge = Edge<DagEdgeData, 'dagEdge'>
+type CanvasEdge = Edge<DagEdgeData & { readonly edge: DirectedDagEdge }, 'dagEdge'>
 
 const REST_TARGET_STYLE: React.CSSProperties = {
   opacity: 0,
@@ -137,7 +139,13 @@ const HIDDEN_SOURCE_STYLE: React.CSSProperties = { ...FULL_CARD_STYLE, pointerEv
 /** The selector a card is dragged by: its name, since the rest of the card draws arrows. */
 const CARD_GRIP = 'dag-card-grip'
 
-function DagVariableCard({ id, data, selected }: NodeProps<CanvasNode>) {
+export function DagVariableCard({
+  id,
+  data,
+  selected,
+  isConnectable,
+  draggable,
+}: NodeProps<CanvasNode>) {
   const connection = useConnection()
   const updateNodeInternals = useUpdateNodeInternals()
   const isTarget = connection.inProgress && connection.fromNode.id !== id
@@ -231,13 +239,14 @@ function DagVariableCard({ id, data, selected }: NodeProps<CanvasNode>) {
         type="source"
         position={Position.Right}
         isConnectableEnd={false}
-        style={connection.inProgress ? HIDDEN_SOURCE_STYLE : IDLE_SOURCE_STYLE}
+        isConnectable={isConnectable}
+        style={!isConnectable || connection.inProgress ? HIDDEN_SOURCE_STYLE : IDLE_SOURCE_STYLE}
         className="nodrag nopan"
-        title={`Drag to draw an arrow from ${data.name}`}
+        title={isConnectable ? `Drag to draw an arrow from ${data.name}` : undefined}
       />
       <span
-        className={`${CARD_GRIP} relative z-10 line-clamp-3 cursor-grab whitespace-normal text-body font-medium text-ink [overflow-wrap:break-word] active:cursor-grabbing`}
-        title={`${data.name}, drag to move`}
+        className={`${CARD_GRIP} relative z-10 line-clamp-3 ${draggable ? 'cursor-grab active:cursor-grabbing' : ''} whitespace-normal text-body font-medium text-ink [overflow-wrap:break-word]`}
+        title={draggable ? `${data.name}, drag to move` : data.name}
       >
         {data.name}
       </span>
@@ -253,7 +262,7 @@ function DagVariableCard({ id, data, selected }: NodeProps<CanvasNode>) {
         type="target"
         position={Position.Left}
         isConnectableStart={false}
-        isConnectable={!refused}
+        isConnectable={isConnectable && !refused}
         style={dropping && dropType === 'target' ? FULL_CARD_STYLE : REST_TARGET_STYLE}
       />
       {dropping && dropType === 'source' && (
@@ -354,7 +363,7 @@ function DagConnectionLine({
   )
 }
 
-function DagEdgePath({
+export function DagEdgePath({
   id,
   source,
   target,
@@ -362,7 +371,7 @@ function DagEdgePath({
   style,
   markerEnd,
   label: edgeLabel,
-}: EdgeProps<CanvasEdge>) {
+}: EdgeProps<DerivedCanvasEdge>) {
   const sourceNode = useInternalNode(source)
   const targetNode = useInternalNode(target)
   if (!sourceNode || !targetNode || data === undefined) return null
@@ -564,7 +573,7 @@ function EdgeActionBar({
 /** Grid pitch in flow units; the dots double their spacing when zoomed out so the grid never turns to moiré. */
 const GRID_PITCH = 16
 const MIN_SCREEN_PITCH = 12
-function DagGrid() {
+export function DagGrid() {
   const { zoom } = useViewport()
   let gap = GRID_PITCH
   while (gap * zoom < MIN_SCREEN_PITCH) gap *= 2
@@ -574,7 +583,7 @@ function DagGrid() {
 }
 
 /** Refits the view when the canvas box changes size, so a pane resize or a taller stage never leaves the graph cut off. */
-function RefitOnResize({
+export function RefitOnResize({
   host,
   layoutKey,
 }: {
@@ -618,42 +627,100 @@ function RefitOnResize({
   return null
 }
 
-function CanvasControls({
-  onTidy,
-  orientation,
-  onToggleOrientation,
-  viewLocked,
-  onToggleLock,
-  expanded,
-  onToggleExpand,
-  labelsShown,
-  onToggleLabels,
-  drawing,
-  onToggleDrawing,
-  variableView,
-  disconnectedCount,
-  onToggleVariables,
-}: {
-  readonly onTidy: () => void
-  readonly orientation: DagLayoutOrientation
-  readonly onToggleOrientation: () => void
-  readonly viewLocked: boolean
-  readonly onToggleLock: () => void
+/** The drawing style is a reader preference shared by every graph canvas, not part of a project. */
+const drawingStore = createStore<{ readonly style: DrawingStyle }>(() => ({ style: 'sketch' }))
+const toggleDrawingStyle = () =>
+  drawingStore.setState(({ style }) => ({ style: style === 'clean' ? 'sketch' : 'clean' }))
+
+export function useDrawingStyle(): readonly [DrawingStyle, () => void] {
+  return [useAppStore(drawingStore, (state) => state.style), toggleDrawingStyle]
+}
+
+/** How a graph canvas is viewed: expanded to the window or not, laid out across or down, wheel locked or not. */
+export interface CanvasView {
   readonly expanded: boolean
-  readonly onToggleExpand: () => void
-  readonly labelsShown: boolean
-  readonly onToggleLabels: () => void
-  readonly drawing: DrawingStyle
-  readonly onToggleDrawing: () => void
-  readonly variableView: VariableView
-  readonly disconnectedCount: number
-  readonly onToggleVariables: () => void
+  readonly orientation: DagLayoutOrientation
+  readonly viewLocked: boolean
+  readonly toggleExpanded: () => void
+  readonly toggleOrientation: () => void
+  readonly toggleLock: () => void
+}
+
+/**
+ * View state for one graph canvas. A narrow canvas runs the layout down the page instead of across it,
+ * unless the reader has turned it. The canvas sits inside a scrolling stage, so a wheel over it is
+ * ambiguous; locked is the safer default: the wheel scrolls the page, ⌘ or Ctrl with the wheel still
+ * zooms, and the buttons always work. Esc returns an expanded canvas to the page.
+ */
+export function useCanvasView(
+  host: React.RefObject<HTMLDivElement | null>,
+  onOrientationChange?: () => void,
+): CanvasView {
+  const [expanded, setExpanded] = useState(false)
+  const [fitted, setFitted] = useState<DagLayoutOrientation>('across')
+  const [chosen, setChosen] = useState<DagLayoutOrientation | null>(null)
+  const [viewLocked, setViewLocked] = useState(true)
+  const orientation = chosen ?? fitted
+  useEffect(() => {
+    const element = host.current
+    if (element === null) return
+    const observer = new ResizeObserver(([entry]) => {
+      setFitted(entry.contentRect.width < 600 ? 'down' : 'across')
+    })
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [host, expanded])
+  useEffect(() => (expanded ? pushLayer(EXPANDED_CANVAS_LAYER) : undefined), [expanded])
+  useEffect(() => {
+    if (!expanded) return undefined
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && escapeFor(EXPANDED_CANVAS_LAYER, event)) setExpanded(false)
+    }
+    window.addEventListener('keydown', escape)
+    return () => window.removeEventListener('keydown', escape)
+  }, [expanded])
+  return {
+    expanded,
+    orientation,
+    viewLocked,
+    toggleExpanded: () => setExpanded((open) => !open),
+    toggleOrientation: () => {
+      onOrientationChange?.()
+      setChosen(orientation === 'across' ? 'down' : 'across')
+    },
+    toggleLock: () => setViewLocked((locked) => !locked),
+  }
+}
+
+/**
+ * The toolbar shared by the DAG editor and derived graphs. Tidy, arrow labels and disconnected
+ * variables act on a drawable DAG, so a read-only graph leaves them out and gets a fit button instead.
+ */
+export function CanvasControls({
+  view,
+  tidy,
+  labels,
+  variables,
+}: {
+  readonly view: CanvasView
+  readonly tidy?: () => void
+  readonly labels?: { readonly shown: boolean; readonly onToggle: () => void }
+  readonly variables?: {
+    readonly view: VariableView
+    readonly disconnected: number
+    readonly onToggle: () => void
+  }
 }) {
-  const { fitView } = useReactFlow<CanvasNode, CanvasEdge>()
+  const { fitView } = useReactFlow()
+  const [drawing, toggleDrawing] = useDrawingStyle()
+  const { orientation, viewLocked, expanded } = view
   const control = flowControl
   return (
-    // Tidy graph fits the view, so the strip carries no separate fit button.
-    <FlowControls>
+    // Tidy fits the view, so the editor's strip carries no separate fit button.
+    <FlowControls
+      fit={tidy === undefined ? FIT_VIEW : undefined}
+      fitLabel={tidy === undefined ? 'Fit the graph' : undefined}
+    >
       <button
         type="button"
         className={control}
@@ -663,64 +730,70 @@ function CanvasControls({
             : 'Lay out the graph across the page'
         }
         aria-label={orientation === 'across' ? 'Lay out down' : 'Lay out across'}
-        onClick={onToggleOrientation}
+        onClick={view.toggleOrientation}
       >
         <Icon
           name={orientation === 'across' ? 'rotate_90_degrees_cw' : 'rotate_90_degrees_ccw'}
           size={14}
         />
       </button>
-      <button
-        type="button"
-        className={control}
-        disabled={disconnectedCount === 0}
-        title={`${variableView === 'all' ? 'Hide disconnected variables' : `Show disconnected variables (${disconnectedCount})`}. Hidden variables remain in the DAG.`}
-        aria-label={
-          variableView === 'all'
-            ? 'Hide disconnected variables'
-            : `Show disconnected variables (${disconnectedCount})`
-        }
-        aria-pressed={variableView === 'connected'}
-        onClick={onToggleVariables}
-      >
-        <Icon name={variableView === 'all' ? 'visibility' : 'visibility_off'} size={16} />
-      </button>
+      {variables !== undefined && (
+        <button
+          type="button"
+          className={control}
+          disabled={variables.disconnected === 0}
+          title={`${variables.view === 'all' ? 'Hide disconnected variables' : `Show disconnected variables (${variables.disconnected})`}. Hidden variables remain in the DAG.`}
+          aria-label={
+            variables.view === 'all'
+              ? 'Hide disconnected variables'
+              : `Show disconnected variables (${variables.disconnected})`
+          }
+          aria-pressed={variables.view === 'connected'}
+          onClick={variables.onToggle}
+        >
+          <Icon name={variables.view === 'all' ? 'visibility' : 'visibility_off'} size={16} />
+        </button>
+      )}
       <button
         type="button"
         className={control}
         title={drawing === 'clean' ? 'Use hand-drawn style' : 'Use clean drawing'}
         aria-label={drawing === 'clean' ? 'Use hand-drawn style' : 'Use clean drawing'}
         aria-pressed={drawing === 'sketch'}
-        onClick={onToggleDrawing}
+        onClick={toggleDrawing}
       >
         <Icon name="draw" size={16} fill={drawing === 'sketch'} />
       </button>
-      <button
-        type="button"
-        className={control}
-        title="Tidy: Lay out the variables again from left to right in causal order and fit the view. Any positions you dragged will be replaced, but the connections remain unchanged."
-        aria-label="Tidy graph"
-        onClick={() => {
-          onTidy()
-          window.setTimeout(() => void fitView({ ...FIT_VIEW, ...canvasMotion('fit') }), 30)
-        }}
-      >
-        <Icon name="auto_awesome_mosaic" size={14} />
-      </button>
-      <button
-        type="button"
-        className={control}
-        title={
-          labelsShown
-            ? 'Hide the label on each arrow'
-            : 'Show the label on each arrow: its lag, and whether it still needs a rationale'
-        }
-        aria-label={labelsShown ? 'Hide arrow labels' : 'Show arrow labels'}
-        aria-pressed={labelsShown}
-        onClick={onToggleLabels}
-      >
-        <Icon name={labelsShown ? 'label' : 'label_off'} size={14} />
-      </button>
+      {tidy !== undefined && (
+        <button
+          type="button"
+          className={control}
+          title="Tidy: Lay out the variables again from left to right in causal order and fit the view. Any positions you dragged will be replaced, but the connections remain unchanged."
+          aria-label="Tidy graph"
+          onClick={() => {
+            tidy()
+            window.setTimeout(() => void fitView({ ...FIT_VIEW, ...canvasMotion('fit') }), 30)
+          }}
+        >
+          <Icon name="auto_awesome_mosaic" size={14} />
+        </button>
+      )}
+      {labels !== undefined && (
+        <button
+          type="button"
+          className={control}
+          title={
+            labels.shown
+              ? 'Hide the label on each arrow'
+              : 'Show the label on each arrow: its lag, and whether it still needs a rationale'
+          }
+          aria-label={labels.shown ? 'Hide arrow labels' : 'Show arrow labels'}
+          aria-pressed={labels.shown}
+          onClick={labels.onToggle}
+        >
+          <Icon name={labels.shown ? 'label' : 'label_off'} size={14} />
+        </button>
+      )}
       <button
         type="button"
         className={control}
@@ -731,7 +804,7 @@ function CanvasControls({
         }
         aria-label={viewLocked ? 'Let the wheel zoom' : 'Lock the view'}
         aria-pressed={viewLocked}
-        onClick={onToggleLock}
+        onClick={view.toggleLock}
       >
         <Icon name={viewLocked ? 'lock' : 'lock_open'} size={14} />
       </button>
@@ -743,7 +816,7 @@ function CanvasControls({
         }
         aria-label={expanded ? 'Return graph to the page' : 'Expand graph'}
         aria-pressed={expanded}
-        onClick={onToggleExpand}
+        onClick={view.toggleExpanded}
       >
         <Icon name={expanded ? 'close_fullscreen' : 'open_in_full'} size={14} />
       </button>
@@ -985,24 +1058,14 @@ export function DagCanvas({
   readonly onEdgeSelected: (edge: DagEdgeId | null) => void
 }) {
   const hostRef = useRef<HTMLDivElement>(null)
-  const [expanded, setExpanded] = useState(false)
-  // A narrow canvas runs the layout down the page instead of across it, unless the reader has turned it.
-  const [fitted, setFitted] = useState<DagLayoutOrientation>('across')
-  const [chosen, setChosen] = useState<DagLayoutOrientation | null>(null)
-  const orientation = chosen ?? fitted
-  useEffect(() => {
-    const host = hostRef.current
-    if (host === null) return
-    const observer = new ResizeObserver(([entry]) => {
-      setFitted(entry.contentRect.width < 600 ? 'down' : 'across')
-    })
-    observer.observe(host)
-    return () => observer.disconnect()
-  }, [expanded])
+  // Cards someone has dragged keep their place; every other card follows the layout as the graph changes.
+  const placedByHand = useRef<Set<string>>(new Set())
+  const view = useCanvasView(hostRef, () => placedByHand.current.clear())
+  const { expanded, orientation, viewLocked } = view
   // The card size is measured from the names, so the model re-runs once the document's fonts have loaded.
   const metricsVersion = useTextMetricsVersion()
   const [labelsShown, setLabelsShown] = useState(false)
-  const [drawing, setDrawing] = useState<DrawingStyle>('sketch')
+  const [drawing] = useDrawingStyle()
   const [variableView, setVariableView] = useState<VariableView>('all')
   const connectedIds = useMemo(
     () => new Set(document.current.graph.edges.flatMap((edge) => [edge.cause, edge.effect])),
@@ -1109,8 +1172,6 @@ export function DagCanvas({
   }, [document])
   const selectedCanvasEdge = model.edges.find((edge) => edge.id === selectedEdge) ?? null
 
-  // Cards someone has dragged keep their place; every other card follows the layout as the graph changes.
-  const placedByHand = useRef<Set<string>>(new Set())
   const latestNodes = useRef(nodes)
   latestNodes.current = nodes
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
@@ -1212,20 +1273,8 @@ export function DagCanvas({
     },
     [onNodesChange, stopMotion],
   )
-  // The canvas sits inside a scrolling stage, so a wheel over it is ambiguous. Locked is the safer
-  // default: the wheel scrolls the page, ⌘ or Ctrl with the wheel still zooms, and the buttons always work.
-  const [viewLocked, setViewLocked] = useState(true)
   // A finger is imprecise: connections snap from further away and a tap on one dot then another also connects.
   const coarse = useMediaQuery('(pointer: coarse)')
-  useEffect(() => (expanded ? pushLayer(EXPANDED_CANVAS_LAYER) : undefined), [expanded])
-  useEffect(() => {
-    if (!expanded) return undefined
-    const escape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && escapeFor(EXPANDED_CANVAS_LAYER, event)) setExpanded(false)
-    }
-    window.addEventListener('keydown', escape)
-    return () => window.removeEventListener('keydown', escape)
-  }, [expanded])
   const additionAllowed = useCallback(
     (cause: DagNodeId | null, effect: DagNodeId | null): boolean =>
       inspectDagEdgeAddition(document, cause, effect).ok,
@@ -1520,28 +1569,17 @@ export function DagCanvas({
               />
             )}
             <CanvasControls
-              onTidy={tidy}
-              orientation={orientation}
-              onToggleOrientation={() => {
-                placedByHand.current.clear()
-                setChosen(orientation === 'across' ? 'down' : 'across')
-              }}
-              viewLocked={viewLocked}
-              onToggleLock={() => setViewLocked((locked) => !locked)}
-              expanded={expanded}
-              onToggleExpand={() => setExpanded((open) => !open)}
-              labelsShown={labelsShown}
-              onToggleLabels={() => setLabelsShown((shown) => !shown)}
-              drawing={drawing}
-              onToggleDrawing={() =>
-                setDrawing((style) => (style === 'clean' ? 'sketch' : 'clean'))
-              }
-              variableView={variableView}
-              disconnectedCount={disconnectedCount}
-              onToggleVariables={() => {
-                placedByHand.current.clear()
-                setVariableView((view) => (view === 'all' ? 'connected' : 'all'))
-                setRearrangements((count) => count + 1)
+              view={view}
+              tidy={tidy}
+              labels={{ shown: labelsShown, onToggle: () => setLabelsShown((shown) => !shown) }}
+              variables={{
+                view: variableView,
+                disconnected: disconnectedCount,
+                onToggle: () => {
+                  placedByHand.current.clear()
+                  setVariableView((current) => (current === 'all' ? 'connected' : 'all'))
+                  setRearrangements((count) => count + 1)
+                },
               }}
             />
             <RefitOnResize host={hostRef} layoutKey={`${bindingKey}\u0000${rearrangements}`} />

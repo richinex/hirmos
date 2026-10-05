@@ -5,6 +5,7 @@
 //! evidence or copy the numerical implementations out of the Hirmos causal core.
 
 mod causal_forest;
+mod swig_analysis;
 mod honest_did;
 mod did_sensitivity;
 mod network_query;
@@ -640,6 +641,9 @@ pub fn run_analysis(
             &unobserved,
             estimand,
         ),
+        AnalysisCommand::SwigAnalysis { specification, names } => {
+            swig_analysis::analyse(specification, &names).map(|result| AnalysisResult::SwigAnalysis { result })
+        },
         AnalysisCommand::DagCheck {
             rows,
             columns,

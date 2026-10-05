@@ -149,6 +149,7 @@ import type { StationarityBattery } from '@/domain/stationarity'
 import type { PandasResamplingEvidence, ResamplingAggregation } from '@/domain/resampling'
 import type { BackdoorIdentificationEvidence } from '@/domain/study'
 import type { DagCheckEvidence } from '@/domain/dagValidation'
+import type { SwigSpecification, SwigEvidence } from '@/domain/swig'
 import type { IdentifiedDiscreteQueryEvidence } from '@/domain/intervention'
 import type { NetworkQuery, NetworkQueryEvidence } from '@/domain/networkQuery'
 import type {
@@ -2194,6 +2195,36 @@ export function runBinaryEtt(
     { kind: 'binary-ett', request, values, rows, columns, ...design },
     values,
   )
+}
+
+export function runSwigAnalysis(
+  specification: SwigSpecification,
+  names: readonly string[],
+  onProgress?: (progress: AnalysisProgress) => void,
+): Promise<Result<SwigEvidence, AnalysisWorkerProblem>> {
+  const request = newWorkerRequestId()
+  return new Promise((resolve) => {
+    pending.set(request, pendingRun('swig-analysis-succeeded', resolve, onProgress))
+    const values = new Float64Array()
+    const command: AnalysisWorkerCommand = {
+      kind: 'swig-analysis',
+      request,
+      values,
+      specification,
+      names,
+    }
+    try {
+      analysisWorker().postMessage(command, [values.buffer])
+    } catch (cause: unknown) {
+      pending.delete(request)
+      resolve(
+        err({
+          kind: 'worker-unavailable',
+          detail: cause instanceof Error ? cause.message : String(cause),
+        }),
+      )
+    }
+  })
 }
 
 export function runDagCheck(

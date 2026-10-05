@@ -96,6 +96,7 @@ import {
 import { parseStationarityBattery } from '@/domain/stationarity'
 import { parseBackdoorIdentificationEvidence } from '@/domain/study'
 import { dagCheckEvidenceSchema } from '@/domain/dagValidation'
+import { swigEvidenceSchema } from '@/domain/swig'
 import { identifiedDiscreteQueryEvidenceSchema } from '@/domain/intervention'
 import { networkQueryEvidenceSchema } from '@/domain/networkQuery'
 import { conditionalGaussianEvidenceSchema } from '@/domain/conditionalGaussianQuery'
@@ -432,6 +433,8 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
         unobserved: command.unobserved,
         estimand: command.estimand,
       }
+    case 'swig-analysis':
+      return { kind: 'swigAnalysis', specification: command.specification, names: command.names }
     case 'dag-check':
       return {
         kind: 'dagCheck',
@@ -1304,6 +1307,25 @@ self.onmessage = (message: MessageEvent<unknown>) => {
           kind: 'backdoor-identification-succeeded',
           request: command.request,
           result: result.value,
+        })
+        return
+      }
+      case 'swig-analysis': {
+        const parsed = z
+          .object({ kind: z.literal('swigAnalysis'), result: swigEvidenceSchema })
+          .strict()
+          .safeParse(decoded)
+        if (!parsed.success) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: z.prettifyError(parsed.error),
+          })
+          return
+        }
+        emit({
+          kind: 'swig-analysis-succeeded',
+          request: command.request,
+          result: parsed.data.result,
         })
         return
       }

@@ -1,6 +1,7 @@
 import { Icon } from '@/components/Icon'
 import { button } from '@/components/ui/recipes'
 
+/** Select-all and clear buttons. Their text labels show only when the enclosing pane is wide enough. */
 export function SelectionActions({
   selectLabel,
   clearLabel,
@@ -22,7 +23,7 @@ export function SelectionActions({
         onClick={onSelectAll}
       >
         <Icon name="select_all" size={15} />
-        <span className="hidden md:inline">Select all</span>
+        <span className="hidden @sm:inline">Select all</span>
       </button>
       <button
         type="button"
@@ -32,7 +33,7 @@ export function SelectionActions({
         onClick={onClear}
       >
         <Icon name="deselect" size={15} />
-        <span className="hidden md:inline">Clear</span>
+        <span className="hidden @sm:inline">Clear</span>
       </button>
     </div>
   )

@@ -182,7 +182,7 @@ export function EvidenceInspector({
     selectedRun === null ? runs.at(-1) : runs.find((candidate) => candidate.id === selectedRun)
   if (run === undefined) {
     return (
-      <aside className="border-t border-hair pt-4" aria-labelledby="discovery-evidence-title">
+      <aside className="pt-4" aria-labelledby="discovery-evidence-title">
         <h3 id="discovery-evidence-title" className="mb-1 mt-0 text-body font-medium text-ink">
           No discovery runs
         </h3>
@@ -195,7 +195,7 @@ export function EvidenceInspector({
   }
   const view = discoveryEvidenceView(run)
   return (
-    <aside className="min-w-0 border-t border-hair pt-4" aria-labelledby="discovery-evidence-title">
+    <aside className="min-w-0 pt-4" aria-labelledby="discovery-evidence-title">
       <div className="mb-3 flex items-start justify-between gap-2">
         <div className="min-w-0">
           <h3 id="discovery-evidence-title" className="mb-1 mt-0 text-body font-medium text-ink">
@@ -252,7 +252,7 @@ export function EvidenceInspector({
         )}
       </div>
       {selectedCandidate !== null && selectedCandidate.run === run.id && (
-        <p className={literal('mb-0 mt-3 border-t border-hair pt-3 text-label text-muted')}>
+        <p className={literal('mb-0 mt-3 pt-3 text-label text-muted')}>
           Blue marks the reported source; amber marks the target. Selection does not create, orient,
           or alter a causal edge.
         </p>

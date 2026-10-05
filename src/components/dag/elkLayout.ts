@@ -136,6 +136,21 @@ export async function layoutDag(
   orientation: DagLayoutOrientation,
   size: DagCardSize,
 ): Promise<Result<DagLayout, LayoutProblem>> {
+  return layoutGraph({
+    nodes: graph.nodes,
+    edges: graph.edges.map(edge => ({ ...edge, labelSize: routeLabelSize(edge) })),
+  }, orientation, size)
+}
+
+/** Geometry only: derived graphs do not masquerade as editable DAG documents. */
+export async function layoutGraph<N extends string, E extends string>(
+  graph: {
+    readonly nodes: readonly { readonly id: N }[]
+    readonly edges: readonly { readonly id: E; readonly cause: N; readonly effect: N; readonly labelSize: { readonly width: number; readonly height: number } }[]
+  },
+  orientation: DagLayoutOrientation,
+  size: DagCardSize,
+): Promise<Result<{ readonly nodes: ReadonlyMap<N, LayoutPoint>; readonly routes: ReadonlyMap<E, DagRoute> }, LayoutProblem>> {
   try {
     engine ??= new ELK({ workerFactory: () => new ElkWorker() })
     const raw = await engine.layout({
@@ -164,7 +179,7 @@ export async function layoutDag(
         labels: [
           {
             id: `${edge.id}:label`,
-            ...routeLabelSize(edge),
+            ...edge.labelSize,
             layoutOptions: { 'elk.edgeLabels.placement': 'CENTER' },
           },
         ],
@@ -174,13 +189,13 @@ export async function layoutDag(
     if (!parsed.success) return err({ kind: 'invalid-result' })
     const placedNodes = new Map(parsed.data.children.map((node) => [node.id, node]))
     const placedEdges = new Map((parsed.data.edges ?? []).map((edge) => [edge.id, edge]))
-    const nodes = new Map<DagNodeId, LayoutPoint>()
+    const nodes = new Map<N, LayoutPoint>()
     for (const node of graph.nodes) {
       const placed = placedNodes.get(node.id)
       if (placed === undefined) return err({ kind: 'invalid-result' })
       nodes.set(node.id, { x: placed.x, y: placed.y })
     }
-    const routes = new Map<DagEdgeId, DagRoute>()
+    const routes = new Map<E, DagRoute>()
     for (const edge of graph.edges) {
       const routed = placedEdges.get(edge.id)
       const section = routed?.sections[0]

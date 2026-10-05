@@ -548,7 +548,7 @@ export function InterventionPanel({
       </section>
     )
   return (
-    <section className="border-t border-hair pt-4" aria-labelledby="intervene-title">
+    <section className="pt-4" aria-labelledby="intervene-title">
       {switcher}
       <h3 id="intervene-title" className="mb-1 mt-0 text-body font-medium text-ink">
         Intervene

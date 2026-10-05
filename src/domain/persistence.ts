@@ -1,4 +1,5 @@
 import { surrogateRunSchema, surrogateRunMatchesProfile, type SurrogateRun } from './surrogateRun'
+import { swigAnalysisSchema, type SwigAnalysis } from './swig'
 import { z } from 'zod'
 import {
   predictorSyntheticConfigurationSchema,
@@ -92,6 +93,7 @@ export interface PersistedProject {
   readonly dagDocuments: readonly DagDocument[]
   readonly dagChecks: readonly DagCheckArtifact[]
   readonly interventionQueries: readonly InterventionQueryArtifact[]
+  readonly swigAnalyses: readonly SwigAnalysis[]
   readonly studyDraft: StudyDesignDraft
   readonly studies: readonly StudySpecification[]
   readonly identifications: readonly IdentificationArtifact[]
@@ -159,6 +161,7 @@ export function snapshotWorkflow(workflow: Workflow, savedAt: string): Persisted
         dagDocuments: [],
         dagChecks: [],
         interventionQueries: [],
+        swigAnalyses: [],
         studyDraft: EMPTY_STUDY_DRAFT,
         studies: [],
         identifications: [],
@@ -194,6 +197,7 @@ export function snapshotWorkflow(workflow: Workflow, savedAt: string): Persisted
         dagDocuments: workflow.dagDocuments,
         dagChecks: workflow.dagChecks,
         interventionQueries: workflow.interventionQueries,
+        swigAnalyses: workflow.swigAnalyses,
         studyDraft: workflow.studyDraft,
         studies: workflow.studies,
         identifications: workflow.identifications,
@@ -287,6 +291,7 @@ const envelopeSchema = z.object({
   discoveryRuns: z.array(artifact),
   dagDocuments: z.array(artifact),
   dagChecks: z.array(artifact).default([]),
+  swigAnalyses: z.array(swigAnalysisSchema).default([]),
   interventionQueries: z
     .array(
       artifact.superRefine((value, ctx) => {

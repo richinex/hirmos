@@ -1,9 +1,10 @@
+import { RunPicker } from '@/components/ui/RunPicker'
 import { SettingsDisclosure } from '@/components/ui/SettingsDisclosure'
 import { useMemo, useState, type ReactNode } from 'react'
 import { useJob } from '@/analysis/JobsProvider'
 import { useWorkflow } from '@/components/WorkflowProvider'
 import { sameCausalSelection } from '@/domain/causalModelDraft'
-import { WorkbenchLayout, useClosePane } from '@/components/shell/WorkbenchLayout'
+import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { Select } from '@/components/ui/Select'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
@@ -14,7 +15,6 @@ import {
   field,
   fieldLabel,
   fieldHint,
-  iconControl,
   panel,
   sectionTitle,
   resultSurface,
@@ -40,7 +40,6 @@ import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
 import type { SelectedSource } from '@/domain/workflow'
 import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
 import { formatStatistic } from '@/lib/format/number'
-import { formatTime } from '@/lib/format/date'
 
 interface Props {
   readonly source: SelectedSource
@@ -185,58 +184,6 @@ export function GcmEffectResult({ run }: { readonly run: GcmEffectsRun }) {
     </section>
   )
 }
-function History({
-  runs,
-  selected,
-  onSelect,
-  onDelete,
-}: {
-  readonly runs: readonly GcmEffectsRun[]
-  readonly selected: string | undefined
-  readonly onSelect: (id: string) => void
-  readonly onDelete: (id: string) => void
-}) {
-  const close = useClosePane()
-  return (
-    <ul className="m-0 list-none p-1 text-body" aria-label="Intervention effect runs">
-      {runs.length === 0 && (
-        <li className="px-3 py-2 text-faint">No intervention effect runs yet.</li>
-      )}
-      {[...runs].reverse().map((run) => (
-        <li
-          key={run.id}
-          className={`flex min-w-0 items-center gap-2 rounded-md px-2 ${selected === run.id ? 'bg-well' : ''}`}
-        >
-          <button
-            type="button"
-            className="flex min-h-10 min-w-0 flex-1 items-center gap-3 rounded-md text-left focus-visible:outline-2 focus-visible:outline-signal"
-            aria-pressed={selected === run.id}
-            onClick={() => {
-              onSelect(run.id)
-              close()
-            }}
-          >
-            <span className="min-w-0 flex-1 truncate text-body text-ink">
-              {run.model.names[run.model.treatment]} → {run.model.names[run.model.outcome]}
-            </span>
-            <time className="shrink-0 text-label tabular-nums text-faint">
-              {formatTime(run.createdAt)}
-            </time>
-          </button>
-          <button
-            type="button"
-            className={iconControl('danger')}
-            aria-label="Delete intervention effect run"
-            onClick={() => onDelete(run.id)}
-          >
-            <Icon name="delete" size={16} />
-          </button>
-        </li>
-      ))}
-    </ul>
-  )
-}
-
 type Quantiles = Extract<GcmEffectsRequest['grouping'], { kind: 'quantiles' }>
 function QuantileGroups({
   value,
@@ -407,8 +354,15 @@ export function GcmEffectsPanel(props: Props) {
         title: `Run history (${props.runs.length})`,
         defaultCollapsed: true,
         body: (
-          <History
-            runs={props.runs}
+          <RunPicker
+            label="Intervention effect runs"
+            empty="No intervention effect runs yet."
+            runs={props.runs.map((run) => ({
+              id: run.id,
+              title: `${run.model.names[run.model.treatment]} → ${run.model.names[run.model.outcome]}`,
+              createdAt: run.createdAt,
+              deleteLabel: 'Delete intervention effect run',
+            }))}
             selected={latest?.id}
             onSelect={setSelected}
             onDelete={props.onDelete}

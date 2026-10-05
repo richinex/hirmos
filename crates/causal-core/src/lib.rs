@@ -214,3 +214,4 @@ pub mod sun_abraham;
 pub mod sun_abraham_fit;
 pub mod augmented_synth;
 pub mod surrogate_index;
+pub mod swig;

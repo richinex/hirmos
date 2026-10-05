@@ -63,7 +63,7 @@ test('DAG actions share dimensions on desktop and in the mobile inspector', asyn
   if (mobile) await page.getByRole('button', { name: 'Inspector', exact: true }).click()
   const selector = page.getByRole('radiogroup', { name: 'DAG inspector' })
   const choices = await selector.getByRole('radio').evaluateAll(elements => elements.map(element => element.getBoundingClientRect().top))
-  expect(choices).toHaveLength(3)
+  expect(choices).toHaveLength(4)
   expect(Math.max(...choices) - Math.min(...choices)).toBeLessThan(1)
   await selector.getByRole('radio', { name: 'Intervene', exact: true }).check()
   await expect(selector.getByRole('radio', { name: 'Intervene', exact: true })).toBeChecked()

@@ -157,6 +157,12 @@ export const adjustedRegressionFixedEffectsSchema = z.discriminatedUnion('kind',
 export type AdjustedRegressionFixedEffects = z.infer<typeof adjustedRegressionFixedEffectsSchema>
 import { dagCheckEvidenceSchema, type DagCheckEvidence } from '@/domain/dagValidation'
 import {
+  swigSpecificationSchema,
+  swigEvidenceSchema,
+  type SwigSpecification,
+  type SwigEvidence,
+} from '@/domain/swig'
+import {
   identifiedDiscreteQueryEvidenceSchema,
   type IdentifiedDiscreteQueryEvidence,
 } from '@/domain/intervention'
@@ -884,6 +890,14 @@ export type AnalysisWorkerCommand =
       readonly outcome: number
       readonly unobserved: readonly number[]
       readonly estimand: 'ate' | 'att'
+    }
+  | {
+      readonly kind: 'swig-analysis'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly specification: SwigSpecification
+      /** One display name per specification role, used in refusal messages. */
+      readonly names: readonly string[]
     }
   | {
       readonly kind: 'dag-check'
@@ -1758,6 +1772,11 @@ export type AnalysisWorkerEvent =
       readonly kind: 'backdoor-identification-succeeded'
       readonly request: WorkerRequestId
       readonly result: BackdoorIdentificationEvidence
+    }
+  | {
+      readonly kind: 'swig-analysis-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: SwigEvidence
     }
   | {
       readonly kind: 'dag-check-succeeded'
@@ -2848,6 +2867,15 @@ const commandSchema = z.discriminatedUnion('kind', [
     .strict(),
   z
     .object({
+      kind: z.literal('swig-analysis'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      specification: swigSpecificationSchema,
+      names: z.array(z.string()).max(256),
+    })
+    .strict(),
+  z
+    .object({
       kind: z.literal('dag-check'),
       request: requestSchema,
       values: z.instanceof(Float64Array),
@@ -3933,6 +3961,13 @@ const eventSchema = z.discriminatedUnion('kind', [
     .strict(),
   z
     .object({
+      kind: z.literal('swig-analysis-succeeded'),
+      request: requestSchema,
+      result: swigEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
       kind: z.literal('dag-check-succeeded'),
       request: requestSchema,
       result: dagCheckEvidenceSchema,
@@ -4683,6 +4718,13 @@ export function parseAnalysisWorkerEvent(
           result: result.value,
         })
       : err({ kind: 'invalid-event', detail: result.error.detail })
+  }
+  if (parsed.data.kind === 'swig-analysis-succeeded') {
+    return ok({
+      kind: 'swig-analysis-succeeded',
+      request: request.value,
+      result: parsed.data.result,
+    })
   }
   if (parsed.data.kind === 'dag-check-succeeded') {
     const result = dagCheckEvidenceSchema.safeParse(parsed.data.result)

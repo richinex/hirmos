@@ -8,6 +8,7 @@ const PREFIXES: readonly (readonly [string, ChapterId])[] = [
   ['influence:', 'root-cause'],
   ['intervention:', 'dag'],
   ['graph-check:', 'dag'],
+  ['swig:', 'dag'],
   ['identification', 'study'],
   ['estimation', 'estimation'],
   ['sensitivity', 'sensitivity'],

@@ -1,4 +1,5 @@
 import { surrogateRunMatchesProfile, type SurrogateRun, type SurrogateRunId } from './surrogateRun'
+import type { SwigAnalysis } from './swig'
 import { assertNever, brand, err, ok, type Brand, type NonEmptyArray, type Result } from './dop'
 import type { DatasetProfile, DatasetProfileProblem, SourcePersistence } from './dataset'
 import { fileReading, NO_DECLARATIONS, type FileReading } from './fileReading'
@@ -144,6 +145,7 @@ export type Workflow =
       readonly dagChecks: readonly DagCheckArtifact[]
       /** Do-queries asked of the graphs above; each records the revision it was asked of. */
       readonly interventionQueries: readonly InterventionQueryArtifact[]
+      readonly swigAnalyses: readonly SwigAnalysis[]
       /** The treatment and outcome being bound, shared by the DAG Workspace and Study Design. */
       readonly studyDraft: StudyDesignDraft
       readonly studies: readonly StudySpecification[]
@@ -221,6 +223,8 @@ export type WorkflowEvent =
   | { readonly type: 'dag-document-revised'; readonly document: DagDocument }
   | { readonly type: 'dag-check-created'; readonly check: DagCheckArtifact }
   | { readonly type: 'intervention-query-created'; readonly query: InterventionQueryArtifact }
+  | { readonly type: 'swig-analysis-created'; readonly analysis: SwigAnalysis }
+  | { readonly type: 'swig-analysis-deleted'; readonly id: SwigAnalysis['id'] }
   | { readonly type: 'intervention-query-deleted'; readonly query: InterventionQueryArtifact['id'] }
   | { readonly type: 'study-draft-changed'; readonly draft: StudyDesignDraft }
   | {
@@ -429,6 +433,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
           dagDocuments: snapshot.dagDocuments,
           dagChecks: snapshot.dagChecks,
           interventionQueries: snapshot.interventionQueries,
+          swigAnalyses: snapshot.swigAnalyses,
           studyDraft: snapshot.studyDraft,
           studies: snapshot.studies,
           identifications: snapshot.identifications,
@@ -536,6 +541,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
           dagDocuments: [],
           dagChecks: [],
           interventionQueries: [],
+          swigAnalyses: [],
           studyDraft: EMPTY_STUDY_DRAFT,
           studies: [],
           identifications: [],
@@ -616,6 +622,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
           dagDocuments: [],
           dagChecks: [],
           interventionQueries: [],
+          swigAnalyses: [],
           studyDraft: EMPTY_STUDY_DRAFT,
           studies: [],
           identifications: [],
@@ -755,6 +762,10 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
         }
       }
       if (event.type === 'study-draft-changed') return { ...state, studyDraft: event.draft }
+      if (event.type === 'swig-analysis-created' && state.prepared?.id === event.analysis.preparedDataset && state.dagDocuments.some(document => document.id === event.analysis.dagDocument && document.current.id === event.analysis.dagRevision)) {
+        return { ...state, swigAnalyses: [...state.swigAnalyses, event.analysis] }
+      }
+      if (event.type === 'swig-analysis-deleted') return { ...state, swigAnalyses: state.swigAnalyses.filter(record => record.id !== event.id) }
       if (
         event.type === 'study-identified' &&
         state.prepared !== null &&

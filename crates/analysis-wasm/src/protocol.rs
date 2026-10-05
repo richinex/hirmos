@@ -1280,6 +1280,7 @@ pub(crate) enum AnalysisCommand {
         unobserved: Vec<usize>,
         estimand: IdentificationEstimand,
     },
+    SwigAnalysis { specification: crate::swig_analysis::Specification, names: Vec<String> },
     DagCheck {
         rows: usize,
         columns: usize,
@@ -3058,6 +3059,7 @@ pub(crate) enum AnalysisResult {
         graphical_identification: GraphicalIdentificationEvidence,
         counterfactual_identification: CounterfactualIdentificationEvidence,
     },
+    SwigAnalysis { result: crate::swig_analysis::Evidence },
     DagCheck {
         observations: usize,
         significance_level: f64,

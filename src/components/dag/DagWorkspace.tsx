@@ -29,6 +29,7 @@ import {
   well,
 } from '@/components/ui/recipes'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
+import { RunPicker } from '@/components/ui/RunPicker'
 import {
   createDagDocument,
   describeDagCreateProblem,
@@ -89,8 +90,13 @@ import { EMPTY_STUDY_DRAFT, type StudyDesignDraft } from '@/domain/study'
 import { EvidenceInspector } from './EvidenceInspector'
 
 import { prepareRootCauseGraph, type RootCauseSelection } from '@/domain/rootCause'
+import { SwigWorkspace } from './SwigWorkspace'
+import type { SwigAnalysis } from '@/domain/swig'
 
 interface DagWorkspaceProps {
+  readonly swigAnalyses: readonly SwigAnalysis[]
+  readonly onSwigAnalysis: (record: SwigAnalysis) => void
+  readonly onDeleteSwigAnalysis: (id: SwigAnalysis['id']) => void
   readonly source: SelectedSource
   readonly profile: DatasetProfile
   readonly prepared: PreparedDatasetArtifact
@@ -1063,6 +1069,9 @@ function GraphCheckPanel({
 }
 
 export function DagWorkspace({
+  swigAnalyses,
+  onSwigAnalysis,
+  onDeleteSwigAnalysis,
   profile,
   prepared,
   discoveryRuns,
@@ -1317,10 +1326,11 @@ export function DagWorkspace({
     }
     dispatch({ type: 'paste-applied' })
   }
-  const [inspectorTab, setInspectorTab] = useState<'selection' | 'evidence' | 'intervene'>(
+  const [inspectorTab, setInspectorTab] = useState<'selection' | 'evidence' | 'intervene' | 'swig'>(
     discoveryRuns.length > 0 ? 'evidence' : 'selection',
   )
   const [interventionOverlay, setInterventionOverlay] = useState<InterventionOverlay | null>(null)
+  const [bottomView, setBottomView] = useState<'arrows' | 'dags'>('arrows')
   useEffect(() => {
     if (selectedEdge !== null) setInspectorTab('selection')
   }, [selectedEdge])
@@ -1458,22 +1468,6 @@ export function DagWorkspace({
       className="@container/panel flex min-h-full flex-1 flex-col"
     >
       {header}
-      {documents.length > 1 && (
-        <SegmentedControl
-          wrap
-          className="mb-3 self-start"
-          ariaLabel="DAG documents"
-          value={document.id}
-          onChange={(id) =>
-            dispatch({
-              type: 'document-selected',
-              document: id,
-              latestRun: latestRunId(discoveryRuns),
-            })
-          }
-          options={documents.map((candidate) => ({ value: candidate.id, label: candidate.name }))}
-        />
-      )}
       <div
         className="mb-4 flex flex-wrap items-center justify-between gap-3"
         role="group"
@@ -1918,6 +1912,7 @@ export function DagWorkspace({
         value={inspectorTab}
         onChange={setInspectorTab}
         options={[
+          { value: 'swig', label: 'SWIG' },
           {
             value: 'selection',
             label: (
@@ -2109,6 +2104,19 @@ export function DagWorkspace({
     />
   )
 
+  if (inspectorTab === 'swig')
+    return (
+      <SwigWorkspace
+        key={document.current.id}
+        document={document}
+        prepared={prepared}
+        records={swigAnalyses}
+        onRecord={onSwigAnalysis}
+        onDelete={onDeleteSwigAnalysis}
+        onBack={() => setInspectorTab('selection')}
+      />
+    )
+
   return (
     <WorkbenchLayout
       id="dag"
@@ -2119,8 +2127,45 @@ export function DagWorkspace({
         body: inspector,
       }}
       bottom={{
-        title: `Arrows (${document.current.graph.edges.length})`,
-        body: ledger,
+        title:
+          bottomView === 'arrows'
+            ? `Arrows (${document.current.graph.edges.length})`
+            : `DAGs (${documents.length})`,
+        controls: (
+          <SegmentedControl
+            variant="line"
+            size="sm"
+            ariaLabel="Bottom panel"
+            value={bottomView}
+            onChange={setBottomView}
+            options={[
+              { value: 'arrows', label: 'Arrows' },
+              { value: 'dags', label: 'DAGs' },
+            ]}
+          />
+        ),
+        body:
+          bottomView === 'arrows' ? (
+            ledger
+          ) : (
+            <RunPicker
+              label="DAGs"
+              empty="Create a DAG to list it here."
+              runs={documents.map((candidate) => ({
+                id: candidate.id,
+                title: candidate.name,
+                createdAt: candidate.current.createdAt,
+              }))}
+              selected={document.id}
+              onSelect={(id) =>
+                dispatch({
+                  type: 'document-selected',
+                  document: id,
+                  latestRun: latestRunId(discoveryRuns),
+                })
+              }
+            />
+          ),
         defaultSize: 150,
       }}
     />

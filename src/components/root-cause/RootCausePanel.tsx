@@ -1,8 +1,9 @@
+import { RunPicker } from '@/components/ui/RunPicker'
 import { formatCount } from '@/lib/format/number'
 import { SettingsDisclosure } from '@/components/ui/SettingsDisclosure'
 import { useId, useRef, useState } from 'react'
 import { useJob } from '@/analysis/JobsProvider'
-import { WorkbenchLayout, useClosePane } from '@/components/shell/WorkbenchLayout'
+import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { Select } from '@/components/ui/Select'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
@@ -18,8 +19,6 @@ import {
 import { GcmInfluencePanel } from './GcmInfluencePanel'
 import type { GcmInfluenceRun } from '@/domain/gcmInfluence'
 import type { GcmEffectsRun } from '@/domain/gcmEffects'
-import { Icon } from '@/components/Icon'
-import { formatTime } from '@/lib/format/date'
 import { ParameterLabel } from '@/components/ui/ParameterLabel'
 import { RootCauseRunResult } from './RootCauseRunResult'
 import { RootCauseChecks } from './RootCauseChecks'
@@ -29,12 +28,10 @@ import { GraphDetails } from './GraphDetails'
 import { readObservation } from '@/domain/observation'
 import {
   button,
-  caption,
   chapterIntro,
   field,
   fieldLabel,
   fieldHint,
-  iconControl,
   panel,
   sectionTitle,
 } from '@/components/ui/recipes'
@@ -88,63 +85,6 @@ const analyses = [
   { value: 'intrinsic', label: 'Variance contributions' },
   { value: 'arrows', label: 'Arrow strengths' },
 ] as const
-
-function RunHistory({
-  runs,
-  selected,
-  onSelect,
-  onDelete,
-}: {
-  readonly runs: readonly RootCauseRun[]
-  readonly selected: string | undefined
-  readonly onSelect: (id: string) => void
-  readonly onDelete: (id: string) => void
-}) {
-  const close = useClosePane()
-  return (
-    <ul className="m-0 list-none p-1 text-body" aria-label="Root-cause runs">
-      {runs.length === 0 && <li className="px-3 py-2 text-faint">No root-cause runs yet.</li>}
-      {[...runs].reverse().map((run) => {
-        const name = analyses.find((entry) => entry.value === run.model.query.kind)!.label
-        return (
-          <li
-            key={run.id}
-            className={`flex min-w-0 items-center gap-2 rounded-md px-2 ${selected === run.id ? 'bg-well' : ''}`}
-          >
-            <button
-              type="button"
-              className="flex min-h-10 min-w-0 flex-1 items-center gap-3 rounded-md text-left focus-visible:outline-2 focus-visible:outline-signal"
-              aria-label={`${name}: ${run.comparison.name}, ${formatTime(run.createdAt)}`}
-              aria-pressed={selected === run.id}
-              title={`${name}: ${run.comparison.name}`}
-              onClick={() => {
-                onSelect(run.id)
-                close()
-              }}
-            >
-              <span className={caption('min-w-0 flex-1 truncate text-ink')}>{name}</span>
-              <time
-                className="shrink-0 text-label tabular-nums text-faint"
-                dateTime={run.createdAt}
-              >
-                {formatTime(run.createdAt)}
-              </time>
-            </button>
-            <button
-              type="button"
-              className={iconControl('danger')}
-              aria-label={`Delete ${run.comparison.name} run`}
-              title="Delete this run"
-              onClick={() => onDelete(run.id)}
-            >
-              <Icon name="delete" size={16} />
-            </button>
-          </li>
-        )
-      })}
-    </ul>
-  )
-}
 
 const descriptions: Record<
   'anomaly' | 'change' | 'intervention',
@@ -563,8 +503,15 @@ export function RootCausePanel(props: Props) {
         title: `Run history (${props.workspace.runs.length})`,
         defaultCollapsed: true,
         body: (
-          <RunHistory
-            runs={props.workspace.runs}
+          <RunPicker
+            label="Root-cause runs"
+            empty="No root-cause runs yet."
+            runs={props.workspace.runs.map((run) => ({
+              id: run.id,
+              title: `${analyses.find((entry) => entry.value === run.model.query.kind)!.label}: ${run.comparison.name}`,
+              createdAt: run.createdAt,
+              deleteLabel: `Delete ${run.comparison.name} run`,
+            }))}
             selected={latest?.id}
             onSelect={setSelected}
             onDelete={props.onDelete}

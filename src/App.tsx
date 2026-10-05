@@ -1689,6 +1689,9 @@ function App() {
                     <ChapterBoundary key={activeChapter} chapter={activeName}>
                       <Suspense fallback={<ChapterSkeleton label="Loading DAG editor…" />}>
                         <DagWorkspace
+                          swigAnalyses={workflow.swigAnalyses}
+                          onSwigAnalysis={analysis => dispatch({ type: 'swig-analysis-created', analysis })}
+                          onDeleteSwigAnalysis={id => dispatch({ type: 'swig-analysis-deleted', id })}
                           key={workflow.prepared.id}
                           source={workflow.source}
                           profile={workflow.profile}
