@@ -15,7 +15,11 @@ export const flowControl = zoomControl
  * centred by `left: 50%` would otherwise shrink to half the canvas, and scrolls rather than wraps. Rendered inside the ReactFlow element,
  * so it reads the canvas's own viewport.
  */
-export function FlowControls({ fit, fitLabel = 'Fit the canvas', children }: {
+export function FlowControls({
+  fit,
+  fitLabel = 'Fit the canvas',
+  children,
+}: {
   readonly fit?: FitViewOptions
   readonly fitLabel?: string
   readonly children?: ReactNode
@@ -23,9 +27,31 @@ export function FlowControls({ fit, fitLabel = 'Fit the canvas', children }: {
   const { fitView, zoomIn, zoomOut } = useReactFlow()
   const isMobile = useIsMobile()
   return (
-    <Panel position={isMobile ? 'bottom-center' : 'bottom-right'} className={isMobile ? '!mx-0 !my-2' : '!m-2'} style={isMobile ? { transform: 'translateX(-50%)', width: 'max-content', maxWidth: 'calc(100vw - 2rem)' } : undefined}>
-      <div className={cn('flex overflow-hidden rounded-lg border border-hair bg-panel/95 backdrop-blur', isMobile ? 'flex-row overflow-x-auto [scrollbar-width:none]' : 'flex-col')} role="toolbar" aria-label="Canvas">
-        <ZoomButtons onIn={() => void zoomIn(canvasMotion('zoom'))} onOut={() => void zoomOut(canvasMotion('zoom'))} onFit={fit === undefined ? undefined : () => void fitView({ ...fit, ...canvasMotion('fit') })} fitLabel={fitLabel} />
+    <Panel
+      position={isMobile ? 'bottom-center' : 'bottom-right'}
+      className={isMobile ? '!mx-0 !my-2' : '!m-2'}
+      style={
+        isMobile
+          ? { transform: 'translateX(-50%)', width: 'max-content', maxWidth: 'calc(100vw - 2rem)' }
+          : undefined
+      }
+    >
+      <div
+        className={cn(
+          'flex overflow-hidden rounded-lg border border-hair bg-panel/95 backdrop-blur',
+          isMobile ? 'flex-row overflow-x-auto [scrollbar-width:none]' : 'flex-col',
+        )}
+        role="toolbar"
+        aria-label="Canvas"
+      >
+        <ZoomButtons
+          onIn={() => void zoomIn(canvasMotion('zoom'))}
+          onOut={() => void zoomOut(canvasMotion('zoom'))}
+          onFit={
+            fit === undefined ? undefined : () => void fitView({ ...fit, ...canvasMotion('fit') })
+          }
+          fitLabel={fitLabel}
+        />
         {children}
       </div>
     </Panel>

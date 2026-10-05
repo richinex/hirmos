@@ -4,7 +4,9 @@ declare module '@duckdb/duckdb-wasm-shell' {
   export interface ShellProps {
     readonly shellModule: RequestInfo | URL | Response | BufferSource | WebAssembly.Module
     readonly container: HTMLDivElement
-    readonly resolveDatabase: (progress: duckdb.InstantiationProgressHandler) => Promise<duckdb.AsyncDuckDB>
+    readonly resolveDatabase: (
+      progress: duckdb.InstantiationProgressHandler,
+    ) => Promise<duckdb.AsyncDuckDB>
     readonly backgroundColor?: string
     readonly fontFamily?: string
   }

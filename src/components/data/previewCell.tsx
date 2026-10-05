@@ -20,7 +20,10 @@ const decimalsOf = (value: number): number => {
   return point < 0 ? 0 : Math.min(6, text.length - point - 1)
 }
 
-export const columnDecimals = (rows: readonly (readonly PreviewCell[] | null)[], columnIndex: number): number => {
+export const columnDecimals = (
+  rows: readonly (readonly PreviewCell[] | null)[],
+  columnIndex: number,
+): number => {
   let decimals = 0
   for (const row of rows) {
     const cell = row?.[columnIndex]
@@ -31,22 +34,46 @@ export const columnDecimals = (rows: readonly (readonly PreviewCell[] | null)[],
 
 export const previewCellText = (cell: PreviewCell, decimals: number): string => {
   switch (cell.kind) {
-    case 'null': return formatAbsent('unavailable', 'missing value').text
-    case 'number': return storedDigits(Number.isFinite(cell.value) ? cell.value.toFixed(decimals) : String(cell.value))
-    case 'integer': return storedDigits(cell.value)
-    case 'boolean': return cell.value ? 'true' : 'false'
-    case 'temporal': return cell.value.replace('T', ' ').replace(/\.000Z$/, '').replace(/Z$/, '')
-    case 'text': return cell.value
-    default: return assertNever(cell)
+    case 'null':
+      return formatAbsent('unavailable', 'missing value').text
+    case 'number':
+      return storedDigits(
+        Number.isFinite(cell.value) ? cell.value.toFixed(decimals) : String(cell.value),
+      )
+    case 'integer':
+      return storedDigits(cell.value)
+    case 'boolean':
+      return cell.value ? 'true' : 'false'
+    case 'temporal':
+      return cell.value
+        .replace('T', ' ')
+        .replace(/\.000Z$/, '')
+        .replace(/Z$/, '')
+    case 'text':
+      return cell.value
+    default:
+      return assertNever(cell)
   }
 }
 
-export function PreviewCellText({ cell, decimals }: { readonly cell: PreviewCell; readonly decimals: number }): ReactNode {
+export function PreviewCellText({
+  cell,
+  decimals,
+}: {
+  readonly cell: PreviewCell
+  readonly decimals: number
+}): ReactNode {
   if (cell.kind === 'null') {
     const absent = formatAbsent('unavailable', 'missing value')
-    return <span className="text-muted" title="Missing value"><span className="sr-only">{absent.srText}</span><span aria-hidden>{absent.text}</span></span>
+    return (
+      <span className="text-muted" title="Missing value">
+        <span className="sr-only">{absent.srText}</span>
+        <span aria-hidden>{absent.text}</span>
+      </span>
+    )
   }
   return previewCellText(cell, decimals)
 }
 
-export const isNumericCell = (cell: PreviewCell): boolean => cell.kind === 'number' || cell.kind === 'integer'
+export const isNumericCell = (cell: PreviewCell): boolean =>
+  cell.kind === 'number' || cell.kind === 'integer'

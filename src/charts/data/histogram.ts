@@ -1,7 +1,14 @@
 import type { EChartsCoreOption } from 'echarts/core'
 import type { HistogramBins } from '@/domain/dataset'
 import { formatCount, formatStatistic } from '@/lib/format/number'
-import { baseOption, categoryAxis, gridAuto, tooltip, valueAxis, type ReferenceMark } from '../grammar'
+import {
+  baseOption,
+  categoryAxis,
+  gridAuto,
+  tooltip,
+  valueAxis,
+  type ReferenceMark,
+} from '../grammar'
 import { variableColour, type ChartTheme } from '../theme'
 
 export interface HistogramView {
@@ -50,21 +57,41 @@ export function histogramOption(view: HistogramView, theme: ChartTheme): ECharts
     },
     xAxis: categoryAxis(theme, labels),
     yAxis: { ...valueAxis(theme), min: 0 },
-    series: [{
-      type: 'bar',
-      name: view.name,
-      data: [...counts],
-      barCategoryGap: '8%',
-      itemStyle: { color: variableColour(theme, view.name), borderRadius: [2, 2, 0, 0] },
-      emphasis: { itemStyle: { color: variableColour(theme, view.name), borderColor: theme.ink, borderWidth: 1 } },
-      markLine: marks.length === 0 ? undefined : {
-        silent: true,
-        symbol: 'none',
-        lineStyle: { color: theme.muted, type: 'dashed', width: 1 },
-        label: { color: theme.muted, fontFamily: theme.font, fontSize: theme.labelSize, formatter: (params: { readonly name?: string }) => params.name ?? '' },
-        // Two marks often fall a bin apart, so their labels take turns on either side of their rules.
-        data: marks.map((mark, index) => ({ name: mark.name, xAxis: binPosition(view.bins, mark.value), label: { position: index % 2 === 0 ? 'insideEndTop' : 'insideEndBottom' } })),
+    series: [
+      {
+        type: 'bar',
+        name: view.name,
+        data: [...counts],
+        barCategoryGap: '8%',
+        itemStyle: { color: variableColour(theme, view.name), borderRadius: [2, 2, 0, 0] },
+        emphasis: {
+          itemStyle: {
+            color: variableColour(theme, view.name),
+            borderColor: theme.ink,
+            borderWidth: 1,
+          },
+        },
+        markLine:
+          marks.length === 0
+            ? undefined
+            : {
+                silent: true,
+                symbol: 'none',
+                lineStyle: { color: theme.muted, type: 'dashed', width: 1 },
+                label: {
+                  color: theme.muted,
+                  fontFamily: theme.font,
+                  fontSize: theme.labelSize,
+                  formatter: (params: { readonly name?: string }) => params.name ?? '',
+                },
+                // Two marks often fall a bin apart, so their labels take turns on either side of their rules.
+                data: marks.map((mark, index) => ({
+                  name: mark.name,
+                  xAxis: binPosition(view.bins, mark.value),
+                  label: { position: index % 2 === 0 ? 'insideEndTop' : 'insideEndBottom' },
+                })),
+              },
       },
-    }],
+    ],
   }
 }

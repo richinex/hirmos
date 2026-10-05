@@ -8,14 +8,16 @@ import type { SqlInputDescriptor, SqlPreparationInput } from '@/domain/sourceInp
  */
 // One map for the page, whatever module instance asks: a hot reload of this file must not lose the handles.
 const registry = globalThis as { hirmosInputFiles?: Map<string, File> }
-const byFingerprint = registry.hirmosInputFiles ??= new Map<string, File>()
+const byFingerprint = (registry.hirmosInputFiles ??= new Map<string, File>())
 
 export const rememberInputFiles = (inputs: readonly SqlPreparationInput[]): void => {
   for (const input of inputs) byFingerprint.set(input.fingerprint, input.file)
 }
 
 /** The inputs a recipe names, from the remembered handles, or null when any is missing. */
-export const inputsFromMemory = (descriptors: readonly SqlInputDescriptor[]): readonly SqlPreparationInput[] | null => {
+export const inputsFromMemory = (
+  descriptors: readonly SqlInputDescriptor[],
+): readonly SqlPreparationInput[] | null => {
   const inputs: SqlPreparationInput[] = []
   for (const descriptor of descriptors) {
     const file = byFingerprint.get(descriptor.fingerprint)
@@ -26,4 +28,6 @@ export const inputsFromMemory = (descriptors: readonly SqlInputDescriptor[]): re
 }
 
 /** Drops every remembered handle, as a reload would. */
-export const forgetInputFiles = (): void => { byFingerprint.clear() }
+export const forgetInputFiles = (): void => {
+  byFingerprint.clear()
+}

@@ -14,7 +14,10 @@ export interface EdgeStrengthBarsView {
 }
 
 /** Selected relations ranked by strength, strongest at the top; horizontal so long names stay readable. */
-export function edgeStrengthBarsOption(view: EdgeStrengthBarsView, theme: ChartTheme): EChartsCoreOption {
+export function edgeStrengthBarsOption(
+  view: EdgeStrengthBarsView,
+  theme: ChartTheme,
+): EChartsCoreOption {
   const ranked = [...view.edges].sort((left, right) => left.strength - right.strength)
   const description = `${view.title}: ${view.edges.length} relations ranked by ${view.quantity}; the strongest is ${ranked.at(-1)?.name ?? 'none'} at ${formatStatistic('score', ranked.at(-1)?.strength ?? 0).text}.`
   return {
@@ -39,14 +42,31 @@ export function edgeStrengthBarsOption(view: EdgeStrengthBarsView, theme: ChartT
       // The bars carry their own names, so the axis reserves no gutter.
       axisLabel: { show: false },
     },
-    series: [{
-      type: 'bar',
-      name: view.quantity,
-      barMaxWidth: 20,
-      barMinWidth: 2,
-      label: { show: true, position: 'insideLeft', distance: 6, color: theme.panel, fontFamily: theme.font, fontSize: theme.labelSize, formatter: (raw: unknown) => { const index = raw !== null && typeof raw === 'object' ? Reflect.get(raw, 'dataIndex') : undefined; return typeof index === 'number' ? ranked[index]?.name ?? '' : '' } },
-      data: ranked.map((edge) => ({ value: edge.strength, itemStyle: { color: theme.bone, borderRadius: [0, 2, 2, 0] } })),
-      emphasis: { itemStyle: { color: theme.ink } },
-    }],
+    series: [
+      {
+        type: 'bar',
+        name: view.quantity,
+        barMaxWidth: 20,
+        barMinWidth: 2,
+        label: {
+          show: true,
+          position: 'insideLeft',
+          distance: 6,
+          color: theme.panel,
+          fontFamily: theme.font,
+          fontSize: theme.labelSize,
+          formatter: (raw: unknown) => {
+            const index =
+              raw !== null && typeof raw === 'object' ? Reflect.get(raw, 'dataIndex') : undefined
+            return typeof index === 'number' ? (ranked[index]?.name ?? '') : ''
+          },
+        },
+        data: ranked.map((edge) => ({
+          value: edge.strength,
+          itemStyle: { color: theme.bone, borderRadius: [0, 2, 2, 0] },
+        })),
+        emphasis: { itemStyle: { color: theme.ink } },
+      },
+    ],
   }
 }

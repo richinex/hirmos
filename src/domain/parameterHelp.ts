@@ -27,7 +27,8 @@ export const DISCOVERY_PARAMETER_HELP = {
     maximumLag: 'Largest source lag included in conditional-independence tests.',
     alpha: 'Significance threshold used to remove links during skeleton discovery.',
     missing: 'Uses pairwise-complete test samples or records VAR-EM imputation before discovery.',
-    context: 'Time basis added as observed context so changes in causal mechanisms can inform orientation.',
+    context:
+      'Time basis added as observed context so changes in causal mechanisms can inform orientation.',
   },
   grace: {
     maximumLag: 'Largest source lag included in the CD-NOTS skeleton and neural refinement.',
@@ -81,24 +82,31 @@ export const ESTIMATION_PARAMETER_HELP = {
     bootstrapSeed: 'Seed used to reproduce the bootstrap samples.',
   },
   adjustedRegression: {
-    interval: 'How the errors are treated: independent, unequal in variance, correlated within clusters, serially correlated with a robust interval, or an ARMA process fitted with the coefficients.',
-    clusterColumn: 'Select the column whose values identify clusters, such as the unit in repeated observations. Keep the cluster column out of the design matrix.',
-    fixedEffects: 'Account for additive differences between units, differences shared within periods, or both. Treatment must retain variation after removing the selected effects.',
-    unitColumn: 'Select the column whose values identify the unit observed repeatedly, such as a person or a firm. Keep the unit column out of the design matrix.',
-    timeColumn: 'Select the column identifying each period, such as the month. Period effects account for additive differences shared within periods. Keep this column outside the regression design.',
+    interval:
+      'How the errors are treated: independent, unequal in variance, correlated within clusters, serially correlated with a robust interval, or an ARMA process fitted with the coefficients.',
+    clusterColumn:
+      'Select the column whose values identify clusters, such as the unit in repeated observations. Keep the cluster column out of the design matrix.',
+    fixedEffects:
+      'Account for additive differences between units, differences shared within periods, or both. Treatment must retain variation after removing the selected effects.',
+    unitColumn:
+      'Select the column whose values identify the unit observed repeatedly, such as a person or a firm. Keep the unit column out of the design matrix.',
+    timeColumn:
+      'Select the column identifying each period, such as the month. Period effects account for additive differences shared within periods. Keep this column outside the regression design.',
     autoregressiveOrder: 'p',
     movingAverageOrder: 'q',
     armaIterations: 'Maximum number of optimiser iterations.',
   },
   interruptedSeries: {
-    outcomeType: 'This can be either a linear model of the series or a quasi-Poisson model with an offset.',
+    outcomeType:
+      'This can be either a linear model of the series or a quasi-Poisson model with an offset.',
     exposure: 'The population or denominator the count is a rate of; its log enters as an offset.',
     interventionRow: 'The first row after the event. Rows before it are the pre-period.',
     lag: 'Rows after the intervention row before the change is assumed to start.',
     impactModel: {
       level: 'Assumes a lasting level change from the first affected row, with no slope change.',
       levelAndSlope: 'Assumes a level change and a slope change from the first affected row.',
-      slope: 'Assumes a slope change from the first affected row, with no separate level-change term.',
+      slope:
+        'Assumes a slope change from the first affected row, with no separate level-change term.',
       temporaryLevel: 'Assumes a temporary level change. The change ends before the until row.',
     },
     untilRow: 'The first row where the temporary change no longer applies.',
@@ -113,21 +121,32 @@ export const ESTIMATION_PARAMETER_HELP = {
   },
   tLearner: {
     learnerSeed: 'One seed for both outcome forests.',
-    outcomeModel: 'Random forest fits one outcome model on all rows within each treatment arm. For boosted models, grid search selects hyperparameters within each arm before a two-half split. Each half is predicted by models fitted on the other half. Hyperparameter selection uses the full sample, not just the training half.',
+    outcomeModel:
+      'Random forest fits one outcome model on all rows within each treatment arm. For boosted models, grid search selects hyperparameters within each arm before a two-half split. Each half is predicted by models fitted on the other half. Hyperparameter selection uses the full sample, not just the training half.',
     boostedSeed: 'Random seed for the boosted trees and the split into two halves.',
   },
   propensity: {
-    treatmentModel: 'Newton-Raphson and L-BFGS-B fit logistic regression. Boosted trees can model nonlinear relationships and interactions; grid search selects hyperparameters using mean cross-validation ROC AUC. Predictive performance alone does not establish adequate overlap or probability calibration.',
-    maxIter: 'Maximum number of L-BFGS-B iterations. Reaching the limit does not establish convergence.',
-    scale: 'Inverse probability weights use the probability of the treatment received. Stabilized weights multiply these by the marginal proportion in the corresponding arm. The estimator adjusts the denominators to preserve the same effect estimate; stabilization does not change relative weights within an arm.',
-    uncertainty: 'A point estimate alone, or a percentile interval from refitting the treatment model on bootstrap resamples of the rows.',
-    crossFitted: 'One model fits and scores the full sample. Cross-fitted fits each half and predicts the other half. Both modes select hyperparameters on the full sample first. Only cross-fitted predictions exclude the prediction rows from the final fit; neither mode excludes them from hyperparameter selection.',
+    treatmentModel:
+      'Newton-Raphson and L-BFGS-B fit logistic regression. Boosted trees can model nonlinear relationships and interactions; grid search selects hyperparameters using mean cross-validation ROC AUC. Predictive performance alone does not establish adequate overlap or probability calibration.',
+    maxIter:
+      'Maximum number of L-BFGS-B iterations. Reaching the limit does not establish convergence.',
+    scale:
+      'Inverse probability weights use the probability of the treatment received. Stabilized weights multiply these by the marginal proportion in the corresponding arm. The estimator adjusts the denominators to preserve the same effect estimate; stabilization does not change relative weights within an arm.',
+    uncertainty:
+      'A point estimate alone, or a percentile interval from refitting the treatment model on bootstrap resamples of the rows.',
+    crossFitted:
+      'One model fits and scores the full sample. Cross-fitted fits each half and predicts the other half. Both modes select hyperparameters on the full sample first. Only cross-fitted predictions exclude the prediction rows from the final fit; neither mode excludes them from hyperparameter selection.',
     splits: 'Number of cross-validation folds used to calculate each candidate’s mean ROC AUC.',
-    learningRates: 'How much each tree contributes to the prediction. Smaller learning rates reduce each tree’s contribution and may require more trees. Enter values to compare, separated by commas.',
-    maxDepths: 'Maximum number of splits along a path through each tree. Greater depth allows more complex relationships. Enter depths to compare, separated by commas.',
-    nEstimators: 'Number of trees fitted in sequence. Each tree builds on the preceding predictions. Enter tree counts to compare, separated by commas.',
-    treeSeed: 'Seed for the boosted trees and for the split that cross-fitting uses, so a run repeats exactly.',
-    gpsScale: 'Inverse-density weighting uses one divided by the conditional treatment density. Stabilized weighting uses the marginal treatment density divided by the conditional treatment density. Stabilization changes the relative weights assigned to observations and can change the fitted slope. Neither weighting method guarantees adequate treatment overlap.',
+    learningRates:
+      'How much each tree contributes to the prediction. Smaller learning rates reduce each tree’s contribution and may require more trees. Enter values to compare, separated by commas.',
+    maxDepths:
+      'Maximum number of splits along a path through each tree. Greater depth allows more complex relationships. Enter depths to compare, separated by commas.',
+    nEstimators:
+      'Number of trees fitted in sequence. Each tree builds on the preceding predictions. Enter tree counts to compare, separated by commas.',
+    treeSeed:
+      'Seed for the boosted trees and for the split that cross-fitting uses, so a run repeats exactly.',
+    gpsScale:
+      'Inverse-density weighting uses one divided by the conditional treatment density. Stabilized weighting uses the marginal treatment density divided by the conditional treatment density. Stabilization changes the relative weights assigned to observations and can change the fitted slope. Neither weighting method guarantees adequate treatment overlap.',
   },
   ardl: {
     maximumLag: 'Largest lag considered by the AIC order search.',
@@ -138,7 +157,8 @@ export const ESTIMATION_PARAMETER_HELP = {
     maximumLags: 'Largest lag considered when selecting the VAR order.',
     deterministicTerms: 'Placement of constants and trends in the VECM.',
     traceSignificance: 'Significance level used by the Johansen trace test.',
-    chowBreakRow: 'Optional number of rows before the parameter-stability split; the next row begins the second fit.',
+    chowBreakRow:
+      'Optional number of rows before the parameter-stability split; the next row begins the second fit.',
   },
   syntheticControl: {
     interventionStart: 'First observation in the post-intervention period.',
@@ -156,7 +176,8 @@ export const ESTIMATION_PARAMETER_HELP = {
     seed: 'Seed used to reproduce sampler initialization and draws.',
   },
   discreteBn: {
-    stateBudget: 'Maximum number of states retained or created for each variable. Observed low-cardinality states are preserved; higher-cardinality values are divided at quantiles.',
+    stateBudget:
+      'Maximum number of states retained or created for each variable. Observed low-cardinality states are preserved; higher-cardinality values are divided at quantiles.',
     equivalentSampleSize: 'Strength of the BDeu prior relative to the observed data.',
   },
   ingarch: {
@@ -205,7 +226,8 @@ export const SENSITIVITY_PARAMETER_HELP = {
   },
   unobservedConfounding: {
     seed: 'Seed used to reproduce the simulated confounder.',
-    treatmentFlipStrength: 'Fraction of binary treatment values flipped by the simulated confounder.',
+    treatmentFlipStrength:
+      'Fraction of binary treatment values flipped by the simulated confounder.',
     outcomeShiftStrength: 'Coefficient multiplying the simulated confounder in the outcome.',
   },
 } as const

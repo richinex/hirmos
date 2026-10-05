@@ -8,7 +8,12 @@ import { useEffect, useState } from 'react'
  *
  * Geometry only: each floating surface keeps its own chrome.
  */
-export interface Rect { x: number; y: number; width: number; height: number }
+export interface Rect {
+  x: number
+  y: number
+  width: number
+  height: number
+}
 
 export interface RectInsets {
   /** Minimum distance from the top — the inspector sits below the app header. Default 8. */
@@ -43,30 +48,53 @@ function load(key: string): Rect | null {
     if (!j || typeof j !== 'object') return null
     const o = j as Record<string, unknown>
     const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
-    const x = num(o.x), y = num(o.y), width = num(o.width), height = num(o.height)
+    const x = num(o.x),
+      y = num(o.y),
+      width = num(o.width),
+      height = num(o.height)
     // Parsed, not cast: a half-written rect would otherwise place the window at NaN and vanish it.
-    return x !== null && y !== null && width !== null && height !== null ? { x, y, width, height } : null
-  } catch { return null }
+    return x !== null && y !== null && width !== null && height !== null
+      ? { x, y, width, height }
+      : null
+  } catch {
+    return null
+  }
 }
 
 function save(key: string, r: Rect): void {
-  try { localStorage.setItem(key, JSON.stringify(r)) } catch { /* quota */ }
+  try {
+    localStorage.setItem(key, JSON.stringify(r))
+  } catch {
+    /* quota */
+  }
 }
 
 /**
  * A draggable/resizable window's rect, clamped on open and persisted on change.
  * `storageKey` null means "do not persist" (the compile flow's expanded canvas, which is transient).
  */
-export function useFloatingRect(storageKey: string | null, initial: () => Rect, insets?: RectInsets) {
-  const [rect, setRect] = useState<Rect>(() => clampRect(storageKey ? load(storageKey) ?? initial() : initial(), insets))
+export function useFloatingRect(
+  storageKey: string | null,
+  initial: () => Rect,
+  insets?: RectInsets,
+) {
+  const [rect, setRect] = useState<Rect>(() =>
+    clampRect(storageKey ? (load(storageKey) ?? initial()) : initial(), insets),
+  )
   const top = insets?.top ?? 8
   const side = insets?.side ?? 8
   const bottom = insets?.bottom ?? 32
   useEffect(() => {
-    const resize = () => setRect((current) => {
-      const next = clampRect(current, { top, side, bottom })
-      return next.x === current.x && next.y === current.y && next.width === current.width && next.height === current.height ? current : next
-    })
+    const resize = () =>
+      setRect((current) => {
+        const next = clampRect(current, { top, side, bottom })
+        return next.x === current.x &&
+          next.y === current.y &&
+          next.width === current.width &&
+          next.height === current.height
+          ? current
+          : next
+      })
     window.addEventListener('resize', resize)
     return () => window.removeEventListener('resize', resize)
   }, [top, side, bottom])
@@ -81,6 +109,7 @@ export function useFloatingRect(storageKey: string | null, initial: () => Rect, 
     /** react-rnd onDragStop */
     onDragStop: (x: number, y: number) => update({ ...rect, x, y }),
     /** react-rnd onResizeStop */
-    onResizeStop: (width: number, height: number, x: number, y: number) => update({ x, y, width, height }),
+    onResizeStop: (width: number, height: number, x: number, y: number) =>
+      update({ x, y, width, height }),
   }
 }

@@ -12,8 +12,13 @@ let observer: MutationObserver | null = null
 function subscribe(notify: () => void): () => void {
   subscribers.add(notify)
   if (!observer) {
-    observer = new MutationObserver(() => { for (const fn of subscribers) fn() })
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+    observer = new MutationObserver(() => {
+      for (const fn of subscribers) fn()
+    })
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    })
   }
   return () => {
     subscribers.delete(notify)

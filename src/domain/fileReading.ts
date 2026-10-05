@@ -18,17 +18,26 @@ export const DECLARED_TYPES = {
 
 export type DeclaredType = keyof typeof DECLARED_TYPES
 
-export const DECLARED_TYPE_NAMES: readonly DeclaredType[] = Object.keys(DECLARED_TYPES) as DeclaredType[]
+export const DECLARED_TYPE_NAMES: readonly DeclaredType[] = Object.keys(
+  DECLARED_TYPES,
+) as DeclaredType[]
 
 export const declaredTypeLabel = (type: DeclaredType): string => {
   switch (type) {
-    case 'text': return 'Text'
-    case 'integer': return 'Whole number'
-    case 'decimal': return 'Decimal number'
-    case 'yes-no': return 'Yes or no'
-    case 'date': return 'Date'
-    case 'time': return 'Time'
-    case 'timestamp': return 'Date and time'
+    case 'text':
+      return 'Text'
+    case 'integer':
+      return 'Whole number'
+    case 'decimal':
+      return 'Decimal number'
+    case 'yes-no':
+      return 'Yes or no'
+    case 'date':
+      return 'Date'
+    case 'time':
+      return 'Time'
+    case 'timestamp':
+      return 'Date and time'
   }
 }
 
@@ -45,7 +54,9 @@ export type FileReading =
 
 /** Just the reading of anything that carries one: a source, a profile's source, an input. */
 export const fileReading = (value: FileReading): FileReading =>
-  value.format === 'parquet' ? { format: value.format } : { format: value.format, declared: value.declared }
+  value.format === 'parquet'
+    ? { format: value.format }
+    : { format: value.format, declared: value.declared }
 
 /** The declarations a reading applies; a Parquet file has none. */
 export const declarationsOf = (reading: FileReading): ColumnDeclarations =>
@@ -53,8 +64,7 @@ export const declarationsOf = (reading: FileReading): ColumnDeclarations =>
 
 /** What one column is read as. */
 export type ColumnReading =
-  | { readonly kind: 'detected' }
-  | { readonly kind: 'declared'; readonly type: DeclaredType }
+  { readonly kind: 'detected' } | { readonly kind: 'declared'; readonly type: DeclaredType }
 
 export const columnReading = (reading: FileReading, column: string): ColumnReading => {
   if (reading.format === 'parquet') return { kind: 'detected' }
@@ -63,18 +73,28 @@ export const columnReading = (reading: FileReading, column: string): ColumnReadi
 }
 
 /** Declares one column's type, or with `null` returns it to detection. Other columns are unchanged. */
-export const declareColumn = (declared: ColumnDeclarations, column: string, type: DeclaredType | null): ColumnDeclarations => {
+export const declareColumn = (
+  declared: ColumnDeclarations,
+  column: string,
+  type: DeclaredType | null,
+): ColumnDeclarations => {
   const { [column]: _previous, ...others } = declared
   return type === null ? others : { ...others, [column]: type }
 }
 
 /** The DuckDB type each declared column is read as, in column-name order so equal declarations give equal text. */
-export const duckDbColumnTypes = (declared: ColumnDeclarations): readonly (readonly [string, string])[] =>
-  Object.keys(declared).sort().map((column) => [column, DECLARED_TYPES[declared[column]!]] as const)
+export const duckDbColumnTypes = (
+  declared: ColumnDeclarations,
+): readonly (readonly [string, string])[] =>
+  Object.keys(declared)
+    .sort()
+    .map((column) => [column, DECLARED_TYPES[declared[column]!]] as const)
 
 /** A stable text for a set of declarations: empty when none are declared. */
 export const declarationsKey = (declared: ColumnDeclarations): string =>
-  duckDbColumnTypes(declared).map(([column, type]) => `${column}=${type}`).join(';')
+  duckDbColumnTypes(declared)
+    .map(([column, type]) => `${column}=${type}`)
+    .join(';')
 
 export const declaredTypeSchema = z.enum(DECLARED_TYPE_NAMES as [DeclaredType, ...DeclaredType[]])
 
@@ -83,9 +103,14 @@ export const columnDeclarationsSchema = z.record(z.string().min(1), declaredType
 export type FileReadingProblem = { readonly kind: 'declarations-on-parquet' }
 
 /** A stored format and declarations, read back. Records written before declarations existed have none. */
-export const fileReadingOf = (format: DelimitedFormat | 'parquet', declared: ColumnDeclarations | undefined): Result<FileReading, FileReadingProblem> => {
+export const fileReadingOf = (
+  format: DelimitedFormat | 'parquet',
+  declared: ColumnDeclarations | undefined,
+): Result<FileReading, FileReadingProblem> => {
   if (format === 'parquet') {
-    return declared === undefined || Object.keys(declared).length === 0 ? ok({ format }) : err({ kind: 'declarations-on-parquet' })
+    return declared === undefined || Object.keys(declared).length === 0
+      ? ok({ format })
+      : err({ kind: 'declarations-on-parquet' })
   }
   return ok({ format, declared: declared ?? NO_DECLARATIONS })
 }

@@ -63,7 +63,8 @@ export function assessDiscoveryRunDeletion(
   const references: DiscoveryRunReference[] = []
   for (const document of documents) {
     switch (document.origin.kind) {
-      case 'user-authored': break
+      case 'user-authored':
+        break
       case 'discovery-informed':
         if (document.origin.reports.includes(run)) {
           references.push({
@@ -73,7 +74,8 @@ export function assessDiscoveryRunDeletion(
           })
         }
         break
-      default: assertNever(document.origin)
+      default:
+        assertNever(document.origin)
     }
 
     for (const revision of document.audit) {

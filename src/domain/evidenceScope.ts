@@ -9,9 +9,7 @@ import { assertNever } from './dop'
  * narrow it further and are independent of it.
  */
 export type EvidenceScope =
-  | { readonly kind: 'all' }
-  | { readonly kind: 'discovered' }
-  | { readonly kind: 'significant' }
+  { readonly kind: 'all' } | { readonly kind: 'discovered' } | { readonly kind: 'significant' }
 
 export interface EvidenceSelection {
   readonly scope: EvidenceScope
@@ -30,16 +28,29 @@ export interface EvidenceCell {
   readonly p: number
 }
 
-export const NO_EVIDENCE_SELECTION: EvidenceSelection = { scope: { kind: 'all' }, source: null, target: null, lag: null }
+export const NO_EVIDENCE_SELECTION: EvidenceSelection = {
+  scope: { kind: 'all' },
+  source: null,
+  target: null,
+  lag: null,
+}
 
-export const EVIDENCE_SCOPES: readonly EvidenceScope[] = [{ kind: 'all' }, { kind: 'discovered' }, { kind: 'significant' }]
+export const EVIDENCE_SCOPES: readonly EvidenceScope[] = [
+  { kind: 'all' },
+  { kind: 'discovered' },
+  { kind: 'significant' },
+]
 
 export function describeEvidenceScope(scope: EvidenceScope): string {
   switch (scope.kind) {
-    case 'all': return 'All cells'
-    case 'discovered': return 'Discovered relations'
-    case 'significant': return 'Below alpha'
-    default: return assertNever(scope)
+    case 'all':
+      return 'All cells'
+    case 'discovered':
+      return 'Discovered relations'
+    case 'significant':
+      return 'Below alpha'
+    default:
+      return assertNever(scope)
   }
 }
 
@@ -52,19 +63,27 @@ export function describeEvidenceScope(scope: EvidenceScope): string {
  */
 export function explainEvidenceScope(scope: EvidenceScope, alpha: number): string {
   switch (scope.kind) {
-    case 'all': return 'Every ordered pair at every lag, including the absences.'
-    case 'discovered': return 'Cells the method recorded a mark for.'
-    case 'significant': return `Cells whose p is below the run's own alpha of ${alpha}.`
-    default: return assertNever(scope)
+    case 'all':
+      return 'Every ordered pair at every lag, including the absences.'
+    case 'discovered':
+      return 'Cells the method recorded a mark for.'
+    case 'significant':
+      return `Cells whose p is below the run's own alpha of ${alpha}.`
+    default:
+      return assertNever(scope)
   }
 }
 
 function matchesScope(cell: EvidenceCell, scope: EvidenceScope, alpha: number): boolean {
   switch (scope.kind) {
-    case 'all': return true
-    case 'discovered': return cell.mark !== ''
-    case 'significant': return cell.p < alpha
-    default: return assertNever(scope)
+    case 'all':
+      return true
+    case 'discovered':
+      return cell.mark !== ''
+    case 'significant':
+      return cell.p < alpha
+    default:
+      return assertNever(scope)
   }
 }
 
@@ -76,7 +95,11 @@ function matchesScope(cell: EvidenceCell, scope: EvidenceScope, alpha: number): 
  *     selection: Scope plus any source, target or lag narrowing
  *     alpha: The significance threshold recorded with the run
  */
-export function matchesEvidenceSelection(cell: EvidenceCell, selection: EvidenceSelection, alpha: number): boolean {
+export function matchesEvidenceSelection(
+  cell: EvidenceCell,
+  selection: EvidenceSelection,
+  alpha: number,
+): boolean {
   if (!matchesScope(cell, selection.scope, alpha)) return false
   if (selection.source !== null && cell.source !== selection.source) return false
   if (selection.target !== null && cell.target !== selection.target) return false
@@ -85,13 +108,19 @@ export function matchesEvidenceSelection(cell: EvidenceCell, selection: Evidence
 
 /** True when the selection would hide nothing, so the table can skip filtering entirely. */
 export function selectsEverything(selection: EvidenceSelection): boolean {
-  return selection.scope.kind === 'all' && selection.source === null && selection.target === null && selection.lag === null
+  return (
+    selection.scope.kind === 'all' &&
+    selection.source === null &&
+    selection.target === null &&
+    selection.lag === null
+  )
 }
 
 /** Summarise the active narrowing for the count line, or null when nothing is narrowed. */
 export function describeEvidenceSelection(selection: EvidenceSelection): string | null {
   const parts: string[] = []
-  if (selection.scope.kind !== 'all') parts.push(describeEvidenceScope(selection.scope).toLowerCase())
+  if (selection.scope.kind !== 'all')
+    parts.push(describeEvidenceScope(selection.scope).toLowerCase())
   if (selection.source !== null) parts.push(`source ${selection.source}`)
   if (selection.target !== null) parts.push(`target ${selection.target}`)
   if (selection.lag !== null) parts.push(`lag ${selection.lag}`)

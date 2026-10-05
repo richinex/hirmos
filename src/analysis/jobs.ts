@@ -1,10 +1,19 @@
 import { createStore } from 'zustand/vanilla'
 
 export type Action = 'analysis' | 'checks'
-export interface Progress { readonly completed: number; readonly total: number }
+export interface Progress {
+  readonly completed: number
+  readonly total: number
+}
 export type Job =
   | { readonly kind: 'idle' }
-  | { readonly kind: 'running'; readonly id: string; readonly action: Action; readonly stage: string; readonly progress: Progress | null }
+  | {
+      readonly kind: 'running'
+      readonly id: string
+      readonly action: Action
+      readonly stage: string
+      readonly progress: Progress | null
+    }
   | { readonly kind: 'failed'; readonly action: Action; readonly detail: string }
   | { readonly kind: 'cancelled'; readonly action: Action }
 
@@ -16,7 +25,8 @@ interface Jobs {
 /** One project session owns these jobs; views only subscribe to them. */
 export function createJobs(stop: () => void) {
   const store = createStore<Jobs>(() => ({ jobs: {} }))
-  const active = () => Object.keys(store.getState().jobs).find(key => store.getState().jobs[key]?.kind === 'running')
+  const active = () =>
+    Object.keys(store.getState().jobs).find((key) => store.getState().jobs[key]?.kind === 'running')
   let available = true
   const current = (key: string, id: string) => {
     const job = store.getState().jobs[key]
@@ -30,7 +40,7 @@ export function createJobs(stop: () => void) {
     if (held.size === 0) return
     const reports = [...held]
     held.clear()
-    store.setState(state => {
+    store.setState((state) => {
       let jobs = state.jobs
       for (const [key, job] of reports) {
         // Dropped when the run finished, failed or was cancelled while held.
@@ -42,10 +52,13 @@ export function createJobs(stop: () => void) {
   }
   const set = (key: string, job: Job) => {
     held.delete(key)
-    store.setState(state => ({ jobs: { ...state.jobs, [key]: job } }))
+    store.setState((state) => ({ jobs: { ...state.jobs, [key]: job } }))
   }
   const hold = (key: string, job: Job) => {
-    if (frame !== null) { held.set(key, job); return }
+    if (frame !== null) {
+      held.set(key, job)
+      return
+    }
     frame = requestAnimationFrame(publish)
     set(key, job)
   }

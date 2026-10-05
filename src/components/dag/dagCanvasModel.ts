@@ -22,9 +22,20 @@ const MARGIN = 34
  */
 export type DagLayoutOrientation = 'across' | 'down'
 
-export function layoutDirectedGraph<Id extends string>(nodes: readonly { readonly id: Id }[], edges: readonly { readonly cause: Id; readonly effect: Id }[], orientation: DagLayoutOrientation = 'across', size: DagCardSize = DEFAULT_CARD_SIZE): readonly { readonly id: Id; readonly x: number; readonly y: number }[] {
+export function layoutDirectedGraph<Id extends string>(
+  nodes: readonly { readonly id: Id }[],
+  edges: readonly { readonly cause: Id; readonly effect: Id }[],
+  orientation: DagLayoutOrientation = 'across',
+  size: DagCardSize = DEFAULT_CARD_SIZE,
+): readonly { readonly id: Id; readonly x: number; readonly y: number }[] {
   const layout = new dagre.graphlib.Graph()
-  layout.setGraph({ rankdir: orientation === 'across' ? 'LR' : 'TB', nodesep: ROW_GAP, ranksep: COLUMN_GAP, marginx: MARGIN, marginy: MARGIN })
+  layout.setGraph({
+    rankdir: orientation === 'across' ? 'LR' : 'TB',
+    nodesep: ROW_GAP,
+    ranksep: COLUMN_GAP,
+    marginx: MARGIN,
+    marginy: MARGIN,
+  })
   layout.setDefaultEdgeLabel(() => ({}))
   for (const node of nodes) layout.setNode(node.id, { width: size.width, height: size.height })
   for (const edge of edges) {

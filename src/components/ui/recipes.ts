@@ -24,14 +24,16 @@ const SIGNAL_WASH = 'border-signal/40 bg-signal/10 text-signal-text hover:bg-sig
 /** A filled tone is lit from above, the texture chapter's way: a faint top-to-bottom gradient over the fill
  * and a one-pixel highlight along the top edge, both dropped on press so the button reads as pushed in.
  * The press itself is the 1px settle in index.css. */
-const FILLED = 'font-medium text-signal-ink [background-image:linear-gradient(to_bottom,rgb(255_255_255/.15),rgb(255_255_255/0))] shadow-[inset_0_1px_0_var(--color-highlight)] hover:brightness-105 active:[background-image:none] active:shadow-none disabled:[background-image:none]'
+const FILLED =
+  'font-medium text-signal-ink [background-image:linear-gradient(to_bottom,rgb(255_255_255/.15),rgb(255_255_255/0))] shadow-[inset_0_1px_0_var(--color-highlight)] hover:brightness-105 active:[background-image:none] active:shadow-none disabled:[background-image:none]'
 
 /** Busy is `aria-busy="true"`, set from the run's own state and never from the pointer: the label stays
  * (so the width does) and a bar-live sweep runs along the inside bottom edge (index.css). `disabled`
  * remains "not ready": the fill drops to the well and the text to faint, but the button keeps a solid
  * ground, because a button that floats over scrolling content must stay a surface. A busy button keeps
  * focus so nothing jumps when the run ends. */
-const BUTTON_BASE = 'dashboard-button inline-flex items-center justify-center gap-1.5 rounded-md border border-transparent transition-[color,background-color,border-color,box-shadow,transform] duration-(--motion-fast) aria-busy:pointer-events-none disabled:cursor-not-allowed disabled:border-hair disabled:bg-well disabled:text-faint disabled:shadow-none disabled:hover:brightness-100 pointer-coarse:min-h-11 pointer-coarse:min-w-11'
+const BUTTON_BASE =
+  'dashboard-button inline-flex items-center justify-center gap-1.5 rounded-md border border-transparent transition-[color,background-color,border-color,box-shadow,transform] duration-(--motion-fast) aria-busy:pointer-events-none disabled:cursor-not-allowed disabled:border-hair disabled:bg-well disabled:text-faint disabled:shadow-none disabled:hover:brightness-100 pointer-coarse:min-h-11 pointer-coarse:min-w-11'
 
 const BUTTON_TONE: Record<ButtonTone, string> = {
   signal: cn('dashboard-primary bg-signal px-4', FILLED),
@@ -51,8 +53,11 @@ const BUTTON_SIZE: Record<ButtonSize, string> = {
   md: 'px-3 py-1.5 text-body',
 }
 
-export const button = (tone: ButtonTone = 'outline', extra?: string, size: ButtonSize = 'md'): string =>
-  cn(BUTTON_BASE, BUTTON_SIZE[size], BUTTON_TONE[tone], extra)
+export const button = (
+  tone: ButtonTone = 'outline',
+  extra?: string,
+  size: ButtonSize = 'md',
+): string => cn(BUTTON_BASE, BUTTON_SIZE[size], BUTTON_TONE[tone], extra)
 
 /** Segmented-control segment. Selected is a surface, never a signal fill. */
 export const segment = (active: boolean, extra?: string): string =>
@@ -98,7 +103,9 @@ export const facet = (active: boolean, extra?: string): string =>
   cn(
     'min-h-8 rounded-md border px-2.5 pointer-coarse:min-h-11 pointer-coarse:min-w-11 transition-colors',
     label(),
-    active ? 'border-solid border-edge bg-raised text-ink' : 'border-dashed border-hair text-faint hover:border-edge hover:text-muted',
+    active
+      ? 'border-solid border-edge bg-raised text-ink'
+      : 'border-dashed border-hair text-faint hover:border-edge hover:text-muted',
     extra,
   )
 
@@ -138,7 +145,8 @@ export const fieldRow = {
   three: 'grid max-w-4xl items-start gap-4 @md/panel:grid-cols-3',
 } as const
 
-export const stepsStack = '@6xl/panel:columns-2 @6xl/panel:gap-x-16 [&>*]:mb-8 [&>*:last-child]:mb-0 [&>*]:break-inside-avoid'
+export const stepsStack =
+  '@6xl/panel:columns-2 @6xl/panel:gap-x-16 [&>*]:mb-8 [&>*:last-child]:mb-0 [&>*]:break-inside-avoid'
 
 export const actionGap = 'mt-12'
 
@@ -169,7 +177,9 @@ export const prose = (extra?: string): string => cn('max-w-[65ch] text-subtitle 
  *  single-column measure. The columns balance, words are never hyphenated, and a column keeps at least
  *  two lines of a sentence on each side of the break. Only the chapter narrative takes this: a help line
  *  beside a field is one thought and stays one column. */
-export const chapterIntro = prose('m-0 text-muted @3xl/panel:max-w-[calc(150ch+2rem)] [columns:45ch_2] gap-x-8 hyphens-none [orphans:2] [widows:2]')
+export const chapterIntro = prose(
+  'm-0 text-muted @3xl/panel:max-w-[calc(150ch+2rem)] [columns:45ch_2] gap-x-8 hyphens-none [orphans:2] [widows:2]',
+)
 
 /** A chapter paragraph too short to split: two columns need four lines so each keeps two, and at the
  *  widest stage a column holds about 73 characters, so a paragraph under about 290 characters (three
@@ -177,11 +187,13 @@ export const chapterIntro = prose('m-0 text-muted @3xl/panel:max-w-[calc(150ch+2
 export const chapterIntroSingle = prose('m-0 text-muted hyphens-none')
 
 /** The intro recipe for a paragraph whose text is chosen at run time: one column under the four-line threshold. */
-export const chapterIntroFor = (text: string): string => text.length < 290 ? chapterIntroSingle : chapterIntro
+export const chapterIntroFor = (text: string): string =>
+  text.length < 290 ? chapterIntroSingle : chapterIntro
 
 /** Figures the reader compares down a column. `tabular-nums` fixes digit advance width, so a counter
  *  ticking 9 to 10 does not nudge what follows; kerning is off so the pair "11" keeps its advance. */
-export const num = (extra?: string): string => cn('font-sans tabular-nums [font-kerning:none]', extra)
+export const num = (extra?: string): string =>
+  cn('font-sans tabular-nums [font-kerning:none]', extra)
 
 /** A literal the reader may have to type or match character by character: a node id, an API key, a hash.
  *  This is the only mono outside actual code. Filenames, model names and timestamps read as words. */
@@ -199,7 +211,8 @@ export const label = (extra?: string): string => cn('font-sans text-label font-m
 export const caption = (extra?: string): string => cn('text-label text-faint text-pretty', extra)
 
 /** A variable name as a member of a set the reader counts: enclosure marks membership, so it is for sets only, never a name inside a sentence. */
-export const chip = (extra?: string): string => cn('inline-block rounded-md border border-hair bg-panel px-1.5 py-0.5 text-ink', extra)
+export const chip = (extra?: string): string =>
+  cn('inline-block rounded-md border border-hair bg-panel px-1.5 py-0.5 text-ink', extra)
 
 /**
  * A section of the workbench: the outermost surface a reader sees inside a chapter.
@@ -213,7 +226,11 @@ export const chip = (extra?: string): string => cn('inline-block rounded-md bord
  * another panel: two of these nested lift the same thing twice, and the inner one stops meaning anything. Where a component would
  * land its own surface inside this one, reach for its `frame` escape hatch instead.
  */
-export const panel = (extra?: string): string => cn('rounded-xl bg-panel lift [--table-surface:var(--color-panel)] [--panel-space:--spacing(4)] @max-md/panel:[--panel-space:--spacing(3)]', extra)
+export const panel = (extra?: string): string =>
+  cn(
+    'rounded-xl bg-panel lift [--table-surface:var(--color-panel)] [--panel-space:--spacing(4)] @max-md/panel:[--panel-space:--spacing(3)]',
+    extra,
+  )
 
 /**
  * A recessed area inside a panel: a control group, a figure, a quoted reading.
@@ -221,18 +238,29 @@ export const panel = (extra?: string): string => cn('rounded-xl bg-panel lift [-
  * One step in from `panel()`, and the innermost surface that should carry a border. A well inside a
  * well reads as a mistake, and the give-away is a call site passing `bg-panel` back to cancel it.
  */
-export const well = (extra?: string): string => cn('rounded-lg border border-hair bg-well [--panel-space:--spacing(3)] @max-md/panel:[--panel-space:--spacing(2)]', extra)
+export const well = (extra?: string): string =>
+  cn(
+    'rounded-lg border border-hair bg-well [--panel-space:--spacing(3)] @max-md/panel:[--panel-space:--spacing(2)]',
+    extra,
+  )
 
 /** Compact summaries retain their column layout on the same surface as MetricGrid. */
-export const figureGrid = (extra?: string): string => cn('numeric-surface numeric-compact grid min-w-0', extra)
+export const figureGrid = (extra?: string): string =>
+  cn('numeric-surface numeric-compact grid min-w-0', extra)
 
 /** Text colour for a machine-state verdict, from the status ramp; muted for a state that is neither good nor bad. */
-export const statusText: Record<'ok' | 'warn' | 'danger' | 'muted', string> = { ok: 'text-ok', warn: 'text-warn', danger: 'text-danger', muted: 'text-muted' }
+export const statusText: Record<'ok' | 'warn' | 'danger' | 'muted', string> = {
+  ok: 'text-ok',
+  warn: 'text-warn',
+  danger: 'text-danger',
+  muted: 'text-muted',
+}
 
 /** Section headings use type hierarchy, without decorative markers. */
 export const sectionTitle = 'text-subtitle font-semibold text-ink text-balance'
 export const resultTitle = 'text-heading font-medium text-ink text-balance'
-export const resultSurface = (extra?: string): string => panel(cn('result-surface p-(--panel-space)', extra))
+export const resultSurface = (extra?: string): string =>
+  panel(cn('result-surface p-(--panel-space)', extra))
 
 /** The title of a floating surface: panel, drawer or sheet.
  *
@@ -241,7 +269,10 @@ export const resultSurface = (extra?: string): string => panel(cn('result-surfac
 export const panelTitle = 'text-subtitle font-medium text-ink text-balance'
 
 /** Row padding per density: 24px compact and 32px comfortable rows with 12px body text, including the 1px hairline under the row. */
-export const rowPadding = { compact: 'pt-[3px] pb-[2px]', comfortable: 'pt-[7px] pb-[6px]' } as const
+export const rowPadding = {
+  compact: 'pt-[3px] pb-[2px]',
+  comfortable: 'pt-[7px] pb-[6px]',
+} as const
 
 /** A data table: the caps tier for headers, hairline rows, comfortable 32px body rows unless a density is applied; figure cells add `text-right`. */
 export const table = 'w-full border-collapse text-left text-table'
@@ -249,7 +280,10 @@ export const table = 'w-full border-collapse text-left text-table'
 /** A header cell. Sticky and opaque on its table's surface, carried by weight rather than capitals,
  *  because a header may be a phrase ("Zivot-Andrews p, constant and trend"). `p-0` when a sort button fills it. */
 export const th = (extra?: string): string =>
-  cn('sticky top-0 z-(--z-sticky) whitespace-nowrap border-b border-hair bg-[var(--table-surface,var(--color-stage))] px-3.5 py-2 text-left text-label font-medium text-muted', extra)
+  cn(
+    'sticky top-0 z-(--z-sticky) whitespace-nowrap border-b border-hair bg-[var(--table-surface,var(--color-stage))] px-3.5 py-2 text-left text-label font-medium text-muted',
+    extra,
+  )
 
 /** A body row. `action` rows fill on hover and focus; `selected` is a surface, never a colour or a weight.
  *  A row whose menu or expander is open stays filled, so the reader keeps which row they are acting on. */
@@ -262,14 +296,16 @@ export const tr = (state: 'static' | 'action' | 'selected' = 'static', extra?: s
   )
 
 /** A body cell. Text cells truncate with the full value in `title`; figure cells add `text-right`. */
-export const td = (extra?: string): string => cn('max-w-[300px] truncate px-3.5 align-top', rowPadding.comfortable, extra)
+export const td = (extra?: string): string =>
+  cn('max-w-[300px] truncate px-3.5 align-top', rowPadding.comfortable, extra)
 
 /** A text cell that takes the lines it needs: a rationale, a conditioning set, an expression. `td` clips
  *  at one line so a row keeps the density's pitch; this cell wraps, and a windowed table predicts the
  *  height it will take before the row exists (lib/textMetrics.ts), so the window stays exact without
  *  measuring rows as they scroll. Words break only where the browser would, which is what the
  *  prediction models. */
-export const tdText = (extra?: string): string => cn('whitespace-normal px-3.5 align-top [overflow-wrap:break-word]', rowPadding.comfortable, extra)
+export const tdText = (extra?: string): string =>
+  cn('whitespace-normal px-3.5 align-top [overflow-wrap:break-word]', rowPadding.comfortable, extra)
 
 /** The row-count line under a table; `aria-live="polite"` so a sort or filter is announced.
  *  It reports a count, so it is sentence case: capitals are for a label naming a slot. */

@@ -15,22 +15,38 @@ import { lagGraphFromRun } from '@/domain/lagGraph'
 
 const methodTitle = (run: DiscoveryRunArtifact): string => {
   switch (run.kind) {
-    case 'direct-lingam-run': return 'DirectLiNGAM'
-    case 'pc-stable-run': return 'PC-stable'
-    case 'fci-run': return 'FCI'
-    case 'pcmci-plus-run': return 'PCMCI+'
-    case 'jpcmci-plus-run': return 'J-PCMCI+'
-    case 'lpcmci-run': return 'LPCMCI'
-    case 'rpcmci-run': return 'RPCMCI'
-    case 'cdnots-run': return 'CD-NOTS'
-    case 'cdnots-plus-run': return 'CD-NOTS+'
-    case 'grace-run': return 'GRACE'
-    case 'dynotears-run': return 'DYNOTEARS'
-    case 'var-lingam-run': return 'VAR-LiNGAM'
-    case 'ocse-run': return 'oCSE'
-    case 'cmlp-run': return 'cMLP'
-    case 'clstm-run': return 'cLSTM'
-    default: return assertNever(run)
+    case 'direct-lingam-run':
+      return 'DirectLiNGAM'
+    case 'pc-stable-run':
+      return 'PC-stable'
+    case 'fci-run':
+      return 'FCI'
+    case 'pcmci-plus-run':
+      return 'PCMCI+'
+    case 'jpcmci-plus-run':
+      return 'J-PCMCI+'
+    case 'lpcmci-run':
+      return 'LPCMCI'
+    case 'rpcmci-run':
+      return 'RPCMCI'
+    case 'cdnots-run':
+      return 'CD-NOTS'
+    case 'cdnots-plus-run':
+      return 'CD-NOTS+'
+    case 'grace-run':
+      return 'GRACE'
+    case 'dynotears-run':
+      return 'DYNOTEARS'
+    case 'var-lingam-run':
+      return 'VAR-LiNGAM'
+    case 'ocse-run':
+      return 'oCSE'
+    case 'cmlp-run':
+      return 'cMLP'
+    case 'clstm-run':
+      return 'cLSTM'
+    default:
+      return assertNever(run)
   }
 }
 
@@ -48,29 +64,42 @@ const variablesOf = (view: DiscoveryEvidenceView) => {
     case 'grace-run':
     case 'dynotears-run':
     case 'var-lingam-run':
-    case 'ocse-run': return view.run.variables
+    case 'ocse-run':
+      return view.run.variables
     case 'cmlp-run':
-    case 'clstm-run': return view.run.variables
-    default: return assertNever(view.run)
+    case 'clstm-run':
+      return view.run.variables
+    default:
+      return assertNever(view.run)
   }
 }
 
-const statistic = (value: number): string => Math.abs(value) >= 1_000 || (Math.abs(value) > 0 && Math.abs(value) < 0.001)
-  ? value.toExponential(2)
-  : value.toFixed(3)
+const statistic = (value: number): string =>
+  Math.abs(value) >= 1_000 || (Math.abs(value) > 0 && Math.abs(value) < 0.001)
+    ? value.toExponential(2)
+    : value.toFixed(3)
 
-const pValue = (value: number): string => value < 0.001 ? value.toExponential(2) : value.toFixed(3)
+const pValue = (value: number): string =>
+  value < 0.001 ? value.toExponential(2) : value.toFixed(3)
 
 const candidateLabel = (candidate: DiscoveryCandidate): string => {
   switch (candidate.kind) {
-    case 'cross-sectional-endpoint': return candidate.mark
-    case 'endpoint-marked': return `${candidate.mark}${candidate.lag === 0 ? '' : `, t−${candidate.lag}`}`
-    case 'regime-endpoint-marked': return `Regime ${candidate.regime + 1}, ${candidate.mark}${candidate.lag === 0 ? '' : `, t−${candidate.lag}`}`
-    case 'weighted-directed': return `w ${statistic(candidate.weight)}${candidate.lag === 0 ? '' : `, t−${candidate.lag}`}`
-    case 'lagged-information': return `CMI ${statistic(candidate.cmi)}, t−${candidate.lag}`
-    case 'neural-lagged': return `${candidate.method === 'GRACE' ? 'gate' : 'score'} ${statistic(candidate.score)}, t−${candidate.lag}`
-    case 'neural-window': return `score ${statistic(candidate.score)}, ${candidate.context}-step window`
-    default: return assertNever(candidate)
+    case 'cross-sectional-endpoint':
+      return candidate.mark
+    case 'endpoint-marked':
+      return `${candidate.mark}${candidate.lag === 0 ? '' : `, t−${candidate.lag}`}`
+    case 'regime-endpoint-marked':
+      return `Regime ${candidate.regime + 1}, ${candidate.mark}${candidate.lag === 0 ? '' : `, t−${candidate.lag}`}`
+    case 'weighted-directed':
+      return `w ${statistic(candidate.weight)}${candidate.lag === 0 ? '' : `, t−${candidate.lag}`}`
+    case 'lagged-information':
+      return `CMI ${statistic(candidate.cmi)}, t−${candidate.lag}`
+    case 'neural-lagged':
+      return `${candidate.method === 'GRACE' ? 'gate' : 'score'} ${statistic(candidate.score)}, t−${candidate.lag}`
+    case 'neural-window':
+      return `score ${statistic(candidate.score)}, ${candidate.context}-step window`
+    default:
+      return assertNever(candidate)
   }
 }
 
@@ -78,33 +107,62 @@ const candidateDetail = (candidate: DiscoveryCandidate): string => {
   switch (candidate.kind) {
     case 'cross-sectional-endpoint': {
       const properties = [
-        candidate.directness === null ? null : candidate.directness === 'definitelyDirect' ? 'definitely direct' : 'possibly direct',
-        candidate.latentConfounding === null ? null : candidate.latentConfounding === 'excluded' ? 'latent confounding excluded' : 'latent confounding possible',
+        candidate.directness === null
+          ? null
+          : candidate.directness === 'definitelyDirect'
+            ? 'definitely direct'
+            : 'possibly direct',
+        candidate.latentConfounding === null
+          ? null
+          : candidate.latentConfounding === 'excluded'
+            ? 'latent confounding excluded'
+            : 'latent confounding possible',
       ].filter((value): value is string => value !== null)
       return [`mark ${candidate.mark}`, ...properties].join('; ')
     }
-    case 'endpoint-marked': return `mark ${candidate.mark}, p ${pValue(candidate.pValue)}, ParCorr ${statistic(candidate.statistic)}`
-    case 'regime-endpoint-marked': return `regime ${candidate.regime + 1}, mark ${candidate.mark}, p ${pValue(candidate.pValue)}, ParCorr ${statistic(candidate.statistic)}`
-    case 'weighted-directed': return `weight ${statistic(candidate.weight)}${candidate.lag === 0 ? ', contemporaneous' : `, lag ${candidate.lag}`}`
-    case 'lagged-information': return `CMI ${statistic(candidate.cmi)}, p ${pValue(candidate.pValue)}, lag ${candidate.lag}`
-    case 'neural-lagged': return candidate.method === 'GRACE'
-      ? `gate value ${statistic(candidate.score)}, lag ${candidate.lag}`
-      : `input-group norm ${statistic(candidate.score)}, lag ${candidate.lag}`
-    case 'neural-window': return `input-group norm ${statistic(candidate.score)}, ${candidate.context}-step history; no individual lag selected`
-    default: return assertNever(candidate)
+    case 'endpoint-marked':
+      return `mark ${candidate.mark}, p ${pValue(candidate.pValue)}, ParCorr ${statistic(candidate.statistic)}`
+    case 'regime-endpoint-marked':
+      return `regime ${candidate.regime + 1}, mark ${candidate.mark}, p ${pValue(candidate.pValue)}, ParCorr ${statistic(candidate.statistic)}`
+    case 'weighted-directed':
+      return `weight ${statistic(candidate.weight)}${candidate.lag === 0 ? ', contemporaneous' : `, lag ${candidate.lag}`}`
+    case 'lagged-information':
+      return `CMI ${statistic(candidate.cmi)}, p ${pValue(candidate.pValue)}, lag ${candidate.lag}`
+    case 'neural-lagged':
+      return candidate.method === 'GRACE'
+        ? `gate value ${statistic(candidate.score)}, lag ${candidate.lag}`
+        : `input-group norm ${statistic(candidate.score)}, lag ${candidate.lag}`
+    case 'neural-window':
+      return `input-group norm ${statistic(candidate.score)}, ${candidate.context}-step history; no individual lag selected`
+    default:
+      return assertNever(candidate)
   }
 }
 
-function EvidenceGraph({ view, selected }: {
+function EvidenceGraph({
+  view,
+  selected,
+}: {
   readonly view: DiscoveryEvidenceView
   readonly selected: DiscoveryCandidate | null
 }) {
   const regime = selected?.kind === 'regime-endpoint-marked' ? selected.regime : 0
-  const projection = useMemo(() => view.run.kind === 'clstm-run' ? null : lagGraphFromRun(view.run, regime), [regime, view.run])
+  const projection = useMemo(
+    () => (view.run.kind === 'clstm-run' ? null : lagGraphFromRun(view.run, regime)),
+    [regime, view.run],
+  )
   const highlighted = selected === null ? [] : [selected.source.column, selected.target.column]
   if (view.run.kind === 'clstm-run') return <NeuralSummaryPlot run={view.run} compact />
   if (projection === null) return null
-  return <LagGraphViews graph={projection.graph} warnings={projection.warnings} label={`${view.method} evidence graph`} highlighted={highlighted} compact />
+  return (
+    <LagGraphViews
+      graph={projection.graph}
+      warnings={projection.warnings}
+      label={`${view.method} evidence graph`}
+      highlighted={highlighted}
+      compact
+    />
+  )
 }
 
 export function EvidenceInspector({
@@ -120,12 +178,18 @@ export function EvidenceInspector({
   readonly onRunSelected: (run: DiscoveryRunId) => void
   readonly onCandidateSelected: (candidate: DiscoveryCandidate) => void
 }) {
-  const run = selectedRun === null ? runs.at(-1) : runs.find((candidate) => candidate.id === selectedRun)
+  const run =
+    selectedRun === null ? runs.at(-1) : runs.find((candidate) => candidate.id === selectedRun)
   if (run === undefined) {
     return (
       <aside className="border-t border-hair pt-4" aria-labelledby="discovery-evidence-title">
-        <h3 id="discovery-evidence-title" className="mb-1 mt-0 text-body font-medium text-ink">No discovery runs</h3>
-        <p className="m-0 text-body text-faint">Create a DAG from substantive knowledge or an experimental design without running discovery.</p>
+        <h3 id="discovery-evidence-title" className="mb-1 mt-0 text-body font-medium text-ink">
+          No discovery runs
+        </h3>
+        <p className="m-0 text-body text-faint">
+          Create a DAG from substantive knowledge or an experimental design without running
+          discovery.
+        </p>
       </aside>
     )
   }
@@ -134,7 +198,9 @@ export function EvidenceInspector({
     <aside className="min-w-0 border-t border-hair pt-4" aria-labelledby="discovery-evidence-title">
       <div className="mb-3 flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <h3 id="discovery-evidence-title" className="mb-1 mt-0 text-body font-medium text-ink">{view.method}</h3>
+          <h3 id="discovery-evidence-title" className="mb-1 mt-0 text-body font-medium text-ink">
+            {view.method}
+          </h3>
           <p className="m-0 text-body text-faint">{describeEvidenceSemantics(view)}</p>
         </div>
         <Select
@@ -146,29 +212,49 @@ export function EvidenceInspector({
             if (next !== undefined) onRunSelected(next.id)
           }}
         >
-          {runs.map((candidate, index) => <option key={candidate.id} value={candidate.id}>{methodTitle(candidate)}, {index + 1}</option>)}
+          {runs.map((candidate, index) => (
+            <option key={candidate.id} value={candidate.id}>
+              {methodTitle(candidate)}, {index + 1}
+            </option>
+          ))}
         </Select>
       </div>
-      <EvidenceGraph view={view} selected={selectedCandidate?.run === run.id ? selectedCandidate : null} />
+      <EvidenceGraph
+        view={view}
+        selected={selectedCandidate?.run === run.id ? selectedCandidate : null}
+      />
       <div className="mt-3 max-h-52 space-y-1.5 overflow-auto" aria-label="Discovered relations">
         {view.candidates.length === 0 ? (
           <p className="m-0 text-body text-faint">This run returned no marked relation.</p>
-        ) : view.candidates.map((candidate) => (
-          <button
-            key={candidate.id}
-            type="button"
-            aria-pressed={selectedCandidate?.id === candidate.id}
-            onClick={() => onCandidateSelected(candidate)}
-            className={well('block w-full px-2.5 py-2 text-left transition-colors hover:border-edge aria-pressed:border-signal aria-pressed:bg-raised')}
-          >
-            <span className="block text-body font-medium text-ink">{candidate.source.name} {candidate.kind === 'endpoint-marked' || candidate.kind === 'regime-endpoint-marked' ? candidate.mark : '→'} {candidate.target.name}</span>
-            <span className={num('mt-0.5 block text-label text-faint')}>{candidateDetail(candidate)}</span>
-          </button>
-        ))}
+        ) : (
+          view.candidates.map((candidate) => (
+            <button
+              key={candidate.id}
+              type="button"
+              aria-pressed={selectedCandidate?.id === candidate.id}
+              onClick={() => onCandidateSelected(candidate)}
+              className={well(
+                'block w-full px-2.5 py-2 text-left transition-colors hover:border-edge aria-pressed:border-signal aria-pressed:bg-raised',
+              )}
+            >
+              <span className="block text-body font-medium text-ink">
+                {candidate.source.name}{' '}
+                {candidate.kind === 'endpoint-marked' || candidate.kind === 'regime-endpoint-marked'
+                  ? candidate.mark
+                  : '→'}{' '}
+                {candidate.target.name}
+              </span>
+              <span className={num('mt-0.5 block text-label text-faint')}>
+                {candidateDetail(candidate)}
+              </span>
+            </button>
+          ))
+        )}
       </div>
       {selectedCandidate !== null && selectedCandidate.run === run.id && (
         <p className={literal('mb-0 mt-3 border-t border-hair pt-3 text-label text-muted')}>
-          Blue marks the reported source; amber marks the target. Selection does not create, orient, or alter a causal edge.
+          Blue marks the reported source; amber marks the target. Selection does not create, orient,
+          or alter a causal edge.
         </p>
       )}
     </aside>

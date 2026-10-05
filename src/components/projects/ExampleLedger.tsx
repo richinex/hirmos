@@ -22,33 +22,55 @@ export function ExampleLedger(props: Props) {
   const [query, setQuery] = useState('')
   const [shape, setShape] = useState<string | null>(null)
   const [sort, setSort] = useState<ExampleSort>('catalog')
-  const shapes = [...new Set(props.examples.map(example => example.shape))]
+  const shapes = [...new Set(props.examples.map((example) => example.shape))]
   const examples = browseExamples(props.examples, { query, shape, sort })
-  const clear = () => { setQuery(''); setShape(null); setSort('catalog') }
+  const clear = () => {
+    setQuery('')
+    setShape(null)
+    setSort('catalog')
+  }
 
   return (
     <div className="example-browser @container/examples space-y-3" data-testid="example-browser">
       <div className="flex flex-wrap items-end gap-3">
         <label className="min-w-0 flex-1 basis-60">
           <span className="sr-only">Search examples</span>
-          <input type="search" className={field()} placeholder="Search examples" value={query} onChange={event => setQuery(event.target.value)} />
+          <input
+            type="search"
+            className={field()}
+            placeholder="Search examples"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
         </label>
         <label className="min-w-0 flex-1 basis-44 @lg/examples:flex-none">
           <span className="sr-only">Data structure</span>
-          <Select className={field()} value={shape ?? ''} onChange={event => {
-            const value = event.target.value
-            if (value === '' || shapes.includes(value)) setShape(value === '' ? null : value)
-          }}>
+          <Select
+            className={field()}
+            value={shape ?? ''}
+            onChange={(event) => {
+              const value = event.target.value
+              if (value === '' || shapes.includes(value)) setShape(value === '' ? null : value)
+            }}
+          >
             <option value="">All data structures</option>
-            {shapes.map(value => <option key={value} value={value}>{value}</option>)}
+            {shapes.map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
           </Select>
         </label>
         <label className="min-w-0 flex-1 basis-40 @lg/examples:flex-none">
           <span className="sr-only">Sort examples</span>
-          <Select className={field()} value={sort} onChange={event => {
-            const value = event.target.value
-            if (value === 'catalog' || value === 'name') setSort(value)
-          }}>
+          <Select
+            className={field()}
+            value={sort}
+            onChange={(event) => {
+              const value = event.target.value
+              if (value === 'catalog' || value === 'name') setSort(value)
+            }}
+          >
             <option value="catalog">Catalog order</option>
             <option value="name">Name A–Z</option>
           </Select>
@@ -57,45 +79,99 @@ export function ExampleLedger(props: Props) {
       {examples.length === 0 ? (
         <div className="py-6 text-body text-muted">
           <p className="m-0">No examples match these filters.</p>
-          <button type="button" className={button('outline', 'mt-3')} onClick={clear}>Clear filters</button>
+          <button type="button" className={button('outline', 'mt-3')} onClick={clear}>
+            Clear filters
+          </button>
         </div>
       ) : (
         <ul className="example-cards" aria-label="Examples">
-          {examples.map(example => {
-            const copy = props.saved.find(entry => entry.id === example.id) ?? null
+          {examples.map((example) => {
+            const copy = props.saved.find((entry) => entry.id === example.id) ?? null
             const count = copy === null ? example.estimationRuns : copy.estimationRuns
-            return <li key={example.id} className="example-card">
-              <div className="flex items-center justify-between gap-3">
-                <ShapeLabel shape={example.shape} />
-                <OpenControl name={example.name} onOpen={() => props.onOpen(example)} />
-              </div>
-              <div className="space-y-2"><h3>{example.name}</h3><p>{example.approach}</p></div>
-              <div className="example-card-meta"><span>{example.size}</span><span className="tabular-nums">{count} estimation {count === 1 ? 'run' : 'runs'}</span></div>
-              <div className="example-card-footer">
-                <span className="example-card-source" title={example.sourceName}>{copy === null ? example.sourceName : 'Saved ' + props.formatSaved(copy.savedAt)}</span>
-                <CopyControls {...props} example={example} copy={copy} />
-              </div>
-            </li>
+            return (
+              <li key={example.id} className="example-card">
+                <div className="flex items-center justify-between gap-3">
+                  <ShapeLabel shape={example.shape} />
+                  <OpenControl name={example.name} onOpen={() => props.onOpen(example)} />
+                </div>
+                <div className="space-y-2">
+                  <h3>{example.name}</h3>
+                  <p>{example.approach}</p>
+                </div>
+                <div className="example-card-meta">
+                  <span>{example.size}</span>
+                  <span className="tabular-nums">
+                    {count} estimation {count === 1 ? 'run' : 'runs'}
+                  </span>
+                </div>
+                <div className="example-card-footer">
+                  <span className="example-card-source" title={example.sourceName}>
+                    {copy === null
+                      ? example.sourceName
+                      : 'Saved ' + props.formatSaved(copy.savedAt)}
+                  </span>
+                  <CopyControls {...props} example={example} copy={copy} />
+                </div>
+              </li>
+            )
           })}
         </ul>
       )}
-      <p role="status" className={num('m-0 text-label text-faint')}>{examples.length} of {props.examples.length} examples</p>
+      <p role="status" className={num('m-0 text-label text-faint')}>
+        {examples.length} of {props.examples.length} examples
+      </p>
     </div>
   )
 }
 
 function ShapeLabel({ shape }: { readonly shape: string }) {
-  return <span className="example-shape" data-shape={shape}>{shape}</span>
+  return (
+    <span className="example-shape" data-shape={shape}>
+      {shape}
+    </span>
+  )
 }
 
-function CopyControls({ example, copy, onReset, onExport, onDelete }: {
+function CopyControls({
+  example,
+  copy,
+  onReset,
+  onExport,
+  onDelete,
+}: {
   readonly example: ShippedExample
   readonly copy: SavedProjectHeader | null
 } & Pick<Props, 'onReset' | 'onExport' | 'onDelete'>) {
   if (copy === null) return null
-  return <>
-    <button type="button" className={iconControl('quiet')} aria-label={`Reset ${example.name}`} title="Put the example back as shipped, discarding changes to this copy" onClick={() => onReset(example)}><Icon name="restart_alt" size={14} /></button>
-    <button type="button" className={iconControl('quiet')} aria-label={`Export ${example.name}`} title="Export this copy as a bundle, without the source file" onClick={() => onExport(example.id)}><Icon name="download" size={14} /></button>
-    <button type="button" className={iconControl('danger')} aria-label={`Delete ${example.name}`} title="Delete this copy" onClick={() => onDelete(copy)}><Icon name="delete" size={14} /></button>
-  </>
+  return (
+    <>
+      <button
+        type="button"
+        className={iconControl('quiet')}
+        aria-label={`Reset ${example.name}`}
+        title="Put the example back as shipped, discarding changes to this copy"
+        onClick={() => onReset(example)}
+      >
+        <Icon name="restart_alt" size={14} />
+      </button>
+      <button
+        type="button"
+        className={iconControl('quiet')}
+        aria-label={`Export ${example.name}`}
+        title="Export this copy as a bundle, without the source file"
+        onClick={() => onExport(example.id)}
+      >
+        <Icon name="download" size={14} />
+      </button>
+      <button
+        type="button"
+        className={iconControl('danger')}
+        aria-label={`Delete ${example.name}`}
+        title="Delete this copy"
+        onClick={() => onDelete(copy)}
+      >
+        <Icon name="delete" size={14} />
+      </button>
+    </>
+  )
 }

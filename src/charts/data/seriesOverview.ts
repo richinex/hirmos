@@ -1,6 +1,14 @@
 import type { EChartsCoreOption } from 'echarts/core'
 import { formatCount, formatStatistic } from '@/lib/format/number'
-import { axisLabelStyle, baseOption, gridAuto, responsive, tooltip, valueAxis, rangeSelection } from '../grammar'
+import {
+  axisLabelStyle,
+  baseOption,
+  gridAuto,
+  responsive,
+  tooltip,
+  valueAxis,
+  rangeSelection,
+} from '../grammar'
 import { variableColour, type ChartTheme } from '../theme'
 
 export interface SeriesOverviewView {
@@ -12,18 +20,27 @@ export interface SeriesOverviewView {
 }
 
 /** One column in row order, with min/max downsampling and a slider zoom. */
-export function seriesOverviewOption(view: SeriesOverviewView, theme: ChartTheme): EChartsCoreOption {
+export function seriesOverviewOption(
+  view: SeriesOverviewView,
+  theme: ChartTheme,
+): EChartsCoreOption {
   const observed = view.values.length
   let min = Number.POSITIVE_INFINITY
   let max = Number.NEGATIVE_INFINITY
   let missing = 0
   for (const value of view.values) {
-    if (Number.isNaN(value)) { missing += 1; continue }
+    if (Number.isNaN(value)) {
+      missing += 1
+      continue
+    }
     if (value < min) min = value
     if (value > max) max = value
   }
   const description = `${view.name} across ${formatCount(observed).text} ${view.stepLabel}s, ranging from ${formatStatistic('raw', min).text} to ${formatStatistic('raw', max).text}.${missing > 0 ? ` ${formatCount(missing).text} missing cells break the line.` : ''}`
-  const data = Array.from(view.values, (value, index) => [index + 1, Number.isNaN(value) ? null : value])
+  const data = Array.from(view.values, (value, index) => [
+    index + 1,
+    Number.isNaN(value) ? null : value,
+  ])
   const base = {
     ...baseOption(theme, description),
     // The slider sits under the axis name; the grid reserves nothing for it.
@@ -55,17 +72,19 @@ export function seriesOverviewOption(view: SeriesOverviewView, theme: ChartTheme
     },
     yAxis: { ...valueAxis(theme), scale: true },
     ...rangeSelection(theme),
-    series: [{
-      type: 'line',
-      name: view.name,
-      data,
-      showSymbol: false,
-      connectNulls: false,
-      sampling: 'minmax',
-      lineStyle: { color: variableColour(theme, view.name), width: 1.2 },
-      itemStyle: { color: variableColour(theme, view.name) },
-      emphasis: { lineStyle: { width: 1.2 } },
-    }],
+    series: [
+      {
+        type: 'line',
+        name: view.name,
+        data,
+        showSymbol: false,
+        connectNulls: false,
+        sampling: 'minmax',
+        lineStyle: { color: variableColour(theme, view.name), width: 1.2 },
+        itemStyle: { color: variableColour(theme, view.name) },
+        emphasis: { lineStyle: { width: 1.2 } },
+      },
+    ],
   }
   return responsive(base, { narrow: { grid: { bottom: 8 }, dataZoom: [{}, { show: false }] } })
 }

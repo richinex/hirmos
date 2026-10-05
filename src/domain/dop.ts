@@ -5,8 +5,7 @@ export type Brand<Value, Name extends string> = Value & {
 }
 
 export type Result<Value, Problem> =
-  | { readonly ok: true; readonly value: Value }
-  | { readonly ok: false; readonly error: Problem }
+  { readonly ok: true; readonly value: Value } | { readonly ok: false; readonly error: Problem }
 
 export const ok = <Value>(value: Value): Result<Value, never> => ({ ok: true, value })
 export const err = <Problem>(error: Problem): Result<never, Problem> => ({ ok: false, error })
@@ -25,7 +24,9 @@ export function mapNonEmpty<Input, Output>(
   return [transform(first, 0), ...rest.map((value, index) => transform(value, index + 1))]
 }
 
-export function flattenNonEmpty<Value>(groups: NonEmptyArray<NonEmptyArray<Value>>): NonEmptyArray<Value> {
+export function flattenNonEmpty<Value>(
+  groups: NonEmptyArray<NonEmptyArray<Value>>,
+): NonEmptyArray<Value> {
   const [[first, ...initial], ...remaining] = groups
   return [first, ...initial, ...remaining.flat()]
 }

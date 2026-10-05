@@ -16,7 +16,8 @@ import { formatStatistic } from '@/lib/format/number'
  */
 
 export type InterventionQueryId = Brand<string, 'InterventionQueryId'>
-export const newInterventionQueryId = (): InterventionQueryId => brand<string, 'InterventionQueryId'>(crypto.randomUUID())
+export const newInterventionQueryId = (): InterventionQueryId =>
+  brand<string, 'InterventionQueryId'>(crypto.randomUUID())
 
 export interface InterventionTarget {
   readonly node: DagNodeId
@@ -26,45 +27,53 @@ export interface InterventionTarget {
 const distributionSchema = z.array(z.tuple([z.string(), z.number().finite()]))
 
 const identifiedDiscreteResultSchema = z.discriminatedUnion('kind', [
-  z.object({
-    kind: z.literal('identified'),
-    algorithm: z.enum(['ID', 'IDC']),
-    expression: z.string().min(1),
-    latex: z.string().min(1),
-    expectations: z.tuple([z.number().finite(), z.number().finite()]),
-    effect: z.number().finite(),
-    distributionLow: distributionSchema,
-    distributionHigh: distributionSchema,
-    normalizationLow: z.number().finite(),
-    normalizationHigh: z.number().finite(),
-  }).strict(),
-  z.object({
-    kind: z.literal('unidentifiable'),
-    hedgeGraph: z.array(z.number().int().nonnegative()),
-    hedgeSubgraph: z.array(z.number().int().nonnegative()),
-  }).strict(),
+  z
+    .object({
+      kind: z.literal('identified'),
+      algorithm: z.enum(['ID', 'IDC']),
+      expression: z.string().min(1),
+      latex: z.string().min(1),
+      expectations: z.tuple([z.number().finite(), z.number().finite()]),
+      effect: z.number().finite(),
+      distributionLow: distributionSchema,
+      distributionHigh: distributionSchema,
+      normalizationLow: z.number().finite(),
+      normalizationHigh: z.number().finite(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('unidentifiable'),
+      hedgeGraph: z.array(z.number().int().nonnegative()),
+      hedgeSubgraph: z.array(z.number().int().nonnegative()),
+    })
+    .strict(),
 ])
 
 const identifiedDiscreteQueryKindSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('unconditional') }).strict(),
-  z.object({
-    kind: z.literal('conditional'),
-    variable: z.number().int().nonnegative(),
-    state: z.string(),
-    representativeValue: z.number().finite(),
-  }).strict(),
+  z
+    .object({
+      kind: z.literal('conditional'),
+      variable: z.number().int().nonnegative(),
+      state: z.string(),
+      representativeValue: z.number().finite(),
+    })
+    .strict(),
 ])
 
-export const identifiedDiscreteQueryEvidenceSchema = z.object({
-  kind: z.literal('identifiedDiscreteQuery'),
-  observations: z.number().int().positive(),
-  bins: z.number().int().min(2).max(10),
-  stateCounts: z.array(z.number().int().positive()).min(2),
-  statePreparations: z.array(discreteStatePreparationSchema).min(2),
-  treatmentStates: z.tuple([z.string(), z.string()]),
-  query: identifiedDiscreteQueryKindSchema,
-  result: identifiedDiscreteResultSchema,
-}).strict()
+export const identifiedDiscreteQueryEvidenceSchema = z
+  .object({
+    kind: z.literal('identifiedDiscreteQuery'),
+    observations: z.number().int().positive(),
+    bins: z.number().int().min(2).max(10),
+    stateCounts: z.array(z.number().int().positive()).min(2),
+    statePreparations: z.array(discreteStatePreparationSchema).min(2),
+    treatmentStates: z.tuple([z.string(), z.string()]),
+    query: identifiedDiscreteQueryKindSchema,
+    result: identifiedDiscreteResultSchema,
+  })
+  .strict()
 
 export type IdentifiedDiscreteQueryEvidence = z.infer<typeof identifiedDiscreteQueryEvidenceSchema>
 
@@ -80,7 +89,8 @@ export type InterventionQueryRoute =
       readonly result: IdentifiedDiscreteQueryEvidence
     }
 
-export type InterventionQueryArtifact = ContrastQueryArtifact | NetworkQueryArtifact | ConditionalGaussianArtifact
+export type InterventionQueryArtifact =
+  ContrastQueryArtifact | NetworkQueryArtifact | ConditionalGaussianArtifact
 export interface ContrastQueryArtifact {
   readonly kind: 'intervention-query'
   readonly id: InterventionQueryId
@@ -106,8 +116,13 @@ export interface InterventionSpecification {
 }
 
 /** Both nodes chosen, distinct and observed, and the revision structurally valid. */
-export function readyInterventionQuery(document: DagDocument, set: DagNodeId | null, read: DagNodeId | null): Result<InterventionSpecification, InterventionReadinessProblem> {
-  if (document.current.validation.structure.kind === 'invalid') return err({ kind: 'graph-invalid' })
+export function readyInterventionQuery(
+  document: DagDocument,
+  set: DagNodeId | null,
+  read: DagNodeId | null,
+): Result<InterventionSpecification, InterventionReadinessProblem> {
+  if (document.current.validation.structure.kind === 'invalid')
+    return err({ kind: 'graph-invalid' })
   const nodes = document.current.graph.nodes
   if (set === null) return err({ kind: 'set-required' })
   if (read === null) return err({ kind: 'read-required' })
@@ -123,12 +138,20 @@ export function readyInterventionQuery(document: DagDocument, set: DagNodeId | n
 
 export function describeInterventionReadiness(problem: InterventionReadinessProblem): string {
   switch (problem.kind) {
-    case 'set-required': return 'Choose the variable to set.'
-    case 'read-required': return 'Choose the variable to read.'
-    case 'distinct-required': return 'Set one variable and read a different one.'
-    case 'latent-node': return `${problem.name} is unmeasured; only measured variables can be set or read.`
-    case 'graph-invalid': return 'The graph has structural issues; resolve them before asking an intervention question.'
-    default: { const exhaustive: never = problem; return exhaustive }
+    case 'set-required':
+      return 'Choose the variable to set.'
+    case 'read-required':
+      return 'Choose the variable to read.'
+    case 'distinct-required':
+      return 'Set one variable and read a different one.'
+    case 'latent-node':
+      return `${problem.name} is unmeasured; only measured variables can be set or read.`
+    case 'graph-invalid':
+      return 'The graph has structural issues; resolve them before asking an intervention question.'
+    default: {
+      const exhaustive: never = problem
+      return exhaustive
+    }
   }
 }
 
@@ -140,17 +163,20 @@ export function describeInterventionVerdict(artifact: ContrastQueryArtifact): st
   switch (artifact.route.kind) {
     case 'bayesian-network': {
       const { result } = artifact.route
-      const adjusted = result.parentsAdjusted.length === 0
-        ? `${artifact.set.name} has no parents in the graph, so no adjustment was needed`
-        : `adjusted for ${result.parentsAdjusted.join(', ')}, the parents of ${artifact.set.name}`
+      const adjusted =
+        result.parentsAdjusted.length === 0
+          ? `${artifact.set.name} has no parents in the graph, so no adjustment was needed`
+          : `adjusted for ${result.parentsAdjusted.join(', ')}, the parents of ${artifact.set.name}`
       return `Setting ${artifact.set.name} to its lowest bin gives an expected ${artifact.read.name} of ${figure(result.expectations[0])}; setting it to its highest gives ${figure(result.expectations[1])}, a difference of ${figure(result.effect)} (${adjusted}).`
     }
     case 'identified-expression': {
       const { result } = artifact.route.result
-      if (result.kind === 'unidentifiable') return `The recorded graph does not identify this intervention query from the observed distribution.`
+      if (result.kind === 'unidentifiable')
+        return `The recorded graph does not identify this intervention query from the observed distribution.`
       return `Setting ${artifact.set.name} to its lowest bin gives an expected ${artifact.read.name} of ${figure(result.expectations[0])}; setting it to its highest gives ${figure(result.expectations[1])}, a difference of ${figure(result.effect)} under the ${result.algorithm} expression.`
     }
-    default: return assertNever(artifact.route)
+    default:
+      return assertNever(artifact.route)
   }
 }
 

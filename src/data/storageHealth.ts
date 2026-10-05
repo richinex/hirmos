@@ -30,5 +30,7 @@ export const lastStorageFailure = (): StorageFailure | null => last
 
 export const subscribeStorageHealth = (listener: Listener): (() => void) => {
   listeners.add(listener)
-  return () => { listeners.delete(listener) }
+  return () => {
+    listeners.delete(listener)
+  }
 }

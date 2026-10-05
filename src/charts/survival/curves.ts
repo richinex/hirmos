@@ -1,5 +1,17 @@
 import type { EChartsCoreOption } from 'echarts/core'
-import { axisLabelStyle, axisNameStyle, baseOption, categoryAxis, escapeHtml, gridAuto, legend, rangeSelection, tooltip, valueAxis, type ReferenceMark } from '@/charts/grammar'
+import {
+  axisLabelStyle,
+  axisNameStyle,
+  baseOption,
+  categoryAxis,
+  escapeHtml,
+  gridAuto,
+  legend,
+  rangeSelection,
+  tooltip,
+  valueAxis,
+  type ReferenceMark,
+} from '@/charts/grammar'
 import { seriesColour, type ChartTheme } from '@/charts/theme'
 import { formatStatistic } from '@/lib/format/number'
 
@@ -32,7 +44,10 @@ const probabilityAxis = (theme: ChartTheme, name: string) => ({
   ...valueAxis(theme, name),
   min: 0,
   max: 1,
-  axisLabel: { ...axisLabelStyle(theme), formatter: (value: number) => `${Math.round(value * 100)}%` },
+  axisLabel: {
+    ...axisLabelStyle(theme),
+    formatter: (value: number) => `${Math.round(value * 100)}%`,
+  },
 })
 
 /** A vertical rule with its name above the plot, in the muted tone of a reference. */
@@ -41,7 +56,13 @@ const markLines = (marks: readonly ReferenceMark[], theme: ChartTheme) => ({
     silent: true,
     symbol: 'none',
     lineStyle: { color: theme.muted, type: 'dashed', width: 1 },
-    label: { color: theme.muted, fontFamily: theme.font, fontSize: theme.labelSize, position: 'insideEndTop', formatter: (raw: unknown) => String(Reflect.get(raw as object, 'name') ?? '') },
+    label: {
+      color: theme.muted,
+      fontFamily: theme.font,
+      fontSize: theme.labelSize,
+      position: 'insideEndTop',
+      formatter: (raw: unknown) => String(Reflect.get(raw as object, 'name') ?? ''),
+    },
     data: marks.map((mark) => ({ name: mark.name, xAxis: mark.value })),
   },
 })
@@ -55,13 +76,35 @@ export function survivalCurvesOption(
   series: readonly SurvivalSeries[],
   timeLabel: string,
   theme: ChartTheme,
-  { marks = [], fill = series.length === 1, stepped = series.length > 1 }: { readonly marks?: readonly ReferenceMark[]; readonly fill?: boolean; readonly stepped?: boolean } = {},
+  {
+    marks = [],
+    fill = series.length === 1,
+    stepped = series.length > 1,
+  }: {
+    readonly marks?: readonly ReferenceMark[]
+    readonly fill?: boolean
+    readonly stepped?: boolean
+  } = {},
 ): EChartsCoreOption {
   return {
-    ...baseOption(theme, `${series.map((item) => item.name).join(' and ')} event-free probability over ${timeLabel}${marks.length === 0 ? '' : `, marked at ${marks.map((mark) => `${mark.name} ${formatStatistic('raw', mark.value).text}`).join(' and ')}`}.`),
+    ...baseOption(
+      theme,
+      `${series.map((item) => item.name).join(' and ')} event-free probability over ${timeLabel}${marks.length === 0 ? '' : `, marked at ${marks.map((mark) => `${mark.name} ${formatStatistic('raw', mark.value).text}`).join(' and ')}`}.`,
+    ),
     // The slider sits under the axis name; a legend for two groups goes above the plot.
     grid: gridAuto({ top: stepped ? 30 : 16, bottom: 64 }),
-    ...(stepped ? { legend: { ...legend(theme, series.map((item) => item.name)), bottom: 'auto', top: 0 } } : {}),
+    ...(stepped
+      ? {
+          legend: {
+            ...legend(
+              theme,
+              series.map((item) => item.name),
+            ),
+            bottom: 'auto',
+            top: 0,
+          },
+        }
+      : {}),
     ...rangeSelection(theme),
     tooltip: {
       ...tooltip(theme, 'axis'),
@@ -76,7 +119,11 @@ export function survivalCurvesOption(
           if (entry === null || typeof entry !== 'object') return []
           const point = Reflect.get(entry, 'value')
           const probability = Array.isArray(point) ? Number(point[1]) : Number.NaN
-          return Number.isFinite(probability) ? [`${escapeHtml(String(Reflect.get(entry, 'seriesName') ?? ''))} <strong>${percent(probability)}</strong>`] : []
+          return Number.isFinite(probability)
+            ? [
+                `${escapeHtml(String(Reflect.get(entry, 'seriesName') ?? ''))} <strong>${percent(probability)}</strong>`,
+              ]
+            : []
         })
         return `${escapeHtml(timeLabel)} ${formatStatistic('raw', time).text}<br/>${lines.join('<br/>')}`
       },
@@ -157,7 +204,9 @@ export function restrictedMeanOption(
   theme: ChartTheme,
 ): EChartsCoreOption {
   const colours = theme.categorical
-  const throughHorizon = (points: readonly (readonly [number, number])[]): readonly (readonly [number, number])[] => [
+  const throughHorizon = (
+    points: readonly (readonly [number, number])[],
+  ): readonly (readonly [number, number])[] => [
     [0, 1],
     ...points.filter((point) => point[0] > 0 && point[0] < horizon),
     [horizon, stepValueAt(points, horizon)],
@@ -167,7 +216,13 @@ export function restrictedMeanOption(
       marks: [{ name: 'comparison horizon', value: horizon }],
       fill: false,
     }),
-    aria: { enabled: true, label: { enabled: false, description: `Area under each event-free probability curve through follow-up time ${formatStatistic('raw', horizon).text}; this area is restricted mean event-free time.` } },
+    aria: {
+      enabled: true,
+      label: {
+        enabled: false,
+        description: `Area under each event-free probability curve through follow-up time ${formatStatistic('raw', horizon).text}; this area is restricted mean event-free time.`,
+      },
+    },
     series: series.map((item, index) => ({
       type: 'line',
       name: item.name,
@@ -194,7 +249,14 @@ export function comparisonMeasureOption(
   return {
     ...baseOption(theme, `${yLabel} by group over follow-up time.`),
     grid: gridAuto({ top: 30, bottom: 64 }),
-    legend: { ...legend(theme, series.map((item) => item.name)), bottom: 'auto', top: 0 },
+    legend: {
+      ...legend(
+        theme,
+        series.map((item) => item.name),
+      ),
+      bottom: 'auto',
+      top: 0,
+    },
     ...rangeSelection(theme),
     tooltip: {
       ...tooltip(theme, 'axis'),
@@ -222,7 +284,10 @@ export function hazardCurveOption(
   theme: ChartTheme,
 ): EChartsCoreOption {
   return {
-    ...baseOption(theme, `Fitted hazard over ${timeLabel}: the instantaneous event rate among those still event-free.`),
+    ...baseOption(
+      theme,
+      `Fitted hazard over ${timeLabel}: the instantaneous event rate among those still event-free.`,
+    ),
     // Follows the event-free chart's window: the drag and the wheel stay, the slider is the other chart's.
     grid: gridAuto({ top: 16, bottom: 30 }),
     ...rangeSelection(theme, 0, { slider: false }),
@@ -239,15 +304,17 @@ export function hazardCurveOption(
     },
     xAxis: timeAxis(theme, timeLabel),
     yAxis: { ...valueAxis(theme, 'hazard'), min: 0 },
-    series: [{
-      type: 'line',
-      name: 'hazard',
-      data: times.map((time, index) => [time, hazard[index] ?? Number.NaN]),
-      showSymbol: false,
-      lineStyle: { color: seriesColour(theme, 0), width: 1.4 },
-      itemStyle: { color: seriesColour(theme, 0) },
-      areaStyle: { color: seriesColour(theme, 0), opacity: 0.12 },
-    }],
+    series: [
+      {
+        type: 'line',
+        name: 'hazard',
+        data: times.map((time, index) => [time, hazard[index] ?? Number.NaN]),
+        showSymbol: false,
+        lineStyle: { color: seriesColour(theme, 0), width: 1.4 },
+        itemStyle: { color: seriesColour(theme, 0) },
+        areaStyle: { color: seriesColour(theme, 0), opacity: 0.12 },
+      },
+    ],
   }
 }
 
@@ -262,9 +329,19 @@ export function stateOccupancyOption(
   const source = Math.max(0, states.indexOf(initial))
   const colours = theme.categorical
   return {
-    ...baseOption(theme, `Probability of each state over time when follow-up starts in state ${states[source]}.`),
+    ...baseOption(
+      theme,
+      `Probability of each state over time when follow-up starts in state ${states[source]}.`,
+    ),
     grid: gridAuto({ top: 30, bottom: 64 }),
-    legend: { ...legend(theme, states.map((state) => `state ${state}`)), bottom: 'auto', top: 0 },
+    legend: {
+      ...legend(
+        theme,
+        states.map((state) => `state ${state}`),
+      ),
+      bottom: 'auto',
+      top: 0,
+    },
     ...rangeSelection(theme),
     tooltip: {
       ...tooltip(theme, 'axis'),
@@ -279,7 +356,11 @@ export function stateOccupancyOption(
           if (entry === null || typeof entry !== 'object') return []
           const point = Reflect.get(entry, 'value')
           const probability = Array.isArray(point) ? Number(point[1]) : Number.NaN
-          return Number.isFinite(probability) ? [`${escapeHtml(String(Reflect.get(entry, 'seriesName') ?? ''))} <strong>${percent(probability)}</strong>`] : []
+          return Number.isFinite(probability)
+            ? [
+                `${escapeHtml(String(Reflect.get(entry, 'seriesName') ?? ''))} <strong>${percent(probability)}</strong>`,
+              ]
+            : []
         })
         return `follow-up time ${formatStatistic('raw', time).text}<br/>${lines.join('<br/>')}`
       },
@@ -289,7 +370,10 @@ export function stateOccupancyOption(
     series: states.map((state, destination) => ({
       type: 'line',
       name: `state ${state}`,
-      data: times.map((time, timeIndex) => [time, probabilities[timeIndex]?.[source * states.length + destination] ?? Number.NaN]),
+      data: times.map((time, timeIndex) => [
+        time,
+        probabilities[timeIndex]?.[source * states.length + destination] ?? Number.NaN,
+      ]),
       showSymbol: false,
       lineStyle: { width: 1.6, color: colours[destination % colours.length] },
       itemStyle: { color: colours[destination % colours.length] },
@@ -306,21 +390,26 @@ export function transitionMapOption(
   theme: ChartTheme,
 ): EChartsCoreOption {
   return {
-    ...baseOption(theme, `Transition structure with ${states.length} states and ${transitions.length} permitted directed transitions.`),
+    ...baseOption(
+      theme,
+      `Transition structure with ${states.length} states and ${transitions.length} permitted directed transitions.`,
+    ),
     tooltip: tooltip(theme),
-    series: [{
-      type: 'graph',
-      layout: 'circular',
-      roam: true,
-      symbolSize: 42,
-      edgeSymbol: ['none', 'arrow'],
-      edgeSymbolSize: [0, 8],
-      label: { show: true, color: theme.ink, fontFamily: theme.font, fontSize: theme.labelSize },
-      lineStyle: { color: theme.muted, width: 1.4, curveness: 0.12 },
-      itemStyle: { color: theme.panel, borderColor: theme.ink, borderWidth: 1.5 },
-      data: states.map((state, index) => ({ id: String(index), name: `state ${state}` })),
-      links: transitions.map(([from, to]) => ({ source: String(from), target: String(to) })),
-    }],
+    series: [
+      {
+        type: 'graph',
+        layout: 'circular',
+        roam: true,
+        symbolSize: 42,
+        edgeSymbol: ['none', 'arrow'],
+        edgeSymbolSize: [0, 8],
+        label: { show: true, color: theme.ink, fontFamily: theme.font, fontSize: theme.labelSize },
+        lineStyle: { color: theme.muted, width: 1.4, curveness: 0.12 },
+        itemStyle: { color: theme.panel, borderColor: theme.ink, borderWidth: 1.5 },
+        data: states.map((state, index) => ({ id: String(index), name: `state ${state}` })),
+        links: transitions.map(([from, to]) => ({ source: String(from), target: String(to) })),
+      },
+    ],
   }
 }
 
@@ -333,7 +422,10 @@ export function transitionMatrixOption(
 ): EChartsCoreOption {
   const labels = states.map((state) => `state ${state}`)
   return {
-    ...baseOption(theme, `Transition probabilities at follow-up time ${formatStatistic('raw', time).text}; rows are starting states and columns are destination states.`),
+    ...baseOption(
+      theme,
+      `Transition probabilities at follow-up time ${formatStatistic('raw', time).text}; rows are starting states and columns are destination states.`,
+    ),
     grid: gridAuto({ left: 56, right: 16, top: 12, bottom: 50 }),
     tooltip: {
       ...tooltip(theme),
@@ -354,15 +446,29 @@ export function transitionMatrixOption(
       show: false,
       inRange: { color: [theme.panel, theme.hair, theme.signal] },
     },
-    series: [{
-      type: 'heatmap',
-      data: states.flatMap((_, source) => states.map((__, destination) => [destination, source, matrix[source * states.length + destination] ?? Number.NaN])),
-      label: { show: true, color: theme.ink, fontFamily: theme.font, fontSize: theme.labelSize, formatter: (raw: unknown) => {
-        if (raw === null || typeof raw !== 'object') return ''
-        const value = Reflect.get(raw, 'value')
-        return Array.isArray(value) ? percent(Number(value[2])) : ''
-      } },
-      itemStyle: { borderColor: theme.panel, borderWidth: 2 },
-    }],
+    series: [
+      {
+        type: 'heatmap',
+        data: states.flatMap((_, source) =>
+          states.map((__, destination) => [
+            destination,
+            source,
+            matrix[source * states.length + destination] ?? Number.NaN,
+          ]),
+        ),
+        label: {
+          show: true,
+          color: theme.ink,
+          fontFamily: theme.font,
+          fontSize: theme.labelSize,
+          formatter: (raw: unknown) => {
+            if (raw === null || typeof raw !== 'object') return ''
+            const value = Reflect.get(raw, 'value')
+            return Array.isArray(value) ? percent(Number(value[2])) : ''
+          },
+        },
+        itemStyle: { borderColor: theme.panel, borderWidth: 2 },
+      },
+    ],
   }
 }

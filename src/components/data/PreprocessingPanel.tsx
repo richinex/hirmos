@@ -28,9 +28,30 @@ import { PreparedSeriesPreview } from './PreparedSeriesPreview'
 import { MulticollinearityCard } from './MulticollinearityCard'
 import type { GrangerEvidenceArtifact } from '@/domain/granger'
 import type { MissingnessResolutionRecord } from '@/domain/missingness'
-import { button, field, fieldLabel, label, num, panel, prose, sectionTitle, table, td, th, tr, well } from '@/components/ui/recipes'
+import {
+  button,
+  field,
+  fieldLabel,
+  label,
+  num,
+  panel,
+  prose,
+  sectionTitle,
+  table,
+  td,
+  th,
+  tr,
+  well,
+} from '@/components/ui/recipes'
 import { cellPadding, SortHeader, useTableDensity } from '@/components/table/primitives'
-import { createColumnHelper, flexRender, getCoreRowModel, getSortedRowModel, useReactTable, type SortingState } from '@tanstack/react-table'
+import {
+  createColumnHelper,
+  flexRender,
+  getCoreRowModel,
+  getSortedRowModel,
+  useReactTable,
+  type SortingState,
+} from '@tanstack/react-table'
 import { cn } from '@/lib/utils'
 import { isNumericDuckDbType, type ColumnId, type DatasetProfile } from '@/domain/dataset'
 import { assertNever, err, isNonEmpty, ok, type Result } from '@/domain/dop'
@@ -57,7 +78,14 @@ import {
   type VariableStationarityEvidence,
   suggestFrequency,
 } from '@/domain/preprocessing'
-import { assessStationarity, decisiveEvidence, describeStationarityAssessment, describeStationarityConflict, type StationarityAssessment, type StationarityTestRef } from '@/domain/stationarityAssessment'
+import {
+  assessStationarity,
+  decisiveEvidence,
+  describeStationarityAssessment,
+  describeStationarityConflict,
+  type StationarityAssessment,
+  type StationarityTestRef,
+} from '@/domain/stationarityAssessment'
 import { seasonalPeriodOf } from '@/domain/seasonal'
 import type { SelectedSource } from '@/domain/workflow'
 import type { PreparedMatrix } from '@/data/prepared'
@@ -115,7 +143,10 @@ const TRANSFORMS: readonly { readonly value: SeriesTransform; readonly label: st
   { value: { kind: 'linear-detrend' }, label: 'Linear detrend' },
 ]
 
-const RESAMPLING_AGGREGATIONS: readonly { readonly value: ResamplingAggregation; readonly label: string }[] = [
+const RESAMPLING_AGGREGATIONS: readonly {
+  readonly value: ResamplingAggregation
+  readonly label: string
+}[] = [
   { value: 'mean', label: 'Mean' },
   { value: 'sum', label: 'Sum' },
   { value: 'median', label: 'Median' },
@@ -125,9 +156,13 @@ const RESAMPLING_AGGREGATIONS: readonly { readonly value: ResamplingAggregation;
   { value: 'last', label: 'Last value' },
 ]
 
-type MissingnessChoiceKind = 'unresolved' | 'lag-aware-exclusion' | 'complete-interval' | 'imputation'
+type MissingnessChoiceKind =
+  'unresolved' | 'lag-aware-exclusion' | 'complete-interval' | 'imputation'
 type LagAwareExclusionDraft = Extract<MissingnessDraft, { readonly kind: 'lag-aware-exclusion' }>
-type AnalysisMaskRole = Extract<LagAwareExclusionDraft['analysisExclusions'], { readonly kind: 'roles' }>['roles'][number]
+type AnalysisMaskRole = Extract<
+  LagAwareExclusionDraft['analysisExclusions'],
+  { readonly kind: 'roles' }
+>['roles'][number]
 
 const MISSINGNESS_CHOICES: readonly MissingnessChoiceKind[] = [
   'unresolved',
@@ -143,28 +178,44 @@ const MISSINGNESS_LABELS: Record<MissingnessChoiceKind, string> = {
   imputation: 'Explicit imputation',
 }
 const MISSINGNESS_HELP: Record<MissingnessChoiceKind, string> = {
-  unresolved: 'Leave missing cells unchanged and select a resolution method before creating the prepared dataset.',
-  'lag-aware-exclusion': 'Retain the time grid and missing cells. Compatible methods exclude constructed lagged samples affected by missing values.',
-  'complete-interval': 'Retain the longest consecutive sequence where all selected columns are observed, and remove rows before and after this sequence.',
-  imputation: 'Replace missing cells using the selected method. This process does not generate rows for missing time points.',
+  unresolved:
+    'Leave missing cells unchanged and select a resolution method before creating the prepared dataset.',
+  'lag-aware-exclusion':
+    'Retain the time grid and missing cells. Compatible methods exclude constructed lagged samples affected by missing values.',
+  'complete-interval':
+    'Retain the longest consecutive sequence where all selected columns are observed, and remove rows before and after this sequence.',
+  imputation:
+    'Replace missing cells using the selected method. This process does not generate rows for missing time points.',
 }
 
-const ANALYSIS_MASK_ROLES: readonly { readonly value: AnalysisMaskRole; readonly label: string }[] = [
-  { value: 'candidate-cause', label: 'Candidate cause (X)' },
-  { value: 'tested-outcome', label: 'Tested outcome (Y)' },
-  { value: 'conditioner', label: 'Conditioning variable (Z)' },
-]
+const ANALYSIS_MASK_ROLES: readonly { readonly value: AnalysisMaskRole; readonly label: string }[] =
+  [
+    { value: 'candidate-cause', label: 'Candidate cause (X)' },
+    { value: 'tested-outcome', label: 'Tested outcome (Y)' },
+    { value: 'conditioner', label: 'Conditioning variable (Z)' },
+  ]
 
-const TONE_CLASS = { ok: 'text-ok', warn: 'text-warn', danger: 'text-danger', muted: 'text-muted' } as const
+const TONE_CLASS = {
+  ok: 'text-ok',
+  warn: 'text-warn',
+  danger: 'text-danger',
+  muted: 'text-muted',
+} as const
 
 const specificationName = (specification: StationarityTestRef['specification']): string => {
   switch (specification) {
-    case 'c': return 'constant'
-    case 'ct': return 'constant and trend'
-    case 'level': return 'level break'
-    case 'trend': return 'trend break'
-    case 'levelAndTrend': return 'level and trend break'
-    default: return assertNever(specification)
+    case 'c':
+      return 'constant'
+    case 'ct':
+      return 'constant and trend'
+    case 'level':
+      return 'level break'
+    case 'trend':
+      return 'trend break'
+    case 'levelAndTrend':
+      return 'level and trend break'
+    default:
+      return assertNever(specification)
   }
 }
 
@@ -175,21 +226,33 @@ const ruleLabel = (ref: StationarityTestRef): string => {
 }
 
 /** The interpreted route for one series with the tests that decided it. */
-function StationarityVerdict({ assessment, transform }: { readonly assessment: StationarityAssessment; readonly transform: SeriesTransform }) {
+function StationarityVerdict({
+  assessment,
+  transform,
+}: {
+  readonly assessment: StationarityAssessment
+  readonly transform: SeriesTransform
+}) {
   const described = describeStationarityAssessment(assessment)
   const stationaryLabel = {
     levels: 'The saved series appears stationary.',
     difference: 'The first-differenced series appears stationary.',
     'linear-detrend': 'The detrended series appears stationary.',
   } satisfies Record<SeriesTransform['kind'], string>
-  const verdict = assessment.kind === 'levelStationary' ? stationaryLabel[transform.kind] : described.verdict
+  const verdict =
+    assessment.kind === 'levelStationary' ? stationaryLabel[transform.kind] : described.verdict
   // An inconclusive verdict is only actionable with the disagreement that produced it: which
   // specification the two tests fell out over, and which way each of them went.
-  const conflicts = assessment.kind === 'inconclusive' ? assessment.conflicts.map(describeStationarityConflict) : []
+  const conflicts =
+    assessment.kind === 'inconclusive' ? assessment.conflicts.map(describeStationarityConflict) : []
   return (
     <div className="min-w-0" aria-label={`Verdict: ${verdict}`}>
       <span className={`text-body font-medium ${TONE_CLASS[described.tone]}`}>{verdict}</span>
-      {conflicts.map((conflict) => <span key={conflict} className="block text-label text-warn">{conflict}</span>)}
+      {conflicts.map((conflict) => (
+        <span key={conflict} className="block text-label text-warn">
+          {conflict}
+        </span>
+      ))}
     </div>
   )
 }
@@ -199,24 +262,30 @@ const transformIsSelected = (selected: SeriesTransform, candidate: SeriesTransfo
 
 const missingnessChoice = (kind: MissingnessDraft['kind'], cells: number): MissingnessDraft => {
   switch (kind) {
-    case 'unresolved': return { kind, cells }
-    case 'lag-aware-exclusion': return {
-      kind,
-      cells,
-      cutOff: 'method-default',
-      propagateThroughMaxLag: false,
-      analysisExclusions: { kind: 'ignore' },
-    }
-    case 'complete-interval': return { kind, cells }
-    case 'imputation': return {
-      kind,
-      cells,
-      method: 'linearInterior',
-      maxGap: 3,
-      confirmedStructuralZero: false,
-    }
-    case 'not-present': return { kind }
-    default: return assertNever(kind)
+    case 'unresolved':
+      return { kind, cells }
+    case 'lag-aware-exclusion':
+      return {
+        kind,
+        cells,
+        cutOff: 'method-default',
+        propagateThroughMaxLag: false,
+        analysisExclusions: { kind: 'ignore' },
+      }
+    case 'complete-interval':
+      return { kind, cells }
+    case 'imputation':
+      return {
+        kind,
+        cells,
+        method: 'linearInterior',
+        maxGap: 3,
+        confirmedStructuralZero: false,
+      }
+    case 'not-present':
+      return { kind }
+    default:
+      return assertNever(kind)
   }
 }
 
@@ -244,14 +313,38 @@ interface TestStatisticRow {
 const statisticHelper = createColumnHelper<TestStatisticRow>()
 
 const statisticColumns = [
-  statisticHelper.accessor('name', { header: 'Specification', cell: (context) => <span className="text-ink">{context.getValue()}</span> }),
-  statisticHelper.accessor('statistic', { header: 'Statistic', meta: { align: 'right' }, cell: (context) => <span className="text-muted">{rawNumber(context.getValue())}</span> }),
-  statisticHelper.accessor('p', { header: 'p-value', meta: { align: 'right' }, cell: (context) => <span className="text-muted">{rawNumber(context.getValue())}</span> }),
-  statisticHelper.accessor('fit', { header: 'Fit', cell: (context) => <span className="text-muted">{context.getValue()}</span> }),
-  statisticHelper.accessor('critical', { header: 'Critical values', enableSorting: false, cell: (context) => <span className="text-muted">{criticalValues(context.getValue())}</span> }),
+  statisticHelper.accessor('name', {
+    header: 'Specification',
+    cell: (context) => <span className="text-ink">{context.getValue()}</span>,
+  }),
+  statisticHelper.accessor('statistic', {
+    header: 'Statistic',
+    meta: { align: 'right' },
+    cell: (context) => <span className="text-muted">{rawNumber(context.getValue())}</span>,
+  }),
+  statisticHelper.accessor('p', {
+    header: 'p-value',
+    meta: { align: 'right' },
+    cell: (context) => <span className="text-muted">{rawNumber(context.getValue())}</span>,
+  }),
+  statisticHelper.accessor('fit', {
+    header: 'Fit',
+    cell: (context) => <span className="text-muted">{context.getValue()}</span>,
+  }),
+  statisticHelper.accessor('critical', {
+    header: 'Critical values',
+    enableSorting: false,
+    cell: (context) => <span className="text-muted">{criticalValues(context.getValue())}</span>,
+  }),
 ]
 
-function TestStatisticsTable({ rows, density }: { readonly rows: readonly TestStatisticRow[]; readonly density: Parameters<typeof cellPadding>[0] }) {
+function TestStatisticsTable({
+  rows,
+  density,
+}: {
+  readonly rows: readonly TestStatisticRow[]
+  readonly density: Parameters<typeof cellPadding>[0]
+}) {
   const [sorting, setSorting] = useState<SortingState>([])
   const statisticsTable = useReactTable({
     data: rows as TestStatisticRow[],
@@ -274,7 +367,12 @@ function TestStatisticsTable({ rows, density }: { readonly rows: readonly TestSt
                   sorted={header.column.getIsSorted()}
                   canSort={header.column.getCanSort()}
                   onToggle={() => header.column.toggleSorting()}
-                  align={(header.column.columnDef.meta as { readonly align?: 'left' | 'right' } | undefined)?.align ?? 'left'}
+                  align={
+                    (
+                      header.column.columnDef.meta as
+                        { readonly align?: 'left' | 'right' } | undefined
+                    )?.align ?? 'left'
+                  }
                 >
                   {flexRender(header.column.columnDef.header, header.getContext())}
                 </SortHeader>
@@ -286,8 +384,19 @@ function TestStatisticsTable({ rows, density }: { readonly rows: readonly TestSt
           {statisticsTable.getRowModel().rows.map((row) => (
             <tr key={row.id} className={tr()}>
               {row.getVisibleCells().map((cell) => {
-                const align = (cell.column.columnDef.meta as { readonly align?: 'left' | 'right' } | undefined)?.align
-                return <td key={cell.id} className={td(cn(padding, align === 'right' && num('whitespace-nowrap text-right')))}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                const align = (
+                  cell.column.columnDef.meta as { readonly align?: 'left' | 'right' } | undefined
+                )?.align
+                return (
+                  <td
+                    key={cell.id}
+                    className={td(
+                      cn(padding, align === 'right' && num('whitespace-nowrap text-right')),
+                    )}
+                  >
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </td>
+                )
               })}
             </tr>
           ))}
@@ -298,8 +407,9 @@ function TestStatisticsTable({ rows, density }: { readonly rows: readonly TestSt
 }
 
 const rawNumber = (value: number): string => formatStatistic('raw', value).text
-const criticalValues = (values: readonly { readonly level: string; readonly value: number }[]): string =>
-  values.map(({ level, value }) => `${level}: ${rawNumber(value)}`).join('; ')
+const criticalValues = (
+  values: readonly { readonly level: string; readonly value: number }[],
+): string => values.map(({ level, value }) => `${level}: ${rawNumber(value)}`).join('; ')
 
 const labelledCriticalValues = (
   test: 'adf' | 'kpss' | 'zivot-andrews',
@@ -326,85 +436,171 @@ function preparedArtifact(
     resolution,
   }
   switch (recipe.kind) {
-    case 'regular-series': return ok({
-      ...identity,
-      kind: 'prepared-time-series',
-      missingness: recipe.missingness,
-      sampling: { ...recipe.sampling, frequency: effectiveFrequency(recipe.sampling.frequency, recipe.resampling) },
-      resampling,
-      seasonalAdjustment: recipe.seasonalAdjustment,
-      seriesTransforms: recipe.seriesTransforms,
-    })
-    case 'cross-sectional': return ok({ ...identity, kind: 'prepared-cross-section', sampling: recipe.sampling, missingness: recipe.missingness, seasonalAdjustment: { kind: 'none' } })
+    case 'regular-series':
+      return ok({
+        ...identity,
+        kind: 'prepared-time-series',
+        missingness: recipe.missingness,
+        sampling: {
+          ...recipe.sampling,
+          frequency: effectiveFrequency(recipe.sampling.frequency, recipe.resampling),
+        },
+        resampling,
+        seasonalAdjustment: recipe.seasonalAdjustment,
+        seriesTransforms: recipe.seriesTransforms,
+      })
+    case 'cross-sectional':
+      return ok({
+        ...identity,
+        kind: 'prepared-cross-section',
+        sampling: recipe.sampling,
+        missingness: recipe.missingness,
+        seasonalAdjustment: { kind: 'none' },
+      })
     case 'regular-panel': {
       if (panel === null) return err({ kind: 'panel-evidence-missing' })
-      return ok({ ...identity, kind: 'prepared-panel', sampling: recipe.sampling, missingness: recipe.missingness, panel, seasonalAdjustment: { kind: 'none' } })
+      return ok({
+        ...identity,
+        kind: 'prepared-panel',
+        sampling: recipe.sampling,
+        missingness: recipe.missingness,
+        panel,
+        seasonalAdjustment: { kind: 'none' },
+      })
     }
-    default: return assertNever(recipe)
+    default:
+      return assertNever(recipe)
   }
 }
 
-export function PreprocessingPanel({ source, profile, onPrepared, onStationarityEvidence, onClearStationarityEvidence, stationarity, preparedVersion, grangerEvidence, onGrangerEvidence }: PreprocessingPanelProps) {
+export function PreprocessingPanel({
+  source,
+  profile,
+  onPrepared,
+  onStationarityEvidence,
+  onClearStationarityEvidence,
+  stationarity,
+  preparedVersion,
+  grangerEvidence,
+  onGrangerEvidence,
+}: PreprocessingPanelProps) {
   const preparation = useJob('preparation')
-  const preprocessing = useWorkflow(state => state.preprocessing)
-  const changePreprocessing = useWorkflow(state => state.changePreprocessing)
-  const saveRecipe = useWorkflow(state => state.saveRecipe)
+  const preprocessing = useWorkflow((state) => state.preprocessing)
+  const changePreprocessing = useWorkflow((state) => state.changePreprocessing)
+  const saveRecipe = useWorkflow((state) => state.saveRecipe)
   const session = useJob('stationarity')
   const { job } = session
-  const diagnostics = useWorkflow(state => state.diagnosticDraft)
-  const changeDiagnostic = useWorkflow(state => state.changeDiagnostic)
-  const multicollinearityChecked = useWorkflow(state => state.redundancy !== null && state.redundancy.prepared === preparedVersion?.id)
-  const structureChecked = useWorkflow(state => state.temporalStructure !== null && state.temporalStructure.prepared === preparedVersion?.id)
+  const diagnostics = useWorkflow((state) => state.diagnosticDraft)
+  const changeDiagnostic = useWorkflow((state) => state.changeDiagnostic)
+  const multicollinearityChecked = useWorkflow(
+    (state) => state.redundancy !== null && state.redundancy.prepared === preparedVersion?.id,
+  )
+  const structureChecked = useWorkflow(
+    (state) =>
+      state.temporalStructure !== null && state.temporalStructure.prepared === preparedVersion?.id,
+  )
   const diagnostic = diagnostics?.view ?? 'multicollinearity'
   const setDiagnostic = (view: Diagnostic) => {
     if (preparedVersion !== null) changeDiagnostic(preparedVersion.id, { type: 'view', view })
   }
-  if (preprocessing === null || preprocessing.profile !== profile.id) throw new Error('Preprocessing requires the current source profile.')
+  if (preprocessing === null || preprocessing.profile !== profile.id)
+    throw new Error('Preprocessing requires the current source profile.')
   const { draft, savedRecipe } = preprocessing
   const dispatch = (event: PreprocessingEvent) => changePreprocessing(profile.id, event)
   const numericColumns = profile.columns.filter((column) => isNumericDuckDbType(column.duckdbType))
   const [density] = useTableDensity()
-  const selectedIds: readonly ColumnId[] = draft.variables.kind === 'selected' ? draft.variables.columns : []
+  const selectedIds: readonly ColumnId[] =
+    draft.variables.kind === 'selected' ? draft.variables.columns : []
   // The transform every selected column shares, or null when they differ: what the "all columns" control shows.
   const sharedTransformKind = ((): SeriesTransform['kind'] | null => {
-    const kinds = new Set(selectedIds.map((column) => seriesTransformFor(draft.seriesTransforms, column).kind))
-    return kinds.size === 1 ? [...kinds][0] ?? null : null
+    const kinds = new Set(
+      selectedIds.map((column) => seriesTransformFor(draft.seriesTransforms, column).kind),
+    )
+    return kinds.size === 1 ? ([...kinds][0] ?? null) : null
   })()
   const readiness = readyPreprocessingRecipe(draft)
-  const action = preparationAction(readiness, savedRecipe, preparation.job.kind === 'running' ? 'running' : preparation.blocked ? 'busy' : 'idle')
-  const timeSeriesSelected = draft.sampling.kind === 'regular-series' || draft.sampling.kind === 'regular-series-awaiting-time'
+  const action = preparationAction(
+    readiness,
+    savedRecipe,
+    preparation.job.kind === 'running' ? 'running' : preparation.blocked ? 'busy' : 'idle',
+  )
+  const timeSeriesSelected =
+    draft.sampling.kind === 'regular-series' ||
+    draft.sampling.kind === 'regular-series-awaiting-time'
   const preparedCurrent = preparedVersion
-  const preparedTimeSeries = preparedCurrent !== null && preparedCurrent.kind === 'prepared-time-series' ? preparedCurrent : null
-  const testColumns = diagnostics?.kind === 'series' && diagnostics.prepared === preparedTimeSeries?.id ? diagnostics.stationarity : []
+  const preparedTimeSeries =
+    preparedCurrent !== null && preparedCurrent.kind === 'prepared-time-series'
+      ? preparedCurrent
+      : null
+  const testColumns =
+    diagnostics?.kind === 'series' && diagnostics.prepared === preparedTimeSeries?.id
+      ? diagnostics.stationarity
+      : []
   const selectTestColumns = (columns: readonly ColumnId[]) => {
-    if (preparedTimeSeries !== null) changeDiagnostic(preparedTimeSeries.id, { type: 'stationarity', columns })
+    if (preparedTimeSeries !== null)
+      changeDiagnostic(preparedTimeSeries.id, { type: 'stationarity', columns })
   }
-  const stationarityEvidence = stationarity !== null && preparedCurrent !== null && stationarity.preparedDataset === preparedCurrent.id ? stationarity : null
-  const panelSelected = draft.sampling.kind === 'regular-panel' || draft.sampling.kind === 'regular-panel-awaiting-keys'
+  const stationarityEvidence =
+    stationarity !== null &&
+    preparedCurrent !== null &&
+    stationarity.preparedDataset === preparedCurrent.id
+      ? stationarity
+      : null
+  const panelSelected =
+    draft.sampling.kind === 'regular-panel' || draft.sampling.kind === 'regular-panel-awaiting-keys'
   const crossSectionSelected = draft.sampling.kind === 'cross-sectional'
-  const currentFrequency = timeSeriesSelected || panelSelected ? draft.sampling.frequency : 'monthly'
-  const currentTime = draft.sampling.kind === 'regular-series' || draft.sampling.kind === 'regular-panel' || draft.sampling.kind === 'regular-panel-awaiting-keys' ? draft.sampling.timeColumn ?? '' : ''
-  const currentUnit = draft.sampling.kind === 'regular-panel' || draft.sampling.kind === 'regular-panel-awaiting-keys' ? draft.sampling.unitColumn ?? '' : ''
+  const currentFrequency =
+    timeSeriesSelected || panelSelected ? draft.sampling.frequency : 'monthly'
+  const currentTime =
+    draft.sampling.kind === 'regular-series' ||
+    draft.sampling.kind === 'regular-panel' ||
+    draft.sampling.kind === 'regular-panel-awaiting-keys'
+      ? (draft.sampling.timeColumn ?? '')
+      : ''
+  const currentUnit =
+    draft.sampling.kind === 'regular-panel' || draft.sampling.kind === 'regular-panel-awaiting-keys'
+      ? (draft.sampling.unitColumn ?? '')
+      : ''
   const timeColumnProfile = profile.columns.find((column) => column.id === currentTime) ?? null
   const timeColumnId = timeColumnProfile === null ? null : timeColumnProfile.id
-  const panelClockOrdinal = panelSelected && timeColumnProfile !== null && isNumericDuckDbType(timeColumnProfile.duckdbType)
-  const interpretationValue = draft.sampling.kind === 'regular-series'
-    ? draft.sampling.interpretation?.kind === 'date-format' ? draft.sampling.interpretation.format : draft.sampling.interpretation?.kind ?? 'source-type'
-    : 'source-type'
+  const panelClockOrdinal =
+    panelSelected && timeColumnProfile !== null && isNumericDuckDbType(timeColumnProfile.duckdbType)
+  const interpretationValue =
+    draft.sampling.kind === 'regular-series'
+      ? draft.sampling.interpretation?.kind === 'date-format'
+        ? draft.sampling.interpretation.format
+        : (draft.sampling.interpretation?.kind ?? 'source-type')
+      : 'source-type'
   useEffect(() => {
-    const interpretation = TIME_INTERPRETATIONS.find((choice) => choice.value === interpretationValue)
+    const interpretation = TIME_INTERPRETATIONS.find(
+      (choice) => choice.value === interpretationValue,
+    )
     if (timeColumnId === null || interpretation === undefined) return
     let current = true
-    void previewTimeColumnInWorker(source.file, profile, timeColumnId, interpretation.interpretation).then((result) => {
+    void previewTimeColumnInWorker(
+      source.file,
+      profile,
+      timeColumnId,
+      interpretation.interpretation,
+    ).then((result) => {
       if (!current || !result.ok) return
-      changePreprocessing(profile.id, { type: 'time-spacing-observed', timeColumn: timeColumnId, suggestion: suggestFrequency(result.value.spacing) })
+      changePreprocessing(profile.id, {
+        type: 'time-spacing-observed',
+        timeColumn: timeColumnId,
+        suggestion: suggestFrequency(result.value.spacing),
+      })
     })
-    return () => { current = false }
+    return () => {
+      current = false
+    }
   }, [source.file, profile, timeColumnId, interpretationValue, changePreprocessing])
-  const outputFrequency = timeSeriesSelected ? effectiveFrequency(draft.sampling.frequency, draft.resampling) : null
+  const outputFrequency = timeSeriesSelected
+    ? effectiveFrequency(draft.sampling.frequency, draft.resampling)
+    : null
   const seasonalPeriod = outputFrequency === null ? null : seasonalPeriodOf(outputFrequency)
   const lagExclusion = draft.missingness.kind === 'lag-aware-exclusion' ? draft.missingness : null
-  const columnName = (column: ColumnId): string => profile.columns.find((candidate) => candidate.id === column)?.name ?? column
+  const columnName = (column: ColumnId): string =>
+    profile.columns.find((candidate) => candidate.id === column)?.name ?? column
   const missingnessChoices = crossSectionSelected
     ? MISSINGNESS_CHOICES.filter((kind) => kind !== 'lag-aware-exclusion')
     : MISSINGNESS_CHOICES
@@ -418,50 +614,96 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
     if (!recipe.ok) return
     const id = preparation.start('analysis', 'Preparing dataset')
     if (id === null) return
-    const dispatch = (event: { readonly type: 'preparation-failed'; readonly detail: string }) => preparation.fail(id, event.detail)
+    const dispatch = (event: { readonly type: 'preparation-failed'; readonly detail: string }) =>
+      preparation.fail(id, event.detail)
     try {
       let panelStructure: PanelStructureEvidence | null = null
       if (recipe.value.kind === 'regular-panel') {
         const { inspectPanelInWorker } = await import('@/data/client')
         if (!preparation.current(id)) return
-        const inspected = await inspectPanelInWorker(source.file, profile, recipe.value.sampling.unitColumn, recipe.value.sampling.timeColumn)
+        const inspected = await inspectPanelInWorker(
+          source.file,
+          profile,
+          recipe.value.sampling.unitColumn,
+          recipe.value.sampling.timeColumn,
+        )
         if (!preparation.current(id)) return
-        if (!inspected.ok) { dispatch({ type: 'preparation-failed', detail: describePanelDataProblem(inspected.error) }); return }
+        if (!inspected.ok) {
+          dispatch({
+            type: 'preparation-failed',
+            detail: describePanelDataProblem(inspected.error),
+          })
+          return
+        }
         panelStructure = inspected.value
         if (panelStructure.missingUnitKeys > 0 || panelStructure.missingTimeKeys > 0) {
-          dispatch({ type: 'preparation-failed', detail: `Panel keys have ${panelStructure.missingUnitKeys} missing unit values and ${panelStructure.missingTimeKeys} missing time values. Fill or drop those rows.` }); return
+          dispatch({
+            type: 'preparation-failed',
+            detail: `Panel keys have ${panelStructure.missingUnitKeys} missing unit values and ${panelStructure.missingTimeKeys} missing time values. Fill or drop those rows.`,
+          })
+          return
         }
-        if (panelStructure.duplicateKeys > 0) { dispatch({ type: 'preparation-failed', detail: `${panelStructure.duplicateKeys} unit–time keys repeat. Remove the duplicate rows.` }); return }
-        if (!panelStructure.balanced) { dispatch({ type: 'preparation-failed', detail: `The panel is unbalanced: ${panelStructure.observations} rows for ${panelStructure.units} units × ${panelStructure.periods} periods. This preparation route requires a balanced panel. Review each unit's observation window before changing the data.` }); return }
+        if (panelStructure.duplicateKeys > 0) {
+          dispatch({
+            type: 'preparation-failed',
+            detail: `${panelStructure.duplicateKeys} unit–time keys repeat. Remove the duplicate rows.`,
+          })
+          return
+        }
+        if (!panelStructure.balanced) {
+          dispatch({
+            type: 'preparation-failed',
+            detail: `The panel is unbalanced: ${panelStructure.observations} rows for ${panelStructure.units} units × ${panelStructure.periods} periods. This preparation route requires a balanced panel. Review each unit's observation window before changing the data.`,
+          })
+          return
+        }
       }
-      const { materializeNumericColumnsInWorker, materializeTimeSeriesColumnsInWorker } = await import('@/data/client')
+      const { materializeNumericColumnsInWorker, materializeTimeSeriesColumnsInWorker } =
+        await import('@/data/client')
       if (!preparation.current(id)) return
-      const matrix = recipe.value.kind === 'regular-series'
-        ? await materializeTimeSeriesColumnsInWorker(source.file, profile, recipe.value.sampling.timeColumn, recipe.value.columns, recipe.value.sampling.interpretation)
-        : await materializeNumericColumnsInWorker(source.file, profile, recipe.value.columns)
+      const matrix =
+        recipe.value.kind === 'regular-series'
+          ? await materializeTimeSeriesColumnsInWorker(
+              source.file,
+              profile,
+              recipe.value.sampling.timeColumn,
+              recipe.value.columns,
+              recipe.value.sampling.interpretation,
+            )
+          : await materializeNumericColumnsInWorker(source.file, profile, recipe.value.columns)
       if (!preparation.current(id)) return
       if (!matrix.ok) {
-        const detail = matrix.error.kind === 'time-value-unparseable'
-          ? `${matrix.error.name} contains an unparseable time at sorted row ${matrix.error.row + 1}.`
-          : matrix.error.kind === 'duplicate-time-value'
-            ? `${matrix.error.name} repeats at sorted row ${matrix.error.row + 1}. A regular time series needs one row per time point.`
-            : 'The selected columns could not be read. Check their types and missing-value settings.'
+        const detail =
+          matrix.error.kind === 'time-value-unparseable'
+            ? `${matrix.error.name} contains an unparseable time at sorted row ${matrix.error.row + 1}.`
+            : matrix.error.kind === 'duplicate-time-value'
+              ? `${matrix.error.name} repeats at sorted row ${matrix.error.row + 1}. A regular time series needs one row per time point.`
+              : 'The selected columns could not be read. Check their types and missing-value settings.'
         dispatch({ type: 'preparation-failed', detail })
         return
       }
       if (recipe.value.kind === 'regular-panel' && matrix.value.missingCells > 0) {
-        dispatch({ type: 'preparation-failed', detail: 'Complete the missing values separately within each unit, then import the balanced panel again.' })
+        dispatch({
+          type: 'preparation-failed',
+          detail:
+            'Complete the missing values separately within each unit, then import the balanced panel again.',
+        })
         return
       }
 
-      const { describePreparedMaterialisationProblem, resolveNullableInput } = await import('@/data/prepared')
+      const { describePreparedMaterialisationProblem, resolveNullableInput } =
+        await import('@/data/prepared')
       if (!preparation.current(id)) return
       let observations: number
       let resolution: MissingnessResolutionRecord
       let resolvedMatrix: PreparedMatrix | null = null
       if (recipe.value.missingness.kind === 'lag-aware-exclusion') {
         if (matrix.value.missingCells !== recipe.value.missingness.cells) {
-          dispatch({ type: 'preparation-failed', detail: 'The number of missing values in the source has changed. Profile the source again before saving this version.' })
+          dispatch({
+            type: 'preparation-failed',
+            detail:
+              'The number of missing values in the source has changed. Profile the source again before saving this version.',
+          })
           return
         }
         observations = matrix.value.rowCount
@@ -469,56 +711,140 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
       } else {
         const resolved = await resolveNullableInput(matrix.value, recipe.value.missingness)
         if (!preparation.current(id)) return
-        if (!resolved.ok) { dispatch({ type: 'preparation-failed', detail: describePreparedMaterialisationProblem(resolved.error) }); return }
+        if (!resolved.ok) {
+          dispatch({
+            type: 'preparation-failed',
+            detail: describePreparedMaterialisationProblem(resolved.error),
+          })
+          return
+        }
         observations = resolved.value.matrix.rowCount
         resolution = resolved.value.resolution
         resolvedMatrix = resolved.value.matrix
       }
       let resampling: ResamplingRecord = { kind: 'none' }
-      const sourceTime = resolvedMatrix?.timeAxis ?? ('timeAxis' in matrix.value ? matrix.value.timeAxis : null)
-      const lastSourceTimestamp = sourceTime?.kind === 'calendar' ? sourceTime.timestamps.at(-1) ?? null : null
+      const sourceTime =
+        resolvedMatrix?.timeAxis ?? ('timeAxis' in matrix.value ? matrix.value.timeAxis : null)
+      const lastSourceTimestamp =
+        sourceTime?.kind === 'calendar' ? (sourceTime.timestamps.at(-1) ?? null) : null
       let coverageCap: number | null = null
 
       if (recipe.value.kind === 'regular-series') {
         if (recipe.value.resampling.kind === 'daily-downsample') {
           if (resolvedMatrix === null) {
-            dispatch({ type: 'preparation-failed', detail: 'Calendar resampling requires prepared values with no missing cells.' })
+            dispatch({
+              type: 'preparation-failed',
+              detail: 'Calendar resampling requires prepared values with no missing cells.',
+            })
             return
           }
           const timeAxis = resolvedMatrix.timeAxis
-          if (timeAxis?.kind !== 'calendar') { dispatch({ type: 'preparation-failed', detail: 'Weekly and monthly resampling require a date or timestamp column. An ordinal time key can order rows but cannot define calendar intervals.' }); return }
+          if (timeAxis?.kind !== 'calendar') {
+            dispatch({
+              type: 'preparation-failed',
+              detail:
+                'Weekly and monthly resampling require a date or timestamp column. An ordinal time key can order rows but cannot define calendar intervals.',
+            })
+            return
+          }
           const input = { ...resolvedMatrix, timestamps: timeAxis.timestamps }
           const aggregations = aggregationsForColumns(input.columns, recipe.value.resampling)
-          if (!aggregations.ok) { dispatch({ type: 'preparation-failed', detail: describeResamplingProblem(aggregations.error) }); return }
+          if (!aggregations.ok) {
+            dispatch({
+              type: 'preparation-failed',
+              detail: describeResamplingProblem(aggregations.error),
+            })
+            return
+          }
           const { runPandasResampling } = await import('@/analysis/client')
           if (!preparation.current(id)) return
-          const evidence = await runPandasResampling(input.timestamps, input.values, input.rowCount, input.columns.length, recipe.value.resampling.targetFrequency, recipe.value.resampling.incompleteBins, aggregations.value, input.imputedCells)
+          const evidence = await runPandasResampling(
+            input.timestamps,
+            input.values,
+            input.rowCount,
+            input.columns.length,
+            recipe.value.resampling.targetFrequency,
+            recipe.value.resampling.incompleteBins,
+            aggregations.value,
+            input.imputedCells,
+          )
           if (!preparation.current(id)) return
-          if (!evidence.ok) { dispatch({ type: 'preparation-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
-          const grouped = resampledMatrixFromEvidence(input, recipe.value.resampling, evidence.value)
-          if (!grouped.ok) { dispatch({ type: 'preparation-failed', detail: describeResamplingProblem(grouped.error) }); return }
+          if (!evidence.ok) {
+            dispatch({
+              type: 'preparation-failed',
+              detail: describeAnalysisWorkerProblem(evidence.error),
+            })
+            return
+          }
+          const grouped = resampledMatrixFromEvidence(
+            input,
+            recipe.value.resampling,
+            evidence.value,
+          )
+          if (!grouped.ok) {
+            dispatch({
+              type: 'preparation-failed',
+              detail: describeResamplingProblem(grouped.error),
+            })
+            return
+          }
           observations = grouped.value.rowCount
           resampling = grouped.value.record
           const lastBin = grouped.value.timestamps.at(-1)
-          if (lastBin !== undefined) coverageCap = rowCoverageEnd(lastBin, recipe.value.resampling.targetFrequency === 'weekly' ? 'week' : 'month')
+          if (lastBin !== undefined)
+            coverageCap = rowCoverageEnd(
+              lastBin,
+              recipe.value.resampling.targetFrequency === 'weekly' ? 'week' : 'month',
+            )
         }
         const leadingRows = transformWarmup(recipe.value.seriesTransforms)
         if (observations <= leadingRows) {
-          dispatch({ type: 'preparation-failed', detail: 'First differencing requires at least two retained observations. Choose a longer interval or keep the series in levels.' })
+          dispatch({
+            type: 'preparation-failed',
+            detail:
+              'First differencing requires at least two retained observations. Choose a longer interval or keep the series in levels.',
+          })
           return
         }
         observations -= leadingRows
       }
 
-      const artifact = preparedArtifact(recipe.value, profile, observations, resolution, resampling, panelStructure)
-      if (!artifact.ok) { dispatch({ type: 'preparation-failed', detail: 'The unit and time columns were not saved. Select both panel keys and create the prepared dataset version again.' }); return }
+      const artifact = preparedArtifact(
+        recipe.value,
+        profile,
+        observations,
+        resolution,
+        resampling,
+        panelStructure,
+      )
+      if (!artifact.ok) {
+        dispatch({
+          type: 'preparation-failed',
+          detail:
+            'The unit and time columns were not saved. Select both panel keys and create the prepared dataset version again.',
+        })
+        return
+      }
       preparation.finish(id)
       saveRecipe(profile.id, JSON.stringify(recipe.value))
       const sampling = recipe.value.sampling
-      const calendarCoverage = sampling.kind === 'regular-series'
-        ? calendarEdgeFor(source.recipe, profile.columns.find(c => c.id === sampling.timeColumn)?.name ?? '', lastSourceTimestamp,
-          sampling.frequency === 'daily' ? 'day' : sampling.frequency === 'weekly' ? 'week' : sampling.frequency === 'monthly' ? 'month' : null, coverageCap, sampling.interpretation)
-        : { kind: 'unavailable' as const, reason: 'non-calendar' as const }
+      const calendarCoverage =
+        sampling.kind === 'regular-series'
+          ? calendarEdgeFor(
+              source.recipe,
+              profile.columns.find((c) => c.id === sampling.timeColumn)?.name ?? '',
+              lastSourceTimestamp,
+              sampling.frequency === 'daily'
+                ? 'day'
+                : sampling.frequency === 'weekly'
+                  ? 'week'
+                  : sampling.frequency === 'monthly'
+                    ? 'month'
+                    : null,
+              coverageCap,
+              sampling.interpretation,
+            )
+          : { kind: 'unavailable' as const, reason: 'non-calendar' as const }
       onPrepared({ ...artifact.value, calendarCoverage })
     } catch (cause: unknown) {
       dispatch({
@@ -534,12 +860,15 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
     if (current === null) return
     const fail = (detail: string) => session.fail(current, detail)
     const prepared = preparedTimeSeries
-    session.progress(current, 'Preparing selected variables', { completed: 0, total: testColumns.length })
+    session.progress(current, 'Preparing selected variables', {
+      completed: 0,
+      total: testColumns.length,
+    })
     try {
-      const [{ materialisePrepared, describePreparedMaterialisationProblem }, { runStationarityBattery }] = await Promise.all([
-        import('@/data/prepared'),
-        import('@/analysis/client'),
-      ])
+      const [
+        { materialisePrepared, describePreparedMaterialisationProblem },
+        { runStationarityBattery },
+      ] = await Promise.all([import('@/data/prepared'), import('@/analysis/client')])
       if (!session.current(current)) return
       const matrix = await materialisePrepared(source, profile, prepared, testColumns)
       if (!session.current(current)) return
@@ -558,11 +887,22 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
           fail(`${column.name}: ${describeAnalysisWorkerProblem(saved.error)}`)
           return
         }
-        evidence.push({ column: column.id, result: saved.value, levels: saved.value, differenced: null, assessment: assessStationarity(saved.value, null) })
-        session.progress(current, 'Stationarity tests', { completed: evidence.length, total: testColumns.length })
+        evidence.push({
+          column: column.id,
+          result: saved.value,
+          levels: saved.value,
+          differenced: null,
+          assessment: assessStationarity(saved.value, null),
+        })
+        session.progress(current, 'Stationarity tests', {
+          completed: evidence.length,
+          total: testColumns.length,
+        })
       }
       if (!isNonEmpty(evidence)) {
-        fail('The stationarity tests returned no results. Check the selected numeric columns and rerun the tests.')
+        fail(
+          'The stationarity tests returned no results. Check the selected numeric columns and rerun the tests.',
+        )
         return
       }
       const [firstEvidence] = evidence
@@ -572,7 +912,13 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
         preparedDataset: prepared.id,
         observations: firstEvidence.result.observations,
         diagnosticTransform: { kind: 'levels' },
-        variables: [firstEvidence, ...evidence.slice(1), ...(stationarityEvidence?.variables.filter(previous => !evidence.some(next => next.column === previous.column)) ?? [])],
+        variables: [
+          firstEvidence,
+          ...evidence.slice(1),
+          ...(stationarityEvidence?.variables.filter(
+            (previous) => !evidence.some((next) => next.column === previous.column),
+          ) ?? []),
+        ],
       }
       onStationarityEvidence(completedEvidence)
       session.finish(current)
@@ -589,19 +935,36 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
 
   const deleteDiagnostic = (column: ColumnId) => {
     if (stationarityEvidence === null) return
-    const variables = stationarityEvidence.variables.filter(value => value.column !== column)
-    if (!isNonEmpty(variables)) { clearDiagnostics(); return }
+    const variables = stationarityEvidence.variables.filter((value) => value.column !== column)
+    if (!isNonEmpty(variables)) {
+      clearDiagnostics()
+      return
+    }
     const evidence = { ...stationarityEvidence, id: newStationarityEvidenceId(), variables }
     onStationarityEvidence(evidence)
   }
 
   const diagnosticOptions: readonly { readonly value: Diagnostic; readonly label: ReactNode }[] = [
-    { value: 'multicollinearity', label: <DiagnosticLabel text="Redundancy" done={multicollinearityChecked} /> },
-    ...(timeSeriesSelected || preparedTimeSeries !== null ? [
-      { value: 'stationarity' as const, label: <DiagnosticLabel text="Stationarity" done={stationarityEvidence !== null} /> },
-      { value: 'structure' as const, label: <DiagnosticLabel text="Breaks" done={structureChecked} /> },
-      { value: 'granger' as const, label: <DiagnosticLabel text="Granger" done={grangerEvidence.length > 0} /> },
-    ] : []),
+    {
+      value: 'multicollinearity',
+      label: <DiagnosticLabel text="Redundancy" done={multicollinearityChecked} />,
+    },
+    ...(timeSeriesSelected || preparedTimeSeries !== null
+      ? [
+          {
+            value: 'stationarity' as const,
+            label: <DiagnosticLabel text="Stationarity" done={stationarityEvidence !== null} />,
+          },
+          {
+            value: 'structure' as const,
+            label: <DiagnosticLabel text="Breaks" done={structureChecked} />,
+          },
+          {
+            value: 'granger' as const,
+            label: <DiagnosticLabel text="Granger" done={grangerEvidence.length > 0} />,
+          },
+        ]
+      : []),
   ]
 
   return (
@@ -609,24 +972,65 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
           <span className={label('text-faint')}>Prepare data</span>
-          <h2 id="preprocessing-title" className="mb-0 mt-2 text-heading text-ink">Set the analysis dataset</h2>
+          <h2 id="preprocessing-title" className="mb-0 mt-2 text-heading text-ink">
+            Set the analysis dataset
+          </h2>
         </div>
-        <span className="max-w-[52ch] text-body text-faint">Specify how rows are organised, address missing values, and select any required time-series transformations.</span>
+        <span className="max-w-[52ch] text-body text-faint">
+          Specify how rows are organised, address missing values, and select any required
+          time-series transformations.
+        </span>
       </div>
 
       <div className="grid gap-4 @3xl/panel:grid-cols-2">
-        <section className={panel('@container/card p-(--panel-space)')} aria-labelledby="sampling-title">
-          <h3 id="sampling-title" className={cn(stepTitle, 'mb-4 mt-0')}><span className="mr-1.5 text-faint">1</span><span>Choose the observation structure</span></h3>
-          <RadioList frame="none"
+        <section
+          className={panel('@container/card p-(--panel-space)')}
+          aria-labelledby="sampling-title"
+        >
+          <h3 id="sampling-title" className={cn(stepTitle, 'mb-4 mt-0')}>
+            <span className="mr-1.5 text-faint">1</span>
+            <span>Choose the observation structure</span>
+          </h3>
+          <RadioList
+            frame="none"
             className="mb-3"
             legend="Observation structure"
             legendHidden
-            value={timeSeriesSelected ? 'regular-series' : panelSelected ? 'regular-panel' : crossSectionSelected ? 'cross-section' : null}
-            onChange={(next) => dispatch({ type: next === 'regular-series' ? 'regular-series-selected' : next === 'regular-panel' ? 'regular-panel-selected' : 'cross-section-selected' })}
+            value={
+              timeSeriesSelected
+                ? 'regular-series'
+                : panelSelected
+                  ? 'regular-panel'
+                  : crossSectionSelected
+                    ? 'cross-section'
+                    : null
+            }
+            onChange={(next) =>
+              dispatch({
+                type:
+                  next === 'regular-series'
+                    ? 'regular-series-selected'
+                    : next === 'regular-panel'
+                      ? 'regular-panel-selected'
+                      : 'cross-section-selected',
+              })
+            }
             options={[
-              { value: 'regular-series', label: 'Regular time series', hint: 'One row per time step, ordered by its temporal key' },
-              { value: 'regular-panel', label: 'Panel', hint: 'Several units observed repeatedly; requires unit and temporal keys' },
-              { value: 'cross-section', label: 'Independent observations', hint: 'Rows are exchangeable; no time ordering' },
+              {
+                value: 'regular-series',
+                label: 'Regular time series',
+                hint: 'One row per time step, ordered by its temporal key',
+              },
+              {
+                value: 'regular-panel',
+                label: 'Panel',
+                hint: 'Several units observed repeatedly; requires unit and temporal keys',
+              },
+              {
+                value: 'cross-section',
+                label: 'Independent observations',
+                hint: 'Rows are exchangeable; no time ordering',
+              },
             ]}
           />
           {(timeSeriesSelected || panelSelected) && (
@@ -634,9 +1038,24 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
               {panelSelected && (
                 <label className="block text-body text-ink">
                   <span className={fieldLabel}>Unit column</span>
-                  <Select className={field('text', 'mt-1')} value={currentUnit} onChange={(event) => { const column = profile.columns.find((candidate) => candidate.id === event.target.value); if (column) dispatch({ type: 'unit-column-selected', unitColumn: column.id }) }}>
+                  <Select
+                    className={field('text', 'mt-1')}
+                    value={currentUnit}
+                    onChange={(event) => {
+                      const column = profile.columns.find(
+                        (candidate) => candidate.id === event.target.value,
+                      )
+                      if (column) dispatch({ type: 'unit-column-selected', unitColumn: column.id })
+                    }}
+                  >
                     <option value="">Choose column</option>
-                    {profile.columns.filter((column) => column.id !== currentTime).map((column) => <option key={column.id} value={column.id}>{column.name}</option>)}
+                    {profile.columns
+                      .filter((column) => column.id !== currentTime)
+                      .map((column) => (
+                        <option key={column.id} value={column.id}>
+                          {column.name}
+                        </option>
+                      ))}
                   </Select>
                 </label>
               )}
@@ -646,73 +1065,164 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                   className={field('text', 'mt-1')}
                   value={currentTime}
                   onChange={(event) => {
-                    const column = profile.columns.find((candidate) => candidate.id === event.target.value)
+                    const column = profile.columns.find(
+                      (candidate) => candidate.id === event.target.value,
+                    )
                     if (column) dispatch({ type: 'time-column-selected', timeColumn: column.id })
                   }}
                 >
                   <option value="">Choose column</option>
-                  {profile.columns.filter((column) => column.id !== currentUnit).map((column) => <option key={column.id} value={column.id}>{column.name}</option>)}
+                  {profile.columns
+                    .filter((column) => column.id !== currentUnit)
+                    .map((column) => (
+                      <option key={column.id} value={column.id}>
+                        {column.name}
+                      </option>
+                    ))}
                 </Select>
               </label>
-              {draft.sampling.kind === 'regular-series' ? <div className="block text-body text-ink">
-                {draft.sampling.interpretation?.kind === 'iso-week'
-                  ? <ParameterLabel className={fieldLabel} htmlFor="time-interpretation" label="Time interpretation" help={ISO_WEEK_NOTE} />
-                  : <label className={fieldLabel} htmlFor="time-interpretation">Time interpretation</label>}
-                <Select id="time-interpretation" className={field('text', 'mt-1')}
-                  value={interpretationValue}
-                  onChange={(event) => {
-                    const choice = TIME_INTERPRETATIONS.find((candidate) => candidate.value === event.target.value)
-                    if (choice) dispatch({ type: 'time-interpretation-selected', interpretation: choice.interpretation })
-                  }}>
-                  {TIME_INTERPRETATIONS.map((choice) => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
-                </Select>
-              </div> : null}
-              {!panelClockOrdinal && <label className="block text-body text-ink">
-                <span className={fieldLabel}>Source frequency</span>
-                <Select
-                  className={field('text', 'mt-1')}
-                  value={currentFrequency}
-                  onChange={(event) => {
-                    const frequency = FREQUENCIES.find((candidate) => candidate.value === event.target.value)
-                    if (frequency) dispatch({ type: 'frequency-selected', frequency: frequency.value })
-                  }}
-                >
-                  {FREQUENCIES.map((frequency) => <option key={frequency.value} value={frequency.value}>{frequency.label}</option>)}
-                </Select>
-              </label>}
+              {draft.sampling.kind === 'regular-series' ? (
+                <div className="block text-body text-ink">
+                  {draft.sampling.interpretation?.kind === 'iso-week' ? (
+                    <ParameterLabel
+                      className={fieldLabel}
+                      htmlFor="time-interpretation"
+                      label="Time interpretation"
+                      help={ISO_WEEK_NOTE}
+                    />
+                  ) : (
+                    <label className={fieldLabel} htmlFor="time-interpretation">
+                      Time interpretation
+                    </label>
+                  )}
+                  <Select
+                    id="time-interpretation"
+                    className={field('text', 'mt-1')}
+                    value={interpretationValue}
+                    onChange={(event) => {
+                      const choice = TIME_INTERPRETATIONS.find(
+                        (candidate) => candidate.value === event.target.value,
+                      )
+                      if (choice)
+                        dispatch({
+                          type: 'time-interpretation-selected',
+                          interpretation: choice.interpretation,
+                        })
+                    }}
+                  >
+                    {TIME_INTERPRETATIONS.map((choice) => (
+                      <option key={choice.value} value={choice.value}>
+                        {choice.label}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              ) : null}
+              {!panelClockOrdinal && (
+                <label className="block text-body text-ink">
+                  <span className={fieldLabel}>Source frequency</span>
+                  <Select
+                    className={field('text', 'mt-1')}
+                    value={currentFrequency}
+                    onChange={(event) => {
+                      const frequency = FREQUENCIES.find(
+                        (candidate) => candidate.value === event.target.value,
+                      )
+                      if (frequency)
+                        dispatch({ type: 'frequency-selected', frequency: frequency.value })
+                    }}
+                  >
+                    {FREQUENCIES.map((frequency) => (
+                      <option key={frequency.value} value={frequency.value}>
+                        {frequency.label}
+                      </option>
+                    ))}
+                  </Select>
+                </label>
+              )}
             </div>
           )}
-          {draft.sampling.kind === 'regular-series' ? <details className="mt-3">
-            <DisclosureSummary className="cursor-pointer text-body font-medium text-ink">Time preview</DisclosureSummary>
-            <TimePreview file={source.file} profile={profile} column={draft.sampling.timeColumn} interpretation={draft.sampling.interpretation} />
-          </details> : null}
-          {draft.sampling.kind === 'regular-series' && <CalendarReport file={source.file} profile={profile} column={draft.sampling.timeColumn} interpretation={draft.sampling.interpretation} frequency={draft.sampling.frequency} />}
-          {draft.sampling.kind === 'regular-panel' && !panelClockOrdinal && <CalendarReport file={source.file} profile={profile} column={draft.sampling.timeColumn} unitColumn={draft.sampling.unitColumn} frequency={draft.sampling.frequency} />}
+          {draft.sampling.kind === 'regular-series' ? (
+            <details className="mt-3">
+              <DisclosureSummary className="cursor-pointer text-body font-medium text-ink">
+                Time preview
+              </DisclosureSummary>
+              <TimePreview
+                file={source.file}
+                profile={profile}
+                column={draft.sampling.timeColumn}
+                interpretation={draft.sampling.interpretation}
+              />
+            </details>
+          ) : null}
+          {draft.sampling.kind === 'regular-series' && (
+            <CalendarReport
+              file={source.file}
+              profile={profile}
+              column={draft.sampling.timeColumn}
+              interpretation={draft.sampling.interpretation}
+              frequency={draft.sampling.frequency}
+            />
+          )}
+          {draft.sampling.kind === 'regular-panel' && !panelClockOrdinal && (
+            <CalendarReport
+              file={source.file}
+              profile={profile}
+              column={draft.sampling.timeColumn}
+              unitColumn={draft.sampling.unitColumn}
+              frequency={draft.sampling.frequency}
+            />
+          )}
           {crossSectionSelected && (
-            <p className="m-0 text-body text-muted">Rows are independent units. Their order does not represent time.</p>
+            <p className="m-0 text-body text-muted">
+              Rows are independent units. Their order does not represent time.
+            </p>
           )}
           {draft.sampling.kind === 'unconfigured' && (
             <p className="m-0 text-body text-faint">Select the structure that describes one row.</p>
           )}
         </section>
 
-        <section className={panel('@container/card flex min-h-0 flex-col p-(--panel-space)')} aria-labelledby="variables-title">
+        <section
+          className={panel('@container/card flex min-h-0 flex-col p-(--panel-space)')}
+          aria-labelledby="variables-title"
+        >
           <div className="mb-3 flex shrink-0 flex-wrap items-end justify-between gap-3">
             <div>
-              <h3 id="variables-title" className={cn(stepTitle, 'm-0')}><span className="mr-1.5 text-faint">2</span><span>Select analysis columns</span></h3>
+              <h3 id="variables-title" className={cn(stepTitle, 'm-0')}>
+                <span className="mr-1.5 text-faint">2</span>
+                <span>Select analysis columns</span>
+              </h3>
             </div>
             <SelectionActions
               selectLabel="Select all columns"
               clearLabel="Clear selected columns"
-              onSelectAll={() => numericColumns.forEach((column) => { if (column.id !== currentTime && column.id !== currentUnit && !selectedIds.includes(column.id)) dispatch({ type: 'variable-toggled', column: column.id }) })}
-              onClear={() => selectedIds.forEach((column) => dispatch({ type: 'variable-toggled', column }))}
+              onSelectAll={() =>
+                numericColumns.forEach((column) => {
+                  if (
+                    column.id !== currentTime &&
+                    column.id !== currentUnit &&
+                    !selectedIds.includes(column.id)
+                  )
+                    dispatch({ type: 'variable-toggled', column: column.id })
+                })
+              }
+              onClear={() =>
+                selectedIds.forEach((column) => dispatch({ type: 'variable-toggled', column }))
+              }
             />
           </div>
-          <div className="panel-scroll grid max-h-64 content-start gap-1 overflow-y-auto @md/card:grid-cols-2 @3xl/panel:min-h-40 @3xl/panel:max-h-none @3xl/panel:flex-1 @3xl/panel:[contain:size]" data-testid="analysis-columns-list">
+          <div
+            className="panel-scroll grid max-h-64 content-start gap-1 overflow-y-auto @md/card:grid-cols-2 @3xl/panel:min-h-40 @3xl/panel:max-h-none @3xl/panel:flex-1 @3xl/panel:[contain:size]"
+            data-testid="analysis-columns-list"
+          >
             {numericColumns.map((column) => {
               const isKey = column.id === currentTime || column.id === currentUnit
               return (
-                <label key={column.id} className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-body text-muted hover:bg-well">
+                <label
+                  key={column.id}
+                  className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-body text-muted hover:bg-well"
+                >
                   <input
                     type="checkbox"
                     className="shrink-0"
@@ -720,35 +1230,67 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                     disabled={isKey}
                     onChange={() => dispatch({ type: 'variable-toggled', column: column.id })}
                   />
-                  <span className={cn('min-w-0 [overflow-wrap:anywhere]', isKey ? 'text-faint' : 'text-ink')}>{column.name}</span>
+                  <span
+                    className={cn(
+                      'min-w-0 [overflow-wrap:anywhere]',
+                      isKey ? 'text-faint' : 'text-ink',
+                    )}
+                  >
+                    {column.name}
+                  </span>
                 </label>
               )
             })}
           </div>
         </section>
 
-        <section className={panel('@container/card p-(--panel-space) @3xl/panel:col-span-2')} aria-labelledby="missingness-title">
-          <h3 id="missingness-title" className={cn(stepTitle, 'mb-4 mt-0')}><span className="mr-1.5 text-faint">3</span><span>{draft.missingness.kind === 'not-present' ? 'Missing-data status' : 'Choose how to handle missing data'}</span></h3>
+        <section
+          className={panel('@container/card p-(--panel-space) @3xl/panel:col-span-2')}
+          aria-labelledby="missingness-title"
+        >
+          <h3 id="missingness-title" className={cn(stepTitle, 'mb-4 mt-0')}>
+            <span className="mr-1.5 text-faint">3</span>
+            <span>
+              {draft.missingness.kind === 'not-present'
+                ? 'Missing-data status'
+                : 'Choose how to handle missing data'}
+            </span>
+          </h3>
           {draft.missingness.kind === 'not-present' ? (
             <p className="m-0 flex items-center gap-2 text-body text-muted">
               <Icon name="check_circle" size={16} className="text-ok" /> No missing values detected.
             </p>
           ) : panelSelected ? (
             <Alert tone="danger" live={false}>
-              <p className="m-0">Fill the missing values separately within each unit before preparing this panel.</p>
-              <p className="mb-0 mt-1 text-muted">This form does not currently support missing-value handling within panel units. Address missing values in the pipeline or SQL editor.</p>
+              <p className="m-0">
+                Fill the missing values separately within each unit before preparing this panel.
+              </p>
+              <p className="mb-0 mt-1 text-muted">
+                This form does not currently support missing-value handling within panel units.
+                Address missing values in the pipeline or SQL editor.
+              </p>
             </Alert>
           ) : (
             <div className="space-y-2">
-              <RadioList frame="none"
+              <RadioList
+                frame="none"
                 legend="Missing-value policy"
                 legendHidden
                 value={draft.missingness.kind}
-                options={missingnessChoices.map((value) => ({ value, label: MISSINGNESS_LABELS[value], help: MISSINGNESS_HELP[value] }))}
-                onChange={(kind) => dispatch({
-                  type: 'missingness-selected',
-                  resolution: missingnessChoice(kind, draft.missingness.kind === 'not-present' ? 0 : draft.missingness.cells),
-                })}
+                options={missingnessChoices.map((value) => ({
+                  value,
+                  label: MISSINGNESS_LABELS[value],
+                  help: MISSINGNESS_HELP[value],
+                }))}
+                onChange={(kind) =>
+                  dispatch({
+                    type: 'missingness-selected',
+                    resolution: missingnessChoice(
+                      kind,
+                      draft.missingness.kind === 'not-present' ? 0 : draft.missingness.cells,
+                    ),
+                  })
+                }
               />
               {lagExclusion !== null && (
                 <div className="mt-2 grid gap-3 pl-6 @md/card:grid-cols-2">
@@ -757,10 +1299,15 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                     <Select
                       className={field('text', 'mt-1')}
                       value={lagExclusion.cutOff}
-                      onChange={(event) => dispatch({
-                        type: 'missingness-selected',
-                        resolution: { ...lagExclusion, cutOff: event.target.value as LagAwareExclusionDraft['cutOff'] },
-                      })}
+                      onChange={(event) =>
+                        dispatch({
+                          type: 'missingness-selected',
+                          resolution: {
+                            ...lagExclusion,
+                            cutOff: event.target.value as LagAwareExclusionDraft['cutOff'],
+                          },
+                        })
+                      }
                     >
                       <option value="method-default">Method default</option>
                       <option value="2xtau-max">2 × maximum lag</option>
@@ -774,58 +1321,153 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                     <input
                       type="checkbox"
                       checked={lagExclusion.propagateThroughMaxLag}
-                      onChange={(event) => dispatch({
-                        type: 'missingness-selected',
-                        resolution: { ...lagExclusion, propagateThroughMaxLag: event.target.checked },
-                      })}
+                      onChange={(event) =>
+                        dispatch({
+                          type: 'missingness-selected',
+                          resolution: {
+                            ...lagExclusion,
+                            propagateThroughMaxLag: event.target.checked,
+                          },
+                        })
+                      }
                     />
                     <span>Exclude subsequent samples within the cutoff window.</span>
                   </label>
                   <fieldset className="@md/card:col-span-2">
-                    <legend className={fieldLabel}>Apply the analysis mask when a cell is used as</legend>
+                    <legend className={fieldLabel}>
+                      Apply the analysis mask when a cell is used as
+                    </legend>
                     <div className="mt-2 flex flex-wrap gap-x-5 gap-y-2">
                       {ANALYSIS_MASK_ROLES.map((role) => (
-                        <label key={role.value} className="flex items-center gap-2 text-body text-ink">
+                        <label
+                          key={role.value}
+                          className="flex items-center gap-2 text-body text-ink"
+                        >
                           <input
                             type="checkbox"
-                            checked={lagExclusion.analysisExclusions.kind === 'roles' && lagExclusion.analysisExclusions.roles.includes(role.value)}
-                            onChange={() => dispatch({
-                              type: 'missingness-selected',
-                              resolution: {
-                                ...lagExclusion,
-                                analysisExclusions: toggleAnalysisMaskRole(lagExclusion.analysisExclusions, role.value),
-                              },
-                            })}
+                            checked={
+                              lagExclusion.analysisExclusions.kind === 'roles' &&
+                              lagExclusion.analysisExclusions.roles.includes(role.value)
+                            }
+                            onChange={() =>
+                              dispatch({
+                                type: 'missingness-selected',
+                                resolution: {
+                                  ...lagExclusion,
+                                  analysisExclusions: toggleAnalysisMaskRole(
+                                    lagExclusion.analysisExclusions,
+                                    role.value,
+                                  ),
+                                },
+                              })
+                            }
                           />
                           <span>{role.label}</span>
                         </label>
                       ))}
                     </div>
                   </fieldset>
-                  <p className="mb-0 text-body text-faint @md/card:col-span-2">Missing cells are always excluded. These roles apply only to separately marked analysis-mask cells. The original time grid is retained.</p>
+                  <p className="mb-0 text-body text-faint @md/card:col-span-2">
+                    Missing cells are always excluded. These roles apply only to separately marked
+                    analysis-mask cells. The original time grid is retained.
+                  </p>
                 </div>
               )}
               {draft.missingness.kind === 'imputation' && (
                 <div className="mt-2 grid gap-3 pl-6 @md/card:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
                   <div>
-                    <span className={`${fieldLabel} min-h-5 pointer-coarse:min-h-11 flex items-center`}>Method</span>
-                    <RadioList frame="none"
+                    <span
+                      className={`${fieldLabel} min-h-5 pointer-coarse:min-h-11 flex items-center`}
+                    >
+                      Method
+                    </span>
+                    <RadioList
+                      frame="none"
                       className="mt-1"
                       legend="Imputation method"
                       legendHidden
-                      value={draft.missingness.kind === 'imputation' ? draft.missingness.method : null}
-                      onChange={(method) => dispatch({ type: 'missingness-selected', resolution: { ...(draft.missingness as Extract<MissingnessDraft, { kind: 'imputation' }>), method } })}
+                      value={
+                        draft.missingness.kind === 'imputation' ? draft.missingness.method : null
+                      }
+                      onChange={(method) =>
+                        dispatch({
+                          type: 'missingness-selected',
+                          resolution: {
+                            ...(draft.missingness as Extract<
+                              MissingnessDraft,
+                              { kind: 'imputation' }
+                            >),
+                            method,
+                          },
+                        })
+                      }
                       options={[
-                        { value: 'linearInterior', label: 'Linear inside the series', help: 'Interpolate between observed values on both sides of a gap. Edge gaps and those exceeding the limit remain missing.' },
-                        { value: 'forwardFill', label: 'Carry forward', help: 'Repeat the preceding observed value through a gap. Leading gaps and those exceeding the limit remain missing.' },
-                        { value: 'structuralZero', label: 'Structural zero', help: 'Replace each missing cell with zero only if you have confirmed it represents a true zero, not an unknown value.' },
+                        {
+                          value: 'linearInterior',
+                          label: 'Linear inside the series',
+                          help: 'Interpolate between observed values on both sides of a gap. Edge gaps and those exceeding the limit remain missing.',
+                        },
+                        {
+                          value: 'forwardFill',
+                          label: 'Carry forward',
+                          help: 'Repeat the preceding observed value through a gap. Leading gaps and those exceeding the limit remain missing.',
+                        },
+                        {
+                          value: 'structuralZero',
+                          label: 'Structural zero',
+                          help: 'Replace each missing cell with zero only if you have confirmed it represents a true zero, not an unknown value.',
+                        },
                       ]}
                     />
                   </div>
                   {draft.missingness.method !== 'structuralZero' ? (
-                    <div className="text-body text-ink"><ParameterLabel className={fieldLabel} label="Longest gap to fill" help="Gaps of up to this many consecutive missing cells in a column are filled. A longer gap is left entirely unfilled, not partially filled." /><input type="number" min={1} max={1000} aria-label="Longest gap to fill" className={field('text', 'mt-1 w-24')} value={draft.missingness.maxGap} onChange={(event) => dispatch({ type: 'missingness-selected', resolution: { ...(draft.missingness as Extract<MissingnessDraft, { kind: 'imputation' }>), maxGap: Math.max(1, Math.min(1000, Number(event.target.value) || 1)) } })} /></div>
+                    <div className="text-body text-ink">
+                      <ParameterLabel
+                        className={fieldLabel}
+                        label="Longest gap to fill"
+                        help="Gaps of up to this many consecutive missing cells in a column are filled. A longer gap is left entirely unfilled, not partially filled."
+                      />
+                      <input
+                        type="number"
+                        min={1}
+                        max={1000}
+                        aria-label="Longest gap to fill"
+                        className={field('text', 'mt-1 w-24')}
+                        value={draft.missingness.maxGap}
+                        onChange={(event) =>
+                          dispatch({
+                            type: 'missingness-selected',
+                            resolution: {
+                              ...(draft.missingness as Extract<
+                                MissingnessDraft,
+                                { kind: 'imputation' }
+                              >),
+                              maxGap: Math.max(1, Math.min(1000, Number(event.target.value) || 1)),
+                            },
+                          })
+                        }
+                      />
+                    </div>
                   ) : (
-                    <label className="flex items-start gap-2 text-body text-ink"><input type="checkbox" checked={draft.missingness.confirmedStructuralZero} onChange={(event) => dispatch({ type: 'missingness-selected', resolution: { ...(draft.missingness as Extract<MissingnessDraft, { kind: 'imputation' }>), confirmedStructuralZero: event.target.checked } })} /><span>Confirm that each missing value represents a true zero.</span></label>
+                    <label className="flex items-start gap-2 text-body text-ink">
+                      <input
+                        type="checkbox"
+                        checked={draft.missingness.confirmedStructuralZero}
+                        onChange={(event) =>
+                          dispatch({
+                            type: 'missingness-selected',
+                            resolution: {
+                              ...(draft.missingness as Extract<
+                                MissingnessDraft,
+                                { kind: 'imputation' }
+                              >),
+                              confirmedStructuralZero: event.target.checked,
+                            },
+                          })
+                        }
+                      />
+                      <span>Confirm that each missing value represents a true zero.</span>
+                    </label>
                   )}
                 </div>
               )}
@@ -834,179 +1476,356 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
         </section>
 
         {(timeSeriesSelected || panelSelected) && (
-        <section className={panel('@container/card p-(--panel-space) @3xl/panel:col-span-2')} aria-labelledby="transform-title">
-          <h3 id="transform-title" className={cn(stepTitle, 'mb-1 mt-0')}><span className="mr-1.5 text-faint">4</span><span>Prepare the analysis scale</span></h3>
-          {timeSeriesSelected ? (
-            <>
-              <p className={cn(fieldHint, 'mb-0 mt-1 max-w-[65ch]')}>A transformation changes the values used in subsequent analyses. Save a separate prepared version so you can compare results from levels and transformed values. The selected missing-value policy is applied before calendar resampling, seasonal adjustment, and per-column transformations.</p>
-              <div className="mt-4 rounded-md border border-line p-3">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <span className={fieldLabel}>Calendar resampling</span>
-                    <span className="block text-label text-faint">Convert daily data to UTC calendar weeks or months before running diagnostics or analysis.</span>
-                  </div>
-                  <SegmentedControl
-                    size="sm"
-                    ariaLabel="Calendar resampling"
-                    value={draft.resampling.kind === 'none' ? 'none' : draft.resampling.targetFrequency}
-                    onChange={(next) => {
-                      if (next === 'none') { dispatch({ type: 'resampling-selected', resampling: { kind: 'none' } }); return }
-                      if (next === 'weekly' || next === 'monthly') dispatch({ type: 'resampling-selected', resampling: { kind: 'daily-downsample', targetFrequency: next, incompleteBins: 'keep', aggregations: draft.resampling.kind === 'daily-downsample' ? draft.resampling.aggregations : [] } })
-                    }}
-                    options={[
-                      { value: 'none', label: 'Keep source' },
-                      { value: 'weekly', label: 'Weekly', disabled: draft.sampling.frequency !== 'daily' },
-                      { value: 'monthly', label: 'Monthly', disabled: draft.sampling.frequency !== 'daily' },
-                    ]}
-                  />
-                </div>
-                {draft.sampling.frequency !== 'daily' && <p className="mb-0 mt-2 text-body text-faint">This step resamples only daily sources; it does not affect other frequencies.</p>}
-                {draft.resampling.kind === 'daily-downsample' && (
-                  <div className="mt-3 border-t border-hair pt-3">
-                    <label className="block text-body text-ink">
-                      <span className={fieldLabel}>Incomplete calendar bins</span>
-                      <Select
-                        className={field('text', 'mt-1 max-w-64')}
-                        value={draft.resampling.incompleteBins}
-                        onChange={(event) => {
-                          if (draft.resampling.kind === 'daily-downsample') dispatch({ type: 'resampling-selected', resampling: { ...draft.resampling, incompleteBins: event.target.value === 'drop' ? 'drop' : 'keep' } })
-                        }}
-                      >
-                        <option value="keep">Keep and record</option>
-                        <option value="drop">Drop</option>
-                      </Select>
-                    </label>
-                    <div className="mt-3 rounded-md border border-hair" role="group" aria-label="Aggregation by column">
-                      <div className="border-b border-hair px-3 py-1.5 text-label text-faint">Use sum for interval totals and mean for rates or measurements when an arithmetic average is appropriate.</div>
-                      <div className="space-y-2">
-                        {selectedIds.map((column) => (
-                          <label key={column} className="flex items-center justify-between gap-3 px-3 py-2 text-body text-ink">
-                            <span>{columnName(column)}</span>
-                            <Select
-                              className={field('text', 'w-36')}
-                              aria-label={`Aggregation for ${columnName(column)}`}
-                              value={aggregationFor(draft.resampling.kind === 'daily-downsample' ? draft.resampling.aggregations : [], column) ?? ''}
-                              onChange={(event) => {
-                                const chosen = RESAMPLING_AGGREGATIONS.find((candidate) => candidate.value === event.target.value)
-                                if (chosen) dispatch({ type: 'resampling-aggregation-selected', column, aggregation: chosen.value })
-                              }}
-                            >
-                              <option value="">Choose aggregation</option>
-                              {RESAMPLING_AGGREGATIONS.map((aggregation) => <option key={aggregation.value} value={aggregation.value}>{aggregation.label}</option>)}
-                            </Select>
-                          </label>
-                        ))}
-                      </div>
+          <section
+            className={panel('@container/card p-(--panel-space) @3xl/panel:col-span-2')}
+            aria-labelledby="transform-title"
+          >
+            <h3 id="transform-title" className={cn(stepTitle, 'mb-1 mt-0')}>
+              <span className="mr-1.5 text-faint">4</span>
+              <span>Prepare the analysis scale</span>
+            </h3>
+            {timeSeriesSelected ? (
+              <>
+                <p className={cn(fieldHint, 'mb-0 mt-1 max-w-[65ch]')}>
+                  A transformation changes the values used in subsequent analyses. Save a separate
+                  prepared version so you can compare results from levels and transformed values.
+                  The selected missing-value policy is applied before calendar resampling, seasonal
+                  adjustment, and per-column transformations.
+                </p>
+                <div className="mt-4 rounded-md border border-line p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <span className={fieldLabel}>Calendar resampling</span>
+                      <span className="block text-label text-faint">
+                        Convert daily data to UTC calendar weeks or months before running
+                        diagnostics or analysis.
+                      </span>
                     </div>
-                    {!readiness.ok && readiness.error.kind === 'resampling-aggregations-required' && (
-                      <p className="mb-0 mt-2 text-body text-danger" role="status">
-                        {describeReadinessProblem(readiness.error)}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-              <div className="mt-4">
-                <label className="flex items-start gap-2 text-body text-ink">
-                  <input
-                    type="checkbox"
-                    checked={draft.seasonal.kind === 'stl'}
-                    disabled={seasonalPeriod === null}
-                    onChange={(event) => dispatch({ type: 'seasonal-adjustment-selected', seasonal: event.target.checked ? { kind: 'stl', columns: [], robust: false } : { kind: 'none' } })}
-                  />
-                  <span>
-                    Remove the seasonal component with seasonal-trend decomposition using loess (STL){seasonalPeriod === null ? ' (no period for yearly rows)' : ` at period ${seasonalPeriod}`}
-                    <span className="block text-faint">STL decomposes the series into a fitted trend, a seasonal component that can change over time, and a remainder. Seasonal adjustment removes the seasonal component but retains the trend. This decomposition does not imply causality.</span>
-                  </span>
-                </label>
-                {draft.seasonal.kind === 'stl' && (
-                  <div className="mt-2 grid gap-2 pl-6">
-                    <div className="grid gap-1 @md/card:grid-cols-2" role="group" aria-label="Columns to adjust seasonally">
-                      {selectedIds.map((column) => {
-                        const name = profile.columns.find((candidate) => candidate.id === column)?.name ?? column
-                        const seasonal = draft.seasonal
-                        return (
-                          <label key={column} className="flex items-center gap-2 rounded-md px-2 py-1 text-body text-ink hover:bg-well">
-                            <input
-                              type="checkbox"
-                              checked={seasonal.kind === 'stl' && seasonal.columns.includes(column)}
-                              onChange={(event) => seasonal.kind === 'stl' && dispatch({ type: 'seasonal-adjustment-selected', seasonal: { ...seasonal, columns: event.target.checked ? [...seasonal.columns, column] : seasonal.columns.filter((candidate) => candidate !== column) } })}
-                            />
-                            <span>{name}</span>
-                          </label>
-                        )
-                      })}
-                      {selectedIds.length === 0 && <p className="m-0 text-body text-faint">Select analysis columns first.</p>}
-                    </div>
-                    <label className="flex items-center gap-2 text-body text-ink">
-                      <input type="checkbox" checked={draft.seasonal.robust} onChange={(event) => draft.seasonal.kind === 'stl' && dispatch({ type: 'seasonal-adjustment-selected', seasonal: { ...draft.seasonal, robust: event.target.checked } })} />
-                      <span>Robust fit (down-weights outliers)</span>
-                    </label>
-                  </div>
-                )}
-              </div>
-              <div className="mt-4 pt-3">
-                <div role="group" aria-label="Transformations by column">
-                  {/* One layout for the whole list, decided by the panel's width rather than per row: a name beside
-                      its control when the panel is at least md wide, every name above its control below that. */}
-                  <div className="grid gap-x-3 gap-y-1 px-3 py-1.5 @md/panel:grid-cols-[minmax(0,1fr)_auto] @md/panel:items-center">
-                    <span className="text-body text-muted">All columns</span>
-                    {/* The same control as each row: it shows the transform the columns share, nothing when they differ, and sets every column when chosen. */}
                     <SegmentedControl
                       size="sm"
-                      wrap
-                      frame="none"
-                      ariaLabel="Transformation for all selected columns"
-                      value={sharedTransformKind}
+                      ariaLabel="Calendar resampling"
+                      value={
+                        draft.resampling.kind === 'none' ? 'none' : draft.resampling.targetFrequency
+                      }
                       onChange={(next) => {
-                        const chosen = TRANSFORMS.find((candidate) => candidate.value.kind === next)
-                        if (chosen) dispatch({ type: 'all-series-transforms-selected', transform: chosen.value })
+                        if (next === 'none') {
+                          dispatch({ type: 'resampling-selected', resampling: { kind: 'none' } })
+                          return
+                        }
+                        if (next === 'weekly' || next === 'monthly')
+                          dispatch({
+                            type: 'resampling-selected',
+                            resampling: {
+                              kind: 'daily-downsample',
+                              targetFrequency: next,
+                              incompleteBins: 'keep',
+                              aggregations:
+                                draft.resampling.kind === 'daily-downsample'
+                                  ? draft.resampling.aggregations
+                                  : [],
+                            },
+                          })
                       }}
-                      options={TRANSFORMS.map((transform) => ({ value: transform.value.kind, label: transform.label }))}
+                      options={[
+                        { value: 'none', label: 'Keep source' },
+                        {
+                          value: 'weekly',
+                          label: 'Weekly',
+                          disabled: draft.sampling.frequency !== 'daily',
+                        },
+                        {
+                          value: 'monthly',
+                          label: 'Monthly',
+                          disabled: draft.sampling.frequency !== 'daily',
+                        },
+                      ]}
                     />
                   </div>
-                  <div>
-                    {selectedIds.map((column) => {
-                      const name = columnName(column)
-                      const selected = seriesTransformFor(draft.seriesTransforms, column)
-                      // The row fills under the pointer, as a table row does (`tr('action')`), so a name and its control read as one row across the width without a rule between rows.
-                      return (
-                        <div key={column} className="grid gap-x-3 gap-y-1 rounded-md px-3 py-1 transition-colors hover:bg-well has-[button:focus-visible]:bg-well @md/panel:grid-cols-[minmax(0,1fr)_auto] @md/panel:items-center">
-                          <span className="min-w-0 text-body text-ink">{name}</span>
-                          <SegmentedControl
-                            size="sm"
-                            wrap
-                            frame="none"
-                            ariaLabel={`Transformation for ${name}`}
-                            value={selected.kind}
-                            onChange={(next) => {
-                              const chosen = TRANSFORMS.find((candidate) => candidate.value.kind === next)
-                              if (chosen) dispatch({ type: 'series-transform-selected', column, transform: chosen.value })
-                            }}
-                            options={TRANSFORMS.map((transform) => ({ value: transform.value.kind, label: transform.label }))}
-                          />
+                  {draft.sampling.frequency !== 'daily' && (
+                    <p className="mb-0 mt-2 text-body text-faint">
+                      This step resamples only daily sources; it does not affect other frequencies.
+                    </p>
+                  )}
+                  {draft.resampling.kind === 'daily-downsample' && (
+                    <div className="mt-3 border-t border-hair pt-3">
+                      <label className="block text-body text-ink">
+                        <span className={fieldLabel}>Incomplete calendar bins</span>
+                        <Select
+                          className={field('text', 'mt-1 max-w-64')}
+                          value={draft.resampling.incompleteBins}
+                          onChange={(event) => {
+                            if (draft.resampling.kind === 'daily-downsample')
+                              dispatch({
+                                type: 'resampling-selected',
+                                resampling: {
+                                  ...draft.resampling,
+                                  incompleteBins: event.target.value === 'drop' ? 'drop' : 'keep',
+                                },
+                              })
+                          }}
+                        >
+                          <option value="keep">Keep and record</option>
+                          <option value="drop">Drop</option>
+                        </Select>
+                      </label>
+                      <div
+                        className="mt-3 rounded-md border border-hair"
+                        role="group"
+                        aria-label="Aggregation by column"
+                      >
+                        <div className="border-b border-hair px-3 py-1.5 text-label text-faint">
+                          Use sum for interval totals and mean for rates or measurements when an
+                          arithmetic average is appropriate.
                         </div>
-                      )
-                    })}
-                    {selectedIds.length === 0 && <p className="m-0 px-3 py-2 text-body text-faint">Select analysis columns first.</p>}
-                  </div>
+                        <div className="space-y-2">
+                          {selectedIds.map((column) => (
+                            <label
+                              key={column}
+                              className="flex items-center justify-between gap-3 px-3 py-2 text-body text-ink"
+                            >
+                              <span>{columnName(column)}</span>
+                              <Select
+                                className={field('text', 'w-36')}
+                                aria-label={`Aggregation for ${columnName(column)}`}
+                                value={
+                                  aggregationFor(
+                                    draft.resampling.kind === 'daily-downsample'
+                                      ? draft.resampling.aggregations
+                                      : [],
+                                    column,
+                                  ) ?? ''
+                                }
+                                onChange={(event) => {
+                                  const chosen = RESAMPLING_AGGREGATIONS.find(
+                                    (candidate) => candidate.value === event.target.value,
+                                  )
+                                  if (chosen)
+                                    dispatch({
+                                      type: 'resampling-aggregation-selected',
+                                      column,
+                                      aggregation: chosen.value,
+                                    })
+                                }}
+                              >
+                                <option value="">Choose aggregation</option>
+                                {RESAMPLING_AGGREGATIONS.map((aggregation) => (
+                                  <option key={aggregation.value} value={aggregation.value}>
+                                    {aggregation.label}
+                                  </option>
+                                ))}
+                              </Select>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                      {!readiness.ok &&
+                        readiness.error.kind === 'resampling-aggregations-required' && (
+                          <p className="mb-0 mt-2 text-body text-danger" role="status">
+                            {describeReadinessProblem(readiness.error)}
+                          </p>
+                        )}
+                    </div>
+                  )}
                 </div>
-                {draft.seriesTransforms.some((record) => record.transform.kind === 'difference') && (
-                  <p className="mb-0 mt-3 text-body text-faint">First differencing replaces xₜ with xₜ − xₜ₋₁. The first retained row is removed from every column to maintain timestamp alignment. Effects on differenced outcomes reflect changes between periods, not the absolute level.</p>
-                )}
-              </div>
-            </>
-          ) : (
-            <p className="m-0 text-body text-faint">This prepared panel retains outcomes in levels. Apply any subsequent lag, differencing, or interpolation separately to each unit.</p>
-          )}
-        </section>
+                <div className="mt-4">
+                  <label className="flex items-start gap-2 text-body text-ink">
+                    <input
+                      type="checkbox"
+                      checked={draft.seasonal.kind === 'stl'}
+                      disabled={seasonalPeriod === null}
+                      onChange={(event) =>
+                        dispatch({
+                          type: 'seasonal-adjustment-selected',
+                          seasonal: event.target.checked
+                            ? { kind: 'stl', columns: [], robust: false }
+                            : { kind: 'none' },
+                        })
+                      }
+                    />
+                    <span>
+                      Remove the seasonal component with seasonal-trend decomposition using loess
+                      (STL)
+                      {seasonalPeriod === null
+                        ? ' (no period for yearly rows)'
+                        : ` at period ${seasonalPeriod}`}
+                      <span className="block text-faint">
+                        STL decomposes the series into a fitted trend, a seasonal component that can
+                        change over time, and a remainder. Seasonal adjustment removes the seasonal
+                        component but retains the trend. This decomposition does not imply
+                        causality.
+                      </span>
+                    </span>
+                  </label>
+                  {draft.seasonal.kind === 'stl' && (
+                    <div className="mt-2 grid gap-2 pl-6">
+                      <div
+                        className="grid gap-1 @md/card:grid-cols-2"
+                        role="group"
+                        aria-label="Columns to adjust seasonally"
+                      >
+                        {selectedIds.map((column) => {
+                          const name =
+                            profile.columns.find((candidate) => candidate.id === column)?.name ??
+                            column
+                          const seasonal = draft.seasonal
+                          return (
+                            <label
+                              key={column}
+                              className="flex items-center gap-2 rounded-md px-2 py-1 text-body text-ink hover:bg-well"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={
+                                  seasonal.kind === 'stl' && seasonal.columns.includes(column)
+                                }
+                                onChange={(event) =>
+                                  seasonal.kind === 'stl' &&
+                                  dispatch({
+                                    type: 'seasonal-adjustment-selected',
+                                    seasonal: {
+                                      ...seasonal,
+                                      columns: event.target.checked
+                                        ? [...seasonal.columns, column]
+                                        : seasonal.columns.filter(
+                                            (candidate) => candidate !== column,
+                                          ),
+                                    },
+                                  })
+                                }
+                              />
+                              <span>{name}</span>
+                            </label>
+                          )
+                        })}
+                        {selectedIds.length === 0 && (
+                          <p className="m-0 text-body text-faint">Select analysis columns first.</p>
+                        )}
+                      </div>
+                      <label className="flex items-center gap-2 text-body text-ink">
+                        <input
+                          type="checkbox"
+                          checked={draft.seasonal.robust}
+                          onChange={(event) =>
+                            draft.seasonal.kind === 'stl' &&
+                            dispatch({
+                              type: 'seasonal-adjustment-selected',
+                              seasonal: { ...draft.seasonal, robust: event.target.checked },
+                            })
+                          }
+                        />
+                        <span>Robust fit (down-weights outliers)</span>
+                      </label>
+                    </div>
+                  )}
+                </div>
+                <div className="mt-4 pt-3">
+                  <div role="group" aria-label="Transformations by column">
+                    {/* One layout for the whole list, decided by the panel's width rather than per row: a name beside
+                      its control when the panel is at least md wide, every name above its control below that. */}
+                    <div className="grid gap-x-3 gap-y-1 px-3 py-1.5 @md/panel:grid-cols-[minmax(0,1fr)_auto] @md/panel:items-center">
+                      <span className="text-body text-muted">All columns</span>
+                      {/* The same control as each row: it shows the transform the columns share, nothing when they differ, and sets every column when chosen. */}
+                      <SegmentedControl
+                        size="sm"
+                        wrap
+                        frame="none"
+                        ariaLabel="Transformation for all selected columns"
+                        value={sharedTransformKind}
+                        onChange={(next) => {
+                          const chosen = TRANSFORMS.find(
+                            (candidate) => candidate.value.kind === next,
+                          )
+                          if (chosen)
+                            dispatch({
+                              type: 'all-series-transforms-selected',
+                              transform: chosen.value,
+                            })
+                        }}
+                        options={TRANSFORMS.map((transform) => ({
+                          value: transform.value.kind,
+                          label: transform.label,
+                        }))}
+                      />
+                    </div>
+                    <div>
+                      {selectedIds.map((column) => {
+                        const name = columnName(column)
+                        const selected = seriesTransformFor(draft.seriesTransforms, column)
+                        // The row fills under the pointer, as a table row does (`tr('action')`), so a name and its control read as one row across the width without a rule between rows.
+                        return (
+                          <div
+                            key={column}
+                            className="grid gap-x-3 gap-y-1 rounded-md px-3 py-1 transition-colors hover:bg-well has-[button:focus-visible]:bg-well @md/panel:grid-cols-[minmax(0,1fr)_auto] @md/panel:items-center"
+                          >
+                            <span className="min-w-0 text-body text-ink">{name}</span>
+                            <SegmentedControl
+                              size="sm"
+                              wrap
+                              frame="none"
+                              ariaLabel={`Transformation for ${name}`}
+                              value={selected.kind}
+                              onChange={(next) => {
+                                const chosen = TRANSFORMS.find(
+                                  (candidate) => candidate.value.kind === next,
+                                )
+                                if (chosen)
+                                  dispatch({
+                                    type: 'series-transform-selected',
+                                    column,
+                                    transform: chosen.value,
+                                  })
+                              }}
+                              options={TRANSFORMS.map((transform) => ({
+                                value: transform.value.kind,
+                                label: transform.label,
+                              }))}
+                            />
+                          </div>
+                        )
+                      })}
+                      {selectedIds.length === 0 && (
+                        <p className="m-0 px-3 py-2 text-body text-faint">
+                          Select analysis columns first.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  {draft.seriesTransforms.some(
+                    (record) => record.transform.kind === 'difference',
+                  ) && (
+                    <p className="mb-0 mt-3 text-body text-faint">
+                      First differencing replaces xₜ with xₜ − xₜ₋₁. The first retained row is
+                      removed from every column to maintain timestamp alignment. Effects on
+                      differenced outcomes reflect changes between periods, not the absolute level.
+                    </p>
+                  )}
+                </div>
+              </>
+            ) : (
+              <p className="m-0 text-body text-faint">
+                This prepared panel retains outcomes in levels. Apply any subsequent lag,
+                differencing, or interpolation separately to each unit.
+              </p>
+            )}
+          </section>
         )}
       </div>
 
       {/* The action closes the numbered steps it saves, ahead of the optional diagnostics. */}
       <JobNotice job={preparation.job} />
-      {action.kind === 'blocked' ? <div id="preparation-requirement" className="mt-3"><Alert tone="info" live={false}>{action.reason}</Alert></div> : null}
-      <RunActions className="mt-4" running={preparation.job.kind === 'running'} onCancel={preparation.cancel} orbLabel="Preparation running">
+      {action.kind === 'blocked' ? (
+        <div id="preparation-requirement" className="mt-3">
+          <Alert tone="info" live={false}>
+            {action.reason}
+          </Alert>
+        </div>
+      ) : null}
+      <RunActions
+        className="mt-4"
+        running={preparation.job.kind === 'running'}
+        onCancel={preparation.cancel}
+        orbLabel="Preparation running"
+      >
         <button
           type="button"
           className={button('signal')}
@@ -1019,172 +1838,333 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
         </button>
       </RunActions>
 
-      {preparedTimeSeries !== null && <PreparedSeriesPreview key={preparedTimeSeries.id} source={source} profile={profile} prepared={preparedTimeSeries} />}
+      {preparedTimeSeries !== null && (
+        <PreparedSeriesPreview
+          key={preparedTimeSeries.id}
+          source={source}
+          profile={profile}
+          prepared={preparedTimeSeries}
+        />
+      )}
 
       {(preparedCurrent !== null || timeSeriesSelected) && (
         <section className={panel('mt-4 p-(--panel-space)')} aria-labelledby="diagnostics-title">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-1.5">
-              <h3 id="diagnostics-title" className={cn(sectionTitle, 'm-0')}>Diagnostics</h3>
-              <ParameterHelp label="diagnostics" help="These tests do not change the prepared dataset." />
+              <h3 id="diagnostics-title" className={cn(sectionTitle, 'm-0')}>
+                Diagnostics
+              </h3>
+              <ParameterHelp
+                label="diagnostics"
+                help="These tests do not change the prepared dataset."
+              />
             </div>
             {/* A cross-section has one diagnostic, and one option is not a choice, so the switch appears only when there are several. */}
             {diagnosticOptions.length > 1 && (
-              <SegmentedControl variant="line" size="sm" ariaLabel="Diagnostic" value={diagnostic} onChange={setDiagnostic} options={diagnosticOptions} />
+              <SegmentedControl
+                variant="line"
+                size="sm"
+                ariaLabel="Diagnostic"
+                value={diagnostic}
+                onChange={setDiagnostic}
+                options={diagnosticOptions}
+              />
             )}
           </div>
           {preparedCurrent === null && (
-            <p role="status" className="mb-0 mt-3 text-body text-faint">Create a version of the prepared dataset to run these diagnostics.</p>
+            <p role="status" className="mb-0 mt-3 text-body text-faint">
+              Create a version of the prepared dataset to run these diagnostics.
+            </p>
           )}
           <div hidden={diagnostic !== 'multicollinearity'} className="mt-4">
-            {preparedCurrent !== null
-              ? <MulticollinearityCard source={source} profile={profile} prepared={preparedCurrent} onSelection={applyMulticollinearitySelection} />
-              : null}
+            {preparedCurrent !== null ? (
+              <MulticollinearityCard
+                source={source}
+                profile={profile}
+                prepared={preparedCurrent}
+                onSelection={applyMulticollinearitySelection}
+              />
+            ) : null}
           </div>
           <div hidden={diagnostic !== 'stationarity'} className="mt-4">
-          <div>
-            <h4 className="m-0 text-body font-medium text-ink">Stationarity tests</h4>
-            <div className="mt-2 grid gap-3 @3xl/panel:grid-cols-2 @3xl/panel:gap-6">
-              <p className={prose('m-0 text-faint')}>{STATIONARITY_TESTS_NOTE}</p>
-              <p className={prose('m-0 text-faint')}>These tests evaluate the saved values. To assess a different transformation, modify it above and create a new version of the prepared dataset.</p>
+            <div>
+              <h4 className="m-0 text-body font-medium text-ink">Stationarity tests</h4>
+              <div className="mt-2 grid gap-3 @3xl/panel:grid-cols-2 @3xl/panel:gap-6">
+                <p className={prose('m-0 text-faint')}>{STATIONARITY_TESTS_NOTE}</p>
+                <p className={prose('m-0 text-faint')}>
+                  These tests evaluate the saved values. To assess a different transformation,
+                  modify it above and create a new version of the prepared dataset.
+                </p>
+              </div>
             </div>
-          </div>
-          <MethodCaveats methods={STATIONARITY_METHODS} />
-          <fieldset disabled={job.kind === 'running'} className="mt-4 min-w-0 border-0 p-0" aria-label="Stationarity variables">
-            <legend className={fieldLabel}>Variables to test</legend>
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <p className="m-0 text-body text-faint">Only selected variables are tested. The prepared dataset is unchanged.</p>
-              <SelectionActions selectLabel="Select all stationarity variables" clearLabel="Clear stationarity variables"
-                onSelectAll={() => selectTestColumns(preparedTimeSeries?.columns ?? [])} onClear={() => selectTestColumns([])} />
-            </div>
-            <div className="grid gap-1 @md/panel:grid-cols-2 @3xl/panel:grid-cols-3">
-              {(preparedTimeSeries?.columns ?? []).map(column => <label key={column} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-body text-ink hover:bg-well">
-                <input type="checkbox" checked={testColumns.includes(column)} onChange={() => selectTestColumns(testColumns.includes(column) ? testColumns.filter(id => id !== column) : [...testColumns, column])} />
-                <span className="min-w-0 break-words">{columnName(column)}</span>
-              </label>)}
-            </div>
-          </fieldset>
-          <div className="mt-3">
-            <RunActions className="mt-3" running={job.kind === 'running'} onCancel={cancelDiagnostics} orbLabel="Stationarity tests running">
-              <button
-                type="button"
-                className={button(testColumns.length > 0 ? 'signal' : 'quiet')}
-                disabled={preparedTimeSeries === null || testColumns.length === 0 || job.kind === 'running' || session.blocked}
-                aria-busy={job.kind === 'running'}
-                onClick={() => void runDiagnostics()}
+            <MethodCaveats methods={STATIONARITY_METHODS} />
+            <fieldset
+              disabled={job.kind === 'running'}
+              className="mt-4 min-w-0 border-0 p-0"
+              aria-label="Stationarity variables"
+            >
+              <legend className={fieldLabel}>Variables to test</legend>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <p className="m-0 text-body text-faint">
+                  Only selected variables are tested. The prepared dataset is unchanged.
+                </p>
+                <SelectionActions
+                  selectLabel="Select all stationarity variables"
+                  clearLabel="Clear stationarity variables"
+                  onSelectAll={() => selectTestColumns(preparedTimeSeries?.columns ?? [])}
+                  onClear={() => selectTestColumns([])}
+                />
+              </div>
+              <div className="grid gap-1 @md/panel:grid-cols-2 @3xl/panel:grid-cols-3">
+                {(preparedTimeSeries?.columns ?? []).map((column) => (
+                  <label
+                    key={column}
+                    className="flex items-center gap-2 rounded-md px-2 py-1.5 text-body text-ink hover:bg-well"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={testColumns.includes(column)}
+                      onChange={() =>
+                        selectTestColumns(
+                          testColumns.includes(column)
+                            ? testColumns.filter((id) => id !== column)
+                            : [...testColumns, column],
+                        )
+                      }
+                    />
+                    <span className="min-w-0 break-words">{columnName(column)}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <div className="mt-3">
+              <RunActions
+                className="mt-3"
+                running={job.kind === 'running'}
+                onCancel={cancelDiagnostics}
+                orbLabel="Stationarity tests running"
               >
-                Run stationarity tests
-              </button>
-              <span role="status" className="sr-only">{job.kind === 'running' ? `${job.progress?.completed ?? 0} of ${job.progress?.total ?? 0} variables completed` : ''}</span>
-            </RunActions>
-          </div>
-          {job.kind === 'failed' && <Alert tone="danger" className="mt-3"><p className="m-0">{job.detail}</p></Alert>}
-          {job.kind === 'cancelled' && <Alert tone="info" className="mt-3"><p className="m-0">Stationarity tests cancelled. No new results were saved.</p></Alert>}
-          {stationarityEvidence !== null && <section className="mt-5 space-y-4" aria-label="Stationarity results">
-            <div className="flex items-center justify-between gap-3">
-              <h4 className="m-0 text-title font-medium">Results</h4>
-              <button type="button" className={button('quiet')} disabled={job.kind === 'running'} onClick={clearDiagnostics}>Clear results</button>
+                <button
+                  type="button"
+                  className={button(testColumns.length > 0 ? 'signal' : 'quiet')}
+                  disabled={
+                    preparedTimeSeries === null ||
+                    testColumns.length === 0 ||
+                    job.kind === 'running' ||
+                    session.blocked
+                  }
+                  aria-busy={job.kind === 'running'}
+                  onClick={() => void runDiagnostics()}
+                >
+                  Run stationarity tests
+                </button>
+                <span role="status" className="sr-only">
+                  {job.kind === 'running'
+                    ? `${job.progress?.completed ?? 0} of ${job.progress?.total ?? 0} variables completed`
+                    : ''}
+                </span>
+              </RunActions>
             </div>
-            {stationarityEvidence.variables.map(evidence => {
-              const column = profile.columns.find(candidate => candidate.id === evidence.column)
-              const name = column?.name ?? String(evidence.column)
-              const result = evidence.result
-                const rows = [
-                  {
-                    name: 'ADF (constant)',
-                    statistic: result.adf.constant.statistic,
-                    p: result.adf.constant.pValue,
-                    fit: `lag ${result.adf.constant.usedLag}, n ${result.adf.constant.observations}`,
-                    critical: labelledCriticalValues('adf', result.adf.constant.criticalValues),
-                  },
-                  {
-                    name: 'ADF (constant + trend)',
-                    statistic: result.adf.constantAndTrend.statistic,
-                    p: result.adf.constantAndTrend.pValue,
-                    fit: `lag ${result.adf.constantAndTrend.usedLag}, n ${result.adf.constantAndTrend.observations}`,
-                    critical: labelledCriticalValues('adf', result.adf.constantAndTrend.criticalValues),
-                  },
-                  {
-                    name: 'KPSS (constant)',
-                    statistic: result.kpss.constant.statistic,
-                    p: result.kpss.constant.pValue,
-                    fit: `lag ${result.kpss.constant.usedLag}`,
-                    critical: labelledCriticalValues('kpss', result.kpss.constant.criticalValues),
-                  },
-                  {
-                    name: 'KPSS (constant + trend)',
-                    statistic: result.kpss.constantAndTrend.statistic,
-                    p: result.kpss.constantAndTrend.pValue,
-                    fit: `lag ${result.kpss.constantAndTrend.usedLag}`,
-                    critical: labelledCriticalValues('kpss', result.kpss.constantAndTrend.criticalValues),
-                  },
-                  {
-                    name: 'Zivot–Andrews (level)',
-                    statistic: result.zivotAndrews.level.statistic,
-                    p: result.zivotAndrews.level.pValue,
-                    fit: `base lag ${result.zivotAndrews.level.baseLags}, break row ${result.zivotAndrews.level.breakIndex + 1}`,
-                    critical: labelledCriticalValues('zivot-andrews', result.zivotAndrews.level.criticalValues),
-                  },
-                  {
-                    name: 'Zivot–Andrews (trend)',
-                    statistic: result.zivotAndrews.trend.statistic,
-                    p: result.zivotAndrews.trend.pValue,
-                    fit: `base lag ${result.zivotAndrews.trend.baseLags}, break row ${result.zivotAndrews.trend.breakIndex + 1}`,
-                    critical: labelledCriticalValues('zivot-andrews', result.zivotAndrews.trend.criticalValues),
-                  },
-                  {
-                    name: 'Zivot–Andrews (level + trend)',
-                    statistic: result.zivotAndrews.levelAndTrend.statistic,
-                    p: result.zivotAndrews.levelAndTrend.pValue,
-                    fit: `base lag ${result.zivotAndrews.levelAndTrend.baseLags}, break row ${result.zivotAndrews.levelAndTrend.breakIndex + 1}`,
-                    critical: labelledCriticalValues('zivot-andrews', result.zivotAndrews.levelAndTrend.criticalValues),
-                  },
-                ] as const
-              return <article key={evidence.column} className={resultSurface('space-y-2 p-3')} aria-label={`Stationarity result for ${name}`}>
-                <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                  <div className="min-w-0">
-                    <h5 className="m-0 break-words text-body font-medium text-ink">{name}</h5>
-                    <p className="m-0 text-label text-faint">{formatCount(result.observations).text} rows{preparedTimeSeries === null ? '' : `, ${describeSeriesTransform(seriesTransformFor(preparedTimeSeries.seriesTransforms, evidence.column))}`}</p>
-                  </div>
-                  <StationarityVerdict assessment={evidence.assessment} transform={preparedTimeSeries === null ? { kind: 'levels' } : seriesTransformFor(preparedTimeSeries.seriesTransforms, evidence.column)} />
-                  <button type="button" className={button('quiet')} aria-label={`Delete stationarity result for ${name}`} disabled={job.kind === 'running'} onClick={() => deleteDiagnostic(evidence.column)}><Icon name="delete" size={15} />Delete</button>
-                </header>
-                <MetricGrid className="stationarity-metrics" label={`Stationarity p-values for ${name}`}>
-                  <MetricTile label="ADF p-value" value={formatP(result.adf.constant.pValue)} context="Constant" size="compact" />
-                  <MetricTile label="KPSS p-value" value={formatP(result.kpss.constant.pValue)} context="Constant" size="compact" />
-                  <MetricTile label="Zivot–Andrews p-value" value={formatP(result.zivotAndrews.levelAndTrend.pValue)} context="Constant and trend" size="compact" />
-                </MetricGrid>
-                <details className="group">
-                  <summary className="flex cursor-pointer list-none items-center gap-1.5 text-body text-muted [&::-webkit-details-marker]:hidden"><Icon name="chevron_right" size={16} className="transition-transform group-open:rotate-90" />Test details for {name}</summary>
-                  <div className="mt-3 overflow-x-auto"><TestStatisticsTable rows={rows} density={density} /></div>
-                </details>
-              </article>
-            })}
-          </section>}
+            {job.kind === 'failed' && (
+              <Alert tone="danger" className="mt-3">
+                <p className="m-0">{job.detail}</p>
+              </Alert>
+            )}
+            {job.kind === 'cancelled' && (
+              <Alert tone="info" className="mt-3">
+                <p className="m-0">Stationarity tests cancelled. No new results were saved.</p>
+              </Alert>
+            )}
+            {stationarityEvidence !== null && (
+              <section className="mt-5 space-y-4" aria-label="Stationarity results">
+                <div className="flex items-center justify-between gap-3">
+                  <h4 className="m-0 text-title font-medium">Results</h4>
+                  <button
+                    type="button"
+                    className={button('quiet')}
+                    disabled={job.kind === 'running'}
+                    onClick={clearDiagnostics}
+                  >
+                    Clear results
+                  </button>
+                </div>
+                {stationarityEvidence.variables.map((evidence) => {
+                  const column = profile.columns.find(
+                    (candidate) => candidate.id === evidence.column,
+                  )
+                  const name = column?.name ?? String(evidence.column)
+                  const result = evidence.result
+                  const rows = [
+                    {
+                      name: 'ADF (constant)',
+                      statistic: result.adf.constant.statistic,
+                      p: result.adf.constant.pValue,
+                      fit: `lag ${result.adf.constant.usedLag}, n ${result.adf.constant.observations}`,
+                      critical: labelledCriticalValues('adf', result.adf.constant.criticalValues),
+                    },
+                    {
+                      name: 'ADF (constant + trend)',
+                      statistic: result.adf.constantAndTrend.statistic,
+                      p: result.adf.constantAndTrend.pValue,
+                      fit: `lag ${result.adf.constantAndTrend.usedLag}, n ${result.adf.constantAndTrend.observations}`,
+                      critical: labelledCriticalValues(
+                        'adf',
+                        result.adf.constantAndTrend.criticalValues,
+                      ),
+                    },
+                    {
+                      name: 'KPSS (constant)',
+                      statistic: result.kpss.constant.statistic,
+                      p: result.kpss.constant.pValue,
+                      fit: `lag ${result.kpss.constant.usedLag}`,
+                      critical: labelledCriticalValues('kpss', result.kpss.constant.criticalValues),
+                    },
+                    {
+                      name: 'KPSS (constant + trend)',
+                      statistic: result.kpss.constantAndTrend.statistic,
+                      p: result.kpss.constantAndTrend.pValue,
+                      fit: `lag ${result.kpss.constantAndTrend.usedLag}`,
+                      critical: labelledCriticalValues(
+                        'kpss',
+                        result.kpss.constantAndTrend.criticalValues,
+                      ),
+                    },
+                    {
+                      name: 'Zivot–Andrews (level)',
+                      statistic: result.zivotAndrews.level.statistic,
+                      p: result.zivotAndrews.level.pValue,
+                      fit: `base lag ${result.zivotAndrews.level.baseLags}, break row ${result.zivotAndrews.level.breakIndex + 1}`,
+                      critical: labelledCriticalValues(
+                        'zivot-andrews',
+                        result.zivotAndrews.level.criticalValues,
+                      ),
+                    },
+                    {
+                      name: 'Zivot–Andrews (trend)',
+                      statistic: result.zivotAndrews.trend.statistic,
+                      p: result.zivotAndrews.trend.pValue,
+                      fit: `base lag ${result.zivotAndrews.trend.baseLags}, break row ${result.zivotAndrews.trend.breakIndex + 1}`,
+                      critical: labelledCriticalValues(
+                        'zivot-andrews',
+                        result.zivotAndrews.trend.criticalValues,
+                      ),
+                    },
+                    {
+                      name: 'Zivot–Andrews (level + trend)',
+                      statistic: result.zivotAndrews.levelAndTrend.statistic,
+                      p: result.zivotAndrews.levelAndTrend.pValue,
+                      fit: `base lag ${result.zivotAndrews.levelAndTrend.baseLags}, break row ${result.zivotAndrews.levelAndTrend.breakIndex + 1}`,
+                      critical: labelledCriticalValues(
+                        'zivot-andrews',
+                        result.zivotAndrews.levelAndTrend.criticalValues,
+                      ),
+                    },
+                  ] as const
+                  return (
+                    <article
+                      key={evidence.column}
+                      className={resultSurface('space-y-2 p-3')}
+                      aria-label={`Stationarity result for ${name}`}
+                    >
+                      <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                        <div className="min-w-0">
+                          <h5 className="m-0 break-words text-body font-medium text-ink">{name}</h5>
+                          <p className="m-0 text-label text-faint">
+                            {formatCount(result.observations).text} rows
+                            {preparedTimeSeries === null
+                              ? ''
+                              : `, ${describeSeriesTransform(seriesTransformFor(preparedTimeSeries.seriesTransforms, evidence.column))}`}
+                          </p>
+                        </div>
+                        <StationarityVerdict
+                          assessment={evidence.assessment}
+                          transform={
+                            preparedTimeSeries === null
+                              ? { kind: 'levels' }
+                              : seriesTransformFor(
+                                  preparedTimeSeries.seriesTransforms,
+                                  evidence.column,
+                                )
+                          }
+                        />
+                        <button
+                          type="button"
+                          className={button('quiet')}
+                          aria-label={`Delete stationarity result for ${name}`}
+                          disabled={job.kind === 'running'}
+                          onClick={() => deleteDiagnostic(evidence.column)}
+                        >
+                          <Icon name="delete" size={15} />
+                          Delete
+                        </button>
+                      </header>
+                      <MetricGrid
+                        className="stationarity-metrics"
+                        label={`Stationarity p-values for ${name}`}
+                      >
+                        <MetricTile
+                          label="ADF p-value"
+                          value={formatP(result.adf.constant.pValue)}
+                          context="Constant"
+                          size="compact"
+                        />
+                        <MetricTile
+                          label="KPSS p-value"
+                          value={formatP(result.kpss.constant.pValue)}
+                          context="Constant"
+                          size="compact"
+                        />
+                        <MetricTile
+                          label="Zivot–Andrews p-value"
+                          value={formatP(result.zivotAndrews.levelAndTrend.pValue)}
+                          context="Constant and trend"
+                          size="compact"
+                        />
+                      </MetricGrid>
+                      <details className="group">
+                        <summary className="flex cursor-pointer list-none items-center gap-1.5 text-body text-muted [&::-webkit-details-marker]:hidden">
+                          <Icon
+                            name="chevron_right"
+                            size={16}
+                            className="transition-transform group-open:rotate-90"
+                          />
+                          Test details for {name}
+                        </summary>
+                        <div className="mt-3 overflow-x-auto">
+                          <TestStatisticsTable rows={rows} density={density} />
+                        </div>
+                      </details>
+                    </article>
+                  )
+                })}
+              </section>
+            )}
           </div>
           <div hidden={diagnostic !== 'structure'} className="mt-4">
-            {preparedTimeSeries !== null
-              ? <SeriesStructureCard embedded source={source} profile={profile} prepared={preparedTimeSeries} />
-              : null}
+            {preparedTimeSeries !== null ? (
+              <SeriesStructureCard
+                embedded
+                source={source}
+                profile={profile}
+                prepared={preparedTimeSeries}
+              />
+            ) : null}
           </div>
           <div hidden={diagnostic !== 'granger'} className="mt-4">
-            {preparedTimeSeries !== null
-              ? (
-                <GrangerCard
-                  embedded
-                  source={source}
-                  profile={profile}
-                  prepared={preparedTimeSeries}
-                  stationarity={stationarityEvidence}
-                  evidence={grangerEvidence}
-                  onEvidence={onGrangerEvidence}
-                />
-              )
-              : null}
+            {preparedTimeSeries !== null ? (
+              <GrangerCard
+                embedded
+                source={source}
+                profile={profile}
+                prepared={preparedTimeSeries}
+                stationarity={stationarityEvidence}
+                evidence={grangerEvidence}
+                onEvidence={onGrangerEvidence}
+              />
+            ) : null}
           </div>
         </section>
       )}
-
     </section>
   )
 }

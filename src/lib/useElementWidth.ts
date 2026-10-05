@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 
 /** The rendered width of an element, updated through a ResizeObserver; 0 until it is first measured. */
-export function useElementWidth<T extends HTMLElement>(): readonly [React.RefObject<T | null>, number] {
+export function useElementWidth<T extends HTMLElement>(): readonly [
+  React.RefObject<T | null>,
+  number,
+] {
   const ref = useRef<T>(null)
   const [width, setWidth] = useState(0)
   useEffect(() => {
@@ -18,7 +21,11 @@ export function useElementWidth<T extends HTMLElement>(): readonly [React.RefObj
 }
 
 /** The rendered width and height of an element, updated through a ResizeObserver; 0 until first measured. */
-export function useElementSize<T extends HTMLElement>(): readonly [React.RefObject<T | null>, number, number] {
+export function useElementSize<T extends HTMLElement>(): readonly [
+  React.RefObject<T | null>,
+  number,
+  number,
+] {
   const ref = useRef<T>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
   useEffect(() => {
@@ -27,7 +34,9 @@ export function useElementSize<T extends HTMLElement>(): readonly [React.RefObje
     const observer = new ResizeObserver((entries) => {
       const rect = entries[0]?.contentRect
       const next = { width: Math.floor(rect?.width ?? 0), height: Math.floor(rect?.height ?? 0) }
-      setSize((current) => (current.width === next.width && current.height === next.height ? current : next))
+      setSize((current) =>
+        current.width === next.width && current.height === next.height ? current : next,
+      )
     })
     observer.observe(element)
     return () => observer.disconnect()

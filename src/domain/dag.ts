@@ -40,8 +40,7 @@ export interface LatentDagNode {
 export type DagNode = ObservedDagNode | LatentDagNode
 
 export type EdgeTiming =
-  | { readonly kind: 'contemporaneous' }
-  | { readonly kind: 'lagged'; readonly lag: number }
+  { readonly kind: 'contemporaneous' } | { readonly kind: 'lagged'; readonly lag: number }
 
 export interface DiscoveryEdgeEvidenceRef {
   readonly kind: 'discovery'
@@ -80,7 +79,12 @@ export type DagStructuralIssue =
   | { readonly kind: 'directed-cycle'; readonly edges: NonEmptyArray<DagEdgeId> }
   | { readonly kind: 'temporal-edge-on-cross-section'; readonly edge: DagEdgeId }
   | { readonly kind: 'invalid-lag'; readonly edge: DagEdgeId; readonly lag: number }
-  | { readonly kind: 'lag-consumes-sample'; readonly edge: DagEdgeId; readonly lag: number; readonly observations: number }
+  | {
+      readonly kind: 'lag-consumes-sample'
+      readonly edge: DagEdgeId
+      readonly lag: number
+      readonly observations: number
+    }
 
 /** Whether the graph is a DAG: sound, empty of arrows, or broken by the listed issues. */
 export type DagStructure =
@@ -155,8 +159,7 @@ export type DagEditProblem =
   | { readonly kind: 'unknown-edge'; readonly edge: DagEdgeId }
 
 export type DagHistoryProblem =
-  | { readonly kind: 'nothing-to-undo' }
-  | { readonly kind: 'nothing-to-redo' }
+  { readonly kind: 'nothing-to-undo' } | { readonly kind: 'nothing-to-redo' }
 
 export type DagVariableEditProblem =
   | { readonly kind: 'empty-variable-name' }
@@ -170,7 +173,12 @@ const MAX_DAG_NAME = 100
 const MAX_VARIABLE_NAME = 100
 const MAX_EDGE_RATIONALE = 600
 
-const dagName = (raw: string): Result<DagName, Extract<DagCreateProblem, { readonly kind: 'empty-name' | 'name-too-long' }>> => {
+const dagName = (
+  raw: string,
+): Result<
+  DagName,
+  Extract<DagCreateProblem, { readonly kind: 'empty-name' | 'name-too-long' }>
+> => {
   const value = raw.trim()
   if (value.length === 0) return err({ kind: 'empty-name' })
   if (value.length > MAX_DAG_NAME) return err({ kind: 'name-too-long', maximum: MAX_DAG_NAME })
@@ -179,10 +187,14 @@ const dagName = (raw: string): Result<DagName, Extract<DagCreateProblem, { reado
 
 const edgeRationale = (
   raw: string,
-): Result<EdgeRationale, Extract<DagEditProblem, { readonly kind: 'empty-rationale' | 'rationale-too-long' }>> => {
+): Result<
+  EdgeRationale,
+  Extract<DagEditProblem, { readonly kind: 'empty-rationale' | 'rationale-too-long' }>
+> => {
   const value = raw.trim()
   if (value.length === 0) return err({ kind: 'empty-rationale' })
-  if (value.length > MAX_EDGE_RATIONALE) return err({ kind: 'rationale-too-long', maximum: MAX_EDGE_RATIONALE })
+  if (value.length > MAX_EDGE_RATIONALE)
+    return err({ kind: 'rationale-too-long', maximum: MAX_EDGE_RATIONALE })
   return ok(brand<string, 'EdgeRationale'>(value))
 }
 
@@ -193,7 +205,9 @@ const newLatentDagNodeId = (document: DagDocumentId): DagNodeId =>
 const dagNodeId = (prepared: PreparedDatasetVersionId, column: ColumnId): DagNodeId =>
   brand<string, 'DagNodeId'>(`${prepared}:${column}`)
 const dagEdgeId = (cause: DagNodeId, effect: DagNodeId, timing: EdgeTiming): DagEdgeId =>
-  brand<string, 'DagEdgeId'>(`${cause}->${effect}@${timing.kind === 'contemporaneous' ? 't' : `t-${timing.lag}`}`)
+  brand<string, 'DagEdgeId'>(
+    `${cause}->${effect}@${timing.kind === 'contemporaneous' ? 't' : `t-${timing.lag}`}`,
+  )
 
 const cycleEdges = (graph: EditableDag): NonEmptyArray<DagEdgeId> | null => {
   const outgoing = new Map<DagNodeId, DirectedDagEdge[]>()
@@ -244,8 +258,10 @@ export const inspectDagStructure = (
   }
   const edges = new Set<string>()
   for (const edge of graph.edges) {
-    if (!nodes.has(edge.cause)) issues.push({ kind: 'unknown-endpoint', edge: edge.id, node: edge.cause })
-    if (!nodes.has(edge.effect)) issues.push({ kind: 'unknown-endpoint', edge: edge.id, node: edge.effect })
+    if (!nodes.has(edge.cause))
+      issues.push({ kind: 'unknown-endpoint', edge: edge.id, node: edge.cause })
+    if (!nodes.has(edge.effect))
+      issues.push({ kind: 'unknown-endpoint', edge: edge.id, node: edge.effect })
     if (edge.timing.kind === 'contemporaneous' && edge.cause === edge.effect) {
       issues.push({ kind: 'self-edge', edge: edge.id, node: edge.cause })
     }
@@ -253,11 +269,17 @@ export const inspectDagStructure = (
     if (edges.has(key)) issues.push({ kind: 'duplicate-edge', edge: edge.id })
     edges.add(key)
     if (edge.timing.kind === 'lagged') {
-      if (dataset.kind === 'cross-section') issues.push({ kind: 'temporal-edge-on-cross-section', edge: edge.id })
+      if (dataset.kind === 'cross-section')
+        issues.push({ kind: 'temporal-edge-on-cross-section', edge: edge.id })
       if (!Number.isSafeInteger(edge.timing.lag) || edge.timing.lag < 1) {
         issues.push({ kind: 'invalid-lag', edge: edge.id, lag: edge.timing.lag })
       } else if (edge.timing.lag >= dataset.observations) {
-        issues.push({ kind: 'lag-consumes-sample', edge: edge.id, lag: edge.timing.lag, observations: dataset.observations })
+        issues.push({
+          kind: 'lag-consumes-sample',
+          edge: edge.id,
+          lag: edge.timing.lag,
+          observations: dataset.observations,
+        })
       }
     }
   }
@@ -265,32 +287,51 @@ export const inspectDagStructure = (
   if (cycle !== null) issues.push({ kind: 'directed-cycle', edges: cycle })
   const structure: DagStructure = isNonEmpty(issues)
     ? { kind: 'invalid', issues }
-    : graph.edges.length === 0 ? { kind: 'empty' } : { kind: 'sound' }
-  const unstated = graph.edges.filter((edge) => edge.support.kind === 'unstated').map((edge) => edge.id)
-  const rationales: DagRationales = isNonEmpty(unstated) ? { kind: 'outstanding', edges: unstated } : { kind: 'complete' }
+    : graph.edges.length === 0
+      ? { kind: 'empty' }
+      : { kind: 'sound' }
+  const unstated = graph.edges
+    .filter((edge) => edge.support.kind === 'unstated')
+    .map((edge) => edge.id)
+  const rationales: DagRationales = isNonEmpty(unstated)
+    ? { kind: 'outstanding', edges: unstated }
+    : { kind: 'complete' }
   return { structure, rationales }
 }
 
 export const resolveDagOrigin = (
   choice: DagOriginDraft,
   discoveryRuns: readonly DiscoveryRunId[],
-): Result<DagOrigin, Extract<DagCreateProblem, {
-  readonly kind: 'discovery-evidence-required' | 'discovery-evidence-unavailable' | 'duplicate-discovery-evidence'
-}>> => {
+): Result<
+  DagOrigin,
+  Extract<
+    DagCreateProblem,
+    {
+      readonly kind:
+        | 'discovery-evidence-required'
+        | 'discovery-evidence-unavailable'
+        | 'duplicate-discovery-evidence'
+    }
+  >
+> => {
   switch (choice.kind) {
-    case 'domain-knowledge': return ok({ kind: 'user-authored', basis: 'domain-knowledge' })
-    case 'experimental-design': return ok({ kind: 'user-authored', basis: 'experimental-design' })
+    case 'domain-knowledge':
+      return ok({ kind: 'user-authored', basis: 'domain-knowledge' })
+    case 'experimental-design':
+      return ok({ kind: 'user-authored', basis: 'experimental-design' })
     case 'discovery-informed': {
       if (!isNonEmpty(choice.reports)) return err({ kind: 'discovery-evidence-required' })
       const seen = new Set<DiscoveryRunId>()
       for (const report of choice.reports) {
         if (seen.has(report)) return err({ kind: 'duplicate-discovery-evidence', run: report })
-        if (!discoveryRuns.includes(report)) return err({ kind: 'discovery-evidence-unavailable', run: report })
+        if (!discoveryRuns.includes(report))
+          return err({ kind: 'discovery-evidence-unavailable', run: report })
         seen.add(report)
       }
       return ok({ kind: 'discovery-informed', reports: choice.reports })
     }
-    default: return assertNever(choice)
+    default:
+      return assertNever(choice)
   }
 }
 
@@ -303,20 +344,34 @@ export function createDagDocument(
 ): Result<DagDocument, DagCreateProblem> {
   const name = dagName(rawName)
   if (!name.ok) return name
-  const origin = resolveDagOrigin(originChoice, discoveryRuns.map((run) => run.id))
+  const origin = resolveDagOrigin(
+    originChoice,
+    discoveryRuns.map((run) => run.id),
+  )
   if (!origin.ok) return origin
 
   const nodes: ObservedDagNode[] = []
   for (const column of prepared.columns) {
     const profiled = profile.columns.find((candidate) => candidate.id === column)
     if (profiled === undefined) return err({ kind: 'prepared-column-missing', column })
-    nodes.push({ kind: 'observed', id: dagNodeId(prepared.id, column), column, name: profiled.name })
+    nodes.push({
+      kind: 'observed',
+      id: dagNodeId(prepared.id, column),
+      column,
+      name: profiled.name,
+    })
   }
-  if (!isNonEmpty(nodes)) return err({ kind: 'prepared-column-missing', column: prepared.columns[0] })
+  if (!isNonEmpty(nodes))
+    return err({ kind: 'prepared-column-missing', column: prepared.columns[0] })
 
   const graph: EditableDag = { kind: 'editable-dag', nodes, edges: [] }
   const dataset: DagDocument['dataset'] = {
-    kind: prepared.kind === 'prepared-time-series' ? 'time-series' : prepared.kind === 'prepared-panel' ? 'panel' : 'cross-section',
+    kind:
+      prepared.kind === 'prepared-time-series'
+        ? 'time-series'
+        : prepared.kind === 'prepared-panel'
+          ? 'panel'
+          : 'cross-section',
     observations: prepared.observations,
   }
   const current: DagDraftRevision = {
@@ -341,7 +396,11 @@ export function createDagDocument(
   })
 }
 
-const hasContemporaneousPath = (graph: EditableDag, start: DagNodeId, target: DagNodeId): boolean => {
+const hasContemporaneousPath = (
+  graph: EditableDag,
+  start: DagNodeId,
+  target: DagNodeId,
+): boolean => {
   const pending: DagNodeId[] = [start]
   const visited = new Set<DagNodeId>()
   while (pending.length > 0) {
@@ -358,11 +417,14 @@ const hasContemporaneousPath = (graph: EditableDag, start: DagNodeId, target: Da
 
 const supportFor = (origin: DagOrigin, rationale: EdgeRationale): EdgeSupport => {
   switch (origin.kind) {
-    case 'user-authored': return origin.basis === 'experimental-design'
-      ? { kind: 'experimental-design', rationale }
-      : { kind: 'user-assumption', rationale }
-    case 'discovery-informed': return { kind: 'user-assumption', rationale }
-    default: return assertNever(origin)
+    case 'user-authored':
+      return origin.basis === 'experimental-design'
+        ? { kind: 'experimental-design', rationale }
+        : { kind: 'user-assumption', rationale }
+    case 'discovery-informed':
+      return { kind: 'user-assumption', rationale }
+    default:
+      return assertNever(origin)
   }
 }
 
@@ -370,14 +432,18 @@ const supportFor = (origin: DagOrigin, rationale: EdgeRationale): EdgeSupport =>
 const supportFrom = (
   origin: DagOrigin,
   rawRationale: string | null,
-): Result<EdgeSupport, Extract<DagEditProblem, { readonly kind: 'empty-rationale' | 'rationale-too-long' }>> => {
+): Result<
+  EdgeSupport,
+  Extract<DagEditProblem, { readonly kind: 'empty-rationale' | 'rationale-too-long' }>
+> => {
   if (rawRationale === null) return ok({ kind: 'unstated' })
   const rationale = edgeRationale(rawRationale)
   return rationale.ok ? ok(supportFor(origin, rationale.value)) : rationale
 }
 
 const sameTiming = (left: EdgeTiming, right: EdgeTiming): boolean =>
-  left.kind === right.kind && (left.kind === 'contemporaneous' || (right.kind === 'lagged' && left.lag === right.lag))
+  left.kind === right.kind &&
+  (left.kind === 'contemporaneous' || (right.kind === 'lagged' && left.lag === right.lag))
 
 const appendRevision = (document: DagDocument, graph: EditableDag): DagDocument => {
   const current: DagDraftRevision = {
@@ -406,19 +472,33 @@ export function inspectDagEdgeAddition(
 ): Result<{ readonly cause: DagNodeId; readonly effect: DagNodeId }, DagEditProblem> {
   if (cause === null) return err({ kind: 'cause-required' })
   if (effect === null) return err({ kind: 'effect-required' })
-  if (!document.current.graph.nodes.some((node) => node.id === cause)) return err({ kind: 'unknown-node', node: cause })
-  if (!document.current.graph.nodes.some((node) => node.id === effect)) return err({ kind: 'unknown-node', node: effect })
+  if (!document.current.graph.nodes.some((node) => node.id === cause))
+    return err({ kind: 'unknown-node', node: cause })
+  if (!document.current.graph.nodes.some((node) => node.id === effect))
+    return err({ kind: 'unknown-node', node: effect })
   if (timing.kind === 'contemporaneous' && cause === effect) return err({ kind: 'self-edge' })
   if (timing.kind === 'lagged') {
-    if (document.dataset.kind === 'cross-section') return err({ kind: 'temporal-edge-on-cross-section' })
-    if (!Number.isSafeInteger(timing.lag) || timing.lag < 1 || timing.lag >= document.dataset.observations) {
+    if (document.dataset.kind === 'cross-section')
+      return err({ kind: 'temporal-edge-on-cross-section' })
+    if (
+      !Number.isSafeInteger(timing.lag) ||
+      timing.lag < 1 ||
+      timing.lag >= document.dataset.observations
+    ) {
       return err({ kind: 'invalid-lag', maximum: Math.max(1, document.dataset.observations - 1) })
     }
   }
-  if (document.current.graph.edges.some((edge) => edge.cause === cause && edge.effect === effect && sameTiming(edge.timing, timing))) {
+  if (
+    document.current.graph.edges.some(
+      (edge) => edge.cause === cause && edge.effect === effect && sameTiming(edge.timing, timing),
+    )
+  ) {
     return err({ kind: 'duplicate-edge' })
   }
-  if (timing.kind === 'contemporaneous' && hasContemporaneousPath(document.current.graph, effect, cause)) {
+  if (
+    timing.kind === 'contemporaneous' &&
+    hasContemporaneousPath(document.current.graph, effect, cause)
+  ) {
     return err({ kind: 'directed-cycle' })
   }
   return ok({ cause, effect })
@@ -447,14 +527,20 @@ export function reviseDagWithEdge(
     support: support.value,
     evidence,
   }
-  return ok(appendRevision(document, { ...document.current.graph, edges: [...document.current.graph.edges, edge] }))
+  return ok(
+    appendRevision(document, {
+      ...document.current.graph,
+      edges: [...document.current.graph.edges, edge],
+    }),
+  )
 }
 
 export function reviseDagWithoutEdge(
   document: DagDocument,
   edgeId: DagEdgeId,
 ): Result<DagDocument, Extract<DagEditProblem, { readonly kind: 'unknown-edge' }>> {
-  if (!document.current.graph.edges.some((edge) => edge.id === edgeId)) return err({ kind: 'unknown-edge', edge: edgeId })
+  if (!document.current.graph.edges.some((edge) => edge.id === edgeId))
+    return err({ kind: 'unknown-edge', edge: edgeId })
   const graph: EditableDag = {
     ...document.current.graph,
     edges: document.current.graph.edges.filter((edge) => edge.id !== edgeId),
@@ -486,19 +572,33 @@ export function inspectDagEdgeReplacement(
 ): Result<true, DagEditProblem> {
   const original = document.current.graph.edges.find((edge) => edge.id === edgeId)
   if (original === undefined) return err({ kind: 'unknown-edge', edge: edgeId })
-  if (!document.current.graph.nodes.some((node) => node.id === cause)) return err({ kind: 'unknown-node', node: cause })
-  if (!document.current.graph.nodes.some((node) => node.id === effect)) return err({ kind: 'unknown-node', node: effect })
+  if (!document.current.graph.nodes.some((node) => node.id === cause))
+    return err({ kind: 'unknown-node', node: cause })
+  if (!document.current.graph.nodes.some((node) => node.id === effect))
+    return err({ kind: 'unknown-node', node: effect })
   if (timing.kind === 'contemporaneous' && cause === effect) return err({ kind: 'self-edge' })
   if (timing.kind === 'lagged') {
-    if (document.dataset.kind === 'cross-section') return err({ kind: 'temporal-edge-on-cross-section' })
-    if (!Number.isSafeInteger(timing.lag) || timing.lag < 1 || timing.lag >= document.dataset.observations) {
+    if (document.dataset.kind === 'cross-section')
+      return err({ kind: 'temporal-edge-on-cross-section' })
+    if (
+      !Number.isSafeInteger(timing.lag) ||
+      timing.lag < 1 ||
+      timing.lag >= document.dataset.observations
+    ) {
       return err({ kind: 'invalid-lag', maximum: Math.max(1, document.dataset.observations - 1) })
     }
   }
   const retained = document.current.graph.edges.filter((edge) => edge.id !== edgeId)
-  if (retained.some((edge) => edge.cause === cause && edge.effect === effect
-    && edge.timing.kind === timing.kind
-    && (edge.timing.kind === 'contemporaneous' || (timing.kind === 'lagged' && edge.timing.lag === timing.lag)))) {
+  if (
+    retained.some(
+      (edge) =>
+        edge.cause === cause &&
+        edge.effect === effect &&
+        edge.timing.kind === timing.kind &&
+        (edge.timing.kind === 'contemporaneous' ||
+          (timing.kind === 'lagged' && edge.timing.lag === timing.lag)),
+    )
+  ) {
     return err({ kind: 'duplicate-edge' })
   }
   const withoutOriginal: EditableDag = { ...document.current.graph, edges: retained }
@@ -544,7 +644,13 @@ export function reviseDagEdgeDetails(
   const original = document.current.graph.edges.find((edge) => edge.id === edgeId)
   if (original === undefined) return err({ kind: 'unknown-edge', edge: edgeId })
   if (!sameTiming(original.timing, timing)) {
-    const inspected = inspectDagEdgeReplacement(document, edgeId, original.cause, original.effect, timing)
+    const inspected = inspectDagEdgeReplacement(
+      document,
+      edgeId,
+      original.cause,
+      original.effect,
+      timing,
+    )
     if (!inspected.ok) return inspected
   }
   const support = supportFrom(document.origin, rawRationale)
@@ -555,7 +661,9 @@ export function reviseDagEdgeDetails(
     timing,
     support: support.value,
   }
-  const edges = document.current.graph.edges.map((candidate) => candidate.id === edgeId ? edge : candidate)
+  const edges = document.current.graph.edges.map((candidate) =>
+    candidate.id === edgeId ? edge : candidate,
+  )
   return ok(appendRevision(document, { ...document.current.graph, edges }))
 }
 
@@ -589,20 +697,37 @@ export function reviseDagWithLatentConfounder(
   const graph: EditableDag = {
     ...document.current.graph,
     nodes: [...document.current.graph.nodes, latent],
-    edges: [...document.current.graph.edges.filter((candidate) => candidate.id !== edgeId), arrow(edge.cause), arrow(edge.effect)],
+    edges: [
+      ...document.current.graph.edges.filter((candidate) => candidate.id !== edgeId),
+      arrow(edge.cause),
+      arrow(edge.effect),
+    ],
   }
   return ok(appendRevision(document, graph))
 }
 
 export interface DagImport {
   readonly latent: readonly string[]
-  readonly arrows: readonly { readonly from: string; readonly to: string; readonly lag: number | null }[]
+  readonly arrows: readonly {
+    readonly from: string
+    readonly to: string
+    readonly lag: number | null
+  }[]
 }
 
 export type DagImportProblem =
   | { readonly kind: 'unknown-variable'; readonly name: string }
-  | { readonly kind: 'variable-refused'; readonly name: string; readonly problem: DagVariableEditProblem }
-  | { readonly kind: 'arrow-refused'; readonly from: string; readonly to: string; readonly problem: DagEditProblem }
+  | {
+      readonly kind: 'variable-refused'
+      readonly name: string
+      readonly problem: DagVariableEditProblem
+    }
+  | {
+      readonly kind: 'arrow-refused'
+      readonly from: string
+      readonly to: string
+      readonly problem: DagEditProblem
+    }
 
 /**
  * Every arrow of a pasted graph joins in one revision, each checked the way a drawn arrow is, so a
@@ -620,19 +745,30 @@ export function reviseDagWithImportedGraph(
   for (const name of imported.latent) {
     const checked = latentVariableName(working(), name)
     if (!checked.ok) return err({ kind: 'variable-refused', name, problem: checked.error })
-    const node: LatentDagNode = { kind: 'latent', id: newLatentDagNodeId(document.id), name: checked.value }
+    const node: LatentDagNode = {
+      kind: 'latent',
+      id: newLatentDagNodeId(document.id),
+      name: checked.value,
+    }
     graph = { ...graph, nodes: [...graph.nodes, node] }
     ids.set(checked.value, node.id)
   }
 
   for (const arrow of imported.arrows) {
-    const timing: EdgeTiming = arrow.lag === null ? { kind: 'contemporaneous' } : { kind: 'lagged', lag: arrow.lag }
+    const timing: EdgeTiming =
+      arrow.lag === null ? { kind: 'contemporaneous' } : { kind: 'lagged', lag: arrow.lag }
     const cause = ids.get(arrow.from)
     const effect = ids.get(arrow.to)
     if (cause === undefined) return err({ kind: 'unknown-variable', name: arrow.from })
     if (effect === undefined) return err({ kind: 'unknown-variable', name: arrow.to })
     const endpoints = inspectDagEdgeAddition(working(), cause, effect, timing)
-    if (!endpoints.ok) return err({ kind: 'arrow-refused', from: arrow.from, to: arrow.to, problem: endpoints.error })
+    if (!endpoints.ok)
+      return err({
+        kind: 'arrow-refused',
+        from: arrow.from,
+        to: arrow.to,
+        problem: endpoints.error,
+      })
     const edge: DirectedDagEdge = {
       kind: 'directed',
       id: dagEdgeId(cause, effect, timing),
@@ -648,7 +784,9 @@ export function reviseDagWithImportedGraph(
 }
 
 /** Move the active revision pointer backward without deleting any revision from the audit. */
-export function undoDagRevision(document: DagDocument): Result<DagDocument, Extract<DagHistoryProblem, { readonly kind: 'nothing-to-undo' }>> {
+export function undoDagRevision(
+  document: DagDocument,
+): Result<DagDocument, Extract<DagHistoryProblem, { readonly kind: 'nothing-to-undo' }>> {
   const previous = document.history.at(-1)
   if (previous === undefined) return err({ kind: 'nothing-to-undo' })
   return ok({
@@ -660,7 +798,9 @@ export function undoDagRevision(document: DagDocument): Result<DagDocument, Extr
 }
 
 /** Move the active revision pointer forward along the current branch. */
-export function redoDagRevision(document: DagDocument): Result<DagDocument, Extract<DagHistoryProblem, { readonly kind: 'nothing-to-redo' }>> {
+export function redoDagRevision(
+  document: DagDocument,
+): Result<DagDocument, Extract<DagHistoryProblem, { readonly kind: 'nothing-to-redo' }>> {
   const [next, ...future] = document.future
   if (next === undefined) return err({ kind: 'nothing-to-redo' })
   return ok({
@@ -675,11 +815,23 @@ const latentVariableName = (
   document: DagDocument,
   rawName: string,
   except: DagNodeId | null = null,
-): Result<string, Extract<DagVariableEditProblem, { readonly kind: 'empty-variable-name' | 'variable-name-too-long' | 'duplicate-variable-name' }>> => {
+): Result<
+  string,
+  Extract<
+    DagVariableEditProblem,
+    { readonly kind: 'empty-variable-name' | 'variable-name-too-long' | 'duplicate-variable-name' }
+  >
+> => {
   const name = rawName.trim()
   if (name.length === 0) return err({ kind: 'empty-variable-name' })
-  if (name.length > MAX_VARIABLE_NAME) return err({ kind: 'variable-name-too-long', maximum: MAX_VARIABLE_NAME })
-  if (document.current.graph.nodes.some((node) => node.id !== except && node.name.trim().toLocaleLowerCase() === name.toLocaleLowerCase())) {
+  if (name.length > MAX_VARIABLE_NAME)
+    return err({ kind: 'variable-name-too-long', maximum: MAX_VARIABLE_NAME })
+  if (
+    document.current.graph.nodes.some(
+      (node) =>
+        node.id !== except && node.name.trim().toLocaleLowerCase() === name.toLocaleLowerCase(),
+    )
+  ) {
     return err({ kind: 'duplicate-variable-name' })
   }
   return ok(name)
@@ -731,9 +883,9 @@ export function reviseDagRenamingLatentNode(
   if (node.kind === 'observed') return err({ kind: 'observed-variable-fixed' })
   const name = latentVariableName(document, rawName, nodeId)
   if (!name.ok) return name
-  const nodes = document.current.graph.nodes.map((candidate): DagNode => candidate.id === nodeId
-    ? { ...candidate, name: name.value }
-    : candidate)
+  const nodes = document.current.graph.nodes.map((candidate): DagNode =>
+    candidate.id === nodeId ? { ...candidate, name: name.value } : candidate,
+  )
   if (!isNonEmpty(nodes)) return err({ kind: 'unknown-variable', node: nodeId })
   return ok(reviseDagGraph(document, { ...document.current.graph, nodes }))
 }
@@ -745,8 +897,11 @@ export function reviseDagWithoutLatentNode(
   const node = document.current.graph.nodes.find((candidate) => candidate.id === nodeId)
   if (node === undefined) return err({ kind: 'unknown-variable', node: nodeId })
   if (node.kind === 'observed') return err({ kind: 'observed-variable-fixed' })
-  const incidentEdges = document.current.graph.edges.filter((edge) => edge.cause === nodeId || edge.effect === nodeId)
-  if (incidentEdges.length > 0) return err({ kind: 'latent-variable-has-edges', count: incidentEdges.length })
+  const incidentEdges = document.current.graph.edges.filter(
+    (edge) => edge.cause === nodeId || edge.effect === nodeId,
+  )
+  if (incidentEdges.length > 0)
+    return err({ kind: 'latent-variable-has-edges', count: incidentEdges.length })
   const nodes = document.current.graph.nodes.filter((candidate) => candidate.id !== nodeId)
   if (!isNonEmpty(nodes)) return err({ kind: 'unknown-variable', node: nodeId })
   return ok(reviseDagGraph(document, { ...document.current.graph, nodes }))
@@ -754,70 +909,110 @@ export function reviseDagWithoutLatentNode(
 
 export function describeDagHistoryProblem(problem: DagHistoryProblem): string {
   switch (problem.kind) {
-    case 'nothing-to-undo': return 'This DAG has no earlier active revision.'
-    case 'nothing-to-redo': return 'This DAG has no later revision on the current branch.'
-    default: return assertNever(problem)
+    case 'nothing-to-undo':
+      return 'This DAG has no earlier active revision.'
+    case 'nothing-to-redo':
+      return 'This DAG has no later revision on the current branch.'
+    default:
+      return assertNever(problem)
   }
 }
 
 export function describeDagVariableEditProblem(problem: DagVariableEditProblem): string {
   switch (problem.kind) {
-    case 'empty-variable-name': return 'Give the unmeasured variable a name.'
-    case 'variable-name-too-long': return `Keep the variable name to ${problem.maximum} characters or fewer.`
-    case 'duplicate-variable-name': return 'A variable with that name already exists in this DAG.'
-    case 'unknown-variable': return 'That variable is not present in the active DAG revision.'
-    case 'observed-variable-fixed': return 'Change observed variables in Data studio. They cannot be removed from the DAG.'
-    case 'latent-variable-has-edges': return `Remove the ${problem.count} connected arrow${problem.count === 1 ? '' : 's'} before deleting this unmeasured variable.`
-    default: return assertNever(problem)
+    case 'empty-variable-name':
+      return 'Give the unmeasured variable a name.'
+    case 'variable-name-too-long':
+      return `Keep the variable name to ${problem.maximum} characters or fewer.`
+    case 'duplicate-variable-name':
+      return 'A variable with that name already exists in this DAG.'
+    case 'unknown-variable':
+      return 'That variable is not present in the active DAG revision.'
+    case 'observed-variable-fixed':
+      return 'Change observed variables in Data studio. They cannot be removed from the DAG.'
+    case 'latent-variable-has-edges':
+      return `Remove the ${problem.count} connected arrow${problem.count === 1 ? '' : 's'} before deleting this unmeasured variable.`
+    default:
+      return assertNever(problem)
   }
 }
 
 export function describeDagCreateProblem(problem: DagCreateProblem): string {
   switch (problem.kind) {
-    case 'empty-name': return 'Give this DAG a name.'
-    case 'name-too-long': return `Keep the DAG name to ${problem.maximum} characters or fewer.`
-    case 'prepared-column-missing': return 'A prepared variable is missing from the source profile. Create another prepared dataset version.'
-    case 'discovery-evidence-required': return 'Select at least one discovery run reviewed while developing this DAG.'
-    case 'discovery-evidence-unavailable': return 'A selected discovery run is no longer available. Review the selection and try again.'
-    case 'duplicate-discovery-evidence': return 'A discovery run was selected more than once. Review the selection and try again.'
-    default: return assertNever(problem)
+    case 'empty-name':
+      return 'Give this DAG a name.'
+    case 'name-too-long':
+      return `Keep the DAG name to ${problem.maximum} characters or fewer.`
+    case 'prepared-column-missing':
+      return 'A prepared variable is missing from the source profile. Create another prepared dataset version.'
+    case 'discovery-evidence-required':
+      return 'Select at least one discovery run reviewed while developing this DAG.'
+    case 'discovery-evidence-unavailable':
+      return 'A selected discovery run is no longer available. Review the selection and try again.'
+    case 'duplicate-discovery-evidence':
+      return 'A discovery run was selected more than once. Review the selection and try again.'
+    default:
+      return assertNever(problem)
   }
 }
 
 export function describeDagEditProblem(problem: DagEditProblem): string {
   switch (problem.kind) {
-    case 'cause-required': return 'Choose the proposed direct cause.'
-    case 'effect-required': return 'Choose the proposed direct effect.'
-    case 'unknown-node': return 'That variable is not present in this DAG revision.'
-    case 'self-edge': return 'A variable cannot directly cause itself in a contemporaneous DAG.'
-    case 'duplicate-edge': return 'That arrow already exists.'
-    case 'directed-cycle': return 'That arrow would create a directed cycle. Represent feedback with explicit time order or lags.'
-    case 'empty-rationale': return 'Record the rationale for this arrow.'
-    case 'rationale-too-long': return `Keep the arrow rationale to ${problem.maximum} characters or fewer.`
-    case 'temporal-edge-on-cross-section': return 'Lagged arrows need a prepared time series. This dataset holds independent rows.'
-    case 'invalid-lag': return `Choose a positive lag no greater than ${problem.maximum}.`
-    case 'unknown-edge': return 'That arrow is not present in the current revision. Select another arrow.'
-    default: return assertNever(problem)
+    case 'cause-required':
+      return 'Choose the proposed direct cause.'
+    case 'effect-required':
+      return 'Choose the proposed direct effect.'
+    case 'unknown-node':
+      return 'That variable is not present in this DAG revision.'
+    case 'self-edge':
+      return 'A variable cannot directly cause itself in a contemporaneous DAG.'
+    case 'duplicate-edge':
+      return 'That arrow already exists.'
+    case 'directed-cycle':
+      return 'That arrow would create a directed cycle. Represent feedback with explicit time order or lags.'
+    case 'empty-rationale':
+      return 'Record the rationale for this arrow.'
+    case 'rationale-too-long':
+      return `Keep the arrow rationale to ${problem.maximum} characters or fewer.`
+    case 'temporal-edge-on-cross-section':
+      return 'Lagged arrows need a prepared time series. This dataset holds independent rows.'
+    case 'invalid-lag':
+      return `Choose a positive lag no greater than ${problem.maximum}.`
+    case 'unknown-edge':
+      return 'That arrow is not present in the current revision. Select another arrow.'
+    default:
+      return assertNever(problem)
   }
 }
 
 export const describeDagBasis = (basis: 'domain-knowledge' | 'experimental-design'): string =>
-  basis === 'domain-knowledge' ? 'substantive and institutional knowledge' : 'experimental assignment mechanism'
+  basis === 'domain-knowledge'
+    ? 'substantive and institutional knowledge'
+    : 'experimental assignment mechanism'
 
 export function describeDagOrigin(origin: DagOrigin): string {
   switch (origin.kind) {
-    case 'user-authored': return `Basis: ${describeDagBasis(origin.basis)}`
-    case 'discovery-informed': return `Basis: substantive review of ${origin.reports.length} discovery result${origin.reports.length === 1 ? '' : 's'}`
-    default: return assertNever(origin)
+    case 'user-authored':
+      return `Basis: ${describeDagBasis(origin.basis)}`
+    case 'discovery-informed':
+      return `Basis: substantive review of ${origin.reports.length} discovery result${origin.reports.length === 1 ? '' : 's'}`
+    default:
+      return assertNever(origin)
   }
 }
 
 export function describeDagValidation(validation: DagStructuralValidation): string {
   switch (validation.structure.kind) {
-    case 'invalid': return 'invalid'
-    case 'empty': return 'no arrows'
-    case 'sound': return validation.rationales.kind === 'complete' ? 'structurally valid' : 'structurally valid, rationale outstanding'
-    default: return assertNever(validation.structure)
+    case 'invalid':
+      return 'invalid'
+    case 'empty':
+      return 'no arrows'
+    case 'sound':
+      return validation.rationales.kind === 'complete'
+        ? 'structurally valid'
+        : 'structurally valid, rationale outstanding'
+    default:
+      return assertNever(validation.structure)
   }
 }
 

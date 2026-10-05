@@ -15,8 +15,14 @@ export function RunActivityChip({ onOpen }: { readonly onOpen: (chapter: Chapter
       onClick={() => onOpen(chapter)}
     >
       <span className="truncate">{run.label}</span>
-      <span aria-hidden className="bar-live absolute inset-x-2 bottom-[3px] h-[2px] rounded-full bg-line">
-        <span className="bar-live__fill block rounded-full bg-signal" style={{ width: `${Math.round((run.progress ?? 0) * 100)}%` }} />
+      <span
+        aria-hidden
+        className="bar-live absolute inset-x-2 bottom-[3px] h-[2px] rounded-full bg-line"
+      >
+        <span
+          className="bar-live__fill block rounded-full bg-signal"
+          style={{ width: `${Math.round((run.progress ?? 0) * 100)}%` }}
+        />
       </span>
     </button>
   )

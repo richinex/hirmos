@@ -1,10 +1,19 @@
 import type { ColumnId, NumericColumnSelection } from './dataset'
-import { assertNever, err, isNonEmpty, mapNonEmpty, ok, type NonEmptyArray, type Result } from './dop'
+import {
+  assertNever,
+  err,
+  isNonEmpty,
+  mapNonEmpty,
+  ok,
+  type NonEmptyArray,
+  type Result,
+} from './dop'
 import type { Frequency } from './preprocessing'
 import { z } from 'zod'
 
 /** Calendar aggregation offered by the first resampling increment. */
-export type ResamplingAggregation = 'mean' | 'sum' | 'median' | 'minimum' | 'maximum' | 'first' | 'last'
+export type ResamplingAggregation =
+  'mean' | 'sum' | 'median' | 'minimum' | 'maximum' | 'first' | 'last'
 
 export interface ColumnResamplingAggregation {
   readonly column: ColumnId
@@ -67,13 +76,13 @@ export interface ResampledMatrix extends ResamplingInputMatrix {
   readonly record: ResamplingRecord
 }
 
-export type ResamplingProblem =
-  | { readonly kind: 'kernel-refused'; readonly detail: string }
+export type ResamplingProblem = { readonly kind: 'kernel-refused'; readonly detail: string }
 
 export const aggregationFor = (
   aggregations: readonly ColumnResamplingAggregation[],
   column: ColumnId,
-): ResamplingAggregation | null => aggregations.find((candidate) => candidate.column === column)?.aggregation ?? null
+): ResamplingAggregation | null =>
+  aggregations.find((candidate) => candidate.column === column)?.aggregation ?? null
 
 export const aggregationsForColumns = (
   columns: NonEmptyArray<NumericColumnSelection>,
@@ -82,7 +91,11 @@ export const aggregationsForColumns = (
   const ordered: ResamplingAggregation[] = []
   for (const column of columns) {
     const aggregation = aggregationFor(recipe.aggregations, column.id)
-    if (aggregation === null) return err({ kind: 'kernel-refused', detail: `The saved recipe has no aggregation for ${column.name}.` })
+    if (aggregation === null)
+      return err({
+        kind: 'kernel-refused',
+        detail: `The saved recipe has no aggregation for ${column.name}.`,
+      })
     ordered.push(aggregation)
   }
   return isNonEmpty(ordered)
@@ -90,15 +103,24 @@ export const aggregationsForColumns = (
     : err({ kind: 'kernel-refused', detail: 'No analysis columns were supplied for resampling.' })
 }
 
-export const effectiveFrequency = (source: Frequency, resampling: ResamplingDraft | ResamplingRecipe | ResamplingRecord): Frequency => {
+export const effectiveFrequency = (
+  source: Frequency,
+  resampling: ResamplingDraft | ResamplingRecipe | ResamplingRecord,
+): Frequency => {
   switch (resampling.kind) {
-    case 'none': return source
-    case 'daily-downsample': return resampling.targetFrequency
-    default: return assertNever(resampling)
+    case 'none':
+      return source
+    case 'daily-downsample':
+      return resampling.targetFrequency
+    default:
+      return assertNever(resampling)
   }
 }
 
-export type ResamplingReadinessProblem = { readonly kind: 'aggregations-required'; readonly columns: NonEmptyArray<ColumnId> }
+export type ResamplingReadinessProblem = {
+  readonly kind: 'aggregations-required'
+  readonly columns: NonEmptyArray<ColumnId>
+}
 
 export const readyResamplingRecipe = (
   source: Frequency,
@@ -106,11 +128,14 @@ export const readyResamplingRecipe = (
   draft: ResamplingDraft,
 ): Result<ResamplingRecipe, ResamplingReadinessProblem> => {
   switch (draft.kind) {
-    case 'none': return ok({ kind: 'none' })
+    case 'none':
+      return ok({ kind: 'none' })
     case 'daily-downsample': {
       // The reducer resets this state when the declared source frequency ceases to be daily.
       if (source !== 'daily') return ok({ kind: 'none' })
-      const missing = columns.filter((column) => aggregationFor(draft.aggregations, column) === null)
+      const missing = columns.filter(
+        (column) => aggregationFor(draft.aggregations, column) === null,
+      )
       if (isNonEmpty(missing)) return err({ kind: 'aggregations-required', columns: missing })
       return ok({
         kind: 'daily-downsample',
@@ -121,30 +146,38 @@ export const readyResamplingRecipe = (
         incompleteBins: draft.incompleteBins,
         aggregations: mapNonEmpty(columns, (column) => {
           const aggregation = aggregationFor(draft.aggregations, column)
-          if (aggregation === null) throw new Error(`Aggregation for ${column} disappeared after validation.`)
+          if (aggregation === null)
+            throw new Error(`Aggregation for ${column} disappeared after validation.`)
           return { column, aggregation }
         }),
       })
     }
-    default: return assertNever(draft)
+    default:
+      return assertNever(draft)
   }
 }
 
-export const pandasResamplingEvidenceSchema = z.object({
-  kind: z.literal('pandasResampled'),
-  values: z.array(z.number().finite()),
-  timestampsMs: z.array(z.number().int()),
-  imputedCells: z.array(z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()])),
-  sourceRows: z.number().int().positive(),
-  outputRows: z.number().int().positive(),
-  incompleteBins: z.number().int().nonnegative(),
-  binsDropped: z.number().int().nonnegative(),
-  sourceRowsDropped: z.number().int().nonnegative(),
-}).strict()
+export const pandasResamplingEvidenceSchema = z
+  .object({
+    kind: z.literal('pandasResampled'),
+    values: z.array(z.number().finite()),
+    timestampsMs: z.array(z.number().int()),
+    imputedCells: z.array(
+      z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()]),
+    ),
+    sourceRows: z.number().int().positive(),
+    outputRows: z.number().int().positive(),
+    incompleteBins: z.number().int().nonnegative(),
+    binsDropped: z.number().int().nonnegative(),
+    sourceRowsDropped: z.number().int().nonnegative(),
+  })
+  .strict()
 
 export type PandasResamplingEvidence = z.infer<typeof pandasResamplingEvidenceSchema>
 
-export const parsePandasResamplingEvidence = (value: unknown): Result<PandasResamplingEvidence, ResamplingProblem> => {
+export const parsePandasResamplingEvidence = (
+  value: unknown,
+): Result<PandasResamplingEvidence, ResamplingProblem> => {
   const parsed = pandasResamplingEvidenceSchema.safeParse(value)
   return parsed.success
     ? ok(parsed.data)
@@ -158,11 +191,19 @@ export const resampledMatrixFromEvidence = (
   evidence: PandasResamplingEvidence,
 ): Result<ResampledMatrix, ResamplingProblem> => {
   const cells = evidence.outputRows * matrix.columns.length
-  if (evidence.sourceRows !== matrix.rowCount
-    || evidence.values.length !== cells
-    || evidence.timestampsMs.length !== evidence.outputRows
-    || evidence.imputedCells.some(([row, column]) => row >= evidence.outputRows || column >= matrix.columns.length)) {
-    return err({ kind: 'kernel-refused', detail: 'The resampled data has unexpected dimensions. It cannot be used to prepare the dataset.' })
+  if (
+    evidence.sourceRows !== matrix.rowCount ||
+    evidence.values.length !== cells ||
+    evidence.timestampsMs.length !== evidence.outputRows ||
+    evidence.imputedCells.some(
+      ([row, column]) => row >= evidence.outputRows || column >= matrix.columns.length,
+    )
+  ) {
+    return err({
+      kind: 'kernel-refused',
+      detail:
+        'The resampled data has unexpected dimensions. It cannot be used to prepare the dataset.',
+    })
   }
   return ok({
     values: Float64Array.from(evidence.values),
@@ -190,29 +231,45 @@ export const resampledMatrixFromEvidence = (
 export function sameResamplingRecord(left: ResamplingRecord, right: ResamplingRecord): boolean {
   if (left.kind !== right.kind) return false
   if (left.kind === 'none' || right.kind === 'none') return true
-  return left.sourceFrequency === right.sourceFrequency
-    && left.targetFrequency === right.targetFrequency
-    && left.weekStartsOn === right.weekStartsOn
-    && left.calendar === right.calendar
-    && left.incompleteBins === right.incompleteBins
-    && left.sourceRows === right.sourceRows
-    && left.outputRows === right.outputRows
-    && left.incompleteBinsFound === right.incompleteBinsFound
-    && left.binsDropped === right.binsDropped
-    && left.sourceRowsDropped === right.sourceRowsDropped
-    && left.aggregations.length === right.aggregations.length
-    && left.aggregations.every((entry, i) => entry.column === right.aggregations[i]?.column && entry.aggregation === right.aggregations[i]?.aggregation)
+  return (
+    left.sourceFrequency === right.sourceFrequency &&
+    left.targetFrequency === right.targetFrequency &&
+    left.weekStartsOn === right.weekStartsOn &&
+    left.calendar === right.calendar &&
+    left.incompleteBins === right.incompleteBins &&
+    left.sourceRows === right.sourceRows &&
+    left.outputRows === right.outputRows &&
+    left.incompleteBinsFound === right.incompleteBinsFound &&
+    left.binsDropped === right.binsDropped &&
+    left.sourceRowsDropped === right.sourceRowsDropped &&
+    left.aggregations.length === right.aggregations.length &&
+    left.aggregations.every(
+      (entry, i) =>
+        entry.column === right.aggregations[i]?.column &&
+        entry.aggregation === right.aggregations[i]?.aggregation,
+    )
+  )
 }
 
-export function describeResampling(record: ResamplingRecord, name: (column: ColumnId) => string): string | null {
+export function describeResampling(
+  record: ResamplingRecord,
+  name: (column: ColumnId) => string,
+): string | null {
   switch (record.kind) {
-    case 'none': return null
+    case 'none':
+      return null
     case 'daily-downsample': {
-      const rules = record.aggregations.map((entry) => `${name(entry.column)}: ${entry.aggregation}`).join(', ')
-      const dropped = record.binsDropped > 0 ? `; dropped ${record.binsDropped} incomplete ${record.binsDropped === 1 ? 'bin' : 'bins'}` : ''
+      const rules = record.aggregations
+        .map((entry) => `${name(entry.column)}: ${entry.aggregation}`)
+        .join(', ')
+      const dropped =
+        record.binsDropped > 0
+          ? `; dropped ${record.binsDropped} incomplete ${record.binsDropped === 1 ? 'bin' : 'bins'}`
+          : ''
       return `Daily to ${record.targetFrequency}, ${rules}${dropped}`
     }
-    default: return assertNever(record)
+    default:
+      return assertNever(record)
   }
 }
 

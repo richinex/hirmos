@@ -17,77 +17,125 @@ export interface DagLayout {
   readonly routes: ReadonlyMap<DagEdgeId, DagRoute>
 }
 export type LayoutProblem =
-  | { readonly kind: 'engine'; readonly message: string }
-  | { readonly kind: 'invalid-result' }
+  { readonly kind: 'engine'; readonly message: string } | { readonly kind: 'invalid-result' }
 
 /**
  * Separates cards that overlap, keeping their arrangement. The role placement treats non-overlap as
  * one goal among its hard rules and can leave cards on top of each other; ELK's overlap removal
  * resolves that without changing which side of the line a card is on.
  */
-export async function separateCards(positions: ReadonlyMap<DagNodeId, LayoutPoint>, size: DagCardSize): Promise<Result<ReadonlyMap<DagNodeId, LayoutPoint>, LayoutProblem>> {
+export async function separateCards(
+  positions: ReadonlyMap<DagNodeId, LayoutPoint>,
+  size: DagCardSize,
+): Promise<Result<ReadonlyMap<DagNodeId, LayoutPoint>, LayoutProblem>> {
   if (positions.size < 2) return ok(positions)
   try {
     engine ??= new ELK({ workerFactory: () => new ElkWorker() })
     const raw = await engine.layout({
       id: 'separation',
-      layoutOptions: { 'elk.algorithm': 'sporeOverlap', 'elk.spacing.nodeNode': '24', 'elk.padding': '[top=34,left=34,bottom=34,right=34]' },
-      children: [...positions].map(([id, at]) => ({ id, x: at.x, y: at.y, width: size.width, height: size.height })),
+      layoutOptions: {
+        'elk.algorithm': 'sporeOverlap',
+        'elk.spacing.nodeNode': '24',
+        'elk.padding': '[top=34,left=34,bottom=34,right=34]',
+      },
+      children: [...positions].map(([id, at]) => ({
+        id,
+        x: at.x,
+        y: at.y,
+        width: size.width,
+        height: size.height,
+      })),
       edges: [],
     })
     const parsed = output.safeParse(raw)
     if (!parsed.success) return err({ kind: 'invalid-result' })
     const separated = new Map<DagNodeId, LayoutPoint>()
-    const placed = new Map(parsed.data.children.map(child => [child.id, child]))
+    const placed = new Map(parsed.data.children.map((child) => [child.id, child]))
     for (const id of positions.keys()) {
       const child = placed.get(id)
       if (child === undefined) return err({ kind: 'invalid-result' })
       separated.set(id, { x: child.x, y: child.y })
     }
     return ok(separated)
-  } catch (cause) { return err({ kind: 'engine', message: cause instanceof Error ? cause.message : String(cause) }) }
+  } catch (cause) {
+    return err({ kind: 'engine', message: cause instanceof Error ? cause.message : String(cause) })
+  }
 }
 
 /** Pack new cards outside the occupied rectangle without changing existing manual positions. */
-export async function extendHeldPositions(graph: EditableDag, held: ReadonlyMap<string, LayoutPoint>, size: DagCardSize): Promise<Result<ReadonlyMap<DagNodeId, LayoutPoint>, LayoutProblem>> {
-  const existing = graph.nodes.flatMap(node => { const position = held.get(node.id); return position === undefined ? [] : [{ id: node.id, ...position }] })
-  const added = graph.nodes.filter(node => !held.has(node.id))
-  if (added.length === 0) return ok(new Map(existing.map(node => [node.id, { x: node.x, y: node.y }])))
+export async function extendHeldPositions(
+  graph: EditableDag,
+  held: ReadonlyMap<string, LayoutPoint>,
+  size: DagCardSize,
+): Promise<Result<ReadonlyMap<DagNodeId, LayoutPoint>, LayoutProblem>> {
+  const existing = graph.nodes.flatMap((node) => {
+    const position = held.get(node.id)
+    return position === undefined ? [] : [{ id: node.id, ...position }]
+  })
+  const added = graph.nodes.filter((node) => !held.has(node.id))
+  if (added.length === 0)
+    return ok(new Map(existing.map((node) => [node.id, { x: node.x, y: node.y }])))
   if (existing.length === 0) return err({ kind: 'invalid-result' })
   try {
     engine ??= new ELK({ workerFactory: () => new ElkWorker() })
-    const left = Math.min(...existing.map(node => node.x))
-    const top = Math.min(...existing.map(node => node.y))
-    const width = Math.max(...existing.map(node => node.x + size.width)) - left
-    const height = Math.max(...existing.map(node => node.y + size.height)) - top
-    const raw = await engine.layout({ id: 'packing', layoutOptions: { 'elk.algorithm': 'box', 'elk.spacing.nodeNode': '46' }, children: [
-      { id: 'occupied', width, height }, ...added.map(node => ({ id: node.id, width: size.width, height: size.height })),
-    ] })
+    const left = Math.min(...existing.map((node) => node.x))
+    const top = Math.min(...existing.map((node) => node.y))
+    const width = Math.max(...existing.map((node) => node.x + size.width)) - left
+    const height = Math.max(...existing.map((node) => node.y + size.height)) - top
+    const raw = await engine.layout({
+      id: 'packing',
+      layoutOptions: { 'elk.algorithm': 'box', 'elk.spacing.nodeNode': '46' },
+      children: [
+        { id: 'occupied', width, height },
+        ...added.map((node) => ({ id: node.id, width: size.width, height: size.height })),
+      ],
+    })
     const parsed = output.safeParse(raw)
     if (!parsed.success) return err({ kind: 'invalid-result' })
-    const occupied = parsed.data.children.find(node => node.id === 'occupied')
+    const occupied = parsed.data.children.find((node) => node.id === 'occupied')
     if (!occupied) return err({ kind: 'invalid-result' })
-    const positions = new Map<DagNodeId, LayoutPoint>(existing.map(node => [node.id, { x: node.x, y: node.y }]))
+    const positions = new Map<DagNodeId, LayoutPoint>(
+      existing.map((node) => [node.id, { x: node.x, y: node.y }]),
+    )
     for (const node of added) {
-      const placed = parsed.data.children.find(placed => placed.id === node.id)
+      const placed = parsed.data.children.find((placed) => placed.id === node.id)
       if (!placed) return err({ kind: 'invalid-result' })
       positions.set(node.id, { x: placed.x - occupied.x + left, y: placed.y - occupied.y + top })
     }
     return ok(positions)
-  } catch (cause) { return err({ kind: 'engine', message: cause instanceof Error ? cause.message : String(cause) }) }
+  } catch (cause) {
+    return err({ kind: 'engine', message: cause instanceof Error ? cause.message : String(cause) })
+  }
 }
 
 const point = z.object({ x: z.number().finite(), y: z.number().finite() })
 const output = z.object({
   children: z.array(point.extend({ id: z.string() })),
-  edges: z.array(z.object({ id: z.string(), sections: z.array(z.object({
-    startPoint: point, endPoint: point, bendPoints: z.array(point).optional(),
-  })).length(1) })).optional(),
+  edges: z
+    .array(
+      z.object({
+        id: z.string(),
+        sections: z
+          .array(
+            z.object({
+              startPoint: point,
+              endPoint: point,
+              bendPoints: z.array(point).optional(),
+            }),
+          )
+          .length(1),
+      }),
+    )
+    .optional(),
 })
 
 // Vite serves a separate worker chunk. Layout never runs on React's rendering thread.
 let engine: ElkEngine | undefined
-export async function layoutDag(graph: EditableDag, orientation: DagLayoutOrientation, size: DagCardSize): Promise<Result<DagLayout, LayoutProblem>> {
+export async function layoutDag(
+  graph: EditableDag,
+  orientation: DagLayoutOrientation,
+  size: DagCardSize,
+): Promise<Result<DagLayout, LayoutProblem>> {
   try {
     engine ??= new ELK({ workerFactory: () => new ElkWorker() })
     const raw = await engine.layout({
@@ -104,13 +152,28 @@ export async function layoutDag(graph: EditableDag, orientation: DagLayoutOrient
         'elk.layered.nodePlacement.favorStraightEdges': 'true',
         'elk.randomSeed': '1',
       },
-      children: graph.nodes.map(node => ({ id: node.id, width: size.width, height: size.height })),
-      edges: graph.edges.map(edge => ({ id: edge.id, sources: [edge.cause], targets: [edge.effect], labels: [{ id: `${edge.id}:label`, ...routeLabelSize(edge), layoutOptions: { 'elk.edgeLabels.placement': 'CENTER' } }] })),
+      children: graph.nodes.map((node) => ({
+        id: node.id,
+        width: size.width,
+        height: size.height,
+      })),
+      edges: graph.edges.map((edge) => ({
+        id: edge.id,
+        sources: [edge.cause],
+        targets: [edge.effect],
+        labels: [
+          {
+            id: `${edge.id}:label`,
+            ...routeLabelSize(edge),
+            layoutOptions: { 'elk.edgeLabels.placement': 'CENTER' },
+          },
+        ],
+      })),
     })
     const parsed = output.safeParse(raw)
     if (!parsed.success) return err({ kind: 'invalid-result' })
-    const placedNodes = new Map(parsed.data.children.map(node => [node.id, node]))
-    const placedEdges = new Map((parsed.data.edges ?? []).map(edge => [edge.id, edge]))
+    const placedNodes = new Map(parsed.data.children.map((node) => [node.id, node]))
+    const placedEdges = new Map((parsed.data.edges ?? []).map((edge) => [edge.id, edge]))
     const nodes = new Map<DagNodeId, LayoutPoint>()
     for (const node of graph.nodes) {
       const placed = placedNodes.get(node.id)
@@ -123,8 +186,13 @@ export async function layoutDag(graph: EditableDag, orientation: DagLayoutOrient
       const section = routed?.sections[0]
       const sourcePosition = nodes.get(edge.cause)
       const targetPosition = nodes.get(edge.effect)
-      if (section === undefined || sourcePosition === undefined || targetPosition === undefined) return err({ kind: 'invalid-result' })
-      routes.set(edge.id, { points: [section.startPoint, ...(section.bendPoints ?? []), section.endPoint], sourcePosition, targetPosition })
+      if (section === undefined || sourcePosition === undefined || targetPosition === undefined)
+        return err({ kind: 'invalid-result' })
+      routes.set(edge.id, {
+        points: [section.startPoint, ...(section.bendPoints ?? []), section.endPoint],
+        sourcePosition,
+        targetPosition,
+      })
     }
     return ok({ nodes, routes })
   } catch (cause) {
@@ -133,13 +201,23 @@ export async function layoutDag(graph: EditableDag, orientation: DagLayoutOrient
 }
 
 /** Keep the engine's route attached during card movement, without inventing another router. */
-export function movedRoute(route: DagRoute, source: LayoutPoint, target: LayoutPoint): NonEmptyArray<LayoutPoint> {
+export function movedRoute(
+  route: DagRoute,
+  source: LayoutPoint,
+  target: LayoutPoint,
+): NonEmptyArray<LayoutPoint> {
   const last = route.points.length - 1
   const move = (p: LayoutPoint, index: number): LayoutPoint => {
     const t = last === 0 ? 0 : index / last
     return {
-      x: p.x + (source.x - route.sourcePosition.x) * (1 - t) + (target.x - route.targetPosition.x) * t,
-      y: p.y + (source.y - route.sourcePosition.y) * (1 - t) + (target.y - route.targetPosition.y) * t,
+      x:
+        p.x +
+        (source.x - route.sourcePosition.x) * (1 - t) +
+        (target.x - route.targetPosition.x) * t,
+      y:
+        p.y +
+        (source.y - route.sourcePosition.y) * (1 - t) +
+        (target.y - route.targetPosition.y) * t,
     }
   }
   const [first, ...rest] = route.points

@@ -23,7 +23,10 @@ export function csvCell(value: string | number): string {
 }
 
 /** Join a header row and body rows into CSV text with CRLF line endings. */
-export function toCsv(headers: readonly string[], rows: readonly (readonly (string | number)[])[]): string {
+export function toCsv(
+  headers: readonly string[],
+  rows: readonly (readonly (string | number)[])[],
+): string {
   const lines = [headers.map(csvCell).join(','), ...rows.map((row) => row.map(csvCell).join(','))]
   return `${lines.join('\r\n')}\r\n`
 }

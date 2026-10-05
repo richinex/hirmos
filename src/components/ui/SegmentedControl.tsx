@@ -1,4 +1,14 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react'
 import { scrollBehavior, useScrollOverflow, type ScrollOverflow } from '@/lib/useScrollOverflow'
 import { cn } from '@/lib/utils'
 import { well } from './recipes'
@@ -101,15 +111,27 @@ interface Hover {
   readonly placed: boolean
 }
 
-type Gesture<V extends string> = { readonly kind: 'idle' } | { readonly kind: 'preview'; readonly pointer: number; readonly value: V }
+type Gesture<V extends string> =
+  | { readonly kind: 'idle' }
+  | { readonly kind: 'preview'; readonly pointer: number; readonly value: V }
 
 type Form = 'track' | 'line' | 'wrap'
 
 const sameFrame = (a: Frame | null | undefined, b: Frame | null | undefined): boolean =>
-  a === b || (a != null && b != null && a.left === b.left && a.top === b.top && a.width === b.width && a.height === b.height)
+  a === b ||
+  (a != null &&
+    b != null &&
+    a.left === b.left &&
+    a.top === b.top &&
+    a.width === b.width &&
+    a.height === b.height)
 
 const sameLayout = (a: Layout | null, b: Layout): boolean =>
-  a !== null && a.width === b.width && a.height === b.height && a.frames.length === b.frames.length && a.frames.every((frame, i) => sameFrame(frame, b.frames[i]))
+  a !== null &&
+  a.width === b.width &&
+  a.height === b.height &&
+  a.frames.length === b.frames.length &&
+  a.frames.every((frame, i) => sameFrame(frame, b.frames[i]))
 
 /** Option padding per form and size; the track and line forms are shorter than the chips because the host adds its own. */
 const SIZE: Record<Form, Record<'sm' | 'md', string>> = {
@@ -134,14 +156,29 @@ const CHIP_LAYERS = [
   'has-[:focus-visible]:outline-none has-[:focus-visible]:before:scale-100 has-[:focus-visible]:before:opacity-100',
 ].join(' ')
 
-const optionsIn = (element: HTMLElement): HTMLLabelElement[] => Array.from(element.querySelectorAll<HTMLLabelElement>(':scope > [data-segment-option]'))
+const optionsIn = (element: HTMLElement): HTMLLabelElement[] =>
+  Array.from(element.querySelectorAll<HTMLLabelElement>(':scope > [data-segment-option]'))
 
 const fadeMask = ({ start, end }: ScrollOverflow): CSSProperties => {
   const mask = `linear-gradient(to right, transparent 0, #000 ${start ? EDGE_FADE : 0}px, #000 calc(100% - ${end ? EDGE_FADE : 0}px), transparent 100%)`
   return { maskImage: mask, WebkitMaskImage: mask }
 }
 
-export function SegmentedControl<V extends string>({ value, onChange, options, ariaLabel, className, size = 'md', variant = 'track', fill = false, wrap = false, disabled = false, name, required = false, frame = 'well' }: SegmentedControlProps<V>) {
+export function SegmentedControl<V extends string>({
+  value,
+  onChange,
+  options,
+  ariaLabel,
+  className,
+  size = 'md',
+  variant = 'track',
+  fill = false,
+  wrap = false,
+  disabled = false,
+  name,
+  required = false,
+  frame = 'well',
+}: SegmentedControlProps<V>) {
   const host = useRef<HTMLDivElement>(null)
   const viewport = useRef<HTMLDivElement>(null)
   const [layout, setLayout] = useState<Layout | null>(null)
@@ -169,15 +206,24 @@ export function SegmentedControl<V extends string>({ value, onChange, options, a
     const labels = optionsIn(element)
     const frames = labels.map((label) => {
       const rect = label.getBoundingClientRect()
-      return { left: rect.left - originX, top: rect.top - originY, width: rect.width, height: rect.height }
+      return {
+        left: rect.left - originX,
+        top: rect.top - originY,
+        width: rect.width,
+        height: rect.height,
+      }
     })
     const next = { frames, width: element.clientWidth, height: element.clientHeight }
     setLayout((previous) => (sameLayout(previous, next) ? previous : next))
-    const target = wrap ? undefined : frames[labels.findIndex((label) => label.dataset['segmentPreview'] === 'true')]
+    const target = wrap
+      ? undefined
+      : frames[labels.findIndex((label) => label.dataset['segmentPreview'] === 'true')]
     setKnob((previous) => {
       if (target === undefined) return null
       if (previous !== null && sameFrame(previous.frame, target)) return previous
-      const forward = previous === null || target.left + target.width / 2 >= previous.frame.left + previous.frame.width / 2
+      const forward =
+        previous === null ||
+        target.left + target.width / 2 >= previous.frame.left + previous.frame.width / 2
       return { frame: target, forward }
     })
   }, [wrap])
@@ -189,27 +235,45 @@ export function SegmentedControl<V extends string>({ value, onChange, options, a
     if (element === null) return
     let pending = 0
     let active = true
-    const schedule = () => { cancelAnimationFrame(pending); pending = requestAnimationFrame(() => { if (active) measure() }) }
+    const schedule = () => {
+      cancelAnimationFrame(pending)
+      pending = requestAnimationFrame(() => {
+        if (active) measure()
+      })
+    }
     const observer = new ResizeObserver(schedule)
     observer.observe(element)
     for (const option of optionsIn(element)) observer.observe(option)
-    void document.fonts.ready.then(() => { if (active) schedule() })
-    return () => { active = false; observer.disconnect(); cancelAnimationFrame(pending) }
+    void document.fonts.ready.then(() => {
+      if (active) schedule()
+    })
+    return () => {
+      active = false
+      observer.disconnect()
+      cancelAnimationFrame(pending)
+    }
   }, [measure, options.length])
 
-  const signature = JSON.stringify(options.map(option => [option.value, option.disabled === true]))
+  const signature = JSON.stringify(
+    options.map((option) => [option.value, option.disabled === true]),
+  )
   const cancelGesture = useCallback(() => {
-    setGesture(current => {
+    setGesture((current) => {
       if (current.kind === 'idle') return current
       return { kind: 'idle' }
     })
   }, [])
   useEffect(cancelGesture, [cancelGesture, signature, disabled, wrap, variant, value])
   useEffect(() => {
-    const onVisibility = () => { if (document.visibilityState === 'hidden') cancelGesture() }
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') cancelGesture()
+    }
     window.addEventListener('blur', cancelGesture)
     document.addEventListener('visibilitychange', onVisibility)
-    return () => { window.removeEventListener('blur', cancelGesture); document.removeEventListener('visibilitychange', onVisibility) }
+    return () => {
+      window.removeEventListener('blur', cancelGesture)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
   }, [cancelGesture])
 
   // The indicator is present for the first measured paint but cannot animate until its geometry has
@@ -229,14 +293,22 @@ export function SegmentedControl<V extends string>({ value, onChange, options, a
   const hoverUnplaced = hover !== null && !hover.placed
   useEffect(() => {
     if (!hoverUnplaced) return
-    const pending = requestAnimationFrame(() => setHover((current) => (current === null || current.placed ? current : { ...current, placed: true })))
+    const pending = requestAnimationFrame(() =>
+      setHover((current) =>
+        current === null || current.placed ? current : { ...current, placed: true },
+      ),
+    )
     return () => cancelAnimationFrame(pending)
   }, [hoverUnplaced])
 
   useEffect(() => {
     if (!import.meta.env.DEV) return
-    if (options.length < 2) console.warn(`SegmentedControl “${ariaLabel}”: a single choice needs at least two options.`)
-    if (new Set(options.map((option) => option.value)).size !== options.length) console.warn(`SegmentedControl “${ariaLabel}”: option values repeat; selection follows the first match.`)
+    if (options.length < 2)
+      console.warn(`SegmentedControl “${ariaLabel}”: a single choice needs at least two options.`)
+    if (new Set(options.map((option) => option.value)).size !== options.length)
+      console.warn(
+        `SegmentedControl “${ariaLabel}”: option values repeat; selection follows the first match.`,
+      )
   }, [options, ariaLabel])
 
   const isEnabled = (index: number): boolean => !disabled && options[index]?.disabled !== true
@@ -253,8 +325,10 @@ export function SegmentedControl<V extends string>({ value, onChange, options, a
     if (frameElement === null || revealedLeft === undefined || revealedRight === undefined) return
     const start = revealedLeft - EDGE_FADE
     const end = revealedRight + EDGE_FADE
-    if (start < frameElement.scrollLeft) frameElement.scrollTo({ left: Math.max(0, start), behavior: scrollBehavior() })
-    else if (end > frameElement.scrollLeft + frameElement.clientWidth) frameElement.scrollTo({ left: end - frameElement.clientWidth, behavior: scrollBehavior() })
+    if (start < frameElement.scrollLeft)
+      frameElement.scrollTo({ left: Math.max(0, start), behavior: scrollBehavior() })
+    else if (end > frameElement.scrollLeft + frameElement.clientWidth)
+      frameElement.scrollTo({ left: end - frameElement.clientWidth, behavior: scrollBehavior() })
   }, [revealedLeft, revealedRight])
 
   const chooseAt = (index: number) => {
@@ -307,7 +381,12 @@ export function SegmentedControl<V extends string>({ value, onChange, options, a
     if (element === null) return -1
     const index = optionsIn(element).findIndex((option) => {
       const rect = option.getBoundingClientRect()
-      return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom
+      return (
+        clientX >= rect.left &&
+        clientX <= rect.right &&
+        clientY >= rect.top &&
+        clientY <= rect.bottom
+      )
     })
     return index >= 0 && isEnabled(index) ? index : -1
   }
@@ -318,31 +397,56 @@ export function SegmentedControl<V extends string>({ value, onChange, options, a
   // at one end read as unfinished. A longer row of tabs keeps its natural width and scrolls.
   const narrowFill = !fill && (form === 'track' || (form === 'line' && options.length <= 3))
 
-  const knobElement = form === 'wrap' || knob === null || layout === null ? null : (
-    <span
-      aria-hidden
-      data-motion={motionReady ? undefined : 'off'}
-      className={cn('segment-knob pointer-events-none absolute', form === 'track' ? 'rounded-md bg-knob [background-image:var(--gradient-knob)] shadow-(--shadow-knob)' : 'bg-ink')}
-      style={{
-        left: knob.frame.left,
-        right: layout.width - knob.frame.left - knob.frame.width,
-        top: form === 'line' ? knob.frame.top + knob.frame.height - LINE_RULE / 2 : knob.frame.top,
-        bottom: layout.height - knob.frame.top - knob.frame.height - (form === 'line' ? LINE_RULE / 2 : 0),
-        '--segment-left': dragging || !knob.forward ? 'var(--motion-fast)' : 'var(--motion-slow)',
-        '--segment-right': dragging || knob.forward ? 'var(--motion-fast)' : 'var(--motion-slow)',
-        transform: dragging ? 'scale(0.96)' : undefined,
-      } as CSSProperties}
-    />
-  )
+  const knobElement =
+    form === 'wrap' || knob === null || layout === null ? null : (
+      <span
+        aria-hidden
+        data-motion={motionReady ? undefined : 'off'}
+        className={cn(
+          'segment-knob pointer-events-none absolute',
+          form === 'track'
+            ? 'rounded-md bg-knob [background-image:var(--gradient-knob)] shadow-(--shadow-knob)'
+            : 'bg-ink',
+        )}
+        style={
+          {
+            left: knob.frame.left,
+            right: layout.width - knob.frame.left - knob.frame.width,
+            top:
+              form === 'line' ? knob.frame.top + knob.frame.height - LINE_RULE / 2 : knob.frame.top,
+            bottom:
+              layout.height -
+              knob.frame.top -
+              knob.frame.height -
+              (form === 'line' ? LINE_RULE / 2 : 0),
+            '--segment-left':
+              dragging || !knob.forward ? 'var(--motion-fast)' : 'var(--motion-slow)',
+            '--segment-right':
+              dragging || knob.forward ? 'var(--motion-fast)' : 'var(--motion-slow)',
+            transform: dragging ? 'scale(0.96)' : undefined,
+          } as CSSProperties
+        }
+      />
+    )
 
   const hovered = form === 'line' && hover !== null ? layout?.frames[hover.index] : undefined
-  const wash = hovered === undefined || hover === null ? null : (
-    <span
-      aria-hidden
-      className={cn('pointer-events-none absolute rounded-md bg-raised duration-(--motion-fast)', hover.placed ? 'transition-[left,top,width,height,opacity]' : 'transition-opacity')}
-      style={{ left: hovered.left, top: hovered.top + 3, width: hovered.width, height: Math.max(0, hovered.height - 7), opacity: hover.shown && hover.index !== displayedIndex ? 1 : 0 }}
-    />
-  )
+  const wash =
+    hovered === undefined || hover === null ? null : (
+      <span
+        aria-hidden
+        className={cn(
+          'pointer-events-none absolute rounded-md bg-raised duration-(--motion-fast)',
+          hover.placed ? 'transition-[left,top,width,height,opacity]' : 'transition-opacity',
+        )}
+        style={{
+          left: hovered.left,
+          top: hovered.top + 3,
+          width: hovered.width,
+          height: Math.max(0, hovered.height - 7),
+          opacity: hover.shown && hover.index !== displayedIndex ? 1 : 0,
+        }}
+      />
+    )
 
   const control = (
     <div
@@ -350,37 +454,70 @@ export function SegmentedControl<V extends string>({ value, onChange, options, a
       role="radiogroup"
       aria-label={ariaLabel}
       aria-disabled={disabled || undefined}
-      onPointerDown={dragEnabled ? (event) => {
-        if (event.button !== 0) return
-        const option = options[optionUnder(event.clientX, event.clientY)]
-        if (option === undefined) return
-        event.preventDefault()
-        setPointerFocus(true)
-        host.current?.setPointerCapture(event.pointerId)
-        setGesture({ kind: 'preview', pointer: event.pointerId, value: option.value })
-      } : undefined}
-      onPointerMove={dragEnabled ? (event) => {
-        if (gesture.kind !== 'preview' || gesture.pointer !== event.pointerId) return
-        const option = options[optionUnder(event.clientX, event.clientY)]
-        if (option !== undefined && option.value !== gesture.value) setGesture({ ...gesture, value: option.value })
-      } : undefined}
-      onPointerUp={dragEnabled ? (event) => {
-        if (gesture.kind !== 'preview' || gesture.pointer !== event.pointerId) return
-        const index = optionUnder(event.clientX, event.clientY)
-        cancelGesture()
-        if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
-        if (index >= 0) chooseAt(index)
-      } : undefined}
+      onPointerDown={
+        dragEnabled
+          ? (event) => {
+              if (event.button !== 0) return
+              const option = options[optionUnder(event.clientX, event.clientY)]
+              if (option === undefined) return
+              event.preventDefault()
+              setPointerFocus(true)
+              host.current?.setPointerCapture(event.pointerId)
+              setGesture({ kind: 'preview', pointer: event.pointerId, value: option.value })
+            }
+          : undefined
+      }
+      onPointerMove={
+        dragEnabled
+          ? (event) => {
+              if (gesture.kind !== 'preview' || gesture.pointer !== event.pointerId) return
+              const option = options[optionUnder(event.clientX, event.clientY)]
+              if (option !== undefined && option.value !== gesture.value)
+                setGesture({ ...gesture, value: option.value })
+            }
+          : undefined
+      }
+      onPointerUp={
+        dragEnabled
+          ? (event) => {
+              if (gesture.kind !== 'preview' || gesture.pointer !== event.pointerId) return
+              const index = optionUnder(event.clientX, event.clientY)
+              cancelGesture()
+              if (event.currentTarget.hasPointerCapture(event.pointerId))
+                event.currentTarget.releasePointerCapture(event.pointerId)
+              if (index >= 0) chooseAt(index)
+            }
+          : undefined
+      }
       onPointerCancel={cancelGesture}
       onLostPointerCapture={cancelGesture}
-      onPointerLeave={form === 'line' ? () => setHover((current) => (current === null || !current.shown ? current : { ...current, shown: false })) : undefined}
-      onBlur={dragEnabled ? (event) => {
-        if (!(event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget))) setPointerFocus(false)
-      } : undefined}
+      onPointerLeave={
+        form === 'line'
+          ? () =>
+              setHover((current) =>
+                current === null || !current.shown ? current : { ...current, shown: false },
+              )
+          : undefined
+      }
+      onBlur={
+        dragEnabled
+          ? (event) => {
+              if (!(
+                event.relatedTarget instanceof Node &&
+                event.currentTarget.contains(event.relatedTarget)
+              ))
+                setPointerFocus(false)
+            }
+          : undefined
+      }
       className={cn(
         'relative max-w-full',
         form === 'wrap' && cn('flex-wrap', frame === 'well' ? well('gap-1 p-1') : 'gap-1 p-1'),
-        form === 'track' && cn('flex-wrap gap-1 rounded-lg p-1', frame === 'well' && 'bg-track shadow-(--shadow-track)'),
+        form === 'track' &&
+          cn(
+            'flex-wrap gap-1 rounded-lg p-1',
+            frame === 'well' && 'bg-track shadow-(--shadow-track)',
+          ),
         form === 'line' && 'w-max max-w-none flex-nowrap gap-1 border-b border-hair',
         dragEnabled && 'touch-pan-y',
         fill ? 'flex w-full' : form === 'line' ? 'flex' : 'inline-flex',
@@ -401,24 +538,42 @@ export function SegmentedControl<V extends string>({ value, onChange, options, a
             data-segment-option
             data-segment-preview={option.value === displayed}
             title={option.title}
-            onPointerEnter={form === 'line' ? (event) => {
-              if (event.pointerType === 'mouse') setHover((current) => ({ index, shown: true, placed: current !== null && current.shown }))
-            } : undefined}
+            onPointerEnter={
+              form === 'line'
+                ? (event) => {
+                    if (event.pointerType === 'mouse')
+                      setHover((current) => ({
+                        index,
+                        shown: true,
+                        placed: current !== null && current.shown,
+                      }))
+                  }
+                : undefined
+            }
             className={cn(
               'relative grid cursor-pointer place-items-center whitespace-nowrap border border-transparent transition-colors duration-(--motion-fast) pointer-coarse:min-h-11',
-              !(form === 'track' && pointerFocus) && 'has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-signal',
+              !(form === 'track' && pointerFocus) &&
+                'has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-signal',
               form === 'line' ? 'shrink-0 rounded-sm' : 'rounded-md',
               SIZE[form][size],
               fill && 'min-w-0 flex-1 basis-0 whitespace-normal text-center',
               // Equal widths while they fit; no option narrower than its own label, so a long set wraps to a second row.
-              narrowFill && '@max-md/panel:min-w-max @max-md/panel:flex-1 @max-md/panel:basis-0 @max-md/panel:text-center',
+              narrowFill &&
+                '@max-md/panel:min-w-max @max-md/panel:flex-1 @max-md/panel:basis-0 @max-md/panel:text-center',
               form !== 'wrap' && 'font-medium',
               wrap && CHIP_LAYERS,
               !enabled
                 ? cn('cursor-not-allowed text-faint', wrap && 'hatch')
                 : option.value === displayed
-                  ? cn('text-ink', form !== 'wrap' && 'font-medium', wrap && 'after:scale-100 after:opacity-100')
-                  : cn('text-muted hover:text-ink', wrap && 'active:after:scale-100 active:after:opacity-40'),
+                  ? cn(
+                      'text-ink',
+                      form !== 'wrap' && 'font-medium',
+                      wrap && 'after:scale-100 after:opacity-100',
+                    )
+                  : cn(
+                      'text-muted hover:text-ink',
+                      wrap && 'active:after:scale-100 active:after:opacity-40',
+                    ),
             )}
           >
             <input
@@ -433,11 +588,17 @@ export function SegmentedControl<V extends string>({ value, onChange, options, a
               aria-describedby={descriptionId}
               aria-label={option.ariaLabel}
               tabIndex={index === tabStop ? 0 : -1}
-              onChange={() => { if (enabled && !checked) onChange(option.value) }}
+              onChange={() => {
+                if (enabled && !checked) onChange(option.value)
+              }}
               onKeyDown={(event) => onKeyDown(event, index)}
             />
             <span className="relative z-10 min-w-0">{option.label}</span>
-            {descriptionId !== undefined && <span id={descriptionId} className="sr-only">{option.title}</span>}
+            {descriptionId !== undefined && (
+              <span id={descriptionId} className="sr-only">
+                {option.title}
+              </span>
+            )}
           </label>
         )
       })}
@@ -450,23 +611,36 @@ export function SegmentedControl<V extends string>({ value, onChange, options, a
     <div className="relative flow-root min-w-0 max-w-full">
       <div
         ref={viewport}
-        className={cn('max-w-full', scrolls && '-my-1 scroll-px-8 overflow-x-auto overflow-y-hidden py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden')}
+        className={cn(
+          'max-w-full',
+          scrolls &&
+            '-my-1 scroll-px-8 overflow-x-auto overflow-y-hidden py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+        )}
         style={scrolls ? fadeMask(overflow) : undefined}
       >
         {control}
       </div>
-      {scrolls ? (['start', 'end'] as const).map((end) => (
-        <span key={end} className={cn('pointer-events-none absolute inset-y-0 z-20 flex items-center pb-px transition-opacity duration-(--motion-fast) motion-reduce:transition-none', end === 'start' ? 'left-0' : 'right-0', overflow[end] ? 'opacity-100' : 'invisible opacity-0')}>
-          <ScrollArrow
-            end={end}
-            size="sm"
-            className="pointer-events-auto"
-            label={end === 'end' ? 'Scroll to more options' : 'Scroll back'}
-            title={end === 'end' ? 'More options to the right' : 'Options to the left'}
-            onClick={() => page(end === 'end' ? 1 : -1)}
-          />
-        </span>
-      )) : null}
+      {scrolls
+        ? (['start', 'end'] as const).map((end) => (
+            <span
+              key={end}
+              className={cn(
+                'pointer-events-none absolute inset-y-0 z-20 flex items-center pb-px transition-opacity duration-(--motion-fast) motion-reduce:transition-none',
+                end === 'start' ? 'left-0' : 'right-0',
+                overflow[end] ? 'opacity-100' : 'invisible opacity-0',
+              )}
+            >
+              <ScrollArrow
+                end={end}
+                size="sm"
+                className="pointer-events-auto"
+                label={end === 'end' ? 'Scroll to more options' : 'Scroll back'}
+                title={end === 'end' ? 'More options to the right' : 'Options to the left'}
+                onClick={() => page(end === 'end' ? 1 : -1)}
+              />
+            </span>
+          ))
+        : null}
     </div>
   )
 }

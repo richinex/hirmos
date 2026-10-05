@@ -12,7 +12,14 @@ export interface VisibleWindow {
 
 /** The first x-axis zoom's current range, or null when the chart shows everything. */
 export const visibleWindow = (chart: EChartsType): VisibleWindow | null => {
-  const option = chart.getOption() as { readonly dataZoom?: readonly { readonly startValue?: unknown; readonly endValue?: unknown; readonly start?: unknown; readonly end?: unknown }[] }
+  const option = chart.getOption() as {
+    readonly dataZoom?: readonly {
+      readonly startValue?: unknown
+      readonly endValue?: unknown
+      readonly start?: unknown
+      readonly end?: unknown
+    }[]
+  }
   const zoom = option.dataZoom?.[0]
   if (zoom === undefined) return null
   const start = typeof zoom.startValue === 'number' ? zoom.startValue : null
@@ -35,7 +42,10 @@ export interface WindowSummary {
  * Summary of the values whose one-based step lies inside the window; the whole series when there is
  * none. NaN marks a missing cell and is counted, not averaged.
  */
-export const summariseWindow = (values: Float64Array, window: VisibleWindow | null): WindowSummary => {
+export const summariseWindow = (
+  values: Float64Array,
+  window: VisibleWindow | null,
+): WindowSummary => {
   const first = window === null ? 1 : Math.max(1, Math.ceil(window.start))
   const last = window === null ? values.length : Math.min(values.length, Math.floor(window.end))
   let observed = 0
@@ -45,11 +55,20 @@ export const summariseWindow = (values: Float64Array, window: VisibleWindow | nu
   let sum = 0
   for (let step = first; step <= last; step += 1) {
     const value = values[step - 1]
-    if (Number.isNaN(value)) { missing += 1; continue }
+    if (Number.isNaN(value)) {
+      missing += 1
+      continue
+    }
     observed += 1
     sum += value
     if (value < min) min = value
     if (value > max) max = value
   }
-  return { observed, missing, min: observed === 0 ? Number.NaN : min, mean: observed === 0 ? Number.NaN : sum / observed, max: observed === 0 ? Number.NaN : max }
+  return {
+    observed,
+    missing,
+    min: observed === 0 ? Number.NaN : min,
+    mean: observed === 0 ? Number.NaN : sum / observed,
+    max: observed === 0 ? Number.NaN : max,
+  }
 }

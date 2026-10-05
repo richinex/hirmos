@@ -7,7 +7,9 @@ export type FingerprintProblem = { readonly kind: 'fingerprint-failed'; readonly
 /** Stream the browser File through a maintained incremental SHA-256 implementation. The source is
  * never assembled into one ArrayBuffer, so fingerprinting does not turn a large file into a peak
  * allocation before DuckDB has had a chance to project or filter it. */
-export async function fingerprintFile(file: File): Promise<Result<SourceFingerprint, FingerprintProblem>> {
+export async function fingerprintFile(
+  file: File,
+): Promise<Result<SourceFingerprint, FingerprintProblem>> {
   try {
     const hasher = await createSHA256()
     hasher.init()
@@ -22,8 +24,13 @@ export async function fingerprintFile(file: File): Promise<Result<SourceFingerpr
       return err({ kind: 'fingerprint-failed', detail: 'SHA-256 returned a non-text digest.' })
     }
     const parsed = sourceFingerprint(digest)
-    return parsed.ok ? ok(parsed.value) : err({ kind: 'fingerprint-failed', detail: 'SHA-256 returned an invalid digest.' })
+    return parsed.ok
+      ? ok(parsed.value)
+      : err({ kind: 'fingerprint-failed', detail: 'SHA-256 returned an invalid digest.' })
   } catch (cause) {
-    return err({ kind: 'fingerprint-failed', detail: cause instanceof Error ? cause.message : String(cause) })
+    return err({
+      kind: 'fingerprint-failed',
+      detail: cause instanceof Error ? cause.message : String(cause),
+    })
   }
 }

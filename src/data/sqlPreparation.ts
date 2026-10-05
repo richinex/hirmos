@@ -22,7 +22,11 @@ export type SqlPreparationProblem =
   | { readonly kind: 'unsupported-input'; readonly fileName: string; readonly detail: string }
   | { readonly kind: 'fingerprint-failed'; readonly fileName: string; readonly detail: string }
   | { readonly kind: 'engine-unavailable'; readonly detail: string }
-  | { readonly kind: 'input-registration-failed'; readonly fileName: string; readonly detail: string }
+  | {
+      readonly kind: 'input-registration-failed'
+      readonly fileName: string
+      readonly detail: string
+    }
   | { readonly kind: 'view-list-failed'; readonly detail: string }
   | { readonly kind: 'prepared-view-missing'; readonly viewName: string }
   | { readonly kind: 'prepared-view-invalid'; readonly detail: string }
@@ -48,17 +52,25 @@ export interface SqlPreparedOutput {
   readonly columns: NonEmptyArray<{ readonly name: string; readonly type: string }>
 }
 
-const detailOf = (cause: unknown): string => cause instanceof Error ? cause.message : String(cause)
+const detailOf = (cause: unknown): string =>
+  cause instanceof Error ? cause.message : String(cause)
 const sqlString = (value: string): string => `'${value.replaceAll("'", "''")}'`
 const sqlIdentifier = (value: string): string => `"${value.replaceAll('"', '""')}"`
 
 const scalarCount = (value: unknown): Result<number, SqlPreparationProblem> => {
-  if (typeof value === 'bigint' && value <= BigInt(Number.MAX_SAFE_INTEGER)) return ok(Number(value))
+  if (typeof value === 'bigint' && value <= BigInt(Number.MAX_SAFE_INTEGER))
+    return ok(Number(value))
   if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) return ok(value)
-  return err({ kind: 'prepared-view-invalid', detail: `DuckDB returned an invalid row count: ${String(value)}` })
+  return err({
+    kind: 'prepared-view-invalid',
+    detail: `DuckDB returned an invalid row count: ${String(value)}`,
+  })
 }
 
-const relationFor = (input: Exclude<SqlPreparationInput, { readonly format: 'duckdb-export-file' }>, path: string): string => fileRelation(input, path)
+const relationFor = (
+  input: Exclude<SqlPreparationInput, { readonly format: 'duckdb-export-file' }>,
+  path: string,
+): string => fileRelation(input, path)
 
 export async function registerInputs(
   engine: DuckDbEngine,
@@ -68,20 +80,43 @@ export async function registerInputs(
   const connection = await engine.db.connect()
   try {
     for (const input of inputs) {
-      const path = input.format === 'duckdb-export-file' ? input.path : `${namespace}-${input.fingerprint}.${input.format}`
+      const path =
+        input.format === 'duckdb-export-file'
+          ? input.path
+          : `${namespace}-${input.fingerprint}.${input.format}`
       try {
-        await engine.db.registerFileHandle(path, input.file, duckdb.DuckDBDataProtocol.BROWSER_FILEREADER, true)
-        if (input.format !== 'duckdb-export-file') await connection.query(`CREATE OR REPLACE VIEW ${sqlIdentifier(input.alias)} AS SELECT * FROM ${relationFor(input, path)}`)
+        await engine.db.registerFileHandle(
+          path,
+          input.file,
+          duckdb.DuckDBDataProtocol.BROWSER_FILEREADER,
+          true,
+        )
+        if (input.format !== 'duckdb-export-file')
+          await connection.query(
+            `CREATE OR REPLACE VIEW ${sqlIdentifier(input.alias)} AS SELECT * FROM ${relationFor(input, path)}`,
+          )
       } catch (cause) {
-        return err({ kind: 'input-registration-failed', fileName: input.fileName, detail: detailOf(cause) })
+        return err({
+          kind: 'input-registration-failed',
+          fileName: input.fileName,
+          detail: detailOf(cause),
+        })
       }
     }
-    const exported = inputs.filter(input => input.format === 'duckdb-export-file')
+    const exported = inputs.filter((input) => input.format === 'duckdb-export-file')
     if (exported.length > 0) {
-      const directory = exportDirectory(exported.map(input => input.path))
-      if (!directory.ok) return err({ kind: 'prepared-view-invalid', detail: directory.error.detail })
-      try { await connection.query(`IMPORT DATABASE ${sqlString(directory.value)}`) }
-      catch (cause) { return err({ kind: 'input-registration-failed', fileName: directory.value, detail: detailOf(cause) }) }
+      const directory = exportDirectory(exported.map((input) => input.path))
+      if (!directory.ok)
+        return err({ kind: 'prepared-view-invalid', detail: directory.error.detail })
+      try {
+        await connection.query(`IMPORT DATABASE ${sqlString(directory.value)}`)
+      } catch (cause) {
+        return err({
+          kind: 'input-registration-failed',
+          fileName: directory.value,
+          detail: detailOf(cause),
+        })
+      }
     }
     return ok(null)
   } finally {
@@ -98,36 +133,66 @@ export async function redeclareInput(
   type: DeclaredType | null,
 ): Promise<Result<SqlPreparationInput, SqlPreparationProblem>> {
   if (input.format === 'duckdb-export-file' || input.format === 'parquet') {
-    return err({ kind: 'input-registration-failed', fileName: input.fileName, detail: 'This file stores its column types, so none can be declared.' })
+    return err({
+      kind: 'input-registration-failed',
+      fileName: input.fileName,
+      detail: 'This file stores its column types, so none can be declared.',
+    })
   }
-  const updated: SqlPreparationInput = { ...input, declared: declareColumn(input.declared, column, type) }
+  const updated: SqlPreparationInput = {
+    ...input,
+    declared: declareColumn(input.declared, column, type),
+  }
   const registered = await registerInputs(engine, [updated], namespace)
   return registered.ok ? ok(updated) : registered
 }
 
-export async function prepareDatabaseExport(files: readonly File[]): Promise<Result<readonly SqlPreparationInput[], SqlPreparationProblem>> {
-  const paths = files.map(file => file.webkitRelativePath)
+export async function prepareDatabaseExport(
+  files: readonly File[],
+): Promise<Result<readonly SqlPreparationInput[], SqlPreparationProblem>> {
+  const paths = files.map((file) => file.webkitRelativePath)
   const directory = exportDirectory(paths)
   if (!directory.ok) return err({ kind: 'prepared-view-invalid', detail: directory.error.detail })
   const inputs: SqlPreparationInput[] = []
   const occupied = new Set<string>()
   for (const file of files) {
     const fingerprint = await fingerprintFile(file)
-    if (!fingerprint.ok) return err({ kind: 'fingerprint-failed', fileName: file.name, detail: fingerprint.error.detail })
+    if (!fingerprint.ok)
+      return err({
+        kind: 'fingerprint-failed',
+        fileName: file.name,
+        detail: fingerprint.error.detail,
+      })
     const alias = uniqueSqlInputAlias(`export_${file.webkitRelativePath}`, occupied)
     occupied.add(alias)
-    inputs.push({ alias, file, fileName: file.name, bytes: file.size, fingerprint: fingerprint.value, format: 'duckdb-export-file', path: file.webkitRelativePath })
+    inputs.push({
+      alias,
+      file,
+      fileName: file.name,
+      bytes: file.size,
+      fingerprint: fingerprint.value,
+      format: 'duckdb-export-file',
+      path: file.webkitRelativePath,
+    })
   }
   rememberInputFiles(inputs)
   return ok(inputs)
 }
 
 /** Match original bytes first, then restore their recorded role and path. */
-export async function recoverSqlInputs(descriptors: readonly SqlInputDescriptor[], files: readonly File[]): Promise<Result<readonly SqlPreparationInput[], SqlPreparationProblem>> {
+export async function recoverSqlInputs(
+  descriptors: readonly SqlInputDescriptor[],
+  files: readonly File[],
+): Promise<Result<readonly SqlPreparationInput[], SqlPreparationProblem>> {
   const offered = new Map<string, File>()
   for (const file of files) {
     const fingerprint = await fingerprintFile(file)
-    if (!fingerprint.ok) return err({ kind: 'fingerprint-failed', fileName: file.name, detail: fingerprint.error.detail })
+    if (!fingerprint.ok)
+      return err({
+        kind: 'fingerprint-failed',
+        fileName: file.name,
+        detail: fingerprint.error.detail,
+      })
     offered.set(fingerprint.value, file)
   }
   const matched: SqlPreparationInput[] = []
@@ -143,7 +208,10 @@ export async function recoverSqlInputs(descriptors: readonly SqlInputDescriptor[
 }
 
 /** Each file gets an alias no other file in the batch, nor any in `taken`, already uses. */
-export async function prepareSqlInputs(files: readonly File[], taken: ReadonlySet<string> = new Set()): Promise<Result<NonEmptyArray<SqlPreparationInput>, SqlPreparationProblem>> {
+export async function prepareSqlInputs(
+  files: readonly File[],
+  taken: ReadonlySet<string> = new Set(),
+): Promise<Result<NonEmptyArray<SqlPreparationInput>, SqlPreparationProblem>> {
   if (!isNonEmpty(files)) return err({ kind: 'no-input-files' })
   const prepared: SqlPreparationInput[] = []
   const occupied = new Set<string>(taken)
@@ -153,7 +221,12 @@ export async function prepareSqlInputs(files: readonly File[], taken: ReadonlySe
       return err({ kind: 'unsupported-input', fileName: file.name, detail: source.error.kind })
     }
     const fingerprint = await fingerprintFile(file)
-    if (!fingerprint.ok) return err({ kind: 'fingerprint-failed', fileName: file.name, detail: fingerprint.error.detail })
+    if (!fingerprint.ok)
+      return err({
+        kind: 'fingerprint-failed',
+        fileName: file.name,
+        detail: fingerprint.error.detail,
+      })
     const alias = uniqueSqlInputAlias(file.name, occupied)
     occupied.add(alias)
     prepared.push({
@@ -174,10 +247,16 @@ export async function prepareSqlInputs(files: readonly File[], taken: ReadonlySe
  * Runs a recipe's recorded view definitions on the shell's database, so an editor reopened on the
  * recipe starts with the views it had made. Each line is one definition, in creation order.
  */
-export async function replayDefinitionsInShell(session: SqlPreparationSession, statement: string): Promise<Result<null, SqlPreparationProblem>> {
+export async function replayDefinitionsInShell(
+  session: SqlPreparationSession,
+  statement: string,
+): Promise<Result<null, SqlPreparationProblem>> {
   const connection = await session.shellDatabase.connect()
   try {
-    for (const line of statement.split('\n').map((text) => text.trim()).filter((text) => text.length > 0)) {
+    for (const line of statement
+      .split('\n')
+      .map((text) => text.trim())
+      .filter((text) => text.length > 0)) {
       await connection.query(line)
     }
     return ok(null)
@@ -197,44 +276,52 @@ const shellDatabase = (
   database: duckdb.AsyncDuckDB,
   connection: { current: number | null },
   onQuery: (running: boolean) => void,
-): duckdb.AsyncDuckDB => new Proxy(database, {
-  get(target, property) {
-    if (property === 'runQuery') {
-      return async (id: number, sql: string) => {
-        onQuery(true)
-        try {
-          const live = new duckdb.AsyncDuckDBConnection(target, id)
-          // DuckDB executes batches and returns their final statement's result.
-          const reader = await live.send(sql)
-          // The official shell expects Arrow file IPC. Arrow preserves the schema
-          // and batches while DuckDB's pending API leaves the query cancellable.
-          const writer = await RecordBatchFileWriter.writeAll(reader)
-          return await writer.toUint8Array()
-        } finally { onQuery(false) }
+): duckdb.AsyncDuckDB =>
+  new Proxy(database, {
+    get(target, property) {
+      if (property === 'runQuery') {
+        return async (id: number, sql: string) => {
+          onQuery(true)
+          try {
+            const live = new duckdb.AsyncDuckDBConnection(target, id)
+            // DuckDB executes batches and returns their final statement's result.
+            const reader = await live.send(sql)
+            // The official shell expects Arrow file IPC. Arrow preserves the schema
+            // and batches while DuckDB's pending API leaves the query cancellable.
+            const writer = await RecordBatchFileWriter.writeAll(reader)
+            return await writer.toUint8Array()
+          } finally {
+            onQuery(false)
+          }
+        }
       }
-    }
-    if (property === 'connectInternal') {
-      return async () => {
-        const id = await target.connectInternal()
-        connection.current = id
-        return id
+      if (property === 'connectInternal') {
+        return async () => {
+          const id = await target.connectInternal()
+          connection.current = id
+          return id
+        }
       }
-    }
-    const value: unknown = Reflect.get(target, property, target)
-    return typeof value === 'function' ? value.bind(target) : value
-  },
-})
+      const value: unknown = Reflect.get(target, property, target)
+      return typeof value === 'function' ? value.bind(target) : value
+    },
+  })
 
 export async function openSqlPreparation(
   inputs: readonly SqlPreparationInput[],
   onQuery: (running: boolean) => void = () => {},
 ): Promise<Result<SqlPreparationSession, SqlPreparationProblem>> {
   let engine: DuckDbEngine
-  try { engine = await isolatedDuckDbEngine() } catch (cause) {
+  try {
+    engine = await isolatedDuckDbEngine()
+  } catch (cause) {
     return err({ kind: 'engine-unavailable', detail: detailOf(cause) })
   }
   const registered = await registerInputs(engine, inputs, `sql-shell-${crypto.randomUUID()}`)
-  if (!registered.ok) { await engine.db.terminate(); return registered }
+  if (!registered.ok) {
+    await engine.db.terminate()
+    return registered
+  }
   const shellConnection = { current: null as number | null }
   return ok({
     shellDatabase: shellDatabase(engine.db, shellConnection, onQuery),
@@ -274,7 +361,9 @@ export interface SqlViewDefinition {
   readonly statement: string
 }
 
-async function viewDefinitions(session: SqlPreparationSession): Promise<Result<readonly SqlViewDefinition[], SqlPreparationProblem>> {
+async function viewDefinitions(
+  session: SqlPreparationSession,
+): Promise<Result<readonly SqlViewDefinition[], SqlPreparationProblem>> {
   const connection = await session.database.connect()
   try {
     const table = await connection.query(`
@@ -291,10 +380,16 @@ async function viewDefinitions(session: SqlPreparationSession): Promise<Result<r
       if (typeof rawName !== 'string' || inputAliases.has(rawName)) continue
       const name = sqlViewName(rawName)
       if (!name.ok || typeof statement !== 'string' || statement.trim().length === 0) {
-        return err({ kind: 'prepared-view-invalid', detail: 'DuckDB returned an invalid view definition.' })
+        return err({
+          kind: 'prepared-view-invalid',
+          detail: 'DuckDB returned an invalid view definition.',
+        })
       }
       // Catalog SQL is generated by DuckDB. Replacement also replays views included in an export.
-      definitions.push({ name: name.value, statement: statement.replace(/^CREATE VIEW\b/i, 'CREATE OR REPLACE VIEW') })
+      definitions.push({
+        name: name.value,
+        statement: statement.replace(/^CREATE VIEW\b/i, 'CREATE OR REPLACE VIEW'),
+      })
     }
     return ok(definitions)
   } catch (cause) {
@@ -324,23 +419,42 @@ export async function materializeView(
 ): Promise<Result<Omit<SqlPreparedOutput, 'recipe'>, SqlPreparationProblem>> {
   const outputPath = `prepared-${crypto.randomUUID()}.parquet`
   try {
-    const description = await connection.query(`DESCRIBE SELECT * FROM ${sqlIdentifier(outputView)}`)
+    const description = await connection.query(
+      `DESCRIBE SELECT * FROM ${sqlIdentifier(outputView)}`,
+    )
     const columns = Array.from({ length: description.numRows }, (_, index) => ({
       name: String(description.getChild('column_name')?.get(index) ?? ''),
       type: String(description.getChild('column_type')?.get(index) ?? ''),
     }))
-    if (!isNonEmpty(columns) || columns.some((column) => column.name.length === 0 || column.type.length === 0)) {
-      return err({ kind: 'prepared-view-invalid', detail: 'The prepared view has no readable columns.' })
+    if (
+      !isNonEmpty(columns) ||
+      columns.some((column) => column.name.length === 0 || column.type.length === 0)
+    ) {
+      return err({
+        kind: 'prepared-view-invalid',
+        detail: 'The prepared view has no readable columns.',
+      })
     }
     const names = new Set(columns.map((column) => column.name))
-    if (names.size !== columns.length) return err({ kind: 'prepared-view-invalid', detail: 'The prepared view has duplicate column names.' })
-    const countTable = await connection.query(`SELECT count(*)::UBIGINT AS rows FROM ${sqlIdentifier(outputView)}`)
+    if (names.size !== columns.length)
+      return err({
+        kind: 'prepared-view-invalid',
+        detail: 'The prepared view has duplicate column names.',
+      })
+    const countTable = await connection.query(
+      `SELECT count(*)::UBIGINT AS rows FROM ${sqlIdentifier(outputView)}`,
+    )
     const count = scalarCount(countTable.getChild('rows')?.get(0))
     if (!count.ok) return count
     if (count.value === 0) return err({ kind: 'prepared-view-empty' })
-    await connection.query(`COPY (SELECT * FROM ${sqlIdentifier(outputView)}) TO ${sqlString(outputPath)} (FORMAT PARQUET)`)
+    await connection.query(
+      `COPY (SELECT * FROM ${sqlIdentifier(outputView)}) TO ${sqlString(outputPath)} (FORMAT PARQUET)`,
+    )
     const bytes = await engine.db.copyFileToBuffer(outputPath)
-    const file = new File([Uint8Array.from(bytes)], fileName, { type: 'application/vnd.apache.parquet', lastModified: Date.now() })
+    const file = new File([Uint8Array.from(bytes)], fileName, {
+      type: 'application/vnd.apache.parquet',
+      lastModified: Date.now(),
+    })
     return ok({ file, rowCount: count.value, columns })
   } catch (cause) {
     return err({ kind: 'materialization-failed', detail: detailOf(cause) })
@@ -353,7 +467,9 @@ async function verifyAndMaterialize(
   inputs: readonly SqlPreparationInput[],
 ): Promise<Result<Omit<SqlPreparedOutput, 'recipe'>, SqlPreparationProblem>> {
   let engine: DuckDbEngine
-  try { engine = await isolatedDuckDbEngine() } catch (cause) {
+  try {
+    engine = await isolatedDuckDbEngine()
+  } catch (cause) {
     return err({ kind: 'engine-unavailable', detail: detailOf(cause) })
   }
   try {
@@ -394,20 +510,37 @@ export async function materializePreparedView(
   }
   const statement = definitions.value.map((definition) => definition.statement.trim()).join('\n')
   const recipe = sqlDerivedRecipe(statement, outputView, session.inputs)
-  if (!recipe.ok) return err({ kind: 'prepared-view-invalid', detail: 'The prepared view has an incomplete source recipe.' })
+  if (!recipe.ok)
+    return err({
+      kind: 'prepared-view-invalid',
+      detail: 'The prepared view has an incomplete source recipe.',
+    })
   const materialized = await verifyAndMaterialize(definitions.value, outputView, session.inputs)
-  if (materialized.ok && session.inputs.some(input => input.format === 'duckdb-export-file')) {
+  if (materialized.ok && session.inputs.some((input) => input.format === 'duckdb-export-file')) {
     const connection = await session.database.connect()
     try {
-      const live = await materializeView({ db: session.database }, connection, outputView, `${outputView}.parquet`)
+      const live = await materializeView(
+        { db: session.database },
+        connection,
+        outputView,
+        `${outputView}.parquet`,
+      )
       if (!live.ok) return live
-      const [expected, actual] = await Promise.all([fingerprintFile(materialized.value.file), fingerprintFile(live.value.file)])
-      if (!expected.ok || !actual.ok || expected.value !== actual.value) return err({ kind: 'prepared-view-invalid', detail: 'The selected view differs from the saved import and view definitions. Changes to imported table data are not saved by this recipe. Express the transformation as a view, or export the changed data.' })
-    } finally { await connection.close() }
+      const [expected, actual] = await Promise.all([
+        fingerprintFile(materialized.value.file),
+        fingerprintFile(live.value.file),
+      ])
+      if (!expected.ok || !actual.ok || expected.value !== actual.value)
+        return err({
+          kind: 'prepared-view-invalid',
+          detail:
+            'The selected view differs from the saved import and view definitions. Changes to imported table data are not saved by this recipe. Express the transformation as a view, or export the changed data.',
+        })
+    } finally {
+      await connection.close()
+    }
   }
-  return materialized.ok
-    ? ok({ ...materialized.value, recipe: recipe.value })
-    : materialized
+  return materialized.ok ? ok({ ...materialized.value, recipe: recipe.value }) : materialized
 }
 
 /**
@@ -434,19 +567,35 @@ export async function replaySqlRecipe(
 
 export function describeSqlPreparationProblem(problem: SqlPreparationProblem): string {
   switch (problem.kind) {
-    case 'no-input-files': return 'Choose at least one input file.'
-    case 'unsupported-input': return `${problem.fileName} cannot be used: ${problem.detail}.`
-    case 'fingerprint-failed': return `${problem.fileName} could not be fingerprinted: ${problem.detail}`
-    case 'engine-unavailable': return `DuckDB could not start: ${problem.detail}`
-    case 'input-registration-failed': return `${problem.fileName} could not be registered: ${problem.detail}`
-    case 'view-list-failed': return `The SQL views could not be listed: ${problem.detail}`
-    case 'prepared-view-missing': return `The selected view ${problem.viewName} no longer exists. Refresh the view list and choose another.`
-    case 'prepared-view-invalid': return `The prepared view was refused: ${problem.detail}`
-    case 'prepared-view-empty': return 'The prepared view contains no rows.'
-    case 'materialization-failed': return `The prepared view could not be materialized: ${problem.detail}`
-    case 'cancellation-failed': return `The query could not be cancelled: ${problem.detail}`
-    case 'session-close-failed': return `The SQL workspace could not release its database: ${problem.detail}`
-    case 'replay-inputs-missing': return `The files chosen do not include ${problem.fileNames.join(', ')}, unchanged. The SQL step needs every input it was built from.`
-    default: { const exhaustive: never = problem; return exhaustive }
+    case 'no-input-files':
+      return 'Choose at least one input file.'
+    case 'unsupported-input':
+      return `${problem.fileName} cannot be used: ${problem.detail}.`
+    case 'fingerprint-failed':
+      return `${problem.fileName} could not be fingerprinted: ${problem.detail}`
+    case 'engine-unavailable':
+      return `DuckDB could not start: ${problem.detail}`
+    case 'input-registration-failed':
+      return `${problem.fileName} could not be registered: ${problem.detail}`
+    case 'view-list-failed':
+      return `The SQL views could not be listed: ${problem.detail}`
+    case 'prepared-view-missing':
+      return `The selected view ${problem.viewName} no longer exists. Refresh the view list and choose another.`
+    case 'prepared-view-invalid':
+      return `The prepared view was refused: ${problem.detail}`
+    case 'prepared-view-empty':
+      return 'The prepared view contains no rows.'
+    case 'materialization-failed':
+      return `The prepared view could not be materialized: ${problem.detail}`
+    case 'cancellation-failed':
+      return `The query could not be cancelled: ${problem.detail}`
+    case 'session-close-failed':
+      return `The SQL workspace could not release its database: ${problem.detail}`
+    case 'replay-inputs-missing':
+      return `The files chosen do not include ${problem.fileNames.join(', ')}, unchanged. The SQL step needs every input it was built from.`
+    default: {
+      const exhaustive: never = problem
+      return exhaustive
+    }
   }
 }

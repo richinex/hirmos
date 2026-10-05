@@ -8,7 +8,10 @@ export type LagListProblem =
   | { readonly kind: 'not-an-integer'; readonly token: string }
   | { readonly kind: 'outside-range'; readonly lag: number; readonly maximum: number }
 
-export function parseLagList(text: string, maximum = 24): Result<NonEmptyArray<number>, LagListProblem> {
+export function parseLagList(
+  text: string,
+  maximum = 24,
+): Result<NonEmptyArray<number>, LagListProblem> {
   const tokens = text.split(/[\s,]+/u).filter((token) => token.length > 0)
   if (!isNonEmpty(tokens)) return err({ kind: 'empty' })
   const parsed: number[] = []
@@ -24,9 +27,12 @@ export function parseLagList(text: string, maximum = 24): Result<NonEmptyArray<n
 
 function describeProblem(problem: LagListProblem): string {
   switch (problem.kind) {
-    case 'empty': return 'Enter at least one lag.'
-    case 'not-an-integer': return `“${problem.token}” is not a whole-number lag.`
-    case 'outside-range': return `Lag ${problem.lag} is outside the supported range 1–${problem.maximum}.`
+    case 'empty':
+      return 'Enter at least one lag.'
+    case 'not-an-integer':
+      return `“${problem.token}” is not a whole-number lag.`
+    case 'outside-range':
+      return `Lag ${problem.lag} is outside the supported range 1–${problem.maximum}.`
   }
 }
 
@@ -51,9 +57,11 @@ export function LagListField({ label, lags, onChange, maximum = 24, help }: LagL
 
   return (
     <label className="block">
-      {help === undefined
-        ? <span className={fieldLabel}>{label}</span>
-        : <ParameterLabel className={fieldLabel} label={label} help={help} />}
+      {help === undefined ? (
+        <span className={fieldLabel}>{label}</span>
+      ) : (
+        <ParameterLabel className={fieldLabel} label={label} help={help} />
+      )}
       <input
         type="text"
         inputMode="numeric"
@@ -78,7 +86,9 @@ export function LagListField({ label, lags, onChange, maximum = 24, help }: LagL
         }}
       />
       <span id={`${label.replace(/\s+/gu, '-').toLowerCase()}-hint`} className={fieldHint}>
-        {problem === null ? 'Comma-separated positive lags, for example 1, 7, 13.' : describeProblem(problem)}
+        {problem === null
+          ? 'Comma-separated positive lags, for example 1, 7, 13.'
+          : describeProblem(problem)}
       </span>
     </label>
   )

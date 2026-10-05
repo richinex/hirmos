@@ -1,6 +1,13 @@
 import { isNonEmpty, type NonEmptyArray } from './dop'
 import type { EvidenceGroup } from './methods'
-import { describeLevelIssue, describeLevelIssueGroup, groupLevelIssues, levelIssueAction, type LevelIssueWording, type StationarityAssessment } from './stationarityAssessment'
+import {
+  describeLevelIssue,
+  describeLevelIssueGroup,
+  groupLevelIssues,
+  levelIssueAction,
+  type LevelIssueWording,
+  type StationarityAssessment,
+} from './stationarityAssessment'
 
 /** What the stationarity battery says about a method fitted in levels, grouped by reason. */
 export interface LevelEvidence {
@@ -11,7 +18,10 @@ export interface LevelEvidence {
 }
 
 export function levelEvidence(
-  readings: readonly { readonly name: string; readonly assessment: StationarityAssessment | null }[],
+  readings: readonly {
+    readonly name: string
+    readonly assessment: StationarityAssessment | null
+  }[],
   wording: LevelIssueWording,
 ): LevelEvidence {
   const refused: EvidenceGroup[] = []
@@ -29,7 +39,9 @@ export function levelEvidence(
 }
 
 /** The groups' stage lines as one text, for the evaluation's evidence field. */
-export const summaries = (groups: readonly EvidenceGroup[]): string => groups.map((group) => group.summary).join(' ')
+export const summaries = (groups: readonly EvidenceGroup[]): string =>
+  groups.map((group) => group.summary).join(' ')
 
-export const nonEmptyGroups = (groups: readonly EvidenceGroup[]): NonEmptyArray<EvidenceGroup> | undefined =>
-  isNonEmpty(groups) ? groups : undefined
+export const nonEmptyGroups = (
+  groups: readonly EvidenceGroup[],
+): NonEmptyArray<EvidenceGroup> | undefined => (isNonEmpty(groups) ? groups : undefined)

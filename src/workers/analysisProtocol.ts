@@ -1,23 +1,130 @@
-import {surrogatePathRequestSchema,surrogatePathEvidenceSchema,type SurrogatePathRequest,type SurrogatePathEvidence} from '@/domain/surrogatePath'
-import {surrogateDiagnosticRequestSchema,surrogateDiagnosticEvidenceSchema,type SurrogateDiagnosticRequest,type SurrogateDiagnosticEvidence} from '@/domain/surrogateDiagnostics'
-import { surrogateRequestSchema, surrogateEvidenceSchema, type SurrogateRequest, type SurrogateEvidence } from '@/domain/surrogate'
-import { countRegressionRequestSchema, countRegressionEvidenceSchema, type CountRegressionRequest, type CountRegressionEvidence } from '@/domain/countRegression'
-import { sunAbrahamRequestSchema, sunAbrahamEvidenceSchema, ridgeAugmentedRequestSchema, ridgeAugmentedEvidenceSchema, type SunAbrahamRequest, type SunAbrahamEvidence, type RidgeAugmentedRequest, type RidgeAugmentedEvidence } from '@/domain/remixExtensions'
-import {panelRegressionRequestSchema,panelRegressionEvidenceSchema,baconRequestSchema,baconEvidenceSchema,type PanelRegressionRequest,type PanelRegressionEvidence,type BaconRequest,type BaconEvidence} from '@/domain/panelRegression'
+import {
+  surrogatePathRequestSchema,
+  surrogatePathEvidenceSchema,
+  type SurrogatePathRequest,
+  type SurrogatePathEvidence,
+} from '@/domain/surrogatePath'
+import {
+  surrogateDiagnosticRequestSchema,
+  surrogateDiagnosticEvidenceSchema,
+  type SurrogateDiagnosticRequest,
+  type SurrogateDiagnosticEvidence,
+} from '@/domain/surrogateDiagnostics'
+import {
+  surrogateRequestSchema,
+  surrogateEvidenceSchema,
+  type SurrogateRequest,
+  type SurrogateEvidence,
+} from '@/domain/surrogate'
+import {
+  countRegressionRequestSchema,
+  countRegressionEvidenceSchema,
+  type CountRegressionRequest,
+  type CountRegressionEvidence,
+} from '@/domain/countRegression'
+import {
+  sunAbrahamRequestSchema,
+  sunAbrahamEvidenceSchema,
+  ridgeAugmentedRequestSchema,
+  ridgeAugmentedEvidenceSchema,
+  type SunAbrahamRequest,
+  type SunAbrahamEvidence,
+  type RidgeAugmentedRequest,
+  type RidgeAugmentedEvidence,
+} from '@/domain/remixExtensions'
+import {
+  panelRegressionRequestSchema,
+  panelRegressionEvidenceSchema,
+  baconRequestSchema,
+  baconEvidenceSchema,
+  type PanelRegressionRequest,
+  type PanelRegressionEvidence,
+  type BaconRequest,
+  type BaconEvidence,
+} from '@/domain/panelRegression'
 import { z } from 'zod'
-import { predictorSyntheticRequestSchema, predictorSyntheticEvidenceSchema, type PredictorSyntheticRequest, type PredictorSyntheticEvidence } from '@/domain/predictorSyntheticControl'
-import { causalForestConfigurationSchema, causalForestEvidenceSchema, causalForestTargetSchema, type CausalForestConfiguration, type CausalForestEvidence, type CausalForestTarget } from '@/domain/causalForest'
-import { staggeredRequestSchema, staggeredEvidenceSchema, type StaggeredRequest, type StaggeredEvidence } from '@/domain/staggeredDid'
+import {
+  predictorSyntheticRequestSchema,
+  predictorSyntheticEvidenceSchema,
+  type PredictorSyntheticRequest,
+  type PredictorSyntheticEvidence,
+} from '@/domain/predictorSyntheticControl'
+import {
+  causalForestConfigurationSchema,
+  causalForestEvidenceSchema,
+  causalForestTargetSchema,
+  type CausalForestConfiguration,
+  type CausalForestEvidence,
+  type CausalForestTarget,
+} from '@/domain/causalForest'
+import {
+  staggeredRequestSchema,
+  staggeredEvidenceSchema,
+  type StaggeredRequest,
+  type StaggeredEvidence,
+} from '@/domain/staggeredDid'
 import { structuralModelSchema, type StructuralModel } from '@/domain/structuralImpact'
-import { rootCauseRequestSchema, rootCauseEvidenceSchema, type RootCauseRequest, type RootCauseEvidence } from '@/domain/rootCauseAnalysis'
-import { rootCauseCheckRequestSchema, rootCauseChecksSchema, type RootCauseCheckRequest, type RootCauseChecks } from '@/domain/rootCauseAnalysis'
-import { ardlModelEvidenceSchema, ardlModelRequestSchema, type ArdlModelEvidence, type ArdlModelRequest } from '@/domain/ardlModel'
-import {honestRequestSchema,honestEvidenceSchema,type HonestRequest,type HonestEvidence} from '@/domain/honestDid'
-import {didSensitivityRequestSchema,didSensitivityEvidenceSchema,type DidSensitivityRequest,type DidSensitivityEvidence} from '@/domain/didSensitivity'
-import { aalenEvidenceSchema, forestEvidenceSchema, forestSettingsSchema, type AalenEvidence, type ForestEvidence, type ForestSettings } from '@/domain/survivalRegression'
-import { multicollinearityEvidenceSchema, parseMulticollinearityEvidence, type MulticollinearityEvidence } from '@/domain/multicollinearity'
-import { countSeriesInterventionScanEvidenceSchema, parseCountSeriesInterventionScanEvidence, type CountSeriesInterventionScanEvidence } from '@/domain/countSeries'
-import { interruptedImpactSchema, interruptedModelSchema, interruptedSeasonalSchema, interruptedSeriesEvidenceSchema, linearErrorModelSchema, parseInterruptedSeriesEvidence, type InterruptedImpact, type InterruptedModel, type InterruptedSeasonal, type InterruptedSeriesEvidence, type LinearErrorModel } from '@/domain/interruptedSeries'
+import {
+  rootCauseRequestSchema,
+  rootCauseEvidenceSchema,
+  type RootCauseRequest,
+  type RootCauseEvidence,
+} from '@/domain/rootCauseAnalysis'
+import {
+  rootCauseCheckRequestSchema,
+  rootCauseChecksSchema,
+  type RootCauseCheckRequest,
+  type RootCauseChecks,
+} from '@/domain/rootCauseAnalysis'
+import {
+  ardlModelEvidenceSchema,
+  ardlModelRequestSchema,
+  type ArdlModelEvidence,
+  type ArdlModelRequest,
+} from '@/domain/ardlModel'
+import {
+  honestRequestSchema,
+  honestEvidenceSchema,
+  type HonestRequest,
+  type HonestEvidence,
+} from '@/domain/honestDid'
+import {
+  didSensitivityRequestSchema,
+  didSensitivityEvidenceSchema,
+  type DidSensitivityRequest,
+  type DidSensitivityEvidence,
+} from '@/domain/didSensitivity'
+import {
+  aalenEvidenceSchema,
+  forestEvidenceSchema,
+  forestSettingsSchema,
+  type AalenEvidence,
+  type ForestEvidence,
+  type ForestSettings,
+} from '@/domain/survivalRegression'
+import {
+  multicollinearityEvidenceSchema,
+  parseMulticollinearityEvidence,
+  type MulticollinearityEvidence,
+} from '@/domain/multicollinearity'
+import {
+  countSeriesInterventionScanEvidenceSchema,
+  parseCountSeriesInterventionScanEvidence,
+  type CountSeriesInterventionScanEvidence,
+} from '@/domain/countSeries'
+import {
+  interruptedImpactSchema,
+  interruptedModelSchema,
+  interruptedSeasonalSchema,
+  interruptedSeriesEvidenceSchema,
+  linearErrorModelSchema,
+  parseInterruptedSeriesEvidence,
+  type InterruptedImpact,
+  type InterruptedModel,
+  type InterruptedSeasonal,
+  type InterruptedSeriesEvidence,
+  type LinearErrorModel,
+} from '@/domain/interruptedSeries'
 
 /** The adjusted regression's error treatments: the series error models, an HC1 covariance, or a covariance clustered by one column of the matrix. */
 export const adjustedRegressionErrorModelSchema = z.union([
@@ -39,20 +146,94 @@ export type DiscreteConditionState = z.infer<typeof discreteConditionStateSchema
 export const adjustedRegressionFixedEffectsSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('unit'), column: z.number().int().nonnegative() }).strict(),
   z.object({ kind: z.literal('time'), column: z.number().int().nonnegative() }).strict(),
-  z.object({ kind: z.literal('unitAndTime'), unit: z.number().int().nonnegative(), time: z.number().int().nonnegative() }).strict(),
+  z
+    .object({
+      kind: z.literal('unitAndTime'),
+      unit: z.number().int().nonnegative(),
+      time: z.number().int().nonnegative(),
+    })
+    .strict(),
 ])
 export type AdjustedRegressionFixedEffects = z.infer<typeof adjustedRegressionFixedEffectsSchema>
 import { dagCheckEvidenceSchema, type DagCheckEvidence } from '@/domain/dagValidation'
-import { identifiedDiscreteQueryEvidenceSchema, type IdentifiedDiscreteQueryEvidence } from '@/domain/intervention'
-import { networkQuerySchema, networkQueryEvidenceSchema, type NetworkQuery, type NetworkQueryEvidence } from '@/domain/networkQuery'
-import {conditionalGaussianQuerySchema,conditionalGaussianEvidenceSchema,type ConditionalGaussianQuery,type ConditionalGaussianEvidence} from '@/domain/conditionalGaussianQuery'
+import {
+  identifiedDiscreteQueryEvidenceSchema,
+  type IdentifiedDiscreteQueryEvidence,
+} from '@/domain/intervention'
+import {
+  networkQuerySchema,
+  networkQueryEvidenceSchema,
+  type NetworkQuery,
+  type NetworkQueryEvidence,
+} from '@/domain/networkQuery'
+import {
+  conditionalGaussianQuerySchema,
+  conditionalGaussianEvidenceSchema,
+  type ConditionalGaussianQuery,
+  type ConditionalGaussianEvidence,
+} from '@/domain/conditionalGaussianQuery'
 import { grangerSsrEvidenceSchema, parseGrangerSsrEvidence } from '@/domain/granger'
 import type { GrangerSsrEvidence } from '@/domain/granger'
-import { parseSeasonalAdjustedEvidence, seasonalAdjustedEvidenceSchema, type SeasonalAdjustedEvidence } from '@/domain/seasonal'
-import { pandasResamplingEvidenceSchema, parsePandasResamplingEvidence, type PandasResamplingEvidence, type ResamplingAggregation } from '@/domain/resampling'
-import { armSelectionSchema, boostedGridAxisSchemas, type ArmSelection, ardlEvidenceSchema, bayesianGaussianEvidenceSchema, binaryEttEvidenceSchema, causalEffectsUncertaintySchema, discreteBnEvidenceSchema, doubleMlEvidenceSchema, ingarchInterventionScheduleSchema, negbinNutsEvidenceSchema, negativeBinomialIngarchEvidenceSchema, panelInterventionEvidenceSchema, syntheticControlEvidenceSchema, tLearnerEvidenceSchema, crossFittedTLearnerEvidenceSchema, totalEffectEstimatorSchema, vecmEvidenceSchema, type ArdlEvidence, type BayesianGaussianEvidence, type BinaryEttEvidence, type CausalEffectsUncertainty, type DiscreteBnEvidence, type DoubleMlEvidence, type IngarchInterventionSchedule, type NegbinNutsEvidence, type NegativeBinomialIngarchEvidence, type PanelInterventionEvidence, type SyntheticControlEvidence, type TLearnerEvidence, type CrossFittedTLearnerEvidence, type TotalEffectEstimator, type VecmEvidence } from '@/domain/estimation'
-import { dmlRefutationEvidenceSchema, parseDmlRefutationEvidence, type DmlRefutationEvidence } from '@/domain/sensitivity'
-import { dynamicCounterfactualUncertaintySchema, dynamicLinearScmEvidenceSchema, linearScmEvidenceSchema, type DynamicCounterfactualUncertainty, type DynamicInterventionTiming, type DynamicLinearScmEvidence, type LinearScmEvidence } from '@/domain/counterfactual'
+import {
+  parseSeasonalAdjustedEvidence,
+  seasonalAdjustedEvidenceSchema,
+  type SeasonalAdjustedEvidence,
+} from '@/domain/seasonal'
+import {
+  pandasResamplingEvidenceSchema,
+  parsePandasResamplingEvidence,
+  type PandasResamplingEvidence,
+  type ResamplingAggregation,
+} from '@/domain/resampling'
+import {
+  armSelectionSchema,
+  boostedGridAxisSchemas,
+  type ArmSelection,
+  ardlEvidenceSchema,
+  bayesianGaussianEvidenceSchema,
+  binaryEttEvidenceSchema,
+  causalEffectsUncertaintySchema,
+  discreteBnEvidenceSchema,
+  doubleMlEvidenceSchema,
+  ingarchInterventionScheduleSchema,
+  negbinNutsEvidenceSchema,
+  negativeBinomialIngarchEvidenceSchema,
+  panelInterventionEvidenceSchema,
+  syntheticControlEvidenceSchema,
+  tLearnerEvidenceSchema,
+  crossFittedTLearnerEvidenceSchema,
+  totalEffectEstimatorSchema,
+  vecmEvidenceSchema,
+  type ArdlEvidence,
+  type BayesianGaussianEvidence,
+  type BinaryEttEvidence,
+  type CausalEffectsUncertainty,
+  type DiscreteBnEvidence,
+  type DoubleMlEvidence,
+  type IngarchInterventionSchedule,
+  type NegbinNutsEvidence,
+  type NegativeBinomialIngarchEvidence,
+  type PanelInterventionEvidence,
+  type SyntheticControlEvidence,
+  type TLearnerEvidence,
+  type CrossFittedTLearnerEvidence,
+  type TotalEffectEstimator,
+  type VecmEvidence,
+} from '@/domain/estimation'
+import {
+  dmlRefutationEvidenceSchema,
+  parseDmlRefutationEvidence,
+  type DmlRefutationEvidence,
+} from '@/domain/sensitivity'
+import {
+  dynamicCounterfactualUncertaintySchema,
+  dynamicLinearScmEvidenceSchema,
+  linearScmEvidenceSchema,
+  type DynamicCounterfactualUncertainty,
+  type DynamicInterventionTiming,
+  type DynamicLinearScmEvidence,
+  type LinearScmEvidence,
+} from '@/domain/counterfactual'
 import {
   comparisonSurvivalEvidenceSchema,
   coxRegressionEvidenceSchema,
@@ -82,10 +263,24 @@ import {
 export const dmlGroupsRequestSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('none') }).strict(),
   z.object({ kind: z.literal('levels'), column: z.number().int().nonnegative() }).strict(),
-  z.object({ kind: z.literal('quantiles'), column: z.number().int().nonnegative(), bins: z.number().int().min(2).max(10) }).strict(),
+  z
+    .object({
+      kind: z.literal('quantiles'),
+      column: z.number().int().nonnegative(),
+      bins: z.number().int().min(2).max(10),
+    })
+    .strict(),
 ])
 export type DmlGroupsRequest = z.infer<typeof dmlGroupsRequestSchema>
-import { assertNever, brand, err, ok, type Brand, type NonEmptyArray, type Result } from '@/domain/dop'
+import {
+  assertNever,
+  brand,
+  err,
+  ok,
+  type Brand,
+  type NonEmptyArray,
+  type Result,
+} from '@/domain/dop'
 import {
   dynotearsEvidenceSchema,
   directLingamEvidenceSchema,
@@ -211,14 +406,28 @@ export type TemporalSamples =
       readonly kind: 'role-aware'
       readonly validity: Uint8Array
       readonly analysisMask: Uint8Array
-      readonly cutOff: 'methodDefault' | 'twoTauMax' | 'tauMax' | 'maxLag' | 'maxLagOrTauMax' | 'twoTauMaxFuture'
+      readonly cutOff:
+        'methodDefault' | 'twoTauMax' | 'tauMax' | 'maxLag' | 'maxLagOrTauMax' | 'twoTauMaxFuture'
       readonly propagateThroughMaxLag: boolean
       readonly maskType: 'none' | 'x' | 'y' | 'z' | 'xy' | 'xz' | 'yz' | 'xyz'
     }
 
 export type MultiStateWorkerInput =
-  | { readonly kind: 'preparedRows'; readonly start: number; readonly stop: number; readonly event: number; readonly from: number; readonly to: number }
-  | { readonly kind: 'longitudinalStates'; readonly subject: number; readonly time: number; readonly state: number; readonly allowed: readonly (readonly boolean[])[] }
+  | {
+      readonly kind: 'preparedRows'
+      readonly start: number
+      readonly stop: number
+      readonly event: number
+      readonly from: number
+      readonly to: number
+    }
+  | {
+      readonly kind: 'longitudinalStates'
+      readonly subject: number
+      readonly time: number
+      readonly state: number
+      readonly allowed: readonly (readonly boolean[])[]
+    }
   | {
       readonly kind: 'wideEvents'
       readonly states: readonly (
@@ -237,7 +446,8 @@ export type CoxRegressionWorkerDesign = {
         readonly kind: 'rightCensored'
         readonly duration: number
         readonly event: number
-        readonly entry: { readonly kind: 'notUsed' } | { readonly kind: 'column'; readonly column: number }
+        readonly entry:
+          { readonly kind: 'notUsed' } | { readonly kind: 'column'; readonly column: number }
         readonly standardErrors:
           | { readonly kind: 'modelBased' }
           | { readonly kind: 'robust' }
@@ -254,8 +464,10 @@ export type CoxRegressionWorkerDesign = {
         readonly stop: number
         readonly event: number
       }
-  readonly weights: { readonly kind: 'equal' } | { readonly kind: 'column'; readonly column: number }
-  readonly strata: { readonly kind: 'unstratified' } | { readonly kind: 'column'; readonly column: number }
+  readonly weights:
+    { readonly kind: 'equal' } | { readonly kind: 'column'; readonly column: number }
+  readonly strata:
+    { readonly kind: 'unstratified' } | { readonly kind: 'column'; readonly column: number }
   readonly covariates: readonly number[]
   readonly penalty:
     | { readonly kind: 'unpenalized' }
@@ -268,15 +480,17 @@ const logisticTreatmentModelSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('lbfgsb'), maxIter: z.number().int().positive() }).strict(),
 ])
 
-const boostedTreatmentModelSchema = z.object({
-  ...boostedGridAxisSchemas,
-  splits: z.number().int().min(2).max(20),
-  minSamplesLeaf: z.number().int().positive(),
-  minSamplesSplit: z.number().int().min(2),
-  seed: z.number().int().nonnegative(),
-  scoring: z.enum(['one-model', 'cross-fitted']),
-  candidatesSearched: z.number().int().positive().nullable(),
-}).strict()
+const boostedTreatmentModelSchema = z
+  .object({
+    ...boostedGridAxisSchemas,
+    splits: z.number().int().min(2).max(20),
+    minSamplesLeaf: z.number().int().positive(),
+    minSamplesSplit: z.number().int().min(2),
+    seed: z.number().int().nonnegative(),
+    scoring: z.enum(['one-model', 'cross-fitted']),
+    candidatesSearched: z.number().int().positive().nullable(),
+  })
+  .strict()
 
 const propensityTreatmentModelSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('logistic'), model: logisticTreatmentModelSchema }).strict(),
@@ -285,8 +499,7 @@ const propensityTreatmentModelSchema = z.discriminatedUnion('kind', [
 
 /** Which treatment model fits the propensity: statsmodels' Newton, or sklearn's L-BFGS-B. */
 export type LogisticTreatmentModel =
-  | { readonly kind: 'newton' }
-  | { readonly kind: 'lbfgsb'; readonly maxIter: number }
+  { readonly kind: 'newton' } | { readonly kind: 'lbfgsb'; readonly maxIter: number }
 
 /** A boosted treatment model: a grid searched on cross-validated ROC AUC. */
 export interface BoostedTreatmentModel {
@@ -308,7 +521,11 @@ export type PropensityTreatmentModel =
 /** A bootstrap refits the treatment model per replicate, which the kernels do for a logistic fit
  * alone, so the request sits inside that variant. */
 export type PropensityWeightingFit =
-  | { readonly kind: 'logistic'; readonly model: LogisticTreatmentModel; readonly bootstrap: PropensityBootstrapRequest | null }
+  | {
+      readonly kind: 'logistic'
+      readonly model: LogisticTreatmentModel
+      readonly bootstrap: PropensityBootstrapRequest | null
+    }
   | { readonly kind: 'boosted'; readonly model: BoostedTreatmentModel }
 
 /** Rounds and seed for a percentile interval; absent when only the point estimate is wanted. */
@@ -319,8 +536,22 @@ export interface PropensityBootstrapRequest {
 }
 
 export type AnalysisWorkerCommand =
-  | { readonly kind: 'aalen'; readonly request: WorkerRequestId; readonly values: Float64Array; readonly rows: number; readonly columns: number; readonly design: AalenWorkerDesign }
-  | { readonly kind: 'survival-forest'; readonly request: WorkerRequestId; readonly values: Float64Array; readonly rows: number; readonly columns: number; readonly design: ForestWorkerDesign }
+  | {
+      readonly kind: 'aalen'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly design: AalenWorkerDesign
+    }
+  | {
+      readonly kind: 'survival-forest'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly design: ForestWorkerDesign
+    }
   | {
       readonly kind: 'flexsurv'
       readonly request: WorkerRequestId
@@ -329,7 +560,12 @@ export type AnalysisWorkerCommand =
       readonly columns: number
       readonly observation:
         | { readonly kind: 'rightCensored'; readonly duration: number; readonly event: number }
-        | { readonly kind: 'startStop'; readonly start: number; readonly stop: number; readonly event: number }
+        | {
+            readonly kind: 'startStop'
+            readonly start: number
+            readonly stop: number
+            readonly event: number
+          }
       readonly rowFrequency:
         | { readonly kind: 'oneObservationPerRow' }
         | { readonly kind: 'frequencyColumn'; readonly column: number }
@@ -483,7 +719,14 @@ export type AnalysisWorkerCommand =
       readonly maxLag: number
       readonly alpha: number
       readonly missing: 'pairwiseComplete' | 'varEm'
-      readonly context: 'none' | 'linear' | 'linearSine' | 'linearExponential' | 'linearQuadratic' | 'step' | 'stepLinear'
+      readonly context:
+        | 'none'
+        | 'linear'
+        | 'linearSine'
+        | 'linearExponential'
+        | 'linearQuadratic'
+        | 'step'
+        | 'stepLinear'
     }
   | {
       readonly kind: 'cdnots-plus'
@@ -495,7 +738,14 @@ export type AnalysisWorkerCommand =
       readonly maxLag: number
       readonly alpha: number
       readonly missing: 'pairwiseComplete' | 'varEm'
-      readonly context: 'none' | 'linear' | 'linearSine' | 'linearExponential' | 'linearQuadratic' | 'step' | 'stepLinear'
+      readonly context:
+        | 'none'
+        | 'linear'
+        | 'linearSine'
+        | 'linearExponential'
+        | 'linearQuadratic'
+        | 'step'
+        | 'stepLinear'
     }
   | {
       readonly kind: 'grace'
@@ -506,7 +756,14 @@ export type AnalysisWorkerCommand =
       readonly columns: number
       readonly maxLag: number
       readonly alpha: number
-      readonly context: 'none' | 'linear' | 'linearSine' | 'linearExponential' | 'linearQuadratic' | 'step' | 'stepLinear'
+      readonly context:
+        | 'none'
+        | 'linear'
+        | 'linearSine'
+        | 'linearExponential'
+        | 'linearQuadratic'
+        | 'step'
+        | 'stepLinear'
       readonly gateThreshold: number
       readonly epochs: number
       readonly patience: number
@@ -1002,9 +1259,24 @@ export type AnalysisWorkerCommand =
       readonly values: Float64Array
       readonly model: RootCauseRequest
     }
-  | { readonly kind: 'root-cause-checks'; readonly request: WorkerRequestId; readonly values: Float64Array; readonly model: RootCauseCheckRequest }
-  | { readonly kind: 'gcm-effects'; readonly request: WorkerRequestId; readonly values: Float64Array; readonly model: GcmEffectsRequest }
-  | { readonly kind: 'gcm-influence'; readonly request: WorkerRequestId; readonly values: Float64Array; readonly model: GcmInfluenceRequest }
+  | {
+      readonly kind: 'root-cause-checks'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly model: RootCauseCheckRequest
+    }
+  | {
+      readonly kind: 'gcm-effects'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly model: GcmEffectsRequest
+    }
+  | {
+      readonly kind: 'gcm-influence'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly model: GcmInfluenceRequest
+    }
   | {
       readonly kind: 'ardl-model'
       readonly request: WorkerRequestId
@@ -1013,8 +1285,22 @@ export type AnalysisWorkerCommand =
       readonly columns: number
       readonly model: ArdlModelRequest
     }
-  | {readonly kind:'honest-did';readonly request:WorkerRequestId;readonly values:Float64Array;readonly model:HonestRequest}
-  | {readonly kind:'did-sensitivity';readonly request:WorkerRequestId;readonly values:Float64Array;readonly rows:number;readonly columns:number;readonly units:readonly string[];readonly times:readonly number[];readonly model:DidSensitivityRequest}
+  | {
+      readonly kind: 'honest-did'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly model: HonestRequest
+    }
+  | {
+      readonly kind: 'did-sensitivity'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly units: readonly string[]
+      readonly times: readonly number[]
+      readonly model: DidSensitivityRequest
+    }
   | {
       readonly kind: 'ardl-pss'
       readonly request: WorkerRequestId
@@ -1064,13 +1350,48 @@ export type AnalysisWorkerCommand =
       readonly values: Float64Array
       readonly model: CountRegressionRequest
     }
-  | {readonly kind:'sun-abraham';readonly request:WorkerRequestId;readonly values:Float64Array;readonly model:SunAbrahamRequest}
-  | {readonly kind:'surrogate-path';readonly request:WorkerRequestId;readonly values:Float64Array;readonly model:SurrogatePathRequest}
-  | {readonly kind:'surrogate-diagnostics';readonly request:WorkerRequestId;readonly values:Float64Array;readonly model:SurrogateDiagnosticRequest}
-  | {readonly kind:'surrogate';readonly request:WorkerRequestId;readonly values:Float64Array;readonly model:SurrogateRequest}
-  | {readonly kind:'ridge-augmented-synthetic';readonly request:WorkerRequestId;readonly values:Float64Array;readonly model:RidgeAugmentedRequest}
-  | {readonly kind:'panel-regression';readonly request:WorkerRequestId;readonly values:Float64Array;readonly model:PanelRegressionRequest}
-  | {readonly kind:'bacon';readonly request:WorkerRequestId;readonly values:Float64Array;readonly model:BaconRequest}
+  | {
+      readonly kind: 'sun-abraham'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly model: SunAbrahamRequest
+    }
+  | {
+      readonly kind: 'surrogate-path'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly model: SurrogatePathRequest
+    }
+  | {
+      readonly kind: 'surrogate-diagnostics'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly model: SurrogateDiagnosticRequest
+    }
+  | {
+      readonly kind: 'surrogate'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly model: SurrogateRequest
+    }
+  | {
+      readonly kind: 'ridge-augmented-synthetic'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly model: RidgeAugmentedRequest
+    }
+  | {
+      readonly kind: 'panel-regression'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly model: PanelRegressionRequest
+    }
+  | {
+      readonly kind: 'bacon'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly model: BaconRequest
+    }
   | {
       readonly kind: 'staggered-did'
       readonly request: WorkerRequestId
@@ -1130,7 +1451,12 @@ export type AnalysisWorkerCommand =
       readonly values: Float64Array
       readonly query: NetworkQuery
     }
-  | {readonly kind:'conditional-gaussian-query';readonly request:WorkerRequestId;readonly values:Float64Array;readonly query:ConditionalGaussianQuery}
+  | {
+      readonly kind: 'conditional-gaussian-query'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly query: ConditionalGaussianQuery
+    }
   | {
       readonly kind: 'discrete-bn-query'
       readonly request: WorkerRequestId
@@ -1158,7 +1484,10 @@ export type AnalysisWorkerCommand =
       readonly outcome: number
       readonly unobserved: readonly number[]
       readonly bins: number
-      readonly condition: { readonly variable: number; readonly state: DiscreteConditionState } | null
+      readonly condition: {
+        readonly variable: number
+        readonly state: DiscreteConditionState
+      } | null
     }
   | {
       readonly kind: 'binary-ett'
@@ -1223,7 +1552,12 @@ export type AnalysisWorkerCommand =
       readonly validity: Uint8Array
       readonly resolution:
         | { readonly kind: 'completeInterval' }
-        | { readonly kind: 'imputation'; readonly method: 'linearInterior' | 'forwardFill' | 'structuralZero'; readonly maxGap: number; readonly confirmation: string | null }
+        | {
+            readonly kind: 'imputation'
+            readonly method: 'linearInterior' | 'forwardFill' | 'structuralZero'
+            readonly maxGap: number
+            readonly confirmation: string | null
+          }
     }
 
 export type AnalysisWorkerProblem =
@@ -1234,22 +1568,25 @@ export type AnalysisWorkerProblem =
   | { readonly kind: 'analysis-cancelled'; readonly detail: string }
   | DiscreteStateRefusal
 
-export type DiscreteStateRefusal =
-  | {
-      readonly kind: 'discreteStateRefused'
-      readonly query: 'bayesianNetwork' | 'identifiedExpression'
-      readonly node: number
-      readonly name: string
-      readonly problem:
-        | { readonly kind: 'noFiniteObservations'; readonly observations: number }
-        | { readonly kind: 'singleObservedState'; readonly value: number; readonly observations: number }
-        | {
-            readonly kind: 'quantileCollapse'
-            readonly distinctValues: number
-            readonly requestedStates: number
-            readonly populatedStates: number
-          }
-    }
+export type DiscreteStateRefusal = {
+  readonly kind: 'discreteStateRefused'
+  readonly query: 'bayesianNetwork' | 'identifiedExpression'
+  readonly node: number
+  readonly name: string
+  readonly problem:
+    | { readonly kind: 'noFiniteObservations'; readonly observations: number }
+    | {
+        readonly kind: 'singleObservedState'
+        readonly value: number
+        readonly observations: number
+      }
+    | {
+        readonly kind: 'quantileCollapse'
+        readonly distinctValues: number
+        readonly requestedStates: number
+        readonly populatedStates: number
+      }
+}
 
 export const describeAnalysisWorkerProblem = (problem: AnalysisWorkerProblem): string => {
   switch (problem.kind) {
@@ -1277,8 +1614,16 @@ export const describeAnalysisWorkerProblem = (problem: AnalysisWorkerProblem): s
 }
 
 export type AnalysisWorkerEvent =
-  | { readonly kind: 'aalen-succeeded'; readonly request: WorkerRequestId; readonly result: AalenEvidence }
-  | { readonly kind: 'survival-forest-succeeded'; readonly request: WorkerRequestId; readonly result: ForestEvidence }
+  | {
+      readonly kind: 'aalen-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: AalenEvidence
+    }
+  | {
+      readonly kind: 'survival-forest-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: ForestEvidence
+    }
   | {
       readonly kind: 'analysis-progress'
       readonly request: WorkerRequestId
@@ -1289,14 +1634,46 @@ export type AnalysisWorkerEvent =
       readonly request: WorkerRequestId
       readonly result: StationarityBattery
     }
-  | { readonly kind: 'multicollinearity-succeeded'; readonly request: WorkerRequestId; readonly result: MulticollinearityEvidence }
-  | { readonly kind: 'pandas-resampling-succeeded'; readonly request: WorkerRequestId; readonly result: PandasResamplingEvidence }
-  | { readonly kind: 'flexsurv-succeeded'; readonly request: WorkerRequestId; readonly result: FlexSurvEvidence }
-  | { readonly kind: 'cox-regression-succeeded'; readonly request: WorkerRequestId; readonly result: CoxRegressionEvidence }
-  | { readonly kind: 'penalized-aft-succeeded'; readonly request: WorkerRequestId; readonly result: PenalizedAftEvidence }
-  | { readonly kind: 'nonparametric-survival-succeeded'; readonly request: WorkerRequestId; readonly result: NonparametricSurvivalEvidence }
-  | { readonly kind: 'comparison-survival-succeeded'; readonly request: WorkerRequestId; readonly result: ComparisonSurvivalEvidence }
-  | { readonly kind: 'multi-state-survival-succeeded'; readonly request: WorkerRequestId; readonly result: MultiStateSurvivalEvidence }
+  | {
+      readonly kind: 'multicollinearity-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: MulticollinearityEvidence
+    }
+  | {
+      readonly kind: 'pandas-resampling-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: PandasResamplingEvidence
+    }
+  | {
+      readonly kind: 'flexsurv-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: FlexSurvEvidence
+    }
+  | {
+      readonly kind: 'cox-regression-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: CoxRegressionEvidence
+    }
+  | {
+      readonly kind: 'penalized-aft-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: PenalizedAftEvidence
+    }
+  | {
+      readonly kind: 'nonparametric-survival-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: NonparametricSurvivalEvidence
+    }
+  | {
+      readonly kind: 'comparison-survival-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: ComparisonSurvivalEvidence
+    }
+  | {
+      readonly kind: 'multi-state-survival-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: MultiStateSurvivalEvidence
+    }
   | {
       readonly kind: 'pcmci-plus-succeeded'
       readonly request: WorkerRequestId
@@ -1317,9 +1694,21 @@ export type AnalysisWorkerEvent =
       readonly request: WorkerRequestId
       readonly result: RpcmciEvidence
     }
-  | { readonly kind: 'cdnots-succeeded'; readonly request: WorkerRequestId; readonly result: CdnotsEvidence }
-  | { readonly kind: 'cdnots-plus-succeeded'; readonly request: WorkerRequestId; readonly result: CdnotsPlusEvidence }
-  | { readonly kind: 'grace-succeeded'; readonly request: WorkerRequestId; readonly result: GraceEvidence }
+  | {
+      readonly kind: 'cdnots-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: CdnotsEvidence
+    }
+  | {
+      readonly kind: 'cdnots-plus-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: CdnotsPlusEvidence
+    }
+  | {
+      readonly kind: 'grace-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: GraceEvidence
+    }
   | {
       readonly kind: 'dynotears-succeeded'
       readonly request: WorkerRequestId
@@ -1330,8 +1719,16 @@ export type AnalysisWorkerEvent =
       readonly request: WorkerRequestId
       readonly result: DirectLingamEvidence
     }
-  | { readonly kind: 'pc-stable-succeeded'; readonly request: WorkerRequestId; readonly result: PcStableEvidence }
-  | { readonly kind: 'fci-succeeded'; readonly request: WorkerRequestId; readonly result: FciEvidence }
+  | {
+      readonly kind: 'pc-stable-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: PcStableEvidence
+    }
+  | {
+      readonly kind: 'fci-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: FciEvidence
+    }
   | {
       readonly kind: 'var-lingam-succeeded'
       readonly request: WorkerRequestId
@@ -1342,8 +1739,16 @@ export type AnalysisWorkerEvent =
       readonly request: WorkerRequestId
       readonly result: OcseEvidence
     }
-  | { readonly kind: 'cmlp-succeeded'; readonly request: WorkerRequestId; readonly result: CmlpEvidence }
-  | { readonly kind: 'clstm-succeeded'; readonly request: WorkerRequestId; readonly result: ClstmEvidence }
+  | {
+      readonly kind: 'cmlp-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: CmlpEvidence
+    }
+  | {
+      readonly kind: 'clstm-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: ClstmEvidence
+    }
   | {
       readonly kind: 'granger-succeeded'
       readonly request: WorkerRequestId
@@ -1354,66 +1759,286 @@ export type AnalysisWorkerEvent =
       readonly request: WorkerRequestId
       readonly result: BackdoorIdentificationEvidence
     }
-  | { readonly kind: 'dag-check-succeeded'; readonly request: WorkerRequestId; readonly result: DagCheckEvidence }
+  | {
+      readonly kind: 'dag-check-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: DagCheckEvidence
+    }
   | {
       readonly kind: 'backdoor-linear-succeeded'
       readonly request: WorkerRequestId
       readonly result: BackdoorLinearEvidence
     }
-  | { readonly kind: 'propensity-weighting-succeeded'; readonly request: WorkerRequestId; readonly result: PropensityWeightingEvidence }
-  | { readonly kind: 'propensity-matching-succeeded'; readonly request: WorkerRequestId; readonly result: PropensityMatchingEvidence }
-  | { readonly kind: 'propensity-grid-slice-succeeded'; readonly request: WorkerRequestId; readonly result: GridSliceEvidence }
-  | { readonly kind: 'doubly-robust-succeeded'; readonly request: WorkerRequestId; readonly result: DoublyRobustEvidence }
-  | { readonly kind: 'continuous-gps-succeeded'; readonly request: WorkerRequestId; readonly result: ContinuousGpsEvidence }
-  | { readonly kind: 'frontdoor-two-stage-succeeded'; readonly request: WorkerRequestId; readonly result: FrontdoorTwoStageEvidence }
-  | { readonly kind: 'instrumental-variable-succeeded'; readonly request: WorkerRequestId; readonly result: InstrumentalVariableEvidence }
-  | { readonly kind: 'count-glm-succeeded'; readonly request: WorkerRequestId; readonly result: CountGlmEvidence }
-  | { readonly kind: 'negative-binomial-ingarch-succeeded'; readonly request: WorkerRequestId; readonly result: NegativeBinomialIngarchEvidence }
-  | { readonly kind: 'count-series-intervention-scan-succeeded'; readonly request: WorkerRequestId; readonly result: CountSeriesInterventionScanEvidence }
-  | { readonly kind: 'interrupted-series-succeeded'; readonly request: WorkerRequestId; readonly result: InterruptedSeriesEvidence }
-  | { readonly kind: 'causal-effects-succeeded'; readonly request: WorkerRequestId; readonly result: CausalEffectsEvidence }
-  | { readonly kind: 'sharp-rd-succeeded'; readonly request: WorkerRequestId; readonly result: SharpRdEvidence }
-  | { readonly kind: 'causal-impact-succeeded'; readonly request: WorkerRequestId; readonly result: CausalImpactEvidence }
-  | { readonly kind: 'linear-refutation-succeeded'; readonly request: WorkerRequestId; readonly result: LinearRefutationEvidence }
-  | { readonly kind: 'unobserved-confounding-succeeded'; readonly request: WorkerRequestId; readonly result: UnobservedConfoundingEvidence }
-  | { readonly kind: 'series-structure-succeeded'; readonly request: WorkerRequestId; readonly result: SeriesStructureEvidence }
-  | { readonly kind: 'seasonal-adjusted'; readonly request: WorkerRequestId; readonly result: SeasonalAdjustedEvidence }
-  | { readonly kind: 'double-ml-succeeded'; readonly request: WorkerRequestId; readonly result: DoubleMlEvidence }
-  | { readonly kind: 'causal-forest-succeeded'; readonly request: WorkerRequestId; readonly result: CausalForestEvidence }
-  | { readonly kind: 't-learner-succeeded'; readonly request: WorkerRequestId; readonly result: TLearnerEvidence }
-  | { readonly kind: 'cross-fitted-t-learner-succeeded'; readonly request: WorkerRequestId; readonly result: CrossFittedTLearnerEvidence }
-  | { readonly kind: 'ardl-succeeded'; readonly request: WorkerRequestId; readonly result: ArdlEvidence }
-  | { readonly kind: 'root-cause-succeeded'; readonly request: WorkerRequestId; readonly result: RootCauseEvidence }
-  | { readonly kind: 'root-cause-checks-succeeded'; readonly request: WorkerRequestId; readonly result: RootCauseChecks }
-  | { readonly kind: 'gcm-effects-succeeded'; readonly request: WorkerRequestId; readonly result: GcmEffectsEvidence }
-  | { readonly kind: 'gcm-influence-succeeded'; readonly request: WorkerRequestId; readonly result: GcmInfluenceEvidence }
-  | { readonly kind: 'ardl-model-succeeded'; readonly request: WorkerRequestId; readonly result: ArdlModelEvidence }
-  | { readonly kind:'honest-did-succeeded';readonly request:WorkerRequestId;readonly result:HonestEvidence }
-  | { readonly kind:'did-sensitivity-succeeded';readonly request:WorkerRequestId;readonly result:DidSensitivityEvidence }
-  | { readonly kind: 'vecm-succeeded'; readonly request: WorkerRequestId; readonly result: VecmEvidence }
-  | { readonly kind: 'predictor-synthetic-control-succeeded'; readonly request: WorkerRequestId; readonly result: PredictorSyntheticEvidence }
-  | { readonly kind: 'synthetic-control-succeeded'; readonly request: WorkerRequestId; readonly result: SyntheticControlEvidence }
-  | { readonly kind: 'count-regression-succeeded'; readonly request: WorkerRequestId; readonly result: CountRegressionEvidence }
-  | {readonly kind:'sun-abraham-succeeded';readonly request:WorkerRequestId;readonly result:SunAbrahamEvidence}
-  | {readonly kind:'surrogate-path-succeeded';readonly request:WorkerRequestId;readonly result:SurrogatePathEvidence}
-  | {readonly kind:'surrogate-diagnostics-succeeded';readonly request:WorkerRequestId;readonly result:SurrogateDiagnosticEvidence}
-  | {readonly kind:'surrogate-succeeded';readonly request:WorkerRequestId;readonly result:SurrogateEvidence}
-  | {readonly kind:'ridge-augmented-synthetic-succeeded';readonly request:WorkerRequestId;readonly result:RidgeAugmentedEvidence}
-  | {readonly kind:'panel-regression-succeeded';readonly request:WorkerRequestId;readonly result:PanelRegressionEvidence}
-  | {readonly kind:'bacon-succeeded';readonly request:WorkerRequestId;readonly result:BaconEvidence}
-  | { readonly kind: 'staggered-did-succeeded'; readonly request: WorkerRequestId; readonly result: StaggeredEvidence }
-  | { readonly kind: 'panel-intervention-succeeded'; readonly request: WorkerRequestId; readonly result: PanelInterventionEvidence }
-  | { readonly kind: 'negbin-nuts-succeeded'; readonly request: WorkerRequestId; readonly result: NegbinNutsEvidence }
-  | { readonly kind: 'bayesian-gaussian-succeeded'; readonly request: WorkerRequestId; readonly result: BayesianGaussianEvidence }
-  | { readonly kind: 'network-query-succeeded'; readonly request: WorkerRequestId; readonly result: NetworkQueryEvidence }
-  | {readonly kind:'conditional-gaussian-query-succeeded';readonly request:WorkerRequestId;readonly result:ConditionalGaussianEvidence}
-  | { readonly kind: 'discrete-bn-succeeded'; readonly request: WorkerRequestId; readonly result: DiscreteBnEvidence }
-  | { readonly kind: 'identified-discrete-query-succeeded'; readonly request: WorkerRequestId; readonly result: IdentifiedDiscreteQueryEvidence }
-  | { readonly kind: 'binary-ett-succeeded'; readonly request: WorkerRequestId; readonly result: BinaryEttEvidence }
-  | { readonly kind: 'linear-scm-succeeded'; readonly request: WorkerRequestId; readonly result: LinearScmEvidence }
-  | { readonly kind: 'dynamic-linear-scm-succeeded'; readonly request: WorkerRequestId; readonly result: DynamicLinearScmEvidence }
-  | { readonly kind: 'dml-refutation-succeeded'; readonly request: WorkerRequestId; readonly result: DmlRefutationEvidence }
-  | { readonly kind: 'missingness-resolved'; readonly request: WorkerRequestId; readonly result: MissingnessResolvedEvidence }
+  | {
+      readonly kind: 'propensity-weighting-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: PropensityWeightingEvidence
+    }
+  | {
+      readonly kind: 'propensity-matching-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: PropensityMatchingEvidence
+    }
+  | {
+      readonly kind: 'propensity-grid-slice-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: GridSliceEvidence
+    }
+  | {
+      readonly kind: 'doubly-robust-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: DoublyRobustEvidence
+    }
+  | {
+      readonly kind: 'continuous-gps-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: ContinuousGpsEvidence
+    }
+  | {
+      readonly kind: 'frontdoor-two-stage-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: FrontdoorTwoStageEvidence
+    }
+  | {
+      readonly kind: 'instrumental-variable-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: InstrumentalVariableEvidence
+    }
+  | {
+      readonly kind: 'count-glm-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: CountGlmEvidence
+    }
+  | {
+      readonly kind: 'negative-binomial-ingarch-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: NegativeBinomialIngarchEvidence
+    }
+  | {
+      readonly kind: 'count-series-intervention-scan-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: CountSeriesInterventionScanEvidence
+    }
+  | {
+      readonly kind: 'interrupted-series-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: InterruptedSeriesEvidence
+    }
+  | {
+      readonly kind: 'causal-effects-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: CausalEffectsEvidence
+    }
+  | {
+      readonly kind: 'sharp-rd-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: SharpRdEvidence
+    }
+  | {
+      readonly kind: 'causal-impact-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: CausalImpactEvidence
+    }
+  | {
+      readonly kind: 'linear-refutation-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: LinearRefutationEvidence
+    }
+  | {
+      readonly kind: 'unobserved-confounding-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: UnobservedConfoundingEvidence
+    }
+  | {
+      readonly kind: 'series-structure-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: SeriesStructureEvidence
+    }
+  | {
+      readonly kind: 'seasonal-adjusted'
+      readonly request: WorkerRequestId
+      readonly result: SeasonalAdjustedEvidence
+    }
+  | {
+      readonly kind: 'double-ml-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: DoubleMlEvidence
+    }
+  | {
+      readonly kind: 'causal-forest-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: CausalForestEvidence
+    }
+  | {
+      readonly kind: 't-learner-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: TLearnerEvidence
+    }
+  | {
+      readonly kind: 'cross-fitted-t-learner-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: CrossFittedTLearnerEvidence
+    }
+  | {
+      readonly kind: 'ardl-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: ArdlEvidence
+    }
+  | {
+      readonly kind: 'root-cause-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: RootCauseEvidence
+    }
+  | {
+      readonly kind: 'root-cause-checks-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: RootCauseChecks
+    }
+  | {
+      readonly kind: 'gcm-effects-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: GcmEffectsEvidence
+    }
+  | {
+      readonly kind: 'gcm-influence-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: GcmInfluenceEvidence
+    }
+  | {
+      readonly kind: 'ardl-model-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: ArdlModelEvidence
+    }
+  | {
+      readonly kind: 'honest-did-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: HonestEvidence
+    }
+  | {
+      readonly kind: 'did-sensitivity-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: DidSensitivityEvidence
+    }
+  | {
+      readonly kind: 'vecm-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: VecmEvidence
+    }
+  | {
+      readonly kind: 'predictor-synthetic-control-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: PredictorSyntheticEvidence
+    }
+  | {
+      readonly kind: 'synthetic-control-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: SyntheticControlEvidence
+    }
+  | {
+      readonly kind: 'count-regression-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: CountRegressionEvidence
+    }
+  | {
+      readonly kind: 'sun-abraham-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: SunAbrahamEvidence
+    }
+  | {
+      readonly kind: 'surrogate-path-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: SurrogatePathEvidence
+    }
+  | {
+      readonly kind: 'surrogate-diagnostics-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: SurrogateDiagnosticEvidence
+    }
+  | {
+      readonly kind: 'surrogate-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: SurrogateEvidence
+    }
+  | {
+      readonly kind: 'ridge-augmented-synthetic-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: RidgeAugmentedEvidence
+    }
+  | {
+      readonly kind: 'panel-regression-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: PanelRegressionEvidence
+    }
+  | {
+      readonly kind: 'bacon-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: BaconEvidence
+    }
+  | {
+      readonly kind: 'staggered-did-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: StaggeredEvidence
+    }
+  | {
+      readonly kind: 'panel-intervention-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: PanelInterventionEvidence
+    }
+  | {
+      readonly kind: 'negbin-nuts-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: NegbinNutsEvidence
+    }
+  | {
+      readonly kind: 'bayesian-gaussian-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: BayesianGaussianEvidence
+    }
+  | {
+      readonly kind: 'network-query-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: NetworkQueryEvidence
+    }
+  | {
+      readonly kind: 'conditional-gaussian-query-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: ConditionalGaussianEvidence
+    }
+  | {
+      readonly kind: 'discrete-bn-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: DiscreteBnEvidence
+    }
+  | {
+      readonly kind: 'identified-discrete-query-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: IdentifiedDiscreteQueryEvidence
+    }
+  | {
+      readonly kind: 'binary-ett-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: BinaryEttEvidence
+    }
+  | {
+      readonly kind: 'linear-scm-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: LinearScmEvidence
+    }
+  | {
+      readonly kind: 'dynamic-linear-scm-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: DynamicLinearScmEvidence
+    }
+  | {
+      readonly kind: 'dml-refutation-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: DmlRefutationEvidence
+    }
+  | {
+      readonly kind: 'missingness-resolved'
+      readonly request: WorkerRequestId
+      readonly result: MissingnessResolvedEvidence
+    }
   | {
       readonly kind: 'analysis-failed'
       readonly request: WorkerRequestId
@@ -1438,12 +2063,13 @@ const propensityCommandFields = {
   adjustment: z.array(z.number().int().nonnegative()).nonempty(),
 } as const
 
-const propensityBootstrapSchema = z.object({
-  rounds: z.number().int().min(2).max(2000),
-  seed: z.number().int().nonnegative(),
-  level: z.number().gt(0.5).lt(1),
-}).strict()
-
+const propensityBootstrapSchema = z
+  .object({
+    rounds: z.number().int().min(2).max(2000),
+    seed: z.number().int().nonnegative(),
+    level: z.number().gt(0.5).lt(1),
+  })
+  .strict()
 
 export interface AalenWorkerDesign {
   readonly duration: number
@@ -1454,18 +2080,24 @@ export interface ForestWorkerDesign extends AalenWorkerDesign, ForestSettings {
   readonly categorical: readonly number[]
   readonly predictionRow: number
 }
-const regressionDesignSchema = z.object({
-  duration: z.number().int().nonnegative(),
-  event: z.number().int().nonnegative(),
-  covariates: z.array(z.number().int().nonnegative()).min(1),
-}).strict()
-const forestDesignSchema = regressionDesignSchema.extend({
-  ...forestSettingsSchema.shape,
-  categorical: z.array(z.number().int().nonnegative()),
-  predictionRow: z.number().int().nonnegative(),
-}).strict()
+const regressionDesignSchema = z
+  .object({
+    duration: z.number().int().nonnegative(),
+    event: z.number().int().nonnegative(),
+    covariates: z.array(z.number().int().nonnegative()).min(1),
+  })
+  .strict()
+const forestDesignSchema = regressionDesignSchema
+  .extend({
+    ...forestSettingsSchema.shape,
+    categorical: z.array(z.number().int().nonnegative()),
+    predictionRow: z.number().int().nonnegative(),
+  })
+  .strict()
 
-const workerRequestId = (value: string): Result<WorkerRequestId, { readonly kind: 'invalid-worker-request-id' }> =>
+const workerRequestId = (
+  value: string,
+): Result<WorkerRequestId, { readonly kind: 'invalid-worker-request-id' }> =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
     ? ok(brand<string, 'WorkerRequestId'>(value))
     : err({ kind: 'invalid-worker-request-id' })
@@ -1475,17 +2107,34 @@ export const newWorkerRequestId = (): WorkerRequestId =>
 
 const temporalSamplesSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('dense') }).strict(),
-  z.object({
-    kind: z.literal('role-aware'),
-    validity: z.instanceof(Uint8Array),
-    analysisMask: z.instanceof(Uint8Array),
-    cutOff: z.enum(['methodDefault', 'twoTauMax', 'tauMax', 'maxLag', 'maxLagOrTauMax', 'twoTauMaxFuture']),
-    propagateThroughMaxLag: z.boolean(),
-    maskType: z.enum(['none', 'x', 'y', 'z', 'xy', 'xz', 'yz', 'xyz']),
-  }).strict(),
+  z
+    .object({
+      kind: z.literal('role-aware'),
+      validity: z.instanceof(Uint8Array),
+      analysisMask: z.instanceof(Uint8Array),
+      cutOff: z.enum([
+        'methodDefault',
+        'twoTauMax',
+        'tauMax',
+        'maxLag',
+        'maxLagOrTauMax',
+        'twoTauMaxFuture',
+      ]),
+      propagateThroughMaxLag: z.boolean(),
+      maskType: z.enum(['none', 'x', 'y', 'z', 'xy', 'xz', 'yz', 'xyz']),
+    })
+    .strict(),
 ])
 
-const cdnotsContextCommandSchema = z.enum(['none', 'linear', 'linearSine', 'linearExponential', 'linearQuadratic', 'step', 'stepLinear'])
+const cdnotsContextCommandSchema = z.enum([
+  'none',
+  'linear',
+  'linearSine',
+  'linearExponential',
+  'linearQuadratic',
+  'step',
+  'stepLinear',
+])
 
 const cdnotsCommandBaseSchema = z.object({
   request: requestSchema,
@@ -1499,16 +2148,21 @@ const cdnotsCommandBaseSchema = z.object({
   context: cdnotsContextCommandSchema,
 })
 
-const constraintPairSchema = z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()])
+const constraintPairSchema = z.tuple([
+  z.number().int().nonnegative(),
+  z.number().int().nonnegative(),
+])
 const constraintPatternSchema = z.tuple([z.string(), z.string()])
-const constraintBackgroundSchema = z.object({
-  forbidden: z.array(constraintPairSchema),
-  required: z.array(constraintPairSchema),
-  forbiddenPatterns: z.array(constraintPatternSchema),
-  requiredPatterns: z.array(constraintPatternSchema),
-  tiers: z.array(z.number().int().nonnegative().nullable()),
-  forbiddenWithinTiers: z.array(z.number().int().nonnegative()),
-}).strict()
+const constraintBackgroundSchema = z
+  .object({
+    forbidden: z.array(constraintPairSchema),
+    required: z.array(constraintPairSchema),
+    forbiddenPatterns: z.array(constraintPatternSchema),
+    requiredPatterns: z.array(constraintPatternSchema),
+    tiers: z.array(z.number().int().nonnegative().nullable()),
+    forbiddenWithinTiers: z.array(z.number().int().nonnegative()),
+  })
+  .strict()
 
 const constraintCommandBaseSchema = z.object({
   request: requestSchema,
@@ -1523,993 +2177,1539 @@ const constraintCommandBaseSchema = z.object({
 })
 
 const commandSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('aalen'), request: requestSchema, values: z.instanceof(Float64Array), rows: z.number().int().min(2), columns: z.number().int().min(3), design: regressionDesignSchema }).strict(),
-  z.object({ kind: z.literal('survival-forest'), request: requestSchema, values: z.instanceof(Float64Array), rows: z.number().int().min(2), columns: z.number().int().min(3), design: forestDesignSchema }).strict(),
-  z.object({
-    kind: z.literal('flexsurv'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().min(2),
-    columns: z.number().int().min(2).max(256),
-    observation: z.discriminatedUnion('kind', [
-      z.object({ kind: z.literal('rightCensored'), duration: z.number().int().nonnegative(), event: z.number().int().nonnegative() }).strict(),
-      z.object({ kind: z.literal('startStop'), start: z.number().int().nonnegative(), stop: z.number().int().nonnegative(), event: z.number().int().nonnegative() }).strict(),
-    ]),
-    rowFrequency: z.discriminatedUnion('kind', [
-      z.object({ kind: z.literal('oneObservationPerRow') }).strict(),
-      z.object({ kind: z.literal('frequencyColumn'), column: z.number().int().nonnegative() }).strict(),
-    ]),
-    covariates: z.array(z.number().int().nonnegative()),
-    family: parametricSurvivalFamilySchema,
-    predictionTimes: z.array(z.number().finite().nonnegative()).min(1).max(500),
-  }).strict().superRefine((value, context) => {
-    const roles = value.observation.kind === 'rightCensored'
-      ? [value.observation.duration, value.observation.event]
-      : [value.observation.start, value.observation.stop, value.observation.event]
-    const frequency = value.rowFrequency.kind === 'frequencyColumn' ? [value.rowFrequency.column] : []
-    const selected = [...roles, ...frequency, ...value.covariates]
-    if (new Set(roles).size !== roles.length || new Set(selected).size !== selected.length || selected.some((column) => column >= value.columns)) {
-      context.addIssue({ code: 'custom', message: 'Survival roles and covariates must be distinct columns inside the matrix.' })
-    }
-    if (value.observation.kind === 'startStop' && !proportionalHazardsFamilySchema.safeParse(value.family).success) {
-      context.addIssue({ code: 'custom', message: 'Start-stop data requires a proportional-hazards family.' })
-    }
-  }),
-  z.object({
-    kind: z.literal('cox-regression'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().min(2),
-    columns: z.number().int().min(3).max(256),
-    design: z.object({
+  z
+    .object({
+      kind: z.literal('aalen'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().min(2),
+      columns: z.number().int().min(3),
+      design: regressionDesignSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('survival-forest'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().min(2),
+      columns: z.number().int().min(3),
+      design: forestDesignSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('flexsurv'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().min(2),
+      columns: z.number().int().min(2).max(256),
       observation: z.discriminatedUnion('kind', [
-        z.object({
-          kind: z.literal('rightCensored'),
-          duration: z.number().int().nonnegative(),
-          event: z.number().int().nonnegative(),
-          entry: z.discriminatedUnion('kind', [
-            z.object({ kind: z.literal('notUsed') }).strict(),
-            z.object({ kind: z.literal('column'), column: z.number().int().nonnegative() }).strict(),
-          ]),
-          standardErrors: z.discriminatedUnion('kind', [
-            z.object({ kind: z.literal('modelBased') }).strict(),
-            z.object({ kind: z.literal('robust') }).strict(),
-            z.object({ kind: z.literal('clustered'), column: z.number().int().nonnegative() }).strict(),
-            z.object({ kind: z.literal('clusteredBreslow'), column: z.number().int().nonnegative() }).strict(),
-          ]),
-          frailty: z.discriminatedUnion('kind', [
-            z.object({ kind: z.literal('none') }).strict(),
-            z.object({ kind: z.literal('gamma'), column: z.number().int().nonnegative(), ties: z.enum(['efron', 'breslow']) }).strict(),
-          ]),
-        }).strict(),
-        z.object({
-          kind: z.literal('startStop'),
-          subject: z.number().int().nonnegative(),
-          start: z.number().int().nonnegative(),
-          stop: z.number().int().nonnegative(),
-          event: z.number().int().nonnegative(),
-        }).strict(),
+        z
+          .object({
+            kind: z.literal('rightCensored'),
+            duration: z.number().int().nonnegative(),
+            event: z.number().int().nonnegative(),
+          })
+          .strict(),
+        z
+          .object({
+            kind: z.literal('startStop'),
+            start: z.number().int().nonnegative(),
+            stop: z.number().int().nonnegative(),
+            event: z.number().int().nonnegative(),
+          })
+          .strict(),
       ]),
-      weights: z.discriminatedUnion('kind', [
-        z.object({ kind: z.literal('equal') }).strict(),
-        z.object({ kind: z.literal('column'), column: z.number().int().nonnegative() }).strict(),
+      rowFrequency: z.discriminatedUnion('kind', [
+        z.object({ kind: z.literal('oneObservationPerRow') }).strict(),
+        z
+          .object({ kind: z.literal('frequencyColumn'), column: z.number().int().nonnegative() })
+          .strict(),
       ]),
-      strata: z.discriminatedUnion('kind', [
-        z.object({ kind: z.literal('unstratified') }).strict(),
-        z.object({ kind: z.literal('column'), column: z.number().int().nonnegative() }).strict(),
-      ]),
+      covariates: z.array(z.number().int().nonnegative()),
+      family: parametricSurvivalFamilySchema,
+      predictionTimes: z.array(z.number().finite().nonnegative()).min(1).max(500),
+    })
+    .strict()
+    .superRefine((value, context) => {
+      const roles =
+        value.observation.kind === 'rightCensored'
+          ? [value.observation.duration, value.observation.event]
+          : [value.observation.start, value.observation.stop, value.observation.event]
+      const frequency =
+        value.rowFrequency.kind === 'frequencyColumn' ? [value.rowFrequency.column] : []
+      const selected = [...roles, ...frequency, ...value.covariates]
+      if (
+        new Set(roles).size !== roles.length ||
+        new Set(selected).size !== selected.length ||
+        selected.some((column) => column >= value.columns)
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Survival roles and covariates must be distinct columns inside the matrix.',
+        })
+      }
+      if (
+        value.observation.kind === 'startStop' &&
+        !proportionalHazardsFamilySchema.safeParse(value.family).success
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Start-stop data requires a proportional-hazards family.',
+        })
+      }
+    }),
+  z
+    .object({
+      kind: z.literal('cox-regression'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().min(2),
+      columns: z.number().int().min(3).max(256),
+      design: z
+        .object({
+          observation: z.discriminatedUnion('kind', [
+            z
+              .object({
+                kind: z.literal('rightCensored'),
+                duration: z.number().int().nonnegative(),
+                event: z.number().int().nonnegative(),
+                entry: z.discriminatedUnion('kind', [
+                  z.object({ kind: z.literal('notUsed') }).strict(),
+                  z
+                    .object({ kind: z.literal('column'), column: z.number().int().nonnegative() })
+                    .strict(),
+                ]),
+                standardErrors: z.discriminatedUnion('kind', [
+                  z.object({ kind: z.literal('modelBased') }).strict(),
+                  z.object({ kind: z.literal('robust') }).strict(),
+                  z
+                    .object({
+                      kind: z.literal('clustered'),
+                      column: z.number().int().nonnegative(),
+                    })
+                    .strict(),
+                  z
+                    .object({
+                      kind: z.literal('clusteredBreslow'),
+                      column: z.number().int().nonnegative(),
+                    })
+                    .strict(),
+                ]),
+                frailty: z.discriminatedUnion('kind', [
+                  z.object({ kind: z.literal('none') }).strict(),
+                  z
+                    .object({
+                      kind: z.literal('gamma'),
+                      column: z.number().int().nonnegative(),
+                      ties: z.enum(['efron', 'breslow']),
+                    })
+                    .strict(),
+                ]),
+              })
+              .strict(),
+            z
+              .object({
+                kind: z.literal('startStop'),
+                subject: z.number().int().nonnegative(),
+                start: z.number().int().nonnegative(),
+                stop: z.number().int().nonnegative(),
+                event: z.number().int().nonnegative(),
+              })
+              .strict(),
+          ]),
+          weights: z.discriminatedUnion('kind', [
+            z.object({ kind: z.literal('equal') }).strict(),
+            z
+              .object({ kind: z.literal('column'), column: z.number().int().nonnegative() })
+              .strict(),
+          ]),
+          strata: z.discriminatedUnion('kind', [
+            z.object({ kind: z.literal('unstratified') }).strict(),
+            z
+              .object({ kind: z.literal('column'), column: z.number().int().nonnegative() })
+              .strict(),
+          ]),
+          covariates: z.array(z.number().int().nonnegative()).min(1),
+          penalty: z.discriminatedUnion('kind', [
+            z.object({ kind: z.literal('unpenalized') }).strict(),
+            z
+              .object({
+                kind: z.literal('elasticNet'),
+                penalizer: z.number().finite().positive(),
+                l1Ratio: z.number().finite().min(0).max(1),
+              })
+              .strict(),
+          ]),
+          confidenceLevel: z.number().finite().gt(0).lt(1),
+        })
+        .strict(),
+    })
+    .strict()
+    .superRefine((value, context) => {
+      const observation = value.design.observation
+      if (
+        observation.kind === 'rightCensored' &&
+        observation.standardErrors.kind === 'clusteredBreslow' &&
+        (observation.entry.kind !== 'notUsed' ||
+          observation.frailty.kind !== 'none' ||
+          value.design.weights.kind !== 'equal' ||
+          value.design.strata.kind !== 'unstratified' ||
+          value.design.penalty.kind !== 'unpenalized')
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message:
+            'Clustered Breslow requires equal weights, no delayed entry, no strata, no frailty and no penalty.',
+        })
+      }
+      const roles =
+        observation.kind === 'rightCensored'
+          ? [
+              observation.duration,
+              observation.event,
+              ...(observation.entry.kind === 'column' ? [observation.entry.column] : []),
+              ...('column' in observation.standardErrors
+                ? [observation.standardErrors.column]
+                : []),
+              ...(observation.frailty.kind === 'gamma' ? [observation.frailty.column] : []),
+            ]
+          : [observation.subject, observation.start, observation.stop, observation.event]
+      const selected = [
+        ...roles,
+        ...(value.design.weights.kind === 'column' ? [value.design.weights.column] : []),
+        ...(value.design.strata.kind === 'column' ? [value.design.strata.column] : []),
+        ...value.design.covariates,
+      ]
+      if (
+        new Set(selected).size !== selected.length ||
+        selected.some((column) => column >= value.columns)
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message:
+            'Cox regression roles and covariates must be distinct columns inside the matrix.',
+        })
+      }
+    }),
+  z
+    .object({
+      kind: z.literal('penalized-aft'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().min(2),
+      columns: z.number().int().min(3).max(256),
+      duration: z.number().int().nonnegative(),
+      event: z.number().int().nonnegative(),
       covariates: z.array(z.number().int().nonnegative()).min(1),
-      penalty: z.discriminatedUnion('kind', [
-        z.object({ kind: z.literal('unpenalized') }).strict(),
-        z.object({ kind: z.literal('elasticNet'), penalizer: z.number().finite().positive(), l1Ratio: z.number().finite().min(0).max(1) }).strict(),
-      ]),
+      family: z.enum(['weibull', 'logLogistic']),
+      penalizer: z.number().finite().nonnegative(),
       confidenceLevel: z.number().finite().gt(0).lt(1),
-    }).strict(),
-  }).strict().superRefine((value, context) => {
-    const observation = value.design.observation
-    if (observation.kind === 'rightCensored' && observation.standardErrors.kind === 'clusteredBreslow'
-      && (observation.entry.kind !== 'notUsed' || observation.frailty.kind !== 'none'
-        || value.design.weights.kind !== 'equal' || value.design.strata.kind !== 'unstratified' || value.design.penalty.kind !== 'unpenalized')) {
-      context.addIssue({ code: 'custom', message: 'Clustered Breslow requires equal weights, no delayed entry, no strata, no frailty and no penalty.' })
-    }
-    const roles = observation.kind === 'rightCensored'
-      ? [
-          observation.duration,
-          observation.event,
-          ...(observation.entry.kind === 'column' ? [observation.entry.column] : []),
-          ...('column' in observation.standardErrors ? [observation.standardErrors.column] : []),
-          ...(observation.frailty.kind === 'gamma' ? [observation.frailty.column] : []),
-        ]
-      : [observation.subject, observation.start, observation.stop, observation.event]
-    const selected = [
-      ...roles,
-      ...(value.design.weights.kind === 'column' ? [value.design.weights.column] : []),
-      ...(value.design.strata.kind === 'column' ? [value.design.strata.column] : []),
-      ...value.design.covariates,
-    ]
-    if (new Set(selected).size !== selected.length || selected.some((column) => column >= value.columns)) {
-      context.addIssue({ code: 'custom', message: 'Cox regression roles and covariates must be distinct columns inside the matrix.' })
-    }
-  }),
-  z.object({
-    kind: z.literal('penalized-aft'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().min(2),
-    columns: z.number().int().min(3).max(256),
-    duration: z.number().int().nonnegative(),
-    event: z.number().int().nonnegative(),
-    covariates: z.array(z.number().int().nonnegative()).min(1),
-    family: z.enum(['weibull', 'logLogistic']),
-    penalizer: z.number().finite().nonnegative(),
-    confidenceLevel: z.number().finite().gt(0).lt(1),
-    predictionTimes: z.array(z.number().finite().nonnegative()).min(1).max(500),
-  }).strict().superRefine((value, context) => {
-    const selected = [value.duration, value.event, ...value.covariates]
-    if (new Set(selected).size !== selected.length || selected.some((column) => column >= value.columns)) {
-      context.addIssue({ code: 'custom', message: 'AFT roles and covariates must be distinct columns inside the matrix.' })
-    }
-  }),
-  z.object({
-    kind: z.literal('nonparametric-survival'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().min(2),
-    columns: z.number().int().min(2).max(3),
-    duration: z.number().int().nonnegative(),
-    event: z.number().int().nonnegative(),
-    rowFrequency: z.discriminatedUnion('kind', [
-      z.object({ kind: z.literal('oneObservationPerRow') }).strict(),
-      z.object({ kind: z.literal('frequencyColumn'), column: z.number().int().nonnegative() }).strict(),
-    ]),
-    predictionTimes: z.array(z.number().finite().nonnegative()).min(1).max(500),
-    ties: z.enum(['discrete', 'smoothed']),
-  }).strict().superRefine((value, context) => {
-    const frequency = value.rowFrequency.kind === 'frequencyColumn' ? [value.rowFrequency.column] : []
-    const roles = [value.duration, value.event, ...frequency]
-    if (new Set(roles).size !== roles.length || roles.some((column) => column >= value.columns)) {
-      context.addIssue({ code: 'custom', message: 'Nonparametric survival roles must be distinct columns inside the matrix.' })
-    }
-  }),
-  z.object({
-    kind: z.literal('comparison-survival'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().min(4),
-    columns: z.number().int().min(3).max(256),
-    duration: z.number().int().nonnegative(),
-    event: z.number().int().nonnegative(),
-    group: z.number().int().nonnegative(),
-    truncationTime: z.number().finite().positive(),
-    permutations: z.number().int().min(1).max(100_000),
-    seed: z.number().int().nonnegative(),
-  }).strict().superRefine((value, context) => {
-    const selected = [value.duration, value.event, value.group]
-    if (new Set(selected).size !== selected.length || selected.some((column) => column >= value.columns)) {
-      context.addIssue({ code: 'custom', message: 'Duration, event, and group must be three distinct columns inside the matrix.' })
-    }
-  }),
-  z.object({
-    kind: z.literal('multi-state-survival'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().min(2),
-    columns: z.number().int().min(2).max(256),
-    input: z.discriminatedUnion('kind', [
-      z.object({ kind: z.literal('preparedRows'), start: z.number().int().nonnegative(), stop: z.number().int().nonnegative(), event: z.number().int().nonnegative(), from: z.number().int().nonnegative(), to: z.number().int().nonnegative() }).strict(),
-      z.object({ kind: z.literal('longitudinalStates'), subject: z.number().int().nonnegative(), time: z.number().int().nonnegative(), state: z.number().int().nonnegative(), allowed: z.array(z.array(z.boolean()).min(1)).min(2) }).strict(),
-      z.object({
-        kind: z.literal('wideEvents'),
-        states: z.array(z.discriminatedUnion('kind', [
-          z.object({ kind: z.literal('notApplicable') }).strict(),
-          z.object({ kind: z.literal('recorded'), time: z.number().int().nonnegative(), status: z.number().int().nonnegative() }).strict(),
-        ])).min(2),
-        transitions: z.array(z.array(z.number().int().positive().nullable()).min(1)).min(2),
-        entry: z.discriminatedUnion('kind', [
-          z.object({ kind: z.literal('shared'), state: z.number().int().positive(), time: z.number().finite() }).strict(),
-          z.object({ kind: z.literal('columns'), state: z.number().int().nonnegative(), time: z.number().int().nonnegative() }).strict(),
-        ]),
-      }).strict(),
-    ]),
-    family: proportionalHazardsFamilySchema,
-    predictionTimes: z.array(z.number().finite().nonnegative()).min(1).max(500),
-  }).strict().superRefine((value, context) => {
-    const input = value.input
-    const selected = input.kind === 'preparedRows'
-      ? [input.start, input.stop, input.event, input.from, input.to]
-      : input.kind === 'longitudinalStates'
-        ? [input.subject, input.time, input.state]
-        : [
-            ...input.states.flatMap((state) => state.kind === 'recorded' ? [state.time, state.status] : []),
-            ...(input.entry.kind === 'columns' ? [input.entry.state, input.entry.time] : []),
-          ]
-    const requiresDistinctRoles = input.kind !== 'wideEvents'
-    if ((requiresDistinctRoles && new Set(selected).size !== selected.length) || selected.some((column) => column >= value.columns)) {
-      context.addIssue({ code: 'custom', message: 'Multi-state input roles must be valid columns, and prepared or longitudinal roles must be distinct.' })
-    }
-    if (input.kind === 'wideEvents' && input.states.some((state) => state.kind === 'recorded' && state.time === state.status)) {
-      context.addIssue({ code: 'custom', message: 'Each wide state needs different time and status columns.' })
-    }
-    if (input.kind === 'longitudinalStates' && input.allowed.some((row) => row.length !== input.allowed.length)) {
-      context.addIssue({ code: 'custom', message: 'The allowed-transition matrix must be square.' })
-    }
-    if (input.kind === 'wideEvents' && (input.transitions.length !== input.states.length || input.transitions.some((row) => row.length !== input.states.length))) {
-      context.addIssue({ code: 'custom', message: 'The numbered transition matrix must be square and match the number of states.' })
-    }
-    if (value.predictionTimes.some((time, index) => index > 0 && value.predictionTimes[index - 1]! > time)) {
-      context.addIssue({ code: 'custom', message: 'Multi-state prediction times must be ordered.' })
-    }
-  }),
-  z.object({
-    kind: z.literal('stationarity-battery'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-  }).strict(),
-  z.object({
-    kind: z.literal('multicollinearity'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().min(3),
-    columns: z.number().int().min(2).max(64),
-    correlationThreshold: z.number().finite().gt(0).max(1),
-    vifThreshold: z.number().finite().gt(1),
-  }).strict(),
-  z.object({
-    kind: z.literal('pandas-resample-daily'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(1).max(256),
-    target: z.enum(['weekly', 'monthly']),
-    incompleteBins: z.enum(['keep', 'drop']),
-    aggregations: z.array(z.enum(['mean', 'sum', 'median', 'minimum', 'maximum', 'first', 'last'])).min(1).max(256),
-    imputedCells: z.array(z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()])),
-  }).strict(),
-  z.object({
-    kind: z.literal('pcmci-plus'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(2),
-    tauMax: z.number().int().min(1).max(20),
-    pcAlpha: z.number().finite().positive().max(1),
-    samples: temporalSamplesSchema,
-  }).strict(),
-  z.object({
-    kind: z.literal('jpcmci-plus'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    datasets: z.number().int().min(2),
-    periods: z.number().int().min(2),
-    observedColumns: z.number().int().min(2),
-    classes: z.array(z.enum(['system', 'timeContext', 'spaceContext'])).min(2),
-    timeDummy: z.boolean(),
-    spaceDummy: z.boolean(),
-    tauMax: z.number().int().min(1).max(20),
-    pcAlpha: z.number().finite().positive().max(1),
-  }).strict(),
-  z.object({
-    kind: z.literal('lpcmci'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(2),
-    tauMax: z.number().int().min(1).max(20),
-    pcAlpha: z.number().finite().positive().max(1),
-    samples: temporalSamplesSchema,
-  }).strict(),
-  z.object({
-    kind: z.literal('rpcmci'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(2),
-    numRegimes: z.number().int().min(2).max(6),
-    maxTransitions: z.number().int().nonnegative(),
-    switchThres: z.number().finite().min(0).max(1),
-    numIterations: z.number().int().min(1).max(100),
-    maxAnneal: z.number().int().min(1).max(50),
-    tauMin: z.number().int().nonnegative().max(6),
-    tauMax: z.number().int().nonnegative().max(6),
-    pcAlpha: z.number().finite().positive().max(1),
-    alphaLevel: z.number().finite().positive().max(1),
-    seed: z.number().int().nonnegative(),
-  }).strict(),
+      predictionTimes: z.array(z.number().finite().nonnegative()).min(1).max(500),
+    })
+    .strict()
+    .superRefine((value, context) => {
+      const selected = [value.duration, value.event, ...value.covariates]
+      if (
+        new Set(selected).size !== selected.length ||
+        selected.some((column) => column >= value.columns)
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message: 'AFT roles and covariates must be distinct columns inside the matrix.',
+        })
+      }
+    }),
+  z
+    .object({
+      kind: z.literal('nonparametric-survival'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().min(2),
+      columns: z.number().int().min(2).max(3),
+      duration: z.number().int().nonnegative(),
+      event: z.number().int().nonnegative(),
+      rowFrequency: z.discriminatedUnion('kind', [
+        z.object({ kind: z.literal('oneObservationPerRow') }).strict(),
+        z
+          .object({ kind: z.literal('frequencyColumn'), column: z.number().int().nonnegative() })
+          .strict(),
+      ]),
+      predictionTimes: z.array(z.number().finite().nonnegative()).min(1).max(500),
+      ties: z.enum(['discrete', 'smoothed']),
+    })
+    .strict()
+    .superRefine((value, context) => {
+      const frequency =
+        value.rowFrequency.kind === 'frequencyColumn' ? [value.rowFrequency.column] : []
+      const roles = [value.duration, value.event, ...frequency]
+      if (new Set(roles).size !== roles.length || roles.some((column) => column >= value.columns)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Nonparametric survival roles must be distinct columns inside the matrix.',
+        })
+      }
+    }),
+  z
+    .object({
+      kind: z.literal('comparison-survival'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().min(4),
+      columns: z.number().int().min(3).max(256),
+      duration: z.number().int().nonnegative(),
+      event: z.number().int().nonnegative(),
+      group: z.number().int().nonnegative(),
+      truncationTime: z.number().finite().positive(),
+      permutations: z.number().int().min(1).max(100_000),
+      seed: z.number().int().nonnegative(),
+    })
+    .strict()
+    .superRefine((value, context) => {
+      const selected = [value.duration, value.event, value.group]
+      if (
+        new Set(selected).size !== selected.length ||
+        selected.some((column) => column >= value.columns)
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Duration, event, and group must be three distinct columns inside the matrix.',
+        })
+      }
+    }),
+  z
+    .object({
+      kind: z.literal('multi-state-survival'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().min(2),
+      columns: z.number().int().min(2).max(256),
+      input: z.discriminatedUnion('kind', [
+        z
+          .object({
+            kind: z.literal('preparedRows'),
+            start: z.number().int().nonnegative(),
+            stop: z.number().int().nonnegative(),
+            event: z.number().int().nonnegative(),
+            from: z.number().int().nonnegative(),
+            to: z.number().int().nonnegative(),
+          })
+          .strict(),
+        z
+          .object({
+            kind: z.literal('longitudinalStates'),
+            subject: z.number().int().nonnegative(),
+            time: z.number().int().nonnegative(),
+            state: z.number().int().nonnegative(),
+            allowed: z.array(z.array(z.boolean()).min(1)).min(2),
+          })
+          .strict(),
+        z
+          .object({
+            kind: z.literal('wideEvents'),
+            states: z
+              .array(
+                z.discriminatedUnion('kind', [
+                  z.object({ kind: z.literal('notApplicable') }).strict(),
+                  z
+                    .object({
+                      kind: z.literal('recorded'),
+                      time: z.number().int().nonnegative(),
+                      status: z.number().int().nonnegative(),
+                    })
+                    .strict(),
+                ]),
+              )
+              .min(2),
+            transitions: z.array(z.array(z.number().int().positive().nullable()).min(1)).min(2),
+            entry: z.discriminatedUnion('kind', [
+              z
+                .object({
+                  kind: z.literal('shared'),
+                  state: z.number().int().positive(),
+                  time: z.number().finite(),
+                })
+                .strict(),
+              z
+                .object({
+                  kind: z.literal('columns'),
+                  state: z.number().int().nonnegative(),
+                  time: z.number().int().nonnegative(),
+                })
+                .strict(),
+            ]),
+          })
+          .strict(),
+      ]),
+      family: proportionalHazardsFamilySchema,
+      predictionTimes: z.array(z.number().finite().nonnegative()).min(1).max(500),
+    })
+    .strict()
+    .superRefine((value, context) => {
+      const input = value.input
+      const selected =
+        input.kind === 'preparedRows'
+          ? [input.start, input.stop, input.event, input.from, input.to]
+          : input.kind === 'longitudinalStates'
+            ? [input.subject, input.time, input.state]
+            : [
+                ...input.states.flatMap((state) =>
+                  state.kind === 'recorded' ? [state.time, state.status] : [],
+                ),
+                ...(input.entry.kind === 'columns' ? [input.entry.state, input.entry.time] : []),
+              ]
+      const requiresDistinctRoles = input.kind !== 'wideEvents'
+      if (
+        (requiresDistinctRoles && new Set(selected).size !== selected.length) ||
+        selected.some((column) => column >= value.columns)
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message:
+            'Multi-state input roles must be valid columns, and prepared or longitudinal roles must be distinct.',
+        })
+      }
+      if (
+        input.kind === 'wideEvents' &&
+        input.states.some((state) => state.kind === 'recorded' && state.time === state.status)
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Each wide state needs different time and status columns.',
+        })
+      }
+      if (
+        input.kind === 'longitudinalStates' &&
+        input.allowed.some((row) => row.length !== input.allowed.length)
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message: 'The allowed-transition matrix must be square.',
+        })
+      }
+      if (
+        input.kind === 'wideEvents' &&
+        (input.transitions.length !== input.states.length ||
+          input.transitions.some((row) => row.length !== input.states.length))
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message: 'The numbered transition matrix must be square and match the number of states.',
+        })
+      }
+      if (
+        value.predictionTimes.some(
+          (time, index) => index > 0 && value.predictionTimes[index - 1]! > time,
+        )
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Multi-state prediction times must be ordered.',
+        })
+      }
+    }),
+  z
+    .object({
+      kind: z.literal('stationarity-battery'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('multicollinearity'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().min(3),
+      columns: z.number().int().min(2).max(64),
+      correlationThreshold: z.number().finite().gt(0).max(1),
+      vifThreshold: z.number().finite().gt(1),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('pandas-resample-daily'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(1).max(256),
+      target: z.enum(['weekly', 'monthly']),
+      incompleteBins: z.enum(['keep', 'drop']),
+      aggregations: z
+        .array(z.enum(['mean', 'sum', 'median', 'minimum', 'maximum', 'first', 'last']))
+        .min(1)
+        .max(256),
+      imputedCells: z.array(
+        z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()]),
+      ),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('pcmci-plus'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(2),
+      tauMax: z.number().int().min(1).max(20),
+      pcAlpha: z.number().finite().positive().max(1),
+      samples: temporalSamplesSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('jpcmci-plus'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      datasets: z.number().int().min(2),
+      periods: z.number().int().min(2),
+      observedColumns: z.number().int().min(2),
+      classes: z.array(z.enum(['system', 'timeContext', 'spaceContext'])).min(2),
+      timeDummy: z.boolean(),
+      spaceDummy: z.boolean(),
+      tauMax: z.number().int().min(1).max(20),
+      pcAlpha: z.number().finite().positive().max(1),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('lpcmci'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(2),
+      tauMax: z.number().int().min(1).max(20),
+      pcAlpha: z.number().finite().positive().max(1),
+      samples: temporalSamplesSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('rpcmci'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(2),
+      numRegimes: z.number().int().min(2).max(6),
+      maxTransitions: z.number().int().nonnegative(),
+      switchThres: z.number().finite().min(0).max(1),
+      numIterations: z.number().int().min(1).max(100),
+      maxAnneal: z.number().int().min(1).max(50),
+      tauMin: z.number().int().nonnegative().max(6),
+      tauMax: z.number().int().nonnegative().max(6),
+      pcAlpha: z.number().finite().positive().max(1),
+      alphaLevel: z.number().finite().positive().max(1),
+      seed: z.number().int().nonnegative(),
+    })
+    .strict(),
   cdnotsCommandBaseSchema.extend({ kind: z.literal('cdnots') }).strict(),
   cdnotsCommandBaseSchema.extend({ kind: z.literal('cdnots-plus') }).strict(),
-  z.object({
-    kind: z.literal('grace'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    validity: z.instanceof(Uint8Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(2),
-    maxLag: z.number().int().min(1).max(20),
-    alpha: z.number().finite().positive().max(1),
-    context: cdnotsContextCommandSchema,
-    gateThreshold: z.number().finite().min(0).max(1),
-    epochs: z.number().int().min(1).max(2_000),
-    patience: z.number().int().min(1).max(500),
-    seed: z.number().int().nonnegative(),
-  }).strict().refine((value) => value.patience <= value.epochs, { message: 'GRACE patience cannot exceed epochs.' }),
-  z.object({
-    kind: z.literal('dynotears'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(2),
-    maxLag: z.number().int().min(1).max(6),
-    lambdaW: z.number().finite().nonnegative(),
-    lambdaA: z.number().finite().nonnegative(),
-  }).strict(),
-  z.object({
-    kind: z.literal('direct-lingam'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(2),
-  }).strict(),
+  z
+    .object({
+      kind: z.literal('grace'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      validity: z.instanceof(Uint8Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(2),
+      maxLag: z.number().int().min(1).max(20),
+      alpha: z.number().finite().positive().max(1),
+      context: cdnotsContextCommandSchema,
+      gateThreshold: z.number().finite().min(0).max(1),
+      epochs: z.number().int().min(1).max(2_000),
+      patience: z.number().int().min(1).max(500),
+      seed: z.number().int().nonnegative(),
+    })
+    .strict()
+    .refine((value) => value.patience <= value.epochs, {
+      message: 'GRACE patience cannot exceed epochs.',
+    }),
+  z
+    .object({
+      kind: z.literal('dynotears'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(2),
+      maxLag: z.number().int().min(1).max(6),
+      lambdaW: z.number().finite().nonnegative(),
+      lambdaA: z.number().finite().nonnegative(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('direct-lingam'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(2),
+    })
+    .strict(),
   constraintCommandBaseSchema.extend({ kind: z.literal('pc-stable') }).strict(),
-  constraintCommandBaseSchema.extend({
-    kind: z.literal('fci'),
-    maxPathLength: z.number().int().nonnegative().nullable(),
-  }).strict(),
-  z.object({
-    kind: z.literal('var-lingam'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(2),
-    lags: z.number().int().min(1).max(6),
-    prune: z.boolean(),
-  }).strict(),
-  z.object({
-    kind: z.literal('ocse'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(2),
-    maxLag: z.number().int().min(1).max(8),
-    alpha: z.number().finite().positive().max(1),
-    nShuffles: z.number().int().min(20).max(2_000),
-    method: z.enum(['gaussian', 'knn']),
-    k: z.number().int().min(1).max(20),
-  }).strict(),
-  z.object({
-    kind: z.literal('cmlp'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(2),
-    lag: z.number().int().min(1).max(20),
-    hidden: z.array(z.number().int().min(1).max(256)).min(1).max(4),
-    activation: z.enum(['sigmoid', 'tanh', 'relu', 'leakyRelu', 'identity']),
-    penalty: z.enum(['groupLasso', 'groupSparseGroupLasso', 'hierarchical']),
-    lambda: z.number().finite().nonnegative(),
-    ridgeLambda: z.number().finite().nonnegative(),
-    learningRate: z.number().finite().positive(),
-    maxIter: z.number().int().min(1).max(50_000),
-    checkEvery: z.number().int().positive(),
-    lookback: z.number().int().positive(),
-    seed: z.number().int().nonnegative(),
-  }).strict().refine((value) => value.checkEvery <= value.maxIter, { message: 'cMLP checkEvery cannot exceed maxIter.' }),
-  z.object({
-    kind: z.literal('clstm'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(2),
-    context: z.number().int().min(1).max(100),
-    hidden: z.number().int().min(1).max(256),
-    lambda: z.number().finite().nonnegative(),
-    ridgeLambda: z.number().finite().nonnegative(),
-    learningRate: z.number().finite().positive(),
-    maxIter: z.number().int().min(1).max(20_000),
-    checkEvery: z.number().int().positive(),
-    lookback: z.number().int().positive(),
-    seed: z.number().int().nonnegative(),
-  }).strict().refine((value) => value.checkEvery <= value.maxIter, { message: 'cLSTM checkEvery cannot exceed maxIter.' }),
-  z.object({
-    kind: z.literal('granger-ssr-f'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    maxLag: z.number().int().min(1).max(20),
-  }).strict(),
-  z.object({
-    kind: z.literal('backdoor-identify'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    nodes: z.number().int().min(2).max(256),
-    names: z.array(z.string().trim().min(1)).min(2).max(256),
-    edges: z.array(z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()])),
-    treatment: z.number().int().nonnegative(),
-    outcome: z.number().int().nonnegative(),
-    unobserved: z.array(z.number().int().nonnegative()),
-    estimand: z.enum(['ate', 'att']),
-  }).strict(),
-  z.object({
-    kind: z.literal('dag-check'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().min(4),
-    columns: z.number().int().min(2).max(256),
-    nodeColumns: z.array(z.number().int().nonnegative()).min(2).max(64),
-    edges: z.array(z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()])),
-    implications: z.array(z.object({
-      x: z.number().int().nonnegative(),
-      y: z.number().int().nonnegative(),
-      given: z.array(z.number().int().nonnegative()),
-    }).strict()).min(1),
-    maximumObservations: z.number().int().min(4).max(2_000),
-    permutations: z.number().int().min(20).max(2_000),
-    significanceLevel: z.number().gt(0).lte(0.25),
-    runFalsification: z.boolean(),
-  }).strict(),
-  z.object({
-    kind: z.literal('backdoor-linear'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(2).max(64),
-    treatment: z.number().int().nonnegative(),
-    outcome: z.number().int().nonnegative(),
-    adjustment: z.array(z.number().int().nonnegative()),
-    hacMaxLags: z.number().int().nonnegative().nullable(),
-    level: z.number().gt(0.5).lt(1),
-    errorModel: adjustedRegressionErrorModelSchema,
-    fixedEffects: adjustedRegressionFixedEffectsSchema.nullable(),
-  }).strict(),
-  z.object({
-    kind: z.literal('propensity-weighting'),
-    target: z.enum(['ate', 'att']).default('ate'),
-    ...propensityCommandFields,
-    scale: z.enum(['inverseProbability', 'stabilized']),
-    fit: z.discriminatedUnion('kind', [
-      z.object({
-        kind: z.literal('logistic'),
-        model: logisticTreatmentModelSchema,
-        bootstrap: propensityBootstrapSchema.nullable(),
-      }).strict(),
-      z.object({ kind: z.literal('boosted'), model: boostedTreatmentModelSchema }).strict(),
-    ]),
-  }).strict(),
-  z.object({
-    kind: z.literal('propensity-matching'),
-    target: z.enum(['ate', 'att']).default('ate'),
-    ...propensityCommandFields,
-    model: propensityTreatmentModelSchema,
-  }).strict(),
-  z.object({
-    kind: z.literal('propensity-grid-slice'),
-    ...propensityCommandFields,
-    learningRate: z.number().finite().nonnegative(),
-    maxDepth: z.number().int().positive().max(16),
-    nEstimators: z.array(z.number().int().positive().max(2000)).min(1).max(12),
-    splits: z.number().int().min(2).max(20),
-    minSamplesLeaf: z.number().int().positive(),
-    minSamplesSplit: z.number().int().min(2),
-    seed: z.number().int().nonnegative(),
-  }).strict(),
-  z.object({
-    kind: z.literal('doubly-robust'),
-    target: z.enum(['ate', 'att']).default('ate'),
-    ...propensityCommandFields,
-    model: logisticTreatmentModelSchema,
-    bootstrap: propensityBootstrapSchema.nullable(),
-  }).strict(),
-  z.object({
-    kind: z.literal('continuous-gps'),
-    ...propensityCommandFields,
-    scale: z.enum(['inverseDensity', 'stabilized']),
-    bootstrap: propensityBootstrapSchema.nullable(),
-  }).strict(),
-  z.object({
-    kind: z.literal('frontdoor-two-stage'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(3).max(64),
-    treatment: z.number().int().nonnegative(),
-    mediator: z.number().int().nonnegative(),
-    outcome: z.number().int().nonnegative(),
-    firstStageAdjustment: z.array(z.number().int().nonnegative()),
-    secondStageAdjustment: z.array(z.number().int().nonnegative()),
-    controlValue: z.number().finite(),
-    treatmentValue: z.number().finite(),
-    uncertainty: z.object({
-      kind: z.literal('bootstrap'),
-      simulations: z.number().int().min(20).max(10_000),
-      sampleSizeFraction: z.number().gt(0).max(2),
-      confidenceLevel: z.number().gt(0.5).lt(1),
+  constraintCommandBaseSchema
+    .extend({
+      kind: z.literal('fci'),
+      maxPathLength: z.number().int().nonnegative().nullable(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('var-lingam'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(2),
+      lags: z.number().int().min(1).max(6),
+      prune: z.boolean(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('ocse'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(2),
+      maxLag: z.number().int().min(1).max(8),
+      alpha: z.number().finite().positive().max(1),
+      nShuffles: z.number().int().min(20).max(2_000),
+      method: z.enum(['gaussian', 'knn']),
+      k: z.number().int().min(1).max(20),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('cmlp'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(2),
+      lag: z.number().int().min(1).max(20),
+      hidden: z.array(z.number().int().min(1).max(256)).min(1).max(4),
+      activation: z.enum(['sigmoid', 'tanh', 'relu', 'leakyRelu', 'identity']),
+      penalty: z.enum(['groupLasso', 'groupSparseGroupLasso', 'hierarchical']),
+      lambda: z.number().finite().nonnegative(),
+      ridgeLambda: z.number().finite().nonnegative(),
+      learningRate: z.number().finite().positive(),
+      maxIter: z.number().int().min(1).max(50_000),
+      checkEvery: z.number().int().positive(),
+      lookback: z.number().int().positive(),
       seed: z.number().int().nonnegative(),
-    }).strict(),
-  }).strict(),
-  z.object({
-    kind: z.literal('instrumental-variable'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(3).max(64),
-    treatment: z.number().int().nonnegative(),
-    outcome: z.number().int().nonnegative(),
-    instruments: z.array(z.number().int().nonnegative()).min(1),
-    uncertainty: z.object({
-      kind: z.literal('bootstrap'),
-      simulations: z.number().int().min(20).max(10_000),
-      sampleSizeFraction: z.number().gt(0).max(2),
-      confidenceLevel: z.number().gt(0.5).lt(1),
+    })
+    .strict()
+    .refine((value) => value.checkEvery <= value.maxIter, {
+      message: 'cMLP checkEvery cannot exceed maxIter.',
+    }),
+  z
+    .object({
+      kind: z.literal('clstm'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(2),
+      context: z.number().int().min(1).max(100),
+      hidden: z.number().int().min(1).max(256),
+      lambda: z.number().finite().nonnegative(),
+      ridgeLambda: z.number().finite().nonnegative(),
+      learningRate: z.number().finite().positive(),
+      maxIter: z.number().int().min(1).max(20_000),
+      checkEvery: z.number().int().positive(),
+      lookback: z.number().int().positive(),
       seed: z.number().int().nonnegative(),
-    }).strict(),
-  }).strict(),
-  z.object({
-    kind: z.literal('count-glm'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(2).max(64),
-    treatment: z.number().int().nonnegative(),
-    outcome: z.number().int().nonnegative(),
-    adjustment: z.array(z.number().int().nonnegative()),
-    family: z.enum(['poisson', 'negativeBinomial']),
-  }).strict(),
-  z.object({
-    kind: z.literal('negative-binomial-ingarch'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(2).max(64),
-    outcome: z.number().int().nonnegative(),
-    link: z.enum(['identity', 'log']),
-    regressors: z.array(z.number().int().nonnegative()).min(1),
-    pastObservationLags: z.array(z.number().int().min(1).max(24)).min(1),
-    pastMeanLags: z.array(z.number().int().min(1).max(24)).min(1),
-    externalRegressors: z.array(z.boolean()),
-    horizon: z.number().int().min(1).max(240),
-    baselineRegressors: z.array(z.number().finite()).min(1),
-    interventionRegressor: z.number().int().nonnegative(),
-    controlValue: z.number().finite(),
-    treatmentValue: z.number().finite(),
-    schedule: ingarchInterventionScheduleSchema,
-  }).strict().superRefine((value, context) => {
-    if (value.link !== 'identity') return
-    if (value.controlValue < 0 || value.treatmentValue < 0 || value.baselineRegressors.some((entry) => entry < 0)) {
-      context.addIssue({ code: 'custom', message: 'Identity-link INGARCH requires non-negative control, treatment, and future regressor values.' })
-    }
-    for (const column of value.regressors) {
-      for (let row = 0; row < value.rows; row += 1) {
-        if ((value.values[column * value.rows + row] ?? Number.NaN) < 0) {
-          context.addIssue({ code: 'custom', message: 'Identity-link INGARCH requires non-negative historical regressors.' })
-          return
+    })
+    .strict()
+    .refine((value) => value.checkEvery <= value.maxIter, {
+      message: 'cLSTM checkEvery cannot exceed maxIter.',
+    }),
+  z
+    .object({
+      kind: z.literal('granger-ssr-f'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      maxLag: z.number().int().min(1).max(20),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('backdoor-identify'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      nodes: z.number().int().min(2).max(256),
+      names: z.array(z.string().trim().min(1)).min(2).max(256),
+      edges: z.array(z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()])),
+      treatment: z.number().int().nonnegative(),
+      outcome: z.number().int().nonnegative(),
+      unobserved: z.array(z.number().int().nonnegative()),
+      estimand: z.enum(['ate', 'att']),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('dag-check'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().min(4),
+      columns: z.number().int().min(2).max(256),
+      nodeColumns: z.array(z.number().int().nonnegative()).min(2).max(64),
+      edges: z.array(z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()])),
+      implications: z
+        .array(
+          z
+            .object({
+              x: z.number().int().nonnegative(),
+              y: z.number().int().nonnegative(),
+              given: z.array(z.number().int().nonnegative()),
+            })
+            .strict(),
+        )
+        .min(1),
+      maximumObservations: z.number().int().min(4).max(2_000),
+      permutations: z.number().int().min(20).max(2_000),
+      significanceLevel: z.number().gt(0).lte(0.25),
+      runFalsification: z.boolean(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('backdoor-linear'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(2).max(64),
+      treatment: z.number().int().nonnegative(),
+      outcome: z.number().int().nonnegative(),
+      adjustment: z.array(z.number().int().nonnegative()),
+      hacMaxLags: z.number().int().nonnegative().nullable(),
+      level: z.number().gt(0.5).lt(1),
+      errorModel: adjustedRegressionErrorModelSchema,
+      fixedEffects: adjustedRegressionFixedEffectsSchema.nullable(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('propensity-weighting'),
+      target: z.enum(['ate', 'att']).default('ate'),
+      ...propensityCommandFields,
+      scale: z.enum(['inverseProbability', 'stabilized']),
+      fit: z.discriminatedUnion('kind', [
+        z
+          .object({
+            kind: z.literal('logistic'),
+            model: logisticTreatmentModelSchema,
+            bootstrap: propensityBootstrapSchema.nullable(),
+          })
+          .strict(),
+        z.object({ kind: z.literal('boosted'), model: boostedTreatmentModelSchema }).strict(),
+      ]),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('propensity-matching'),
+      target: z.enum(['ate', 'att']).default('ate'),
+      ...propensityCommandFields,
+      model: propensityTreatmentModelSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('propensity-grid-slice'),
+      ...propensityCommandFields,
+      learningRate: z.number().finite().nonnegative(),
+      maxDepth: z.number().int().positive().max(16),
+      nEstimators: z.array(z.number().int().positive().max(2000)).min(1).max(12),
+      splits: z.number().int().min(2).max(20),
+      minSamplesLeaf: z.number().int().positive(),
+      minSamplesSplit: z.number().int().min(2),
+      seed: z.number().int().nonnegative(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('doubly-robust'),
+      target: z.enum(['ate', 'att']).default('ate'),
+      ...propensityCommandFields,
+      model: logisticTreatmentModelSchema,
+      bootstrap: propensityBootstrapSchema.nullable(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('continuous-gps'),
+      ...propensityCommandFields,
+      scale: z.enum(['inverseDensity', 'stabilized']),
+      bootstrap: propensityBootstrapSchema.nullable(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('frontdoor-two-stage'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(3).max(64),
+      treatment: z.number().int().nonnegative(),
+      mediator: z.number().int().nonnegative(),
+      outcome: z.number().int().nonnegative(),
+      firstStageAdjustment: z.array(z.number().int().nonnegative()),
+      secondStageAdjustment: z.array(z.number().int().nonnegative()),
+      controlValue: z.number().finite(),
+      treatmentValue: z.number().finite(),
+      uncertainty: z
+        .object({
+          kind: z.literal('bootstrap'),
+          simulations: z.number().int().min(20).max(10_000),
+          sampleSizeFraction: z.number().gt(0).max(2),
+          confidenceLevel: z.number().gt(0.5).lt(1),
+          seed: z.number().int().nonnegative(),
+        })
+        .strict(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('instrumental-variable'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(3).max(64),
+      treatment: z.number().int().nonnegative(),
+      outcome: z.number().int().nonnegative(),
+      instruments: z.array(z.number().int().nonnegative()).min(1),
+      uncertainty: z
+        .object({
+          kind: z.literal('bootstrap'),
+          simulations: z.number().int().min(20).max(10_000),
+          sampleSizeFraction: z.number().gt(0).max(2),
+          confidenceLevel: z.number().gt(0.5).lt(1),
+          seed: z.number().int().nonnegative(),
+        })
+        .strict(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('count-glm'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(2).max(64),
+      treatment: z.number().int().nonnegative(),
+      outcome: z.number().int().nonnegative(),
+      adjustment: z.array(z.number().int().nonnegative()),
+      family: z.enum(['poisson', 'negativeBinomial']),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('negative-binomial-ingarch'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(2).max(64),
+      outcome: z.number().int().nonnegative(),
+      link: z.enum(['identity', 'log']),
+      regressors: z.array(z.number().int().nonnegative()).min(1),
+      pastObservationLags: z.array(z.number().int().min(1).max(24)).min(1),
+      pastMeanLags: z.array(z.number().int().min(1).max(24)).min(1),
+      externalRegressors: z.array(z.boolean()),
+      horizon: z.number().int().min(1).max(240),
+      baselineRegressors: z.array(z.number().finite()).min(1),
+      interventionRegressor: z.number().int().nonnegative(),
+      controlValue: z.number().finite(),
+      treatmentValue: z.number().finite(),
+      schedule: ingarchInterventionScheduleSchema,
+    })
+    .strict()
+    .superRefine((value, context) => {
+      if (value.link !== 'identity') return
+      if (
+        value.controlValue < 0 ||
+        value.treatmentValue < 0 ||
+        value.baselineRegressors.some((entry) => entry < 0)
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message:
+            'Identity-link INGARCH requires non-negative control, treatment, and future regressor values.',
+        })
+      }
+      for (const column of value.regressors) {
+        for (let row = 0; row < value.rows; row += 1) {
+          if ((value.values[column * value.rows + row] ?? Number.NaN) < 0) {
+            context.addIssue({
+              code: 'custom',
+              message: 'Identity-link INGARCH requires non-negative historical regressors.',
+            })
+            return
+          }
         }
       }
-    }
-  }),
-  z.object({
-    kind: z.literal('count-series-intervention-scan'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().positive().max(64),
-    outcome: z.number().int().nonnegative(),
-    link: z.enum(['identity', 'log']),
-    pastObservationLags: z.array(z.number().int().min(1).max(24)).min(1),
-    pastMeanLags: z.array(z.number().int().min(1).max(24)).min(1),
-    candidateReferencePoints: z.array(z.number().int().nonnegative()).min(1),
-    delta: z.number().finite().min(0).max(1),
-  }).strict(),
-  z.object({
-    kind: z.literal('interrupted-series'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().positive().max(64),
-    outcome: z.number().int().nonnegative(),
-    model: interruptedModelSchema,
-    interventionRow: z.number().int().positive(),
-    lag: z.number().int().nonnegative(),
-    impact: interruptedImpactSchema,
-    seasonal: interruptedSeasonalSchema,
-    ljungBoxLags: z.number().int().positive().max(48),
-  }).strict().superRefine((value, context) => {
-    if (value.outcome >= value.columns || (value.model.kind === 'count' && value.model.exposure !== null && value.model.exposure >= value.columns)) context.addIssue({ code: 'custom', message: 'The interrupted series refers to a column outside the matrix.' })
-    if (value.interventionRow + value.lag >= value.rows) context.addIssue({ code: 'custom', message: 'The change must start inside the series.' })
-    if (value.impact.kind === 'temporaryLevel' && (value.impact.until <= value.interventionRow + value.lag || value.impact.until > value.rows)) context.addIssue({ code: 'custom', message: 'A temporary level change must end after it starts and within the series.' })
-  }),
-  z.object({
-    kind: z.literal('causal-effects-total'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(2).max(64),
-    statLag: z.number().int().min(0).max(20),
-    graph: z.array(z.array(z.array(z.string().max(3)))),
-    x: z.array(z.tuple([z.number().int().nonnegative(), z.number().int().max(0)])).min(1),
-    y: z.array(z.tuple([z.number().int().nonnegative(), z.number().int().max(0)])).length(1),
-    hidden: z.array(z.tuple([z.number().int().nonnegative(), z.number().int().max(0)])),
-    estimator: totalEffectEstimatorSchema,
-    interventions: z.tuple([z.number().finite(), z.number().finite()]),
-    uncertainty: causalEffectsUncertaintySchema,
-  }).strict(),
-  z.object({
-    kind: z.literal('sharp-rd'), request: requestSchema,
-    values: z.instanceof(Float64Array), rows: z.number().int().positive(), cutoff: z.number().finite(),
-  }).strict(),
-  z.object({
-    kind: z.literal('causal-impact'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(1).max(64),
-    outcome: z.number().int().nonnegative(),
-    controls: z.array(z.number().int().nonnegative()),
-    nPre: z.number().int().min(8),
-    postEnd: z.number().int().positive(),
-    maxIter: z.number().int().min(1).max(2000),
-  }).strict(),
-  z.object({
-    kind: z.literal('structural-causal-impact'), request: requestSchema,
-    values: z.instanceof(Float64Array), rows: z.number().int().positive(),
-    columns: z.number().int().positive(), outcome: z.number().int().nonnegative(),
-    controls: z.array(z.number().int().nonnegative()), nPre: z.number().int().min(8),
-    postEnd: z.number().int().positive(),
-    draws: z.number().int().min(2), warmup: z.number().int().nonnegative(),
-    seed: z.number().int().min(0).max(0xffffffff), model: structuralModelSchema,
-  }).strict(),
-  z.object({
-    kind: z.literal('bayesian-causal-impact'), request: requestSchema,
-    values: z.instanceof(Float64Array), rows: z.number().int().positive(),
-    columns: z.number().int().positive(), outcome: z.number().int().nonnegative(),
-    controls: z.array(z.number().int().nonnegative()), nPre: z.number().int().min(8),
-    postEnd: z.number().int().positive(),
-    draws: z.number().int().min(2), warmup: z.number().int().nonnegative(),
-    seed: z.number().int().min(0).max(0xffffffff), priorLevelSd: z.number().finite().positive(),
-  }).strict(),
-  z.object({
-    kind: z.literal('linear-refutation'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(2).max(64),
-    treatment: z.number().int().nonnegative(),
-    outcome: z.number().int().nonnegative(),
-    adjustment: z.array(z.number().int().nonnegative()),
-    simulations: z.number().int().min(1).max(2000),
-    subsetFraction: z.number().gt(0.1).lt(1),
-    seed: z.number().int().min(0).max(4294967295),
-    ljungBoxLags: z.number().int().min(1).max(200),
-  }).strict(),
-  z.object({
-    kind: z.literal('unobserved-confounding'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(3).max(64),
-    treatment: z.number().int().nonnegative(),
-    outcome: z.number().int().nonnegative(),
-    adjustment: z.array(z.number().int().nonnegative()).min(1),
-    seed: z.number().int().min(0).max(4294967295),
-    kappaT: z.array(z.number().min(0).max(1)).min(1).max(200).nullable(),
-    kappaY: z.array(z.number().finite()).min(1).max(200).nullable(),
-  }).strict(),
-  z.object({
-    kind: z.literal('series-structure'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(1).max(64),
-    period: z.number().int().min(2).max(400).nullable(),
-    robust: z.boolean(),
-    correlationMaxLag: z.number().int().min(1).max(400),
-    peltMinSize: z.number().int().min(1).max(1000),
-    peltJump: z.number().int().min(1).max(100),
-    peltPenalty: z.number().finite().nonnegative(),
-  }).strict(),
-  z.object({
-    kind: z.literal('double-ml'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(2).max(64),
-    treatment: z.number().int().nonnegative(),
-    outcome: z.number().int().nonnegative(),
-    adjustment: z.array(z.number().int().nonnegative()).min(1),
-    model: z.enum(['plr', 'irm']),
-    att: z.boolean(),
-    seed: z.number().int().nonnegative(),
-    groups: dmlGroupsRequestSchema,
-  }).strict(),
-  z.object({
-    kind: z.literal('causal-forest'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().min(2),
-    columns: z.number().int().min(3),
-    treatment: z.number().int().nonnegative(),
-    outcome: z.number().int().nonnegative(),
-    adjustment: z.array(z.number().int().nonnegative()).min(1),
-    target: causalForestTargetSchema,
-    configuration: causalForestConfigurationSchema,
-    columnNames: z.array(z.string().min(1)).optional(),
-  }).strict(),
-  z.object({
-    kind: z.literal('t-learner'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(3).max(64),
-    treatment: z.number().int().nonnegative(),
-    outcome: z.number().int().nonnegative(),
-    adjustment: z.array(z.number().int().nonnegative()).min(1),
-    seed: z.number().int().nonnegative(),
-    uncertainty: tLearnerUncertaintySchema,
-  }).strict(),
-  z.object({
-    kind: z.literal('cross-fitted-t-learner'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(3).max(256),
-    treatment: z.number().int().nonnegative(),
-    outcome: z.number().int().nonnegative(),
-    adjustment: z.array(z.number().int().nonnegative()).min(1),
-    ...boostedGridAxisSchemas,
-    splits: z.number().int().min(2).max(20),
-    minSamplesLeaf: z.number().int().positive(),
-    minSamplesSplit: z.number().int().min(2),
-    seed: z.number().int().min(0).max(0xffffffff),
-    selection: armSelectionSchema,
-  }).strict(),
-  z.object({
-    kind: z.literal('dml-refutation-batch'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(2).max(64),
-    treatment: z.number().int().nonnegative(),
-    outcome: z.number().int().nonnegative(),
-    adjustment: z.array(z.number().int().nonnegative()).min(1),
-    model: z.enum(['plr', 'irm']),
-    att: z.boolean(),
-    seed: z.number().int().nonnegative(),
-  }).strict(),
-  z.object({
-    kind: z.literal('root-cause'), request: requestSchema,
-    values: z.instanceof(Float64Array), model: rootCauseRequestSchema,
-  }).strict(),
-  z.object({ kind: z.literal('root-cause-checks'), request: requestSchema, values: z.instanceof(Float64Array), model: rootCauseCheckRequestSchema }).strict(),
-  z.object({ kind: z.literal('gcm-effects'), request: requestSchema, values: z.instanceof(Float64Array), model: gcmEffectsRequestSchema }).strict(),
-  z.object({ kind: z.literal('gcm-influence'), request: requestSchema, values: z.instanceof(Float64Array), model: gcmInfluenceRequestSchema }).strict(),
-  z.object({
-    kind: z.literal('ardl-model'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(2).max(64),
-    model: ardlModelRequestSchema,
-  }).strict(),
-  z.object({kind:z.literal('honest-did'),request:requestSchema,values:z.instanceof(Float64Array),model:honestRequestSchema}).strict(),
-  z.object({kind:z.literal('did-sensitivity'),request:requestSchema,values:z.instanceof(Float64Array),rows:z.number().int().positive(),columns:z.number().int().min(3),units:z.array(z.string()),times:z.array(z.number().int()),model:didSensitivityRequestSchema}).strict(),
-  z.object({
-    kind: z.literal('ardl-pss'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(2).max(64),
-    treatment: z.number().int().nonnegative(),
-    outcome: z.number().int().nonnegative(),
-    maxLag: z.number().int().min(1).max(24),
-    trend: z.enum(['c', 'ct']),
-    case: z.number().int().min(2).max(5),
-  }).strict(),
-  z.object({
-    kind: z.literal('vecm'),
-    forecastSteps: z.number().int().min(1).max(200).nullable().optional(),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(2).max(64),
-    endogenous: z.array(z.number().int().nonnegative()).min(2),
-    maxLags: z.number().int().min(1).max(24),
-    deterministic: z.enum(['n', 'co', 'ci', 'coli']),
-    significance: z.number().int().min(0).max(2),
-    breakIndex: z.number().int().nonnegative().nullable(),
-  }).strict(),
-  z.object({kind:z.literal('predictor-synthetic-control'),request:requestSchema,values:z.instanceof(Float64Array),model:predictorSyntheticRequestSchema}).strict(),
-  z.object({
-    kind: z.literal('synthetic-control'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(2).max(64),
-    treated: z.number().int().nonnegative(),
-    donors: z.array(z.number().int().nonnegative()).min(1),
-    nPre: z.number().int().min(2),
-    crossFitFolds: z.number().int().min(2).max(20),
-    alpha: z.number().gt(0).lt(1),
-  }).strict(),
-  z.object({
-    kind: z.literal('count-regression'), request: requestSchema, values:z.instanceof(Float64Array),model:countRegressionRequestSchema,
-  }).strict(),
-  z.object({kind:z.literal('sun-abraham'),request:requestSchema,values:z.instanceof(Float64Array),model:sunAbrahamRequestSchema}).strict(),
-  z.object({kind:z.literal('surrogate-path'),request:requestSchema,values:z.instanceof(Float64Array).refine(v=>v.length===0),model:surrogatePathRequestSchema}).strict(),
-  z.object({kind:z.literal('surrogate-diagnostics'),request:requestSchema,values:z.instanceof(Float64Array).refine(v=>v.length===0),model:surrogateDiagnosticRequestSchema}).strict(),
-  z.object({kind:z.literal('surrogate'),request:requestSchema,values:z.instanceof(Float64Array).refine(v=>v.length===0),model:surrogateRequestSchema}).strict(),
-  z.object({kind:z.literal('ridge-augmented-synthetic'),request:requestSchema,values:z.instanceof(Float64Array),model:ridgeAugmentedRequestSchema}).strict(),
-  z.object({kind:z.literal('panel-regression'),request:requestSchema,values:z.instanceof(Float64Array),model:panelRegressionRequestSchema}).strict(),
-  z.object({kind:z.literal('bacon'),request:requestSchema,values:z.instanceof(Float64Array),model:baconRequestSchema}).strict(),
-  z.object({
-    kind: z.literal('staggered-did'), request: requestSchema, values:z.instanceof(Float64Array),model:staggeredRequestSchema,
-  }).strict(),
-  z.object({
-    kind: z.literal('panel-adjusted'), request: requestSchema, values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(), columns: z.number().int().min(2),
-    units: z.array(z.string().min(1)).min(1), times: z.array(z.number().int().nonnegative()).min(1), specification: adjustedDidSpecificationSchema,
-  }).strict(),
-  z.object({
-    kind: z.literal('panel-intervention'),
-    primary: z.enum(['did', 'syntheticDid']).optional(),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    units: z.array(z.string().min(1)).min(1),
-    times: z.array(z.number().int().nonnegative()).min(1),
-    placeboReplications: z.number().int().min(2).max(2000),
-    seed: z.number().int().min(0).max(0xffff_ffff),
-  }).strict(),
-  z.object({
-    kind: z.literal('negbin-nuts'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(3).max(64),
-    treatment: z.number().int().nonnegative(),
-    outcome: z.number().int().nonnegative(),
-    confounder: z.number().int().nonnegative(),
-    warmup: z.number().int().min(10).max(5000),
-    samples: z.number().int().min(10).max(5000),
-    seed: z.number().int().nonnegative(),
-  }).strict(),
-  z.object({
-    kind: z.literal('bayesian-gaussian'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(2).max(64),
-    treatment: z.number().int().nonnegative(),
-    outcome: z.number().int().nonnegative(),
-    adjustment: z.array(z.number().int().nonnegative()),
-    warmup: z.number().int().min(10).max(5000),
-    samples: z.number().int().min(10).max(5000),
-    seed: z.number().int().nonnegative(),
-  }).strict(),
-  z.object({
-    kind: z.literal('network-query'),request:requestSchema,values:z.instanceof(Float64Array),query:networkQuerySchema,
-  }).strict(),
-  z.object({kind:z.literal('conditional-gaussian-query'),request:requestSchema,values:z.instanceof(Float64Array),query:conditionalGaussianQuerySchema}).strict(),
-  z.object({
-    kind: z.literal('discrete-bn-query'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(2).max(64),
-    nodes: z.array(z.number().int().nonnegative()).min(2),
-    names: z.array(z.string().min(1)).min(2),
-    edges: z.array(z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()])),
-    treatment: z.number().int().nonnegative(),
-    outcome: z.number().int().nonnegative(),
-    bins: z.number().int().min(2).max(10),
-    equivalentSampleSize: z.number().positive(),
-  }).strict(),
-  z.object({
-    kind: z.literal('identified-discrete-query'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(2).max(64),
-    observedNodes: z.array(z.number().int().nonnegative()).min(2),
-    names: z.array(z.string().trim().min(1)).min(2),
-    edges: z.array(z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()])),
-    treatment: z.number().int().nonnegative(),
-    outcome: z.number().int().nonnegative(),
-    unobserved: z.array(z.number().int().nonnegative()),
-    bins: z.number().int().min(2).max(10),
-    condition: z.object({ variable: z.number().int().nonnegative(), state: discreteConditionStateSchema }).strict().nullable(),
-  }).strict(),
-  z.object({
-    kind: z.literal('binary-ett'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(2).max(64),
-    observedNodes: z.array(z.number().int().nonnegative()).min(2).max(64),
-    names: z.array(z.string().trim().min(1)).min(2).max(64),
-    edges: z.array(z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()])),
-    treatment: z.number().int().nonnegative(),
-    outcome: z.number().int().nonnegative(),
-    unobserved: z.array(z.number().int().nonnegative()),
-  }).strict(),
-  z.object({
-    kind: z.literal('linear-scm-counterfactual'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(2).max(64),
-    nodes: z.array(z.number().int().nonnegative()).min(2),
-    names: z.array(z.string().min(1)).min(2),
-    edges: z.array(z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()])),
-    treatment: z.number().int().nonnegative(),
-    outcome: z.number().int().nonnegative(),
-    interventions: z.tuple([z.number().finite(), z.number().finite()]),
-    observationNoise: z.number().positive().nullable(),
-  }).strict(),
-  z.object({
-    kind: z.literal('dynamic-linear-scm-counterfactual'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(2).max(64),
-    nodes: z.array(z.number().int().nonnegative()).min(2),
-    statLag: z.number().int().min(0).max(20),
-    graph: z.array(z.array(z.array(z.string().max(3)))),
-    treatment: z.number().int().nonnegative(),
-    outcome: z.number().int().nonnegative(),
-    timing: z.discriminatedUnion('kind', [
-      z.object({ kind: z.literal('point'), time: z.number().int().nonnegative() }).strict(),
-      z.object({ kind: z.literal('persistent'), start: z.number().int().nonnegative() }).strict(),
-    ]),
-    steps: z.number().int().positive(),
-    interventions: z.tuple([z.number().finite(), z.number().finite()]),
-    uncertainty: dynamicCounterfactualUncertaintySchema,
-  }).strict(),
-  z.object({
-    kind: z.literal('seasonal-adjust'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(1).max(64),
-    period: z.number().int().min(2).max(400),
-    robust: z.boolean(),
-    adjust: z.array(z.number().int().nonnegative()).min(1),
-  }).strict(),
-  z.object({
-    kind: z.literal('resolve-missingness'),
-    request: requestSchema,
-    values: z.instanceof(Float64Array),
-    rows: z.number().int().positive(),
-    columns: z.number().int().min(1).max(256),
-    validity: z.instanceof(Uint8Array),
-    resolution: z.discriminatedUnion('kind', [
-      z.object({ kind: z.literal('completeInterval') }).strict(),
-      z.object({ kind: z.literal('imputation'), method: z.enum(['linearInterior', 'forwardFill', 'structuralZero']), maxGap: z.number().int().min(1).max(100000), confirmation: z.string().nullable() }).strict(),
-    ]),
-  }).strict(),
+    }),
+  z
+    .object({
+      kind: z.literal('count-series-intervention-scan'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().positive().max(64),
+      outcome: z.number().int().nonnegative(),
+      link: z.enum(['identity', 'log']),
+      pastObservationLags: z.array(z.number().int().min(1).max(24)).min(1),
+      pastMeanLags: z.array(z.number().int().min(1).max(24)).min(1),
+      candidateReferencePoints: z.array(z.number().int().nonnegative()).min(1),
+      delta: z.number().finite().min(0).max(1),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('interrupted-series'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().positive().max(64),
+      outcome: z.number().int().nonnegative(),
+      model: interruptedModelSchema,
+      interventionRow: z.number().int().positive(),
+      lag: z.number().int().nonnegative(),
+      impact: interruptedImpactSchema,
+      seasonal: interruptedSeasonalSchema,
+      ljungBoxLags: z.number().int().positive().max(48),
+    })
+    .strict()
+    .superRefine((value, context) => {
+      if (
+        value.outcome >= value.columns ||
+        (value.model.kind === 'count' &&
+          value.model.exposure !== null &&
+          value.model.exposure >= value.columns)
+      )
+        context.addIssue({
+          code: 'custom',
+          message: 'The interrupted series refers to a column outside the matrix.',
+        })
+      if (value.interventionRow + value.lag >= value.rows)
+        context.addIssue({ code: 'custom', message: 'The change must start inside the series.' })
+      if (
+        value.impact.kind === 'temporaryLevel' &&
+        (value.impact.until <= value.interventionRow + value.lag || value.impact.until > value.rows)
+      )
+        context.addIssue({
+          code: 'custom',
+          message: 'A temporary level change must end after it starts and within the series.',
+        })
+    }),
+  z
+    .object({
+      kind: z.literal('causal-effects-total'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(2).max(64),
+      statLag: z.number().int().min(0).max(20),
+      graph: z.array(z.array(z.array(z.string().max(3)))),
+      x: z.array(z.tuple([z.number().int().nonnegative(), z.number().int().max(0)])).min(1),
+      y: z.array(z.tuple([z.number().int().nonnegative(), z.number().int().max(0)])).length(1),
+      hidden: z.array(z.tuple([z.number().int().nonnegative(), z.number().int().max(0)])),
+      estimator: totalEffectEstimatorSchema,
+      interventions: z.tuple([z.number().finite(), z.number().finite()]),
+      uncertainty: causalEffectsUncertaintySchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('sharp-rd'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      cutoff: z.number().finite(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('causal-impact'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(1).max(64),
+      outcome: z.number().int().nonnegative(),
+      controls: z.array(z.number().int().nonnegative()),
+      nPre: z.number().int().min(8),
+      postEnd: z.number().int().positive(),
+      maxIter: z.number().int().min(1).max(2000),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('structural-causal-impact'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().positive(),
+      outcome: z.number().int().nonnegative(),
+      controls: z.array(z.number().int().nonnegative()),
+      nPre: z.number().int().min(8),
+      postEnd: z.number().int().positive(),
+      draws: z.number().int().min(2),
+      warmup: z.number().int().nonnegative(),
+      seed: z.number().int().min(0).max(0xffffffff),
+      model: structuralModelSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('bayesian-causal-impact'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().positive(),
+      outcome: z.number().int().nonnegative(),
+      controls: z.array(z.number().int().nonnegative()),
+      nPre: z.number().int().min(8),
+      postEnd: z.number().int().positive(),
+      draws: z.number().int().min(2),
+      warmup: z.number().int().nonnegative(),
+      seed: z.number().int().min(0).max(0xffffffff),
+      priorLevelSd: z.number().finite().positive(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('linear-refutation'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(2).max(64),
+      treatment: z.number().int().nonnegative(),
+      outcome: z.number().int().nonnegative(),
+      adjustment: z.array(z.number().int().nonnegative()),
+      simulations: z.number().int().min(1).max(2000),
+      subsetFraction: z.number().gt(0.1).lt(1),
+      seed: z.number().int().min(0).max(4294967295),
+      ljungBoxLags: z.number().int().min(1).max(200),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('unobserved-confounding'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(3).max(64),
+      treatment: z.number().int().nonnegative(),
+      outcome: z.number().int().nonnegative(),
+      adjustment: z.array(z.number().int().nonnegative()).min(1),
+      seed: z.number().int().min(0).max(4294967295),
+      kappaT: z.array(z.number().min(0).max(1)).min(1).max(200).nullable(),
+      kappaY: z.array(z.number().finite()).min(1).max(200).nullable(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('series-structure'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(1).max(64),
+      period: z.number().int().min(2).max(400).nullable(),
+      robust: z.boolean(),
+      correlationMaxLag: z.number().int().min(1).max(400),
+      peltMinSize: z.number().int().min(1).max(1000),
+      peltJump: z.number().int().min(1).max(100),
+      peltPenalty: z.number().finite().nonnegative(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('double-ml'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(2).max(64),
+      treatment: z.number().int().nonnegative(),
+      outcome: z.number().int().nonnegative(),
+      adjustment: z.array(z.number().int().nonnegative()).min(1),
+      model: z.enum(['plr', 'irm']),
+      att: z.boolean(),
+      seed: z.number().int().nonnegative(),
+      groups: dmlGroupsRequestSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('causal-forest'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().min(2),
+      columns: z.number().int().min(3),
+      treatment: z.number().int().nonnegative(),
+      outcome: z.number().int().nonnegative(),
+      adjustment: z.array(z.number().int().nonnegative()).min(1),
+      target: causalForestTargetSchema,
+      configuration: causalForestConfigurationSchema,
+      columnNames: z.array(z.string().min(1)).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('t-learner'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(3).max(64),
+      treatment: z.number().int().nonnegative(),
+      outcome: z.number().int().nonnegative(),
+      adjustment: z.array(z.number().int().nonnegative()).min(1),
+      seed: z.number().int().nonnegative(),
+      uncertainty: tLearnerUncertaintySchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('cross-fitted-t-learner'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(3).max(256),
+      treatment: z.number().int().nonnegative(),
+      outcome: z.number().int().nonnegative(),
+      adjustment: z.array(z.number().int().nonnegative()).min(1),
+      ...boostedGridAxisSchemas,
+      splits: z.number().int().min(2).max(20),
+      minSamplesLeaf: z.number().int().positive(),
+      minSamplesSplit: z.number().int().min(2),
+      seed: z.number().int().min(0).max(0xffffffff),
+      selection: armSelectionSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('dml-refutation-batch'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(2).max(64),
+      treatment: z.number().int().nonnegative(),
+      outcome: z.number().int().nonnegative(),
+      adjustment: z.array(z.number().int().nonnegative()).min(1),
+      model: z.enum(['plr', 'irm']),
+      att: z.boolean(),
+      seed: z.number().int().nonnegative(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('root-cause'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      model: rootCauseRequestSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('root-cause-checks'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      model: rootCauseCheckRequestSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('gcm-effects'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      model: gcmEffectsRequestSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('gcm-influence'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      model: gcmInfluenceRequestSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('ardl-model'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(2).max(64),
+      model: ardlModelRequestSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('honest-did'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      model: honestRequestSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('did-sensitivity'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(3),
+      units: z.array(z.string()),
+      times: z.array(z.number().int()),
+      model: didSensitivityRequestSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('ardl-pss'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(2).max(64),
+      treatment: z.number().int().nonnegative(),
+      outcome: z.number().int().nonnegative(),
+      maxLag: z.number().int().min(1).max(24),
+      trend: z.enum(['c', 'ct']),
+      case: z.number().int().min(2).max(5),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('vecm'),
+      forecastSteps: z.number().int().min(1).max(200).nullable().optional(),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(2).max(64),
+      endogenous: z.array(z.number().int().nonnegative()).min(2),
+      maxLags: z.number().int().min(1).max(24),
+      deterministic: z.enum(['n', 'co', 'ci', 'coli']),
+      significance: z.number().int().min(0).max(2),
+      breakIndex: z.number().int().nonnegative().nullable(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('predictor-synthetic-control'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      model: predictorSyntheticRequestSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('synthetic-control'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(2).max(64),
+      treated: z.number().int().nonnegative(),
+      donors: z.array(z.number().int().nonnegative()).min(1),
+      nPre: z.number().int().min(2),
+      crossFitFolds: z.number().int().min(2).max(20),
+      alpha: z.number().gt(0).lt(1),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('count-regression'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      model: countRegressionRequestSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('sun-abraham'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      model: sunAbrahamRequestSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('surrogate-path'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array).refine((v) => v.length === 0),
+      model: surrogatePathRequestSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('surrogate-diagnostics'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array).refine((v) => v.length === 0),
+      model: surrogateDiagnosticRequestSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('surrogate'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array).refine((v) => v.length === 0),
+      model: surrogateRequestSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('ridge-augmented-synthetic'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      model: ridgeAugmentedRequestSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('panel-regression'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      model: panelRegressionRequestSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('bacon'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      model: baconRequestSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('staggered-did'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      model: staggeredRequestSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('panel-adjusted'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(2),
+      units: z.array(z.string().min(1)).min(1),
+      times: z.array(z.number().int().nonnegative()).min(1),
+      specification: adjustedDidSpecificationSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('panel-intervention'),
+      primary: z.enum(['did', 'syntheticDid']).optional(),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      units: z.array(z.string().min(1)).min(1),
+      times: z.array(z.number().int().nonnegative()).min(1),
+      placeboReplications: z.number().int().min(2).max(2000),
+      seed: z.number().int().min(0).max(0xffff_ffff),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('negbin-nuts'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(3).max(64),
+      treatment: z.number().int().nonnegative(),
+      outcome: z.number().int().nonnegative(),
+      confounder: z.number().int().nonnegative(),
+      warmup: z.number().int().min(10).max(5000),
+      samples: z.number().int().min(10).max(5000),
+      seed: z.number().int().nonnegative(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('bayesian-gaussian'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(2).max(64),
+      treatment: z.number().int().nonnegative(),
+      outcome: z.number().int().nonnegative(),
+      adjustment: z.array(z.number().int().nonnegative()),
+      warmup: z.number().int().min(10).max(5000),
+      samples: z.number().int().min(10).max(5000),
+      seed: z.number().int().nonnegative(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('network-query'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      query: networkQuerySchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('conditional-gaussian-query'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      query: conditionalGaussianQuerySchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('discrete-bn-query'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(2).max(64),
+      nodes: z.array(z.number().int().nonnegative()).min(2),
+      names: z.array(z.string().min(1)).min(2),
+      edges: z.array(z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()])),
+      treatment: z.number().int().nonnegative(),
+      outcome: z.number().int().nonnegative(),
+      bins: z.number().int().min(2).max(10),
+      equivalentSampleSize: z.number().positive(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('identified-discrete-query'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(2).max(64),
+      observedNodes: z.array(z.number().int().nonnegative()).min(2),
+      names: z.array(z.string().trim().min(1)).min(2),
+      edges: z.array(z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()])),
+      treatment: z.number().int().nonnegative(),
+      outcome: z.number().int().nonnegative(),
+      unobserved: z.array(z.number().int().nonnegative()),
+      bins: z.number().int().min(2).max(10),
+      condition: z
+        .object({ variable: z.number().int().nonnegative(), state: discreteConditionStateSchema })
+        .strict()
+        .nullable(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('binary-ett'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(2).max(64),
+      observedNodes: z.array(z.number().int().nonnegative()).min(2).max(64),
+      names: z.array(z.string().trim().min(1)).min(2).max(64),
+      edges: z.array(z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()])),
+      treatment: z.number().int().nonnegative(),
+      outcome: z.number().int().nonnegative(),
+      unobserved: z.array(z.number().int().nonnegative()),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('linear-scm-counterfactual'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(2).max(64),
+      nodes: z.array(z.number().int().nonnegative()).min(2),
+      names: z.array(z.string().min(1)).min(2),
+      edges: z.array(z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()])),
+      treatment: z.number().int().nonnegative(),
+      outcome: z.number().int().nonnegative(),
+      interventions: z.tuple([z.number().finite(), z.number().finite()]),
+      observationNoise: z.number().positive().nullable(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('dynamic-linear-scm-counterfactual'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(2).max(64),
+      nodes: z.array(z.number().int().nonnegative()).min(2),
+      statLag: z.number().int().min(0).max(20),
+      graph: z.array(z.array(z.array(z.string().max(3)))),
+      treatment: z.number().int().nonnegative(),
+      outcome: z.number().int().nonnegative(),
+      timing: z.discriminatedUnion('kind', [
+        z.object({ kind: z.literal('point'), time: z.number().int().nonnegative() }).strict(),
+        z.object({ kind: z.literal('persistent'), start: z.number().int().nonnegative() }).strict(),
+      ]),
+      steps: z.number().int().positive(),
+      interventions: z.tuple([z.number().finite(), z.number().finite()]),
+      uncertainty: dynamicCounterfactualUncertaintySchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('seasonal-adjust'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(1).max(64),
+      period: z.number().int().min(2).max(400),
+      robust: z.boolean(),
+      adjust: z.array(z.number().int().nonnegative()).min(1),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('resolve-missingness'),
+      request: requestSchema,
+      values: z.instanceof(Float64Array),
+      rows: z.number().int().positive(),
+      columns: z.number().int().min(1).max(256),
+      validity: z.instanceof(Uint8Array),
+      resolution: z.discriminatedUnion('kind', [
+        z.object({ kind: z.literal('completeInterval') }).strict(),
+        z
+          .object({
+            kind: z.literal('imputation'),
+            method: z.enum(['linearInterior', 'forwardFill', 'structuralZero']),
+            maxGap: z.number().int().min(1).max(100000),
+            confirmation: z.string().nullable(),
+          })
+          .strict(),
+      ]),
+    })
+    .strict(),
 ])
 
-const discreteStateRefusalSchema = z.object({
-  kind: z.literal('discreteStateRefused'),
-  query: z.enum(['bayesianNetwork', 'identifiedExpression']),
-  node: z.number().int().nonnegative(),
-  name: z.string().trim().min(1),
-  problem: z.discriminatedUnion('kind', [
-    z.object({
-      kind: z.literal('noFiniteObservations'),
-      observations: z.number().int().nonnegative(),
-    }).strict(),
-    z.object({
-      kind: z.literal('singleObservedState'),
-      value: z.number().finite(),
-      observations: z.number().int().positive(),
-    }).strict(),
-    z.object({
-      kind: z.literal('quantileCollapse'),
-      distinctValues: z.number().int().min(2),
-      requestedStates: z.number().int().min(2),
-      populatedStates: z.number().int().max(1),
-    }).strict(),
-  ]),
-}).strict()
+const discreteStateRefusalSchema = z
+  .object({
+    kind: z.literal('discreteStateRefused'),
+    query: z.enum(['bayesianNetwork', 'identifiedExpression']),
+    node: z.number().int().nonnegative(),
+    name: z.string().trim().min(1),
+    problem: z.discriminatedUnion('kind', [
+      z
+        .object({
+          kind: z.literal('noFiniteObservations'),
+          observations: z.number().int().nonnegative(),
+        })
+        .strict(),
+      z
+        .object({
+          kind: z.literal('singleObservedState'),
+          value: z.number().finite(),
+          observations: z.number().int().positive(),
+        })
+        .strict(),
+      z
+        .object({
+          kind: z.literal('quantileCollapse'),
+          distinctValues: z.number().int().min(2),
+          requestedStates: z.number().int().min(2),
+          populatedStates: z.number().int().max(1),
+        })
+        .strict(),
+    ]),
+  })
+  .strict()
 
 const workerProblemSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('kernel-refused'), detail: z.string() }).strict(),
@@ -2520,234 +3720,777 @@ const workerProblemSchema = z.discriminatedUnion('kind', [
   discreteStateRefusalSchema,
 ])
 
-export const analysisProgressSchema = z.object({
-  stage: z.string().trim().min(1),
-  completed: z.number().int().nonnegative(),
-  total: z.number().int().positive(),
-}).strict().refine((progress) => progress.completed <= progress.total, {
-  message: 'Completed progress cannot exceed its total.',
-})
+export const analysisProgressSchema = z
+  .object({
+    stage: z.string().trim().min(1),
+    completed: z.number().int().nonnegative(),
+    total: z.number().int().positive(),
+  })
+  .strict()
+  .refine((progress) => progress.completed <= progress.total, {
+    message: 'Completed progress cannot exceed its total.',
+  })
 
 const eventSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('aalen-succeeded'), request: requestSchema, result: aalenEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('survival-forest-succeeded'), request: requestSchema, result: forestEvidenceSchema }).strict(),
-  z.object({
-    kind: z.literal('analysis-progress'),
-    request: requestSchema,
-    progress: analysisProgressSchema,
-  }).strict(),
-  z.object({
-    kind: z.literal('stationarity-succeeded'),
-    request: requestSchema,
-    result: stationarityBatterySchema,
-  }).strict(),
-  z.object({ kind: z.literal('multicollinearity-succeeded'), request: requestSchema, result: multicollinearityEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('flexsurv-succeeded'), request: requestSchema, result: flexSurvEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('cox-regression-succeeded'), request: requestSchema, result: coxRegressionEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('penalized-aft-succeeded'), request: requestSchema, result: penalizedAftEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('nonparametric-survival-succeeded'), request: requestSchema, result: nonparametricSurvivalEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('comparison-survival-succeeded'), request: requestSchema, result: comparisonSurvivalEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('multi-state-survival-succeeded'), request: requestSchema, result: multiStateSurvivalEvidenceSchema }).strict(),
-  z.object({
-    kind: z.literal('pandas-resampling-succeeded'),
-    request: requestSchema,
-    result: pandasResamplingEvidenceSchema,
-  }).strict(),
-  z.object({
-    kind: z.literal('pcmci-plus-succeeded'),
-    request: requestSchema,
-    result: pcmciPlusEvidenceSchema,
-  }).strict(),
-  z.object({
-    kind: z.literal('jpcmci-plus-succeeded'),
-    request: requestSchema,
-    result: jpcmciPlusEvidenceSchema,
-  }).strict(),
-  z.object({
-    kind: z.literal('lpcmci-succeeded'),
-    request: requestSchema,
-    result: lpcmciEvidenceSchema,
-  }).strict(),
-  z.object({
-    kind: z.literal('rpcmci-succeeded'),
-    request: requestSchema,
-    result: rpcmciEvidenceSchema,
-  }).strict(),
-  z.object({ kind: z.literal('cdnots-succeeded'), request: requestSchema, result: cdnotsEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('cdnots-plus-succeeded'), request: requestSchema, result: cdnotsPlusEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('grace-succeeded'), request: requestSchema, result: graceEvidenceSchema }).strict(),
-  z.object({
-    kind: z.literal('dynotears-succeeded'),
-    request: requestSchema,
-    result: dynotearsEvidenceSchema,
-  }).strict(),
-  z.object({
-    kind: z.literal('direct-lingam-succeeded'),
-    request: requestSchema,
-    result: directLingamEvidenceSchema,
-  }).strict(),
-  z.object({ kind: z.literal('pc-stable-succeeded'), request: requestSchema, result: pcStableEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('fci-succeeded'), request: requestSchema, result: fciEvidenceSchema }).strict(),
-  z.object({
-    kind: z.literal('var-lingam-succeeded'),
-    request: requestSchema,
-    result: varLingamEvidenceSchema,
-  }).strict(),
-  z.object({
-    kind: z.literal('ocse-succeeded'),
-    request: requestSchema,
-    result: ocseEvidenceSchema,
-  }).strict(),
-  z.object({ kind: z.literal('cmlp-succeeded'), request: requestSchema, result: cmlpEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('clstm-succeeded'), request: requestSchema, result: clstmEvidenceSchema }).strict(),
-  z.object({
-    kind: z.literal('granger-succeeded'),
-    request: requestSchema,
-    result: grangerSsrEvidenceSchema,
-  }).strict(),
-  z.object({
-    kind: z.literal('backdoor-identification-succeeded'),
-    request: requestSchema,
-    result: backdoorIdentificationEvidenceSchema,
-  }).strict(),
-  z.object({ kind: z.literal('dag-check-succeeded'), request: requestSchema, result: dagCheckEvidenceSchema }).strict(),
-  z.object({
-    kind: z.literal('backdoor-linear-succeeded'),
-    request: requestSchema,
-    result: backdoorLinearEvidenceSchema,
-  }).strict(),
-  z.object({ kind: z.literal('propensity-weighting-succeeded'), request: requestSchema, result: propensityWeightingEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('propensity-matching-succeeded'), request: requestSchema, result: propensityMatchingEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('propensity-grid-slice-succeeded'), request: requestSchema, result: gridSliceEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('doubly-robust-succeeded'), request: requestSchema, result: doublyRobustEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('continuous-gps-succeeded'), request: requestSchema, result: continuousGpsEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('frontdoor-two-stage-succeeded'), request: requestSchema, result: frontdoorTwoStageEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('instrumental-variable-succeeded'), request: requestSchema, result: instrumentalVariableEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('count-glm-succeeded'), request: requestSchema, result: countGlmEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('negative-binomial-ingarch-succeeded'), request: requestSchema, result: negativeBinomialIngarchEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('count-series-intervention-scan-succeeded'), request: requestSchema, result: countSeriesInterventionScanEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('interrupted-series-succeeded'), request: requestSchema, result: interruptedSeriesEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('causal-effects-succeeded'), request: requestSchema, result: causalEffectsEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('sharp-rd-succeeded'), request: requestSchema, result: sharpRdEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('causal-impact-succeeded'), request: requestSchema, result: causalImpactEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('linear-refutation-succeeded'), request: requestSchema, result: linearRefutationEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('unobserved-confounding-succeeded'), request: requestSchema, result: unobservedConfoundingEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('series-structure-succeeded'), request: requestSchema, result: seriesStructureEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('seasonal-adjusted'), request: requestSchema, result: seasonalAdjustedEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('double-ml-succeeded'), request: requestSchema, result: doubleMlEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('causal-forest-succeeded'), request: requestSchema, result: causalForestEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('t-learner-succeeded'), request: requestSchema, result: tLearnerEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('cross-fitted-t-learner-succeeded'), request: requestSchema, result: crossFittedTLearnerEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('ardl-succeeded'), request: requestSchema, result: ardlEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('root-cause-succeeded'), request: requestSchema, result: rootCauseEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('root-cause-checks-succeeded'), request: requestSchema, result: rootCauseChecksSchema }).strict(),
-  z.object({ kind: z.literal('gcm-effects-succeeded'), request: requestSchema, result: gcmEffectsEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('gcm-influence-succeeded'), request: requestSchema, result: gcmInfluenceEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('ardl-model-succeeded'), request: requestSchema, result: ardlModelEvidenceSchema }).strict(),
-  z.object({kind:z.literal('honest-did-succeeded'),request:requestSchema,result:honestEvidenceSchema}).strict(),
-  z.object({kind:z.literal('did-sensitivity-succeeded'),request:requestSchema,result:didSensitivityEvidenceSchema}).strict(),
-  z.object({ kind: z.literal('vecm-succeeded'), request: requestSchema, result: vecmEvidenceSchema }).strict(),
-  z.object({kind:z.literal('predictor-synthetic-control-succeeded'),request:requestSchema,result:predictorSyntheticEvidenceSchema}).strict(),
-  z.object({ kind: z.literal('synthetic-control-succeeded'), request: requestSchema, result: syntheticControlEvidenceSchema }).strict(),
-  z.object({kind:z.literal('count-regression-succeeded'),request:requestSchema,result:countRegressionEvidenceSchema}).strict(),
-  z.object({kind:z.literal('sun-abraham-succeeded'),request:requestSchema,result:sunAbrahamEvidenceSchema}).strict(),
-  z.object({kind:z.literal('surrogate-path-succeeded'),request:requestSchema,result:surrogatePathEvidenceSchema}).strict(),
-  z.object({kind:z.literal('surrogate-diagnostics-succeeded'),request:requestSchema,result:surrogateDiagnosticEvidenceSchema}).strict(),
-  z.object({kind:z.literal('surrogate-succeeded'),request:requestSchema,result:surrogateEvidenceSchema}).strict(),
-  z.object({kind:z.literal('ridge-augmented-synthetic-succeeded'),request:requestSchema,result:ridgeAugmentedEvidenceSchema}).strict(),
-  z.object({kind:z.literal('panel-regression-succeeded'),request:requestSchema,result:panelRegressionEvidenceSchema}).strict(),
-  z.object({kind:z.literal('bacon-succeeded'),request:requestSchema,result:baconEvidenceSchema}).strict(),
-  z.object({ kind:z.literal('staggered-did-succeeded'),request:requestSchema,result:staggeredEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('panel-intervention-succeeded'), request: requestSchema, result: panelInterventionEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('negbin-nuts-succeeded'), request: requestSchema, result: negbinNutsEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('bayesian-gaussian-succeeded'), request: requestSchema, result: bayesianGaussianEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('network-query-succeeded'), request: requestSchema, result: networkQueryEvidenceSchema }).strict(),
-  z.object({kind:z.literal('conditional-gaussian-query-succeeded'),request:requestSchema,result:conditionalGaussianEvidenceSchema}).strict(),
-  z.object({ kind: z.literal('discrete-bn-succeeded'), request: requestSchema, result: discreteBnEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('identified-discrete-query-succeeded'), request: requestSchema, result: identifiedDiscreteQueryEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('binary-ett-succeeded'), request: requestSchema, result: binaryEttEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('linear-scm-succeeded'), request: requestSchema, result: linearScmEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('dynamic-linear-scm-succeeded'), request: requestSchema, result: dynamicLinearScmEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('dml-refutation-succeeded'), request: requestSchema, result: dmlRefutationEvidenceSchema }).strict(),
-  z.object({ kind: z.literal('missingness-resolved'), request: requestSchema, result: missingnessResolvedEvidenceSchema }).strict(),
-  z.object({
-    kind: z.literal('analysis-failed'),
-    request: requestSchema,
-    problem: workerProblemSchema,
-  }).strict(),
+  z
+    .object({
+      kind: z.literal('aalen-succeeded'),
+      request: requestSchema,
+      result: aalenEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('survival-forest-succeeded'),
+      request: requestSchema,
+      result: forestEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('analysis-progress'),
+      request: requestSchema,
+      progress: analysisProgressSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('stationarity-succeeded'),
+      request: requestSchema,
+      result: stationarityBatterySchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('multicollinearity-succeeded'),
+      request: requestSchema,
+      result: multicollinearityEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('flexsurv-succeeded'),
+      request: requestSchema,
+      result: flexSurvEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('cox-regression-succeeded'),
+      request: requestSchema,
+      result: coxRegressionEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('penalized-aft-succeeded'),
+      request: requestSchema,
+      result: penalizedAftEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('nonparametric-survival-succeeded'),
+      request: requestSchema,
+      result: nonparametricSurvivalEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('comparison-survival-succeeded'),
+      request: requestSchema,
+      result: comparisonSurvivalEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('multi-state-survival-succeeded'),
+      request: requestSchema,
+      result: multiStateSurvivalEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('pandas-resampling-succeeded'),
+      request: requestSchema,
+      result: pandasResamplingEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('pcmci-plus-succeeded'),
+      request: requestSchema,
+      result: pcmciPlusEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('jpcmci-plus-succeeded'),
+      request: requestSchema,
+      result: jpcmciPlusEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('lpcmci-succeeded'),
+      request: requestSchema,
+      result: lpcmciEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('rpcmci-succeeded'),
+      request: requestSchema,
+      result: rpcmciEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('cdnots-succeeded'),
+      request: requestSchema,
+      result: cdnotsEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('cdnots-plus-succeeded'),
+      request: requestSchema,
+      result: cdnotsPlusEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('grace-succeeded'),
+      request: requestSchema,
+      result: graceEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('dynotears-succeeded'),
+      request: requestSchema,
+      result: dynotearsEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('direct-lingam-succeeded'),
+      request: requestSchema,
+      result: directLingamEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('pc-stable-succeeded'),
+      request: requestSchema,
+      result: pcStableEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({ kind: z.literal('fci-succeeded'), request: requestSchema, result: fciEvidenceSchema })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('var-lingam-succeeded'),
+      request: requestSchema,
+      result: varLingamEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('ocse-succeeded'),
+      request: requestSchema,
+      result: ocseEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('cmlp-succeeded'),
+      request: requestSchema,
+      result: cmlpEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('clstm-succeeded'),
+      request: requestSchema,
+      result: clstmEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('granger-succeeded'),
+      request: requestSchema,
+      result: grangerSsrEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('backdoor-identification-succeeded'),
+      request: requestSchema,
+      result: backdoorIdentificationEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('dag-check-succeeded'),
+      request: requestSchema,
+      result: dagCheckEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('backdoor-linear-succeeded'),
+      request: requestSchema,
+      result: backdoorLinearEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('propensity-weighting-succeeded'),
+      request: requestSchema,
+      result: propensityWeightingEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('propensity-matching-succeeded'),
+      request: requestSchema,
+      result: propensityMatchingEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('propensity-grid-slice-succeeded'),
+      request: requestSchema,
+      result: gridSliceEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('doubly-robust-succeeded'),
+      request: requestSchema,
+      result: doublyRobustEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('continuous-gps-succeeded'),
+      request: requestSchema,
+      result: continuousGpsEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('frontdoor-two-stage-succeeded'),
+      request: requestSchema,
+      result: frontdoorTwoStageEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('instrumental-variable-succeeded'),
+      request: requestSchema,
+      result: instrumentalVariableEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('count-glm-succeeded'),
+      request: requestSchema,
+      result: countGlmEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('negative-binomial-ingarch-succeeded'),
+      request: requestSchema,
+      result: negativeBinomialIngarchEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('count-series-intervention-scan-succeeded'),
+      request: requestSchema,
+      result: countSeriesInterventionScanEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('interrupted-series-succeeded'),
+      request: requestSchema,
+      result: interruptedSeriesEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('causal-effects-succeeded'),
+      request: requestSchema,
+      result: causalEffectsEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('sharp-rd-succeeded'),
+      request: requestSchema,
+      result: sharpRdEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('causal-impact-succeeded'),
+      request: requestSchema,
+      result: causalImpactEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('linear-refutation-succeeded'),
+      request: requestSchema,
+      result: linearRefutationEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('unobserved-confounding-succeeded'),
+      request: requestSchema,
+      result: unobservedConfoundingEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('series-structure-succeeded'),
+      request: requestSchema,
+      result: seriesStructureEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('seasonal-adjusted'),
+      request: requestSchema,
+      result: seasonalAdjustedEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('double-ml-succeeded'),
+      request: requestSchema,
+      result: doubleMlEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('causal-forest-succeeded'),
+      request: requestSchema,
+      result: causalForestEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('t-learner-succeeded'),
+      request: requestSchema,
+      result: tLearnerEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('cross-fitted-t-learner-succeeded'),
+      request: requestSchema,
+      result: crossFittedTLearnerEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('ardl-succeeded'),
+      request: requestSchema,
+      result: ardlEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('root-cause-succeeded'),
+      request: requestSchema,
+      result: rootCauseEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('root-cause-checks-succeeded'),
+      request: requestSchema,
+      result: rootCauseChecksSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('gcm-effects-succeeded'),
+      request: requestSchema,
+      result: gcmEffectsEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('gcm-influence-succeeded'),
+      request: requestSchema,
+      result: gcmInfluenceEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('ardl-model-succeeded'),
+      request: requestSchema,
+      result: ardlModelEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('honest-did-succeeded'),
+      request: requestSchema,
+      result: honestEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('did-sensitivity-succeeded'),
+      request: requestSchema,
+      result: didSensitivityEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('vecm-succeeded'),
+      request: requestSchema,
+      result: vecmEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('predictor-synthetic-control-succeeded'),
+      request: requestSchema,
+      result: predictorSyntheticEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('synthetic-control-succeeded'),
+      request: requestSchema,
+      result: syntheticControlEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('count-regression-succeeded'),
+      request: requestSchema,
+      result: countRegressionEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('sun-abraham-succeeded'),
+      request: requestSchema,
+      result: sunAbrahamEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('surrogate-path-succeeded'),
+      request: requestSchema,
+      result: surrogatePathEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('surrogate-diagnostics-succeeded'),
+      request: requestSchema,
+      result: surrogateDiagnosticEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('surrogate-succeeded'),
+      request: requestSchema,
+      result: surrogateEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('ridge-augmented-synthetic-succeeded'),
+      request: requestSchema,
+      result: ridgeAugmentedEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('panel-regression-succeeded'),
+      request: requestSchema,
+      result: panelRegressionEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('bacon-succeeded'),
+      request: requestSchema,
+      result: baconEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('staggered-did-succeeded'),
+      request: requestSchema,
+      result: staggeredEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('panel-intervention-succeeded'),
+      request: requestSchema,
+      result: panelInterventionEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('negbin-nuts-succeeded'),
+      request: requestSchema,
+      result: negbinNutsEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('bayesian-gaussian-succeeded'),
+      request: requestSchema,
+      result: bayesianGaussianEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('network-query-succeeded'),
+      request: requestSchema,
+      result: networkQueryEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('conditional-gaussian-query-succeeded'),
+      request: requestSchema,
+      result: conditionalGaussianEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('discrete-bn-succeeded'),
+      request: requestSchema,
+      result: discreteBnEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('identified-discrete-query-succeeded'),
+      request: requestSchema,
+      result: identifiedDiscreteQueryEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('binary-ett-succeeded'),
+      request: requestSchema,
+      result: binaryEttEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('linear-scm-succeeded'),
+      request: requestSchema,
+      result: linearScmEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('dynamic-linear-scm-succeeded'),
+      request: requestSchema,
+      result: dynamicLinearScmEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('dml-refutation-succeeded'),
+      request: requestSchema,
+      result: dmlRefutationEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('missingness-resolved'),
+      request: requestSchema,
+      result: missingnessResolvedEvidenceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('analysis-failed'),
+      request: requestSchema,
+      problem: workerProblemSchema,
+    })
+    .strict(),
   z.object({ kind: z.literal('protocol-failed'), detail: z.string() }).strict(),
 ])
 
-export function parseAnalysisWorkerCommand(value: unknown): Result<AnalysisWorkerCommand, AnalysisProtocolProblem> {
+export function parseAnalysisWorkerCommand(
+  value: unknown,
+): Result<AnalysisWorkerCommand, AnalysisProtocolProblem> {
   const parsed = commandSchema.safeParse(value)
-  if (!parsed.success) return err({ kind: 'invalid-command', detail: z.prettifyError(parsed.error) })
+  if (!parsed.success)
+    return err({ kind: 'invalid-command', detail: z.prettifyError(parsed.error) })
   const request = workerRequestId(parsed.data.request)
-  if (!request.ok) return err({ kind: 'invalid-command', detail: 'The worker request identity is invalid.' })
+  if (!request.ok)
+    return err({ kind: 'invalid-command', detail: 'The worker request identity is invalid.' })
   if (parsed.data.kind === 'pandas-resample-daily') {
     const { rows, columns } = parsed.data
-    if (parsed.data.values.length !== rows * (columns + 1)
-      || parsed.data.aggregations.length !== columns
-      || parsed.data.imputedCells.some(([row, column]) => row >= rows || column >= columns)) {
-      return err({ kind: 'invalid-command', detail: 'The resampling timestamps, matrix, aggregation rules, or imputation evidence do not share one shape.' })
+    if (
+      parsed.data.values.length !== rows * (columns + 1) ||
+      parsed.data.aggregations.length !== columns ||
+      parsed.data.imputedCells.some(([row, column]) => row >= rows || column >= columns)
+    ) {
+      return err({
+        kind: 'invalid-command',
+        detail:
+          'The resampling timestamps, matrix, aggregation rules, or imputation evidence do not share one shape.',
+      })
     }
   }
-  if (parsed.data.kind !== 'pandas-resample-daily' && 'columns' in parsed.data && parsed.data.values.length !== parsed.data.rows * parsed.data.columns) {
-    return err({ kind: 'invalid-command', detail: 'The multivariate matrix dimensions do not match its numeric buffer.' })
+  if (
+    parsed.data.kind !== 'pandas-resample-daily' &&
+    'columns' in parsed.data &&
+    parsed.data.values.length !== parsed.data.rows * parsed.data.columns
+  ) {
+    return err({
+      kind: 'invalid-command',
+      detail: 'The multivariate matrix dimensions do not match its numeric buffer.',
+    })
   }
-  if (parsed.data.kind === 'jpcmci-plus' && (
-    parsed.data.rows !== parsed.data.datasets * parsed.data.periods
-    || parsed.data.values.length !== parsed.data.rows * parsed.data.observedColumns
-    || parsed.data.classes.length !== parsed.data.observedColumns
-    || parsed.data.classes.filter((role) => role === 'system').length < 2
-  )) {
-    return err({ kind: 'invalid-command', detail: 'J-PCMCI+ panel dimensions and observed-variable roles must describe one balanced joint matrix.' })
+  if (
+    parsed.data.kind === 'jpcmci-plus' &&
+    (parsed.data.rows !== parsed.data.datasets * parsed.data.periods ||
+      parsed.data.values.length !== parsed.data.rows * parsed.data.observedColumns ||
+      parsed.data.classes.length !== parsed.data.observedColumns ||
+      parsed.data.classes.filter((role) => role === 'system').length < 2)
+  ) {
+    return err({
+      kind: 'invalid-command',
+      detail:
+        'J-PCMCI+ panel dimensions and observed-variable roles must describe one balanced joint matrix.',
+    })
   }
-  if ((parsed.data.kind === 'pcmci-plus' || parsed.data.kind === 'lpcmci') && parsed.data.samples.kind === 'role-aware') {
+  if (
+    (parsed.data.kind === 'pcmci-plus' || parsed.data.kind === 'lpcmci') &&
+    parsed.data.samples.kind === 'role-aware'
+  ) {
     const cells = parsed.data.rows * parsed.data.columns
-    if (parsed.data.samples.validity.length !== cells || parsed.data.samples.analysisMask.length !== cells) {
-      return err({ kind: 'invalid-command', detail: 'Role-aware validity and analysis-mask bytes must match the time-series matrix.' })
+    if (
+      parsed.data.samples.validity.length !== cells ||
+      parsed.data.samples.analysisMask.length !== cells
+    ) {
+      return err({
+        kind: 'invalid-command',
+        detail: 'Role-aware validity and analysis-mask bytes must match the time-series matrix.',
+      })
     }
-    if (parsed.data.samples.validity.some((value) => value > 1) || parsed.data.samples.analysisMask.some((value) => value > 1)) {
-      return err({ kind: 'invalid-command', detail: 'Role-aware validity and analysis-mask cells must be encoded as 0 or 1.' })
+    if (
+      parsed.data.samples.validity.some((value) => value > 1) ||
+      parsed.data.samples.analysisMask.some((value) => value > 1)
+    ) {
+      return err({
+        kind: 'invalid-command',
+        detail: 'Role-aware validity and analysis-mask cells must be encoded as 0 or 1.',
+      })
     }
   }
-  if (parsed.data.kind === 'cdnots' || parsed.data.kind === 'cdnots-plus' || parsed.data.kind === 'grace') {
+  if (
+    parsed.data.kind === 'cdnots' ||
+    parsed.data.kind === 'cdnots-plus' ||
+    parsed.data.kind === 'grace'
+  ) {
     const cells = parsed.data.rows * parsed.data.columns
     if (parsed.data.validity.length !== cells) {
-      return err({ kind: 'invalid-command', detail: 'Causal-TS validity bytes must match the time-series matrix.' })
+      return err({
+        kind: 'invalid-command',
+        detail: 'Causal-TS validity bytes must match the time-series matrix.',
+      })
     }
     if (parsed.data.validity.some((value) => value > 1)) {
-      return err({ kind: 'invalid-command', detail: 'Causal-TS validity cells must be encoded as 0 or 1.' })
+      return err({
+        kind: 'invalid-command',
+        detail: 'Causal-TS validity cells must be encoded as 0 or 1.',
+      })
     }
   }
   if (parsed.data.kind === 'granger-ssr-f' && parsed.data.values.length !== parsed.data.rows * 2) {
-    return err({ kind: 'invalid-command', detail: 'The Granger matrix must contain exactly two columns.' })
+    return err({
+      kind: 'invalid-command',
+      detail: 'The Granger matrix must contain exactly two columns.',
+    })
   }
-  if (parsed.data.kind === 'predictor-synthetic-control' && parsed.data.values.length !== parsed.data.model.rows * parsed.data.model.columnNames.length) return err({kind:'invalid-command',detail:'Synthetic-control matrix dimensions disagree.'})
-  if (parsed.data.kind === 'count-regression' && parsed.data.values.length !== parsed.data.model.rows * parsed.data.model.columns) return err({kind:'invalid-command',detail:'Count regression matrix dimensions disagree.'})
-  if ((parsed.data.kind === 'panel-regression'||parsed.data.kind==='bacon') && parsed.data.values.length!==parsed.data.model.rows*parsed.data.model.columns) return err({kind:'invalid-command',detail:'Panel analysis matrix dimensions disagree.'})
-  if (parsed.data.kind === 'staggered-did' && parsed.data.values.length !== parsed.data.model.rows * parsed.data.model.columns) return err({kind:'invalid-command',detail:'Staggered DiD matrix dimensions disagree.'})
-  if (parsed.data.kind === 'panel-adjusted' && (parsed.data.values.length !== parsed.data.rows * parsed.data.columns || parsed.data.units.length !== parsed.data.rows || parsed.data.times.length !== parsed.data.rows)) {
-    return err({ kind: 'invalid-command', detail: 'Adjusted DiD values and keys must describe the same rows.' })
+  if (
+    parsed.data.kind === 'predictor-synthetic-control' &&
+    parsed.data.values.length !== parsed.data.model.rows * parsed.data.model.columnNames.length
+  )
+    return err({ kind: 'invalid-command', detail: 'Synthetic-control matrix dimensions disagree.' })
+  if (
+    parsed.data.kind === 'count-regression' &&
+    parsed.data.values.length !== parsed.data.model.rows * parsed.data.model.columns
+  )
+    return err({ kind: 'invalid-command', detail: 'Count regression matrix dimensions disagree.' })
+  if (
+    (parsed.data.kind === 'panel-regression' || parsed.data.kind === 'bacon') &&
+    parsed.data.values.length !== parsed.data.model.rows * parsed.data.model.columns
+  )
+    return err({ kind: 'invalid-command', detail: 'Panel analysis matrix dimensions disagree.' })
+  if (
+    parsed.data.kind === 'staggered-did' &&
+    parsed.data.values.length !== parsed.data.model.rows * parsed.data.model.columns
+  )
+    return err({ kind: 'invalid-command', detail: 'Staggered DiD matrix dimensions disagree.' })
+  if (
+    parsed.data.kind === 'panel-adjusted' &&
+    (parsed.data.values.length !== parsed.data.rows * parsed.data.columns ||
+      parsed.data.units.length !== parsed.data.rows ||
+      parsed.data.times.length !== parsed.data.rows)
+  ) {
+    return err({
+      kind: 'invalid-command',
+      detail: 'Adjusted DiD values and keys must describe the same rows.',
+    })
   }
-  if (parsed.data.kind === 'panel-intervention' && (
-    parsed.data.values.length !== parsed.data.rows * 2
-    || parsed.data.units.length !== parsed.data.rows
-    || parsed.data.times.length !== parsed.data.rows
-  )) {
-    return err({ kind: 'invalid-command', detail: 'Panel values, unit keys, and time keys must describe the same rows.' })
+  if (
+    parsed.data.kind === 'panel-intervention' &&
+    (parsed.data.values.length !== parsed.data.rows * 2 ||
+      parsed.data.units.length !== parsed.data.rows ||
+      parsed.data.times.length !== parsed.data.rows)
+  ) {
+    return err({
+      kind: 'invalid-command',
+      detail: 'Panel values, unit keys, and time keys must describe the same rows.',
+    })
   }
   if (parsed.data.kind === 'backdoor-identify' && parsed.data.values.length !== 0) {
     return err({ kind: 'invalid-command', detail: 'Identification takes a graph, not data.' })
   }
-  if (parsed.data.kind === 'backdoor-identify' && (
-    parsed.data.names.length !== parsed.data.nodes
-    || new Set(parsed.data.names).size !== parsed.data.names.length
-  )) {
-    return err({ kind: 'invalid-command', detail: 'Identification requires one distinct name for every graph node.' })
+  if (
+    parsed.data.kind === 'backdoor-identify' &&
+    (parsed.data.names.length !== parsed.data.nodes ||
+      new Set(parsed.data.names).size !== parsed.data.names.length)
+  ) {
+    return err({
+      kind: 'invalid-command',
+      detail: 'Identification requires one distinct name for every graph node.',
+    })
   }
-  if (parsed.data.kind === 'resolve-missingness' && parsed.data.validity.length !== parsed.data.rows * parsed.data.columns) {
-    return err({ kind: 'invalid-command', detail: 'The validity bytes do not match the matrix dimensions.' })
+  if (
+    parsed.data.kind === 'resolve-missingness' &&
+    parsed.data.validity.length !== parsed.data.rows * parsed.data.columns
+  ) {
+    return err({
+      kind: 'invalid-command',
+      detail: 'The validity bytes do not match the matrix dimensions.',
+    })
   }
   return ok({ ...parsed.data, request: request.value })
 }
@@ -2755,7 +4498,12 @@ export function parseAnalysisWorkerCommand(value: unknown): Result<AnalysisWorke
 export function parseAnalysisRefusal(
   value: unknown,
 ): Result<DiscreteStateRefusal | null, AnalysisProtocolProblem> {
-  if (typeof value !== 'object' || value === null || !('kind' in value) || value.kind !== 'discreteStateRefused') {
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    !('kind' in value) ||
+    value.kind !== 'discreteStateRefused'
+  ) {
     return ok(null)
   }
   const parsed = discreteStateRefusalSchema.safeParse(value)
@@ -2764,44 +4512,71 @@ export function parseAnalysisRefusal(
     : err({ kind: 'invalid-event', detail: z.prettifyError(parsed.error) })
 }
 
-export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerEvent, AnalysisProtocolProblem> {
+export function parseAnalysisWorkerEvent(
+  value: unknown,
+): Result<AnalysisWorkerEvent, AnalysisProtocolProblem> {
   const parsed = eventSchema.safeParse(value)
   if (!parsed.success) return err({ kind: 'invalid-event', detail: z.prettifyError(parsed.error) })
   if (parsed.data.kind === 'protocol-failed') return ok(parsed.data)
   const request = workerRequestId(parsed.data.request)
-  if (!request.ok) return err({ kind: 'invalid-event', detail: 'The worker request identity is invalid.' })
+  if (!request.ok)
+    return err({ kind: 'invalid-event', detail: 'The worker request identity is invalid.' })
   if (parsed.data.kind === 'analysis-failed') return ok({ ...parsed.data, request: request.value })
-  if (parsed.data.kind === 'analysis-progress') return ok({ ...parsed.data, request: request.value })
-  if (parsed.data.kind === 'aalen-succeeded' || parsed.data.kind === 'survival-forest-succeeded') return ok({ ...parsed.data, request: request.value })
+  if (parsed.data.kind === 'analysis-progress')
+    return ok({ ...parsed.data, request: request.value })
+  if (parsed.data.kind === 'aalen-succeeded' || parsed.data.kind === 'survival-forest-succeeded')
+    return ok({ ...parsed.data, request: request.value })
   if (parsed.data.kind === 'penalized-aft-succeeded') {
     const result = parsePenalizedAftEvidence(parsed.data.result)
-    return result.ok ? ok({ kind: 'penalized-aft-succeeded', request: request.value, result: result.value }) : err({ kind: 'invalid-event', detail: result.error.detail })
+    return result.ok
+      ? ok({ kind: 'penalized-aft-succeeded', request: request.value, result: result.value })
+      : err({ kind: 'invalid-event', detail: result.error.detail })
   }
   if (parsed.data.kind === 'flexsurv-succeeded') {
     const result = parseFlexSurvEvidence(parsed.data.result)
-    return result.ok ? ok({ kind: 'flexsurv-succeeded', request: request.value, result: result.value }) : err({ kind: 'invalid-event', detail: result.error.detail })
+    return result.ok
+      ? ok({ kind: 'flexsurv-succeeded', request: request.value, result: result.value })
+      : err({ kind: 'invalid-event', detail: result.error.detail })
   }
   if (parsed.data.kind === 'cox-regression-succeeded') {
     const result = parseCoxRegressionEvidence(parsed.data.result)
-    return result.ok ? ok({ kind: 'cox-regression-succeeded', request: request.value, result: result.value }) : err({ kind: 'invalid-event', detail: result.error.detail })
+    return result.ok
+      ? ok({ kind: 'cox-regression-succeeded', request: request.value, result: result.value })
+      : err({ kind: 'invalid-event', detail: result.error.detail })
   }
   if (parsed.data.kind === 'nonparametric-survival-succeeded') {
     const result = parseNonparametricSurvivalEvidence(parsed.data.result)
-    return result.ok ? ok({ kind: 'nonparametric-survival-succeeded', request: request.value, result: result.value }) : err({ kind: 'invalid-event', detail: result.error.detail })
+    return result.ok
+      ? ok({
+          kind: 'nonparametric-survival-succeeded',
+          request: request.value,
+          result: result.value,
+        })
+      : err({ kind: 'invalid-event', detail: result.error.detail })
   }
   if (parsed.data.kind === 'comparison-survival-succeeded') {
     const result = parseComparisonSurvivalEvidence(parsed.data.result)
-    return result.ok ? ok({ kind: 'comparison-survival-succeeded', request: request.value, result: result.value }) : err({ kind: 'invalid-event', detail: result.error.detail })
+    return result.ok
+      ? ok({ kind: 'comparison-survival-succeeded', request: request.value, result: result.value })
+      : err({ kind: 'invalid-event', detail: result.error.detail })
   }
   if (parsed.data.kind === 'multi-state-survival-succeeded') {
     const result = parseMultiStateSurvivalEvidence(parsed.data.result)
-    return result.ok ? ok({ kind: 'multi-state-survival-succeeded', request: request.value, result: result.value }) : err({ kind: 'invalid-event', detail: result.error.detail })
+    return result.ok
+      ? ok({ kind: 'multi-state-survival-succeeded', request: request.value, result: result.value })
+      : err({ kind: 'invalid-event', detail: result.error.detail })
   }
   if (parsed.data.kind === 'multicollinearity-succeeded') {
     const result = parseMulticollinearityEvidence(parsed.data.result)
     return result.ok
       ? ok({ kind: 'multicollinearity-succeeded', request: request.value, result: result.value })
-      : err({ kind: 'invalid-event', detail: result.error.kind === 'invalid-evidence' ? result.error.detail : 'The multicollinearity result does not match its columns.' })
+      : err({
+          kind: 'invalid-event',
+          detail:
+            result.error.kind === 'invalid-evidence'
+              ? result.error.detail
+              : 'The multicollinearity result does not match its columns.',
+        })
   }
   if (parsed.data.kind === 'pcmci-plus-succeeded') {
     const result = parsePcmciPlusEvidence(parsed.data.result)
@@ -2902,7 +4677,11 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
   if (parsed.data.kind === 'backdoor-identification-succeeded') {
     const result = parseBackdoorIdentificationEvidence(parsed.data.result)
     return result.ok
-      ? ok({ kind: 'backdoor-identification-succeeded', request: request.value, result: result.value })
+      ? ok({
+          kind: 'backdoor-identification-succeeded',
+          request: request.value,
+          result: result.value,
+        })
       : err({ kind: 'invalid-event', detail: result.error.detail })
   }
   if (parsed.data.kind === 'dag-check-succeeded') {
@@ -2956,160 +4735,281 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
   if (parsed.data.kind === 'instrumental-variable-succeeded') {
     const result = parseInstrumentalVariableEvidence(parsed.data.result)
     return result.ok
-      ? ok({ kind: 'instrumental-variable-succeeded', request: request.value, result: result.value })
+      ? ok({
+          kind: 'instrumental-variable-succeeded',
+          request: request.value,
+          result: result.value,
+        })
       : err({ kind: 'invalid-event', detail: result.error.detail })
   }
   if (parsed.data.kind === 'count-glm-succeeded') {
     const result = parseCountGlmEvidence(parsed.data.result)
-    return result.ok ? ok({ kind: 'count-glm-succeeded', request: request.value, result: result.value }) : err({ kind: 'invalid-event', detail: result.error.detail })
+    return result.ok
+      ? ok({ kind: 'count-glm-succeeded', request: request.value, result: result.value })
+      : err({ kind: 'invalid-event', detail: result.error.detail })
   }
   if (parsed.data.kind === 'negative-binomial-ingarch-succeeded') {
     const result = parseNegativeBinomialIngarchEvidence(parsed.data.result)
-    return result.ok ? ok({ kind: 'negative-binomial-ingarch-succeeded', request: request.value, result: result.value }) : err({ kind: 'invalid-event', detail: result.error.detail })
+    return result.ok
+      ? ok({
+          kind: 'negative-binomial-ingarch-succeeded',
+          request: request.value,
+          result: result.value,
+        })
+      : err({ kind: 'invalid-event', detail: result.error.detail })
   }
   if (parsed.data.kind === 'count-series-intervention-scan-succeeded') {
     const result = parseCountSeriesInterventionScanEvidence(parsed.data.result)
-    return result.ok ? ok({ kind: 'count-series-intervention-scan-succeeded', request: request.value, result: result.value }) : err({ kind: 'invalid-event', detail: result.error.detail })
+    return result.ok
+      ? ok({
+          kind: 'count-series-intervention-scan-succeeded',
+          request: request.value,
+          result: result.value,
+        })
+      : err({ kind: 'invalid-event', detail: result.error.detail })
   }
   if (parsed.data.kind === 'interrupted-series-succeeded') {
     const result = parseInterruptedSeriesEvidence(parsed.data.result)
-    return result.ok ? ok({ kind: 'interrupted-series-succeeded', request: request.value, result: result.value }) : err({ kind: 'invalid-event', detail: result.error.detail })
+    return result.ok
+      ? ok({ kind: 'interrupted-series-succeeded', request: request.value, result: result.value })
+      : err({ kind: 'invalid-event', detail: result.error.detail })
   }
   if (parsed.data.kind === 'causal-effects-succeeded') {
     const result = parseCausalEffectsEvidence(parsed.data.result)
-    return result.ok ? ok({ kind: 'causal-effects-succeeded', request: request.value, result: result.value }) : err({ kind: 'invalid-event', detail: result.error.detail })
+    return result.ok
+      ? ok({ kind: 'causal-effects-succeeded', request: request.value, result: result.value })
+      : err({ kind: 'invalid-event', detail: result.error.detail })
   }
   if (parsed.data.kind === 'causal-impact-succeeded') {
     const result = parseCausalImpactEvidence(parsed.data.result)
-    return result.ok ? ok({ kind: 'causal-impact-succeeded', request: request.value, result: result.value }) : err({ kind: 'invalid-event', detail: result.error.detail })
+    return result.ok
+      ? ok({ kind: 'causal-impact-succeeded', request: request.value, result: result.value })
+      : err({ kind: 'invalid-event', detail: result.error.detail })
   }
   if (parsed.data.kind === 'linear-refutation-succeeded') {
     const result = parseLinearRefutationEvidence(parsed.data.result)
-    return result.ok ? ok({ kind: 'linear-refutation-succeeded', request: request.value, result: result.value }) : err({ kind: 'invalid-event', detail: result.error.detail })
+    return result.ok
+      ? ok({ kind: 'linear-refutation-succeeded', request: request.value, result: result.value })
+      : err({ kind: 'invalid-event', detail: result.error.detail })
   }
   if (parsed.data.kind === 'unobserved-confounding-succeeded') {
     const result = parseUnobservedConfoundingEvidence(parsed.data.result)
-    return result.ok ? ok({ kind: 'unobserved-confounding-succeeded', request: request.value, result: result.value }) : err({ kind: 'invalid-event', detail: result.error.detail })
+    return result.ok
+      ? ok({
+          kind: 'unobserved-confounding-succeeded',
+          request: request.value,
+          result: result.value,
+        })
+      : err({ kind: 'invalid-event', detail: result.error.detail })
   }
   if (parsed.data.kind === 'series-structure-succeeded') {
     const result = parseSeriesStructureEvidence(parsed.data.result)
-    return result.ok ? ok({ kind: 'series-structure-succeeded', request: request.value, result: result.value }) : err({ kind: 'invalid-event', detail: result.error.detail })
+    return result.ok
+      ? ok({ kind: 'series-structure-succeeded', request: request.value, result: result.value })
+      : err({ kind: 'invalid-event', detail: result.error.detail })
   }
   if (parsed.data.kind === 'double-ml-succeeded') {
     const result = doubleMlEvidenceSchema.safeParse(parsed.data.result)
-    return result.success ? ok({ kind: 'double-ml-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
+    return result.success
+      ? ok({ kind: 'double-ml-succeeded', request: request.value, result: result.data })
+      : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
   if (parsed.data.kind === 'causal-forest-succeeded') {
-    return ok({ kind: 'causal-forest-succeeded', request: request.value, result: parsed.data.result })
+    return ok({
+      kind: 'causal-forest-succeeded',
+      request: request.value,
+      result: parsed.data.result,
+    })
   }
   if (parsed.data.kind === 't-learner-succeeded') {
     const result = tLearnerEvidenceSchema.safeParse(parsed.data.result)
-    return result.success ? ok({ kind: 't-learner-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
+    return result.success
+      ? ok({ kind: 't-learner-succeeded', request: request.value, result: result.data })
+      : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
   if (parsed.data.kind === 'cross-fitted-t-learner-succeeded') {
     const result = crossFittedTLearnerEvidenceSchema.safeParse(parsed.data.result)
-    return result.success ? ok({ kind: 'cross-fitted-t-learner-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
+    return result.success
+      ? ok({
+          kind: 'cross-fitted-t-learner-succeeded',
+          request: request.value,
+          result: result.data,
+        })
+      : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
   if (parsed.data.kind === 'ardl-succeeded') {
     const result = ardlEvidenceSchema.safeParse(parsed.data.result)
-    return result.success ? ok({ kind: 'ardl-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
+    return result.success
+      ? ok({ kind: 'ardl-succeeded', request: request.value, result: result.data })
+      : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
   if (parsed.data.kind === 'ardl-model-succeeded') {
     const result = ardlModelEvidenceSchema.safeParse(parsed.data.result)
-    return result.success ? ok({ kind: 'ardl-model-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
+    return result.success
+      ? ok({ kind: 'ardl-model-succeeded', request: request.value, result: result.data })
+      : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
-  if(parsed.data.kind==='honest-did-succeeded'){
-    const result=honestEvidenceSchema.safeParse(parsed.data.result)
-    return result.success?ok({kind:'honest-did-succeeded',request:request.value,result:result.data}):err({kind:'invalid-event',detail:z.prettifyError(result.error)})
+  if (parsed.data.kind === 'honest-did-succeeded') {
+    const result = honestEvidenceSchema.safeParse(parsed.data.result)
+    return result.success
+      ? ok({ kind: 'honest-did-succeeded', request: request.value, result: result.data })
+      : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
-  if(parsed.data.kind==='did-sensitivity-succeeded'){
-    const result=didSensitivityEvidenceSchema.safeParse(parsed.data.result)
-    return result.success?ok({kind:'did-sensitivity-succeeded',request:request.value,result:result.data}):err({kind:'invalid-event',detail:z.prettifyError(result.error)})
+  if (parsed.data.kind === 'did-sensitivity-succeeded') {
+    const result = didSensitivityEvidenceSchema.safeParse(parsed.data.result)
+    return result.success
+      ? ok({ kind: 'did-sensitivity-succeeded', request: request.value, result: result.data })
+      : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
   if (parsed.data.kind === 'root-cause-succeeded') {
     const result = rootCauseEvidenceSchema.safeParse(parsed.data.result)
-    return result.success ? ok({ kind: 'root-cause-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
+    return result.success
+      ? ok({ kind: 'root-cause-succeeded', request: request.value, result: result.data })
+      : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
   if (parsed.data.kind === 'gcm-effects-succeeded') {
     const result = gcmEffectsEvidenceSchema.safeParse(parsed.data.result)
-    return result.success ? ok({ kind: 'gcm-effects-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
+    return result.success
+      ? ok({ kind: 'gcm-effects-succeeded', request: request.value, result: result.data })
+      : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
   if (parsed.data.kind === 'gcm-influence-succeeded') {
     const result = gcmInfluenceEvidenceSchema.safeParse(parsed.data.result)
-    return result.success ? ok({ kind: 'gcm-influence-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
+    return result.success
+      ? ok({ kind: 'gcm-influence-succeeded', request: request.value, result: result.data })
+      : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
   if (parsed.data.kind === 'root-cause-checks-succeeded') {
     const result = rootCauseChecksSchema.safeParse(parsed.data.result)
-    return result.success ? ok({ kind: 'root-cause-checks-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
+    return result.success
+      ? ok({ kind: 'root-cause-checks-succeeded', request: request.value, result: result.data })
+      : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
   if (parsed.data.kind === 'vecm-succeeded') {
     const result = vecmEvidenceSchema.safeParse(parsed.data.result)
-    return result.success ? ok({ kind: 'vecm-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
+    return result.success
+      ? ok({ kind: 'vecm-succeeded', request: request.value, result: result.data })
+      : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
   if (parsed.data.kind === 'predictor-synthetic-control-succeeded') {
-    return ok({kind:'predictor-synthetic-control-succeeded',request:request.value,result:parsed.data.result})
+    return ok({
+      kind: 'predictor-synthetic-control-succeeded',
+      request: request.value,
+      result: parsed.data.result,
+    })
   }
   if (parsed.data.kind === 'synthetic-control-succeeded') {
     const result = syntheticControlEvidenceSchema.safeParse(parsed.data.result)
-    return result.success ? ok({ kind: 'synthetic-control-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
+    return result.success
+      ? ok({ kind: 'synthetic-control-succeeded', request: request.value, result: result.data })
+      : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
   if (parsed.data.kind === 'sharp-rd-succeeded') {
     const result = sharpRdEvidenceSchema.safeParse(parsed.data.result)
-    return result.success ? ok({ kind: 'sharp-rd-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
+    return result.success
+      ? ok({ kind: 'sharp-rd-succeeded', request: request.value, result: result.data })
+      : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
-  if (parsed.data.kind === 'count-regression-succeeded') return ok({...parsed.data,request:request.value})
-  if (parsed.data.kind === 'surrogate-path-succeeded') return ok({...parsed.data,request:request.value})
-  if (parsed.data.kind === 'surrogate-diagnostics-succeeded') return ok({...parsed.data,request:request.value})
-  if (parsed.data.kind === 'surrogate-succeeded') return ok({...parsed.data,request:request.value})
-  if (parsed.data.kind === 'sun-abraham-succeeded'||parsed.data.kind === 'ridge-augmented-synthetic-succeeded') return ok({...parsed.data,request:request.value})
-  if (parsed.data.kind === 'panel-regression-succeeded'||parsed.data.kind==='bacon-succeeded') return ok({...parsed.data,request:request.value})
-  if (parsed.data.kind === 'staggered-did-succeeded') return ok({...parsed.data,request:request.value})
+  if (parsed.data.kind === 'count-regression-succeeded')
+    return ok({ ...parsed.data, request: request.value })
+  if (parsed.data.kind === 'surrogate-path-succeeded')
+    return ok({ ...parsed.data, request: request.value })
+  if (parsed.data.kind === 'surrogate-diagnostics-succeeded')
+    return ok({ ...parsed.data, request: request.value })
+  if (parsed.data.kind === 'surrogate-succeeded')
+    return ok({ ...parsed.data, request: request.value })
+  if (
+    parsed.data.kind === 'sun-abraham-succeeded' ||
+    parsed.data.kind === 'ridge-augmented-synthetic-succeeded'
+  )
+    return ok({ ...parsed.data, request: request.value })
+  if (parsed.data.kind === 'panel-regression-succeeded' || parsed.data.kind === 'bacon-succeeded')
+    return ok({ ...parsed.data, request: request.value })
+  if (parsed.data.kind === 'staggered-did-succeeded')
+    return ok({ ...parsed.data, request: request.value })
   if (parsed.data.kind === 'panel-intervention-succeeded') {
     const result = panelInterventionEvidenceSchema.safeParse(parsed.data.result)
-    if (result.success && result.data.kind === 'panelAdjusted' && result.data.inference.kind === 'crossFitted' && result.data.inference.propensityFit === undefined) return err({ kind: 'invalid-event', detail: 'A new DR DiD result must record the standardized propensity fit.' })
-    return result.success ? ok({ kind: 'panel-intervention-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
+    if (
+      result.success &&
+      result.data.kind === 'panelAdjusted' &&
+      result.data.inference.kind === 'crossFitted' &&
+      result.data.inference.propensityFit === undefined
+    )
+      return err({
+        kind: 'invalid-event',
+        detail: 'A new DR DiD result must record the standardized propensity fit.',
+      })
+    return result.success
+      ? ok({ kind: 'panel-intervention-succeeded', request: request.value, result: result.data })
+      : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
   if (parsed.data.kind === 'negbin-nuts-succeeded') {
     const result = negbinNutsEvidenceSchema.safeParse(parsed.data.result)
-    return result.success ? ok({ kind: 'negbin-nuts-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
+    return result.success
+      ? ok({ kind: 'negbin-nuts-succeeded', request: request.value, result: result.data })
+      : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
   if (parsed.data.kind === 'bayesian-gaussian-succeeded') {
     const result = bayesianGaussianEvidenceSchema.safeParse(parsed.data.result)
-    return result.success ? ok({ kind: 'bayesian-gaussian-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
+    return result.success
+      ? ok({ kind: 'bayesian-gaussian-succeeded', request: request.value, result: result.data })
+      : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
-  if (parsed.data.kind === 'network-query-succeeded') return ok({...parsed.data,request:request.value})
-  if (parsed.data.kind === 'conditional-gaussian-query-succeeded') return ok({...parsed.data,request:request.value})
+  if (parsed.data.kind === 'network-query-succeeded')
+    return ok({ ...parsed.data, request: request.value })
+  if (parsed.data.kind === 'conditional-gaussian-query-succeeded')
+    return ok({ ...parsed.data, request: request.value })
   if (parsed.data.kind === 'discrete-bn-succeeded') {
     const result = discreteBnEvidenceSchema.safeParse(parsed.data.result)
-    return result.success ? ok({ kind: 'discrete-bn-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
+    return result.success
+      ? ok({ kind: 'discrete-bn-succeeded', request: request.value, result: result.data })
+      : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
   if (parsed.data.kind === 'identified-discrete-query-succeeded') {
     const result = identifiedDiscreteQueryEvidenceSchema.safeParse(parsed.data.result)
-    return result.success ? ok({ kind: 'identified-discrete-query-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
+    return result.success
+      ? ok({
+          kind: 'identified-discrete-query-succeeded',
+          request: request.value,
+          result: result.data,
+        })
+      : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
   if (parsed.data.kind === 'binary-ett-succeeded') {
     const result = binaryEttEvidenceSchema.safeParse(parsed.data.result)
-    return result.success ? ok({ kind: 'binary-ett-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
+    return result.success
+      ? ok({ kind: 'binary-ett-succeeded', request: request.value, result: result.data })
+      : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
   if (parsed.data.kind === 'linear-scm-succeeded') {
     const result = linearScmEvidenceSchema.safeParse(parsed.data.result)
-    return result.success ? ok({ kind: 'linear-scm-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
+    return result.success
+      ? ok({ kind: 'linear-scm-succeeded', request: request.value, result: result.data })
+      : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
   if (parsed.data.kind === 'dynamic-linear-scm-succeeded') {
     const result = dynamicLinearScmEvidenceSchema.safeParse(parsed.data.result)
-    return result.success ? ok({ kind: 'dynamic-linear-scm-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
+    return result.success
+      ? ok({ kind: 'dynamic-linear-scm-succeeded', request: request.value, result: result.data })
+      : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
   if (parsed.data.kind === 'dml-refutation-succeeded') {
     const result = parseDmlRefutationEvidence(parsed.data.result)
-    return result.ok ? ok({ kind: 'dml-refutation-succeeded', request: request.value, result: result.value }) : err({ kind: 'invalid-event', detail: result.error.detail })
+    return result.ok
+      ? ok({ kind: 'dml-refutation-succeeded', request: request.value, result: result.value })
+      : err({ kind: 'invalid-event', detail: result.error.detail })
   }
   if (parsed.data.kind === 'seasonal-adjusted') {
     const result = parseSeasonalAdjustedEvidence(parsed.data.result)
-    return result.ok ? ok({ kind: 'seasonal-adjusted', request: request.value, result: result.value }) : err({ kind: 'invalid-event', detail: result.error.detail })
+    return result.ok
+      ? ok({ kind: 'seasonal-adjusted', request: request.value, result: result.value })
+      : err({ kind: 'invalid-event', detail: result.error.detail })
   }
   if (parsed.data.kind === 'missingness-resolved') {
     const result = parseMissingnessResolvedEvidence(parsed.data.result)
-    return result.ok ? ok({ kind: 'missingness-resolved', request: request.value, result: result.value }) : err({ kind: 'invalid-event', detail: result.error.detail })
+    return result.ok
+      ? ok({ kind: 'missingness-resolved', request: request.value, result: result.value })
+      : err({ kind: 'invalid-event', detail: result.error.detail })
   }
   if (parsed.data.kind === 'pandas-resampling-succeeded') {
     const result = parsePandasResamplingEvidence(parsed.data.result)
@@ -3127,7 +5027,17 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
   return exhaustive
 }
 import { tLearnerUncertaintySchema, type TLearnerUncertainty } from '@/domain/tLearner'
-import { gcmEffectsRequestSchema, gcmEffectsEvidenceSchema, type GcmEffectsRequest, type GcmEffectsEvidence } from '@/domain/gcmEffects'
-import { gcmInfluenceRequestSchema, gcmInfluenceEvidenceSchema, type GcmInfluenceRequest, type GcmInfluenceEvidence } from '@/domain/gcmInfluence'
+import {
+  gcmEffectsRequestSchema,
+  gcmEffectsEvidenceSchema,
+  type GcmEffectsRequest,
+  type GcmEffectsEvidence,
+} from '@/domain/gcmEffects'
+import {
+  gcmInfluenceRequestSchema,
+  gcmInfluenceEvidenceSchema,
+  type GcmInfluenceRequest,
+  type GcmInfluenceEvidence,
+} from '@/domain/gcmInfluence'
 import { sharpRdEvidenceSchema, type SharpRdEvidence } from '@/domain/sharpRd'
 import { adjustedDidSpecificationSchema, type AdjustedDidSpecification } from '@/domain/adjustedDid'

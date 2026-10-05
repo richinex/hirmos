@@ -9,7 +9,8 @@ export interface ScrollOverflow {
 const NONE: ScrollOverflow = { start: false, end: false }
 
 /** Smooth, unless the reader asked for reduced motion; read at the moment of scrolling. */
-export const scrollBehavior = (): ScrollBehavior => (window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth')
+export const scrollBehavior = (): ScrollBehavior =>
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'
 
 /**
  * Tracks a horizontal scroller whose content may be wider than it, and pages it by most of its width.
@@ -34,7 +35,9 @@ export function useScrollOverflow(
     const measure = () => {
       const start = scroller.scrollLeft > 1
       const end = scroller.scrollLeft + scroller.clientWidth < scroller.scrollWidth - 1
-      setOverflow((current) => (current.start === start && current.end === end ? current : { start, end }))
+      setOverflow((current) =>
+        current.start === start && current.end === end ? current : { start, end },
+      )
     }
     const schedule = () => {
       cancelAnimationFrame(pending)
@@ -45,13 +48,23 @@ export function useScrollOverflow(
     observer.observe(row)
     scroller.addEventListener('scroll', schedule, { passive: true })
     measure()
-    return () => { observer.disconnect(); cancelAnimationFrame(pending); scroller.removeEventListener('scroll', schedule) }
+    return () => {
+      observer.disconnect()
+      cancelAnimationFrame(pending)
+      scroller.removeEventListener('scroll', schedule)
+    }
   }, [viewport, content, active])
 
-  const page = useCallback((direction: 1 | -1) => {
-    const scroller = viewport.current
-    scroller?.scrollBy({ left: direction * scroller.clientWidth * 0.7, behavior: scrollBehavior() })
-  }, [viewport])
+  const page = useCallback(
+    (direction: 1 | -1) => {
+      const scroller = viewport.current
+      scroller?.scrollBy({
+        left: direction * scroller.clientWidth * 0.7,
+        behavior: scrollBehavior(),
+      })
+    },
+    [viewport],
+  )
 
   return { overflow, page }
 }

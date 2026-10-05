@@ -20,12 +20,21 @@ export interface WorkbenchPane {
   readonly defaultCollapsed?: boolean
 }
 
-function PaneHeader({ id, title, controls, collapse }: {
+function PaneHeader({
+  id,
+  title,
+  controls,
+  collapse,
+}: {
   readonly id?: string
   readonly title: string
   readonly controls?: ReactNode
   /** Collapse or expand the pane; the header stays visible when collapsed so the pane can be reopened. */
-  readonly collapse?: { readonly collapsed: boolean; readonly onToggle: () => void; readonly icon: { readonly open: string; readonly closed: string } }
+  readonly collapse?: {
+    readonly collapsed: boolean
+    readonly onToggle: () => void
+    readonly icon: { readonly open: string; readonly closed: string }
+  }
 }) {
   return (
     <div className="workbench-pane-header flex h-9 shrink-0 select-none items-center justify-between gap-2 border-b border-hair px-3">
@@ -33,7 +42,9 @@ function PaneHeader({ id, title, controls, collapse }: {
           `text-nowrap` replaces the recipe's balanced wrapping, which would otherwise win over the clip,
           because `text-wrap: balance` also sets the wrap mode back to wrapping. The real text stays in the
           heading, so its accessible name and a test's text query both see it. */}
-      <h2 id={id} className={label('m-0 min-w-0 truncate text-nowrap text-ink')} title={title}>{title}</h2>
+      <h2 id={id} className={label('m-0 min-w-0 truncate text-nowrap text-ink')} title={title}>
+        {title}
+      </h2>
       <div className="flex items-center gap-1.5">
         {!collapse?.collapsed && controls}
         {collapse && (
@@ -69,7 +80,17 @@ export const useOpenPane = (): ((pane: PhonePane) => void) => useContext(PaneReq
 export const useClosePane = (): (() => void) => useContext(PaneCloseContext)
 
 /** Independent actions open contextual sheets; they do not select a workbench mode. */
-function PaneOpener({ pane, icon, open, onOpen }: { readonly pane: WorkbenchPane; readonly icon: string; readonly open: boolean; readonly onOpen: () => void }) {
+function PaneOpener({
+  pane,
+  icon,
+  open,
+  onOpen,
+}: {
+  readonly pane: WorkbenchPane
+  readonly icon: string
+  readonly open: boolean
+  readonly onOpen: () => void
+}) {
   return (
     <button
       type="button"
@@ -86,7 +107,12 @@ function PaneOpener({ pane, icon, open, onOpen }: { readonly pane: WorkbenchPane
 }
 
 /** Below `md` the panes become bottom sheets opened from a bar under the stage, as Octopus does for its drawer. */
-function PhoneWorkbench({ stage, inspector, bottom, stagePadding }: {
+function PhoneWorkbench({
+  stage,
+  inspector,
+  bottom,
+  stagePadding,
+}: {
   readonly stage: ReactNode
   readonly inspector?: WorkbenchPane
   readonly bottom?: WorkbenchPane
@@ -95,33 +121,67 @@ function PhoneWorkbench({ stage, inspector, bottom, stagePadding }: {
   const [open, setOpen] = useState<PhonePane | null>(null)
   return (
     <PaneRequestContext.Provider value={setOpen}>
-    <PaneCloseContext.Provider value={() => setOpen(null)}>
-    <div className="flex min-w-0 flex-1 flex-col">
-      <div className="panel-scroll min-h-0 flex-1 overflow-y-auto">
-        <div className={cn('flex min-h-full w-full flex-col', stagePadding && 'workbench-stage px-4 py-5')}>{stage}</div>
-      </div>
-      {(inspector || bottom) && (
-        <div className="shrink-0 bg-panel px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2">
-          <div className={cn('grid items-stretch gap-2', inspector && bottom ? 'grid-cols-2' : 'grid-cols-1')} role="group" aria-label="Panes">
-            {inspector && <PaneOpener pane={inspector} icon="tune" open={open === 'inspector'} onOpen={() => setOpen('inspector')} />}
-            {bottom && <PaneOpener pane={bottom} icon="bottom_panel_open" open={open === 'bottom'} onOpen={() => setOpen('bottom')} />}
+      <PaneCloseContext.Provider value={() => setOpen(null)}>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="panel-scroll min-h-0 flex-1 overflow-y-auto">
+            <div
+              className={cn(
+                'flex min-h-full w-full flex-col',
+                stagePadding && 'workbench-stage px-4 py-5',
+              )}
+            >
+              {stage}
+            </div>
           </div>
+          {(inspector || bottom) && (
+            <div className="shrink-0 bg-panel px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2">
+              <div
+                className={cn(
+                  'grid items-stretch gap-2',
+                  inspector && bottom ? 'grid-cols-2' : 'grid-cols-1',
+                )}
+                role="group"
+                aria-label="Panes"
+              >
+                {inspector && (
+                  <PaneOpener
+                    pane={inspector}
+                    icon="tune"
+                    open={open === 'inspector'}
+                    onOpen={() => setOpen('inspector')}
+                  />
+                )}
+                {bottom && (
+                  <PaneOpener
+                    pane={bottom}
+                    icon="bottom_panel_open"
+                    open={open === 'bottom'}
+                    onOpen={() => setOpen('bottom')}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+          {inspector && (
+            <Sheet
+              open={open === 'inspector'}
+              onClose={() => setOpen(null)}
+              title={inspector.title}
+            >
+              {inspector.controls && (
+                <div className="mb-2 flex justify-end">{inspector.controls}</div>
+              )}
+              <div className="inspector-content">{inspector.body}</div>
+            </Sheet>
+          )}
+          {bottom && (
+            <Sheet open={open === 'bottom'} onClose={() => setOpen(null)} title={bottom.title}>
+              {bottom.controls && <div className="mb-2 flex justify-end">{bottom.controls}</div>}
+              <div className="workbench-bottom-content">{bottom.body}</div>
+            </Sheet>
+          )}
         </div>
-      )}
-      {inspector && (
-        <Sheet open={open === 'inspector'} onClose={() => setOpen(null)} title={inspector.title}>
-          {inspector.controls && <div className="mb-2 flex justify-end">{inspector.controls}</div>}
-          <div className="inspector-content">{inspector.body}</div>
-        </Sheet>
-      )}
-      {bottom && (
-        <Sheet open={open === 'bottom'} onClose={() => setOpen(null)} title={bottom.title}>
-          {bottom.controls && <div className="mb-2 flex justify-end">{bottom.controls}</div>}
-          <div className="workbench-bottom-content">{bottom.body}</div>
-        </Sheet>
-      )}
-    </div>
-    </PaneCloseContext.Provider>
+      </PaneCloseContext.Provider>
     </PaneRequestContext.Provider>
   )
 }
@@ -140,12 +200,26 @@ export function WorkbenchLayout(props: {
   readonly stageScroll?: boolean
 }) {
   const mobile = useIsMobile()
-  return mobile
-    ? <PhoneWorkbench stage={props.stage} inspector={props.inspector} bottom={props.bottom} stagePadding={props.stagePadding ?? true} />
-    : <DesktopWorkbench {...props} />
+  return mobile ? (
+    <PhoneWorkbench
+      stage={props.stage}
+      inspector={props.inspector}
+      bottom={props.bottom}
+      stagePadding={props.stagePadding ?? true}
+    />
+  ) : (
+    <DesktopWorkbench {...props} />
+  )
 }
 
-function DesktopWorkbench({ id, stage, inspector, bottom, stagePadding = true, stageScroll = true }: {
+function DesktopWorkbench({
+  id,
+  stage,
+  inspector,
+  bottom,
+  stagePadding = true,
+  stageScroll = true,
+}: {
   readonly id: string
   readonly stage: ReactNode
   readonly inspector?: WorkbenchPane
@@ -190,64 +264,130 @@ function DesktopWorkbench({ id, stage, inspector, bottom, stagePadding = true, s
   return (
     <div ref={host} className="flex min-w-0 flex-1">
       {measured && (
-    <Group orientation="horizontal" defaultLayout={defaultLayout} onLayoutChanged={onLayoutChanged} className="min-w-0 flex-1">
-      <Panel id="stage" minSize={320} className="flex min-w-0 flex-col">
-        <Group orientation="vertical">
-          <Panel id="canvas" minSize={200} className={cn('flex min-h-0 flex-col [container-type:size] [container-name:layout]', stageScroll ? 'panel-scroll overflow-y-auto' : 'overflow-hidden')}>
-            <div className={cn('flex w-full flex-col', stageScroll ? 'min-h-full' : 'h-full min-h-0', stagePadding && 'workbench-stage px-5 py-6')}>{stage}</div>
-          </Panel>
-          {bottom && (
-            <>
-              <Separator className="seam seam-h" aria-label={`Resize ${bottom.title}`} />
+        <Group
+          orientation="horizontal"
+          defaultLayout={defaultLayout}
+          onLayoutChanged={onLayoutChanged}
+          className="min-w-0 flex-1"
+        >
+          <Panel id="stage" minSize={320} className="flex min-w-0 flex-col">
+            <Group orientation="vertical">
               <Panel
-                id="bottom"
-                panelRef={bottomRef}
-                collapsible
-                collapsedSize={PANE_HEADER_HEIGHT + 1}
-                minSize={120}
-                maxSize="50%"
-                defaultSize={bottom.defaultCollapsed ? PANE_HEADER_HEIGHT + 1 : bottom.defaultSize ?? 240}
-                onResize={(size) => { if (size.inPixels > 0) setBottomCollapsed(size.inPixels <= PANE_HEADER_HEIGHT + 2) }}
-                className="flex flex-col border-t border-line bg-column [container-type:size] [container-name:layout_bottom]"
+                id="canvas"
+                minSize={200}
+                className={cn(
+                  'flex min-h-0 flex-col [container-type:size] [container-name:layout]',
+                  stageScroll ? 'panel-scroll overflow-y-auto' : 'overflow-hidden',
+                )}
               >
-                <PaneHeader title={bottom.title} controls={bottom.controls} collapse={{ collapsed: bottomCollapsed, onToggle: () => toggle(bottomRef, bottomCollapsed), icon: { open: 'keyboard_arrow_down', closed: 'keyboard_arrow_up' } }} />
-                {!bottomCollapsed && <div className="workbench-bottom-content panel-scroll min-h-0 flex-1 overflow-y-auto">{bottom.body}</div>}
+                <div
+                  className={cn(
+                    'flex w-full flex-col',
+                    stageScroll ? 'min-h-full' : 'h-full min-h-0',
+                    stagePadding && 'workbench-stage px-5 py-6',
+                  )}
+                >
+                  {stage}
+                </div>
+              </Panel>
+              {bottom && (
+                <>
+                  <Separator className="seam seam-h" aria-label={`Resize ${bottom.title}`} />
+                  <Panel
+                    id="bottom"
+                    panelRef={bottomRef}
+                    collapsible
+                    collapsedSize={PANE_HEADER_HEIGHT + 1}
+                    minSize={120}
+                    maxSize="50%"
+                    defaultSize={
+                      bottom.defaultCollapsed ? PANE_HEADER_HEIGHT + 1 : (bottom.defaultSize ?? 240)
+                    }
+                    onResize={(size) => {
+                      if (size.inPixels > 0)
+                        setBottomCollapsed(size.inPixels <= PANE_HEADER_HEIGHT + 2)
+                    }}
+                    className="flex flex-col border-t border-line bg-column [container-type:size] [container-name:layout_bottom]"
+                  >
+                    <PaneHeader
+                      title={bottom.title}
+                      controls={bottom.controls}
+                      collapse={{
+                        collapsed: bottomCollapsed,
+                        onToggle: () => toggle(bottomRef, bottomCollapsed),
+                        icon: { open: 'keyboard_arrow_down', closed: 'keyboard_arrow_up' },
+                      }}
+                    />
+                    {!bottomCollapsed && (
+                      <div className="workbench-bottom-content panel-scroll min-h-0 flex-1 overflow-y-auto">
+                        {bottom.body}
+                      </div>
+                    )}
+                  </Panel>
+                </>
+              )}
+            </Group>
+          </Panel>
+          {inspector && (
+            <>
+              <Separator className="seam seam-v" aria-label={`Resize ${inspector.title}`} />
+              <Panel
+                id="inspector"
+                panelRef={inspectorRef}
+                collapsible
+                collapsedSize={PANE_HEADER_HEIGHT + 4}
+                minSize={260}
+                maxSize={520}
+                defaultSize={320}
+                onResize={(size) => {
+                  if (size.inPixels > 0)
+                    setInspectorCollapsed(size.inPixels <= PANE_HEADER_HEIGHT + 5)
+                }}
+                className="workbench-inspector flex flex-col border-l border-line bg-panel [container-type:size] [container-name:layout_inspector]"
+              >
+                <aside
+                  aria-labelledby={`${id}-inspector-title`}
+                  className="flex min-h-0 flex-1 flex-col"
+                >
+                  {inspectorCollapsed ? (
+                    <button
+                      type="button"
+                      className="flex h-full w-full flex-col items-center gap-2 pt-2 text-faint hover:text-ink"
+                      aria-expanded={false}
+                      aria-label={`Expand ${inspector.title}`}
+                      title={`Expand ${inspector.title}`}
+                      onClick={() => toggle(inspectorRef, true)}
+                    >
+                      <Icon name="left_panel_open" size={16} />
+                      <span
+                        id={`${id}-inspector-title`}
+                        className={cn(panelTitle, '[writing-mode:vertical-rl]')}
+                      >
+                        {inspector.title}
+                      </span>
+                    </button>
+                  ) : (
+                    <>
+                      <PaneHeader
+                        id={`${id}-inspector-title`}
+                        title={inspector.title}
+                        controls={inspector.controls}
+                        collapse={{
+                          collapsed: false,
+                          onToggle: () => toggle(inspectorRef, false),
+                          icon: { open: 'right_panel_close', closed: 'right_panel_open' },
+                        }}
+                      />
+                      <div className="inspector-content panel-scroll min-h-0 flex-1 overflow-y-auto p-3">
+                        {inspector.body}
+                      </div>
+                    </>
+                  )}
+                </aside>
               </Panel>
             </>
           )}
         </Group>
-      </Panel>
-      {inspector && (
-        <>
-          <Separator className="seam seam-v" aria-label={`Resize ${inspector.title}`} />
-          <Panel
-            id="inspector"
-            panelRef={inspectorRef}
-            collapsible
-            collapsedSize={PANE_HEADER_HEIGHT + 4}
-            minSize={260}
-            maxSize={520}
-            defaultSize={320}
-            onResize={(size) => { if (size.inPixels > 0) setInspectorCollapsed(size.inPixels <= PANE_HEADER_HEIGHT + 5) }}
-            className="workbench-inspector flex flex-col border-l border-line bg-panel [container-type:size] [container-name:layout_inspector]"
-          >
-            <aside aria-labelledby={`${id}-inspector-title`} className="flex min-h-0 flex-1 flex-col">
-              {inspectorCollapsed ? (
-                <button type="button" className="flex h-full w-full flex-col items-center gap-2 pt-2 text-faint hover:text-ink" aria-expanded={false} aria-label={`Expand ${inspector.title}`} title={`Expand ${inspector.title}`} onClick={() => toggle(inspectorRef, true)}>
-                  <Icon name="left_panel_open" size={16} />
-                  <span id={`${id}-inspector-title`} className={cn(panelTitle, '[writing-mode:vertical-rl]')}>{inspector.title}</span>
-                </button>
-              ) : (
-                <>
-                  <PaneHeader id={`${id}-inspector-title`} title={inspector.title} controls={inspector.controls} collapse={{ collapsed: false, onToggle: () => toggle(inspectorRef, false), icon: { open: 'right_panel_close', closed: 'right_panel_open' } }} />
-                  <div className="inspector-content panel-scroll min-h-0 flex-1 overflow-y-auto p-3">{inspector.body}</div>
-                </>
-              )}
-            </aside>
-          </Panel>
-        </>
-      )}
-    </Group>
       )}
     </div>
   )

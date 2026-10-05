@@ -1,4 +1,11 @@
-import type { ColumnId, DatasetProfile, NullableNumericMatrix, NumericColumnSelection, TimeAxis, TimeOrderedNumericMatrix } from '@/domain/dataset'
+import type {
+  ColumnId,
+  DatasetProfile,
+  NullableNumericMatrix,
+  NumericColumnSelection,
+  TimeAxis,
+  TimeOrderedNumericMatrix,
+} from '@/domain/dataset'
 import { assertNever, err, mapNonEmpty, ok, type NonEmptyArray, type Result } from '@/domain/dop'
 import { resolutionCommandFor } from '@/domain/missingness'
 import {
@@ -9,7 +16,12 @@ import {
   type DenseReadyMissingness,
   type PreparedDatasetArtifact,
 } from '@/domain/preprocessing'
-import { aggregationsForColumns, describeResamplingProblem, resampledMatrixFromEvidence, sameResamplingRecord } from '@/domain/resampling'
+import {
+  aggregationsForColumns,
+  describeResamplingProblem,
+  resampledMatrixFromEvidence,
+  sameResamplingRecord,
+} from '@/domain/resampling'
 import type { MissingnessResolutionRecord } from '@/domain/missingness'
 import type { SelectedSource } from '@/domain/workflow'
 import type { SeasonalAdjustedEvidence } from '@/domain/seasonal'
@@ -51,7 +63,8 @@ export type PreparedMaterialisationProblem =
 /** Unpack the bit-packed validity into one byte per cell, column-major like the values. */
 const unpackValidity = (validity: Uint8Array, cells: number): Uint8Array => {
   const bytes = new Uint8Array(cells)
-  for (let index = 0; index < cells; index += 1) bytes[index] = (validity[index >> 3] >> (index & 7)) & 1
+  for (let index = 0; index < cells; index += 1)
+    bytes[index] = (validity[index >> 3] >> (index & 7)) & 1
   return bytes
 }
 
@@ -77,7 +90,8 @@ export async function materialiseRoleAwarePrepared(
   prepared: Extract<PreparedDatasetArtifact, { readonly kind: 'prepared-time-series' }>,
   columnIds: NonEmptyArray<ColumnId>,
 ): Promise<Result<RoleAwarePreparedMatrix, PreparedMaterialisationProblem>> {
-  if (prepared.missingness.kind !== 'lag-aware-exclusion') return err({ kind: 'role-aware-policy-required' })
+  if (prepared.missingness.kind !== 'lag-aware-exclusion')
+    return err({ kind: 'role-aware-policy-required' })
   for (const column of columnIds) {
     if (!prepared.columns.includes(column)) return err({ kind: 'column-outside-prepared', column })
   }
@@ -89,7 +103,8 @@ export async function materialiseRoleAwarePrepared(
     prepared.columns,
     prepared.sampling.interpretation,
   )
-  if (!sourceMatrix.ok) return err({ kind: 'materialization-refused', detail: sourceMatrix.error.kind })
+  if (!sourceMatrix.ok)
+    return err({ kind: 'materialization-refused', detail: sourceMatrix.error.kind })
   if (sourceMatrix.value.missingCells !== prepared.missingness.cells) {
     return err({ kind: 'resolution-record-mismatch' })
   }
@@ -97,15 +112,24 @@ export async function materialiseRoleAwarePrepared(
   const rows = sourceMatrix.value.rowCount
   const columns = mapNonEmpty(columnIds, (id) => {
     const column = sourceMatrix.value.columns.find((candidate) => candidate.id === id)
-    if (column === undefined) throw new Error(`Prepared column ${id} is absent from the source matrix.`)
+    if (column === undefined)
+      throw new Error(`Prepared column ${id} is absent from the source matrix.`)
     return column
   })
   const values = new Float64Array(rows * columns.length)
   const validity = new Uint8Array(rows * columns.length)
-  const unpacked = unpackValidity(sourceMatrix.value.validity, rows * sourceMatrix.value.columns.length)
+  const unpacked = unpackValidity(
+    sourceMatrix.value.validity,
+    rows * sourceMatrix.value.columns.length,
+  )
   columns.forEach((column, target) => {
-    const sourceIndex = sourceMatrix.value.columns.findIndex((candidate) => candidate.id === column.id)
-    values.set(sourceMatrix.value.values.subarray(sourceIndex * rows, (sourceIndex + 1) * rows), target * rows)
+    const sourceIndex = sourceMatrix.value.columns.findIndex(
+      (candidate) => candidate.id === column.id,
+    )
+    values.set(
+      sourceMatrix.value.values.subarray(sourceIndex * rows, (sourceIndex + 1) * rows),
+      target * rows,
+    )
     validity.set(unpacked.subarray(sourceIndex * rows, (sourceIndex + 1) * rows), target * rows)
   })
   return ok({
@@ -140,33 +164,82 @@ export async function materialisePreparedStages(
   if (!resolved.ok) return resolved
   let resampled: PreparedMatrix | null = null
   if (prepared.kind === 'prepared-time-series' && prepared.resampling.kind === 'daily-downsample') {
-    if (resolved.value.timeAxis?.kind !== 'calendar') return err({ kind: 'resampling-refused', detail: 'Calendar resampling requires a date or timestamp column; an ordinal time key only defines row order.' })
+    if (resolved.value.timeAxis?.kind !== 'calendar')
+      return err({
+        kind: 'resampling-refused',
+        detail:
+          'Calendar resampling requires a date or timestamp column; an ordinal time key only defines row order.',
+      })
     const input = { ...resolved.value, timestamps: resolved.value.timeAxis.timestamps }
     const aggregations = aggregationsForColumns(resolved.value.columns, prepared.resampling)
-    if (!aggregations.ok) return err({ kind: 'resampling-refused', detail: describeResamplingProblem(aggregations.error) })
+    if (!aggregations.ok)
+      return err({
+        kind: 'resampling-refused',
+        detail: describeResamplingProblem(aggregations.error),
+      })
     const { runPandasResampling } = await import('@/analysis/client')
-    const evidence = await runPandasResampling(input.timestamps, input.values, input.rowCount, input.columns.length, prepared.resampling.targetFrequency, prepared.resampling.incompleteBins, aggregations.value, input.imputedCells)
-    if (!evidence.ok) return err({ kind: 'resampling-refused', detail: describeAnalysisWorkerProblem(evidence.error) })
+    const evidence = await runPandasResampling(
+      input.timestamps,
+      input.values,
+      input.rowCount,
+      input.columns.length,
+      prepared.resampling.targetFrequency,
+      prepared.resampling.incompleteBins,
+      aggregations.value,
+      input.imputedCells,
+    )
+    if (!evidence.ok)
+      return err({
+        kind: 'resampling-refused',
+        detail: describeAnalysisWorkerProblem(evidence.error),
+      })
     const result = resampledMatrixFromEvidence(input, prepared.resampling, evidence.value)
-    if (!result.ok) return err({ kind: 'resampling-refused', detail: describeResamplingProblem(result.error) })
-    if (!sameResamplingRecord(result.value.record, prepared.resampling)) return err({ kind: 'resolution-record-mismatch' })
-    resampled = { ...result.value, leadingRowsRemoved: resolved.value.leadingRowsRemoved, timeAxis: { kind: 'calendar', timestamps: result.value.timestamps } }
+    if (!result.ok)
+      return err({ kind: 'resampling-refused', detail: describeResamplingProblem(result.error) })
+    if (!sameResamplingRecord(result.value.record, prepared.resampling))
+      return err({ kind: 'resolution-record-mismatch' })
+    resampled = {
+      ...result.value,
+      leadingRowsRemoved: resolved.value.leadingRowsRemoved,
+      timeAxis: { kind: 'calendar', timestamps: result.value.timestamps },
+    }
   }
   let adjusted: PreparedMatrix | null = null
   let stl: SeasonalAdjustedEvidence | null = null
   if (prepared.seasonalAdjustment.kind === 'stl') {
     const matrix = resampled ?? resolved.value
-    const adjust = matrix.columns.flatMap((column, index) => (prepared.seasonalAdjustment.kind === 'stl' && prepared.seasonalAdjustment.columns.includes(column.id) ? [index] : []))
+    const adjust = matrix.columns.flatMap((column, index) =>
+      prepared.seasonalAdjustment.kind === 'stl' &&
+      prepared.seasonalAdjustment.columns.includes(column.id)
+        ? [index]
+        : [],
+    )
     if (adjust.length > 0) {
       const { seasonalAdjustInWorker } = await import('@/analysis/client')
-      const result = await seasonalAdjustInWorker(matrix.values, matrix.rowCount, matrix.columns.length, { period: prepared.seasonalAdjustment.period, robust: prepared.seasonalAdjustment.robust, adjust })
-      if (!result.ok) return err({ kind: 'seasonal-adjustment-refused', detail: describeAnalysisWorkerProblem(result.error) })
+      const result = await seasonalAdjustInWorker(
+        matrix.values,
+        matrix.rowCount,
+        matrix.columns.length,
+        {
+          period: prepared.seasonalAdjustment.period,
+          robust: prepared.seasonalAdjustment.robust,
+          adjust,
+        },
+      )
+      if (!result.ok)
+        return err({
+          kind: 'seasonal-adjustment-refused',
+          detail: describeAnalysisWorkerProblem(result.error),
+        })
       stl = result.value
       adjusted = { ...matrix, values: Float64Array.from(result.value.values) }
     }
   }
   const base = adjusted ?? resampled ?? resolved.value
-  const final = prepared.kind === 'prepared-time-series' ? applySeriesTransforms(base, prepared.seriesTransforms) : base
+  const final =
+    prepared.kind === 'prepared-time-series'
+      ? applySeriesTransforms(base, prepared.seriesTransforms)
+      : base
   return ok({ resolved: resolved.value, resampled, adjusted, stl, final })
 }
 
@@ -191,12 +264,16 @@ export function applySeriesTransforms(
     const transform = seriesTransformFor(transforms, matrix.columns[columnIndex].id)
     const transformed = transformSeries(source, transform)
     const transformedOffset = transform.kind === 'difference' ? 0 : leadingRowsRemoved
-    values.set(transformed.subarray(transformedOffset, transformedOffset + outputRows), columnIndex * outputRows)
+    values.set(
+      transformed.subarray(transformedOffset, transformedOffset + outputRows),
+      columnIndex * outputRows,
+    )
 
     for (let outputRow = 0; outputRow < outputRows; outputRow += 1) {
       const sourceRow = outputRow + leadingRowsRemoved
       const directlyImputed = imputedSource.has(`${sourceRow}:${columnIndex}`)
-      const priorImputed = transform.kind === 'difference' && imputedSource.has(`${sourceRow - 1}:${columnIndex}`)
+      const priorImputed =
+        transform.kind === 'difference' && imputedSource.has(`${sourceRow - 1}:${columnIndex}`)
       if (directlyImputed || priorImputed) imputedCells.push([outputRow, columnIndex])
     }
   }
@@ -207,11 +284,12 @@ export function applySeriesTransforms(
     rowCount: outputRows,
     imputedCells,
     leadingRowsRemoved: matrix.leadingRowsRemoved + leadingRowsRemoved,
-    timeAxis: matrix.timeAxis === null
-      ? null
-      : matrix.timeAxis.kind === 'calendar'
-        ? { kind: 'calendar', timestamps: matrix.timeAxis.timestamps.slice(leadingRowsRemoved) }
-        : { kind: 'ordinal', values: matrix.timeAxis.values.slice(leadingRowsRemoved) },
+    timeAxis:
+      matrix.timeAxis === null
+        ? null
+        : matrix.timeAxis.kind === 'calendar'
+          ? { kind: 'calendar', timestamps: matrix.timeAxis.timestamps.slice(leadingRowsRemoved) }
+          : { kind: 'ordinal', values: matrix.timeAxis.values.slice(leadingRowsRemoved) },
   }
 }
 
@@ -229,25 +307,52 @@ async function materialiseResolved(
   for (const column of columnIds) {
     if (!prepared.columns.includes(column)) return err({ kind: 'column-outside-prepared', column })
   }
-  const { materializeNumericColumnsInWorker, materializeTimeSeriesColumnsInWorker } = await import('./client')
-  const matrix = prepared.kind === 'prepared-time-series'
-    ? await materializeTimeSeriesColumnsInWorker(source.file, profile, prepared.sampling.timeColumn, prepared.columns, prepared.sampling.interpretation)
-    : await materializeNumericColumnsInWorker(source.file, profile, prepared.columns)
+  const { materializeNumericColumnsInWorker, materializeTimeSeriesColumnsInWorker } =
+    await import('./client')
+  const matrix =
+    prepared.kind === 'prepared-time-series'
+      ? await materializeTimeSeriesColumnsInWorker(
+          source.file,
+          profile,
+          prepared.sampling.timeColumn,
+          prepared.columns,
+          prepared.sampling.interpretation,
+        )
+      : await materializeNumericColumnsInWorker(source.file, profile, prepared.columns)
   if (!matrix.ok) return err({ kind: 'materialization-refused', detail: matrix.error.kind })
   const resolved = await resolveNullableInput(matrix.value, missingness)
   if (!resolved.ok) return resolved
-  if (!sameResolution(resolved.value.resolution, prepared.resolution)) return err({ kind: 'resolution-record-mismatch' })
+  if (!sameResolution(resolved.value.resolution, prepared.resolution))
+    return err({ kind: 'resolution-record-mismatch' })
   return ok(selectColumns(resolved.value.matrix, columnIds))
 }
 
-const sameResolution = (left: MissingnessResolutionRecord, right: MissingnessResolutionRecord): boolean => {
+const sameResolution = (
+  left: MissingnessResolutionRecord,
+  right: MissingnessResolutionRecord,
+): boolean => {
   if (left.kind !== right.kind) return false
   switch (left.kind) {
-    case 'none': return true
-    case 'lag-aware-exclusion': return right.kind === 'lag-aware-exclusion' && left.cells === right.cells
-    case 'window': return right.kind === 'window' && left.start === right.start && left.endExclusive === right.endExclusive && left.sourceRows === right.sourceRows
-    case 'imputed': return right.kind === 'imputed' && left.method === right.method && left.maxGap === right.maxGap && left.cells === right.cells
-    default: return assertNever(left)
+    case 'none':
+      return true
+    case 'lag-aware-exclusion':
+      return right.kind === 'lag-aware-exclusion' && left.cells === right.cells
+    case 'window':
+      return (
+        right.kind === 'window' &&
+        left.start === right.start &&
+        left.endExclusive === right.endExclusive &&
+        left.sourceRows === right.sourceRows
+      )
+    case 'imputed':
+      return (
+        right.kind === 'imputed' &&
+        left.method === right.method &&
+        left.maxGap === right.maxGap &&
+        left.cells === right.cells
+      )
+    default:
+      return assertNever(left)
   }
 }
 
@@ -264,7 +369,8 @@ const selectColumns = (matrix: PreparedMatrix, ids: NonEmptyArray<ColumnId>): Pr
   columns.forEach((column, target) => {
     const source = matrix.columns.findIndex((candidate) => candidate.id === column.id)
     values.set(matrix.values.subarray(source * rows, (source + 1) * rows), target * rows)
-    for (const [row, index] of matrix.imputedCells) if (index === source) imputedCells.push([row, target])
+    for (const [row, index] of matrix.imputedCells)
+      if (index === source) imputedCells.push([row, target])
   })
 
   return { ...matrix, values, columns, imputedCells }
@@ -283,19 +389,34 @@ export async function resolveNullableInput(
   const { values, validity, rowCount, columns, missingCells } = input
   const timeAxis = input.kind === 'time-ordered-numeric-matrix' ? input.timeAxis : null
   const command = resolutionCommandFor(missingness)
-  if (missingCells > 0 && command === null) return err({ kind: 'missing-values-remain', cells: missingCells })
-  if (command === null) return ok({
-    matrix: { values, rowCount, columns, imputedCells: [], leadingRowsRemoved: 0, timeAxis },
-    resolution: { kind: 'none' },
-  })
+  if (missingCells > 0 && command === null)
+    return err({ kind: 'missing-values-remain', cells: missingCells })
+  if (command === null)
+    return ok({
+      matrix: { values, rowCount, columns, imputedCells: [], leadingRowsRemoved: 0, timeAxis },
+      resolution: { kind: 'none' },
+    })
 
   const { resolveMissingnessInWorker } = await import('@/analysis/client')
-  const resolved = await resolveMissingnessInWorker(values, rowCount, columns.length, unpackValidity(validity, rowCount * columns.length), command)
-  if (!resolved.ok) return err({ kind: 'resolution-refused', detail: describeAnalysisWorkerProblem(resolved.error) })
+  const resolved = await resolveMissingnessInWorker(
+    values,
+    rowCount,
+    columns.length,
+    unpackValidity(validity, rowCount * columns.length),
+    command,
+  )
+  if (!resolved.ok)
+    return err({
+      kind: 'resolution-refused',
+      detail: describeAnalysisWorkerProblem(resolved.error),
+    })
   const outcome = resolved.value.outcome
   if (outcome.kind === 'refused') {
     const { describeMissingnessRefusal } = await import('@/domain/missingness')
-    return err({ kind: 'resolution-refused', detail: outcome.reasons.map(describeMissingnessRefusal).join(' ') })
+    return err({
+      kind: 'resolution-refused',
+      detail: outcome.reasons.map(describeMissingnessRefusal).join(' '),
+    })
   }
 
   if (command.kind === 'completeInterval') {
@@ -312,13 +433,25 @@ export async function resolveNullableInput(
         columns,
         imputedCells: [],
         leadingRowsRemoved: 0,
-        timeAxis: timeAxis === null
-          ? null
-          : timeAxis.kind === 'calendar'
-            ? { kind: 'calendar', timestamps: timeAxis.timestamps.slice(outcome.windowStart, outcome.windowEnd) }
-            : { kind: 'ordinal', values: timeAxis.values.slice(outcome.windowStart, outcome.windowEnd) },
+        timeAxis:
+          timeAxis === null
+            ? null
+            : timeAxis.kind === 'calendar'
+              ? {
+                  kind: 'calendar',
+                  timestamps: timeAxis.timestamps.slice(outcome.windowStart, outcome.windowEnd),
+                }
+              : {
+                  kind: 'ordinal',
+                  values: timeAxis.values.slice(outcome.windowStart, outcome.windowEnd),
+                },
       },
-      resolution: { kind: 'window', start: outcome.windowStart, endExclusive: outcome.windowEnd, sourceRows: rowCount },
+      resolution: {
+        kind: 'window',
+        start: outcome.windowStart,
+        endExclusive: outcome.windowEnd,
+        sourceRows: rowCount,
+      },
     })
   }
 
@@ -331,20 +464,36 @@ export async function resolveNullableInput(
       leadingRowsRemoved: 0,
       timeAxis,
     },
-    resolution: { kind: 'imputed', method: command.method, maxGap: command.maxGap, cells: outcome.imputedCells.length },
+    resolution: {
+      kind: 'imputed',
+      method: command.method,
+      maxGap: command.maxGap,
+      cells: outcome.imputedCells.length,
+    },
   })
 }
 
-export function describePreparedMaterialisationProblem(problem: PreparedMaterialisationProblem): string {
+export function describePreparedMaterialisationProblem(
+  problem: PreparedMaterialisationProblem,
+): string {
   switch (problem.kind) {
-    case 'materialization-refused': return `The numeric columns could not be read: ${problem.detail}. Check their types and missing-value settings.`
-    case 'seasonal-adjustment-refused': return `The recorded seasonal adjustment could not be applied: ${problem.detail}`
-    case 'missing-values-remain': return `${problem.cells} values are missing. Choose a missing-value policy in Data studio.`
-    case 'resolution-refused': return `The recorded missingness resolution could not be applied: ${problem.detail}`
-    case 'resampling-refused': return `The recorded resampling could not be applied: ${problem.detail}`
-    case 'resolution-record-mismatch': return 'The source no longer reproduces the saved preparation record. Recreate the prepared dataset version.'
-    case 'column-outside-prepared': return 'A requested column is not part of the prepared dataset version. Select another column.'
-    case 'role-aware-policy-required': return 'This operation requires a time-series version prepared with lag-aware sample exclusion.'
-    default: return assertNever(problem)
+    case 'materialization-refused':
+      return `The numeric columns could not be read: ${problem.detail}. Check their types and missing-value settings.`
+    case 'seasonal-adjustment-refused':
+      return `The recorded seasonal adjustment could not be applied: ${problem.detail}`
+    case 'missing-values-remain':
+      return `${problem.cells} values are missing. Choose a missing-value policy in Data studio.`
+    case 'resolution-refused':
+      return `The recorded missingness resolution could not be applied: ${problem.detail}`
+    case 'resampling-refused':
+      return `The recorded resampling could not be applied: ${problem.detail}`
+    case 'resolution-record-mismatch':
+      return 'The source no longer reproduces the saved preparation record. Recreate the prepared dataset version.'
+    case 'column-outside-prepared':
+      return 'A requested column is not part of the prepared dataset version. Select another column.'
+    case 'role-aware-policy-required':
+      return 'This operation requires a time-series version prepared with lag-aware sample exclusion.'
+    default:
+      return assertNever(problem)
   }
 }

@@ -4,7 +4,13 @@ import { ParameterHelp } from './ParameterLabel'
 import { fontFor, textWidth, useTextMetricsVersion, type TextTier } from '@/lib/textMetrics'
 import { useElementWidth } from '@/lib/useElementWidth'
 import { label as labelCn, num, well } from './recipes'
-import { formatEstimate, formatInterval, type EffectScale, type Formatted, type IntervalType } from '@/lib/format/number'
+import {
+  formatEstimate,
+  formatInterval,
+  type EffectScale,
+  type Formatted,
+  type IntervalType,
+} from '@/lib/format/number'
 import { cn } from '@/lib/utils'
 
 /**
@@ -13,17 +19,39 @@ import { cn } from '@/lib/utils'
  */
 
 /** Renders a `Formatted` with its screen-reader form and per-part styling; every figure outside a chart should pass through here. */
-export function FigureParts({ value, unitClass = 'text-bone' }: { readonly value: Formatted; readonly unitClass?: string }) {
+export function FigureParts({
+  value,
+  unitClass = 'text-bone',
+}: {
+  readonly value: Formatted
+  readonly unitClass?: string
+}) {
   return (
     <>
       <span className="sr-only">{value.srText}</span>
       <span aria-hidden className={num()}>
         {value.parts.map((part, index) => {
           switch (part.kind) {
-            case 'unit': return <span key={index} className={cn('font-medium', unitClass)}>{part.text}</span>
-            case 'qualifier': return <span key={index} className="text-bone">{part.text}</span>
-            case 'token': return <span key={index} className="text-muted">{part.text}</span>
-            default: return <span key={index}>{part.text}</span>
+            case 'unit':
+              return (
+                <span key={index} className={cn('font-medium', unitClass)}>
+                  {part.text}
+                </span>
+              )
+            case 'qualifier':
+              return (
+                <span key={index} className="text-bone">
+                  {part.text}
+                </span>
+              )
+            case 'token':
+              return (
+                <span key={index} className="text-muted">
+                  {part.text}
+                </span>
+              )
+            default:
+              return <span key={index}>{part.text}</span>
           }
         })}
       </span>
@@ -31,7 +59,15 @@ export function FigureParts({ value, unitClass = 'text-bone' }: { readonly value
   )
 }
 
-export function MetricTile({ label, value, context, help, size = 'default', frame = 'card', className }: {
+export function MetricTile({
+  label,
+  value,
+  context,
+  help,
+  size = 'default',
+  frame = 'card',
+  className,
+}: {
   readonly label: string
   readonly value: Formatted
   readonly context?: ReactNode
@@ -42,7 +78,8 @@ export function MetricTile({ label, value, context, help, size = 'default', fram
   readonly frame?: 'card' | 'cell'
   readonly className?: string
 }) {
-  const figure = size === 'hero' ? 'text-metric' : size === 'compact' ? 'text-title' : 'text-heading'
+  const figure =
+    size === 'hero' ? 'text-metric' : size === 'compact' ? 'text-title' : 'text-heading'
   const [values, width] = useElementWidth<HTMLDivElement>()
   const version = useTextMetricsVersion()
   // The figure size is for a value that sits on one line. One that would wrap there, words or several
@@ -54,31 +91,88 @@ export function MetricTile({ label, value, context, help, size = 'default', fram
     return textWidth(value.text, fontFor(tier, 600)) <= width ? 'figure' : 'phrase'
   }, [size, width, value.text, tier, version])
   return (
-    <div data-size={size} className={cn('@container metric-tile', frame === 'card' ? 'metric-card' : 'bg-well', size === 'compact' ? 'px-3 py-2.5' : 'px-4 py-3', className)}>
-      {help === undefined
-        ? <span className={labelCn('metric-card-label block min-h-5 text-muted')}>{label}</span>
-        : <span className={labelCn('metric-card-label flex min-h-5 items-center gap-1.5 text-muted')}>{label}<ParameterHelp label={label} help={help} /></span>}
+    <div
+      data-size={size}
+      className={cn(
+        '@container metric-tile',
+        frame === 'card' ? 'metric-card' : 'bg-well',
+        size === 'compact' ? 'px-3 py-2.5' : 'px-4 py-3',
+        className,
+      )}
+    >
+      {help === undefined ? (
+        <span className={labelCn('metric-card-label block min-h-5 text-muted')}>{label}</span>
+      ) : (
+        <span className={labelCn('metric-card-label flex min-h-5 items-center gap-1.5 text-muted')}>
+          {label}
+          <ParameterHelp label={label} help={help} />
+        </span>
+      )}
       <div ref={values} className="metric-card-values">
-        <p data-length={length} className={cn('metric-card-number mb-0 mt-1 font-semibold leading-none tracking-tight text-ink', figure, '@max-[9rem]:text-title')} title={value.exact || value.srText}><FigureParts value={value} /></p>
-        {context && <p className={num('metric-card-context mb-0 mt-1 text-body text-bone [overflow-wrap:anywhere]')}>{context}</p>}
+        <p
+          data-length={length}
+          className={cn(
+            'metric-card-number mb-0 mt-1 font-semibold leading-none tracking-tight text-ink',
+            figure,
+            '@max-[9rem]:text-title',
+          )}
+          title={value.exact || value.srText}
+        >
+          <FigureParts value={value} />
+        </p>
+        {context && (
+          <p
+            className={num(
+              'metric-card-context mb-0 mt-1 text-body text-bone [overflow-wrap:anywhere]',
+            )}
+          >
+            {context}
+          </p>
+        )}
       </div>
     </div>
   )
 }
 
 /** Related numeric summaries share one surface; lists retain their semantic wrapper. */
-export function MetricGrid({children,as:Element='div',className,label,testId}: {
-  readonly children:ReactNode
-  readonly as?:'div'|'ul'
-  readonly className?:string
-  readonly label?:string
-  readonly testId?:string
+export function MetricGrid({
+  children,
+  as: Element = 'div',
+  className,
+  label,
+  testId,
+}: {
+  readonly children: ReactNode
+  readonly as?: 'div' | 'ul'
+  readonly className?: string
+  readonly label?: string
+  readonly testId?: string
 }) {
-  return <Element className={cn('numeric-surface metric-cards',className)} aria-label={label} data-testid={testId}>{children}</Element>
+  return (
+    <Element
+      className={cn('numeric-surface metric-cards', className)}
+      aria-label={label}
+      data-testid={testId}
+    >
+      {children}
+    </Element>
+  )
 }
 
 /** The hero estimate: the estimand sentence, the figure, its named interval, and the scale line. */
-export function IntervalFigure({ sentence, estimate, lower, upper, type, scale, standardError, sampleLine, scaleLine, accent = false, testId }: {
+export function IntervalFigure({
+  sentence,
+  estimate,
+  lower,
+  upper,
+  type,
+  scale,
+  standardError,
+  sampleLine,
+  scaleLine,
+  accent = false,
+  testId,
+}: {
   readonly sentence: string
   readonly estimate: number
   readonly lower: number
@@ -96,21 +190,41 @@ export function IntervalFigure({ sentence, estimate, lower, upper, type, scale, 
   // The point uses the same precision as prose and history. Interval width only rounds the bounds.
   const pointFigure = formatEstimate(estimate, scale)
   const point = pointFigure.parts
-  const se = standardError === undefined ? null : formatEstimate(standardError, scale, { precision: { kind: 'significant', digits: 2 } }).text
+  const se =
+    standardError === undefined
+      ? null
+      : formatEstimate(standardError, scale, { precision: { kind: 'significant', digits: 2 } }).text
   return (
     <figure className="m-0" data-testid={testId}>
       <figcaption className="text-title leading-7 text-ink">{sentence}</figcaption>
-      <p className={cn('mb-0 mt-1 text-metric font-semibold leading-none tracking-tight', accent ? 'text-signal-text' : 'text-ink')} title={figure.exact}>
-        <span className="sr-only">{pointFigure.srText}; {figure.typeLabel}: {figure.bounds.lower} to {figure.bounds.upper}</span>
+      <p
+        className={cn(
+          'mb-0 mt-1 text-metric font-semibold leading-none tracking-tight',
+          accent ? 'text-signal-text' : 'text-ink',
+        )}
+        title={figure.exact}
+      >
+        <span className="sr-only">
+          {pointFigure.srText}; {figure.typeLabel}: {figure.bounds.lower} to {figure.bounds.upper}
+        </span>
         <span aria-hidden className={num()}>
-          {point.map((part, index) => part.kind === 'unit'
-            ? <span key={index} className="text-display-sub font-medium text-bone">{part.text}</span>
-            : <span key={index}>{part.text}</span>)}
+          {point.map((part, index) =>
+            part.kind === 'unit' ? (
+              <span key={index} className="text-display-sub font-medium text-bone">
+                {part.text}
+              </span>
+            ) : (
+              <span key={index}>{part.text}</span>
+            ),
+          )}
         </span>
       </p>
       <p aria-hidden className={num('mb-0 mt-1 text-body text-bone')}>
         <Metadata>
-          <span>[{figure.bounds.lower}, {figure.bounds.upper}] <span className="text-ink">{figure.typeLabel}</span></span>
+          <span>
+            [{figure.bounds.lower}, {figure.bounds.upper}]{' '}
+            <span className="text-ink">{figure.typeLabel}</span>
+          </span>
           {se !== null && <span>SE {se}</span>}
           <span>{sampleLine}</span>
         </Metadata>
@@ -121,7 +235,14 @@ export function IntervalFigure({ sentence, estimate, lower, upper, type, scale, 
 }
 
 /** Takes the slot of a result when the machine declines: grey, the reason, the rule, and what to do. */
-export function RefusalTile({ label, headline, reason, rule, actions, testId }: {
+export function RefusalTile({
+  label,
+  headline,
+  reason,
+  rule,
+  actions,
+  testId,
+}: {
   readonly label: string
   readonly headline: string
   readonly reason: ReactNode

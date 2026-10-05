@@ -1,6 +1,16 @@
 import type { MissingnessResolutionRecord } from './missingness'
 import type { TimeInterpretation, TimeSpacing } from './timeInterpretation'
-import { assertNever, brand, err, isNonEmpty, mapNonEmpty, ok, type Brand, type NonEmptyArray, type Result } from './dop'
+import {
+  assertNever,
+  brand,
+  err,
+  isNonEmpty,
+  mapNonEmpty,
+  ok,
+  type Brand,
+  type NonEmptyArray,
+  type Result,
+} from './dop'
 import type { ColumnId, DatasetProfile } from './dataset'
 import { seasonalPeriodOf, type SeasonalAdjustmentRecord } from './seasonal'
 import type { StationarityBattery } from './stationarity'
@@ -30,7 +40,10 @@ export type FrequencySuggestion =
   | { readonly kind: 'single-period' }
   | { readonly kind: 'unrecognised'; readonly days: number }
 
-const FREQUENCY_BANDS: readonly { readonly frequency: Frequency; readonly days: readonly [number, number] }[] = [
+const FREQUENCY_BANDS: readonly {
+  readonly frequency: Frequency
+  readonly days: readonly [number, number]
+}[] = [
   { frequency: 'daily', days: [1, 1] },
   { frequency: 'weekly', days: [7, 7] },
   { frequency: 'monthly', days: [28, 31] },
@@ -41,25 +54,38 @@ const FREQUENCY_BANDS: readonly { readonly frequency: Frequency; readonly days: 
 /** The source frequency read from the modal gap between distinct times; half a day either side allows for clock changes. */
 export function suggestFrequency(spacing: TimeSpacing): FrequencySuggestion {
   switch (spacing.kind) {
-    case 'ordinal': return { kind: 'ordinal' }
-    case 'single-period': return { kind: 'single-period' }
+    case 'ordinal':
+      return { kind: 'ordinal' }
+    case 'single-period':
+      return { kind: 'single-period' }
     case 'days': {
-      const band = FREQUENCY_BANDS.find(({ days: [low, high] }) => spacing.modal >= low - 0.5 && spacing.modal <= high + 0.5)
-      return band === undefined ? { kind: 'unrecognised', days: spacing.modal } : { kind: 'suggested', frequency: band.frequency }
+      const band = FREQUENCY_BANDS.find(
+        ({ days: [low, high] }) => spacing.modal >= low - 0.5 && spacing.modal <= high + 0.5,
+      )
+      return band === undefined
+        ? { kind: 'unrecognised', days: spacing.modal }
+        : { kind: 'suggested', frequency: band.frequency }
     }
-    default: return assertNever(spacing)
+    default:
+      return assertNever(spacing)
   }
 }
 
 /** The singular calendar unit represented by one row of a regular series. */
 export function frequencyUnit(frequency: Frequency): 'day' | 'week' | 'month' | 'quarter' | 'year' {
   switch (frequency) {
-    case 'daily': return 'day'
-    case 'weekly': return 'week'
-    case 'monthly': return 'month'
-    case 'quarterly': return 'quarter'
-    case 'yearly': return 'year'
-    default: return assertNever(frequency)
+    case 'daily':
+      return 'day'
+    case 'weekly':
+      return 'week'
+    case 'monthly':
+      return 'month'
+    case 'quarterly':
+      return 'quarter'
+    case 'yearly':
+      return 'year'
+    default:
+      return assertNever(frequency)
   }
 }
 
@@ -69,18 +95,28 @@ export type PreparedColumnRole =
   | { readonly kind: 'time-key'; readonly frequency: Frequency }
   | { readonly kind: 'value' }
 
-export function preparedColumnRole(prepared: PreparedDatasetArtifact | null, column: ColumnId): PreparedColumnRole {
+export function preparedColumnRole(
+  prepared: PreparedDatasetArtifact | null,
+  column: ColumnId,
+): PreparedColumnRole {
   if (prepared === null || prepared.kind === 'prepared-cross-section') return { kind: 'value' }
-  if (prepared.kind === 'prepared-panel' && prepared.sampling.unitColumn === column) return { kind: 'unit-key' }
-  return prepared.sampling.timeColumn === column ? { kind: 'time-key', frequency: prepared.sampling.frequency } : { kind: 'value' }
+  if (prepared.kind === 'prepared-panel' && prepared.sampling.unitColumn === column)
+    return { kind: 'unit-key' }
+  return prepared.sampling.timeColumn === column
+    ? { kind: 'time-key', frequency: prepared.sampling.frequency }
+    : { kind: 'value' }
 }
 
 export function describeColumnRole(role: PreparedColumnRole): string | null {
   switch (role.kind) {
-    case 'unit-key': return 'Unit key'
-    case 'time-key': return `Time key, one row per ${frequencyUnit(role.frequency)}`
-    case 'value': return null
-    default: return assertNever(role)
+    case 'unit-key':
+      return 'Unit key'
+    case 'time-key':
+      return `Time key, one row per ${frequencyUnit(role.frequency)}`
+    case 'value':
+      return null
+    default:
+      return assertNever(role)
   }
 }
 
@@ -88,9 +124,24 @@ export type SamplingDraft =
   | { readonly kind: 'unconfigured' }
   | { readonly kind: 'cross-sectional' }
   | { readonly kind: 'regular-series-awaiting-time'; readonly frequency: Frequency }
-  | { readonly kind: 'regular-series'; readonly timeColumn: ColumnId; readonly frequency: Frequency; readonly interpretation?: TimeInterpretation }
-  | { readonly kind: 'regular-panel-awaiting-keys'; readonly unitColumn: ColumnId | null; readonly timeColumn: ColumnId | null; readonly frequency: Frequency }
-  | { readonly kind: 'regular-panel'; readonly unitColumn: ColumnId; readonly timeColumn: ColumnId; readonly frequency: Frequency }
+  | {
+      readonly kind: 'regular-series'
+      readonly timeColumn: ColumnId
+      readonly frequency: Frequency
+      readonly interpretation?: TimeInterpretation
+    }
+  | {
+      readonly kind: 'regular-panel-awaiting-keys'
+      readonly unitColumn: ColumnId | null
+      readonly timeColumn: ColumnId | null
+      readonly frequency: Frequency
+    }
+  | {
+      readonly kind: 'regular-panel'
+      readonly unitColumn: ColumnId
+      readonly timeColumn: ColumnId
+      readonly frequency: Frequency
+    }
 
 export type VariableDraft =
   | { readonly kind: 'empty' }
@@ -156,7 +207,10 @@ export interface PreprocessingDraft {
   readonly diagnosticTransform: SeriesTransform
 }
 
-export type DenseReadyMissingness = Exclude<MissingnessDraft, { readonly kind: 'unresolved' | 'lag-aware-exclusion' }>
+export type DenseReadyMissingness = Exclude<
+  MissingnessDraft,
+  { readonly kind: 'unresolved' | 'lag-aware-exclusion' }
+>
 export type TimeSeriesReadyMissingness = Exclude<MissingnessDraft, { readonly kind: 'unresolved' }>
 
 export type ReadyPreprocessingRecipe =
@@ -206,7 +260,7 @@ interface PreparedDatasetIdentity {
 }
 
 export type PreparedDatasetArtifact =
-  | PreparedDatasetIdentity & {
+  | (PreparedDatasetIdentity & {
       readonly kind: 'prepared-time-series'
       readonly sampling: Extract<SamplingDraft, { readonly kind: 'regular-series' }>
       readonly missingness: TimeSeriesReadyMissingness
@@ -214,18 +268,18 @@ export type PreparedDatasetArtifact =
       readonly resampling: ResamplingRecord
       /** One record per analysis column. Materialisation applies these after missingness and STL. */
       readonly seriesTransforms: NonEmptyArray<ColumnSeriesTransform>
-    }
-  | PreparedDatasetIdentity & {
+    })
+  | (PreparedDatasetIdentity & {
       readonly kind: 'prepared-panel'
       readonly sampling: Extract<SamplingDraft, { readonly kind: 'regular-panel' }>
       readonly missingness: DenseReadyMissingness
       readonly panel: PanelStructureEvidence
-    }
-  | PreparedDatasetIdentity & {
+    })
+  | (PreparedDatasetIdentity & {
       readonly kind: 'prepared-cross-section'
       readonly sampling: Extract<SamplingDraft, { readonly kind: 'cross-sectional' }>
       readonly missingness: DenseReadyMissingness
-    }
+    })
 
 export interface StationarityEvidenceArtifact {
   readonly kind: 'stationarity-evidence'
@@ -245,14 +299,26 @@ export type PreprocessingEvent =
   | { readonly type: 'unit-column-selected'; readonly unitColumn: ColumnId }
   | { readonly type: 'time-column-selected'; readonly timeColumn: ColumnId }
   | { readonly type: 'frequency-selected'; readonly frequency: Frequency }
-  | { readonly type: 'time-spacing-observed'; readonly timeColumn: ColumnId; readonly suggestion: FrequencySuggestion }
+  | {
+      readonly type: 'time-spacing-observed'
+      readonly timeColumn: ColumnId
+      readonly suggestion: FrequencySuggestion
+    }
   | { readonly type: 'variable-toggled'; readonly column: ColumnId }
   | { readonly type: 'column-selection-replaced'; readonly columns: NonEmptyArray<ColumnId> }
   | { readonly type: 'missingness-selected'; readonly resolution: MissingnessDraft }
   | { readonly type: 'resampling-selected'; readonly resampling: ResamplingDraft }
-  | { readonly type: 'resampling-aggregation-selected'; readonly column: ColumnId; readonly aggregation: ResamplingAggregation }
+  | {
+      readonly type: 'resampling-aggregation-selected'
+      readonly column: ColumnId
+      readonly aggregation: ResamplingAggregation
+    }
   | { readonly type: 'seasonal-adjustment-selected'; readonly seasonal: SeasonalAdjustmentDraft }
-  | { readonly type: 'series-transform-selected'; readonly column: ColumnId; readonly transform: SeriesTransform }
+  | {
+      readonly type: 'series-transform-selected'
+      readonly column: ColumnId
+      readonly transform: SeriesTransform
+    }
   | { readonly type: 'all-series-transforms-selected'; readonly transform: SeriesTransform }
   | { readonly type: 'diagnostic-transform-selected'; readonly transform: SeriesTransform }
 
@@ -284,9 +350,15 @@ export const initialPreprocessingDraft = (profile: DatasetProfile): Preprocessin
 }
 
 /** A policy applies to the chosen analysis values; key validity is checked separately. */
-export function selectedMissingness(draft: PreprocessingDraft, profile: DatasetProfile): MissingnessDraft {
+export function selectedMissingness(
+  draft: PreprocessingDraft,
+  profile: DatasetProfile,
+): MissingnessDraft {
   const selected = new Set(draft.variables.kind === 'selected' ? draft.variables.columns : [])
-  const cells = profile.columns.reduce((sum, column) => sum + (selected.has(column.id) ? column.nullCount : 0), 0)
+  const cells = profile.columns.reduce(
+    (sum, column) => sum + (selected.has(column.id) ? column.nullCount : 0),
+    0,
+  )
   return cells === 0 ? { kind: 'not-present' } : { kind: 'unresolved', cells }
 }
 
@@ -303,29 +375,46 @@ const retainColumnConfiguration = (
   columns: NonEmptyArray<ColumnId>,
 ): Pick<PreprocessingDraft, 'variables' | 'seasonal' | 'resampling' | 'seriesTransforms'> => ({
   variables: { kind: 'selected', columns },
-  seasonal: state.seasonal.kind === 'stl'
-    ? { ...state.seasonal, columns: state.seasonal.columns.filter((column) => columns.includes(column)) }
-    : state.seasonal,
-  resampling: state.resampling.kind === 'daily-downsample'
-    ? { ...state.resampling, aggregations: state.resampling.aggregations.filter((candidate) => columns.includes(candidate.column)) }
-    : state.resampling,
-  seriesTransforms: state.seriesTransforms.filter((candidate) => columns.includes(candidate.column)),
+  seasonal:
+    state.seasonal.kind === 'stl'
+      ? {
+          ...state.seasonal,
+          columns: state.seasonal.columns.filter((column) => columns.includes(column)),
+        }
+      : state.seasonal,
+  resampling:
+    state.resampling.kind === 'daily-downsample'
+      ? {
+          ...state.resampling,
+          aggregations: state.resampling.aggregations.filter((candidate) =>
+            columns.includes(candidate.column),
+          ),
+        }
+      : state.resampling,
+  seriesTransforms: state.seriesTransforms.filter((candidate) =>
+    columns.includes(candidate.column),
+  ),
 })
 
 export const seriesTransformFor = (
   transforms: readonly ColumnSeriesTransform[],
   column: ColumnId,
-): SeriesTransform => transforms.find((candidate) => candidate.column === column)?.transform ?? { kind: 'levels' }
+): SeriesTransform =>
+  transforms.find((candidate) => candidate.column === column)?.transform ?? { kind: 'levels' }
 
 export const transformWarmup = (transforms: readonly ColumnSeriesTransform[]): number =>
   transforms.some((record) => record.transform.kind === 'difference') ? 1 : 0
 
 export function describeSeriesTransform(transform: SeriesTransform): string {
   switch (transform.kind) {
-    case 'levels': return 'levels'
-    case 'difference': return 'first difference'
-    case 'linear-detrend': return 'linear detrend'
-    default: return assertNever(transform)
+    case 'levels':
+      return 'levels'
+    case 'difference':
+      return 'first difference'
+    case 'linear-detrend':
+      return 'linear detrend'
+    default:
+      return assertNever(transform)
   }
 }
 
@@ -338,23 +427,41 @@ const setSeriesTransform = (
   { column, transform },
 ]
 
-const withFrequency = (state: PreprocessingDraft, frequency: Frequency, frequencyOrigin: FrequencyOrigin): PreprocessingDraft => {
+const withFrequency = (
+  state: PreprocessingDraft,
+  frequency: Frequency,
+  frequencyOrigin: FrequencyOrigin,
+): PreprocessingDraft => {
   switch (state.sampling.kind) {
     case 'regular-series':
-      return { ...state, frequencyOrigin, sampling: { ...state.sampling, frequency }, resampling: frequency === 'daily' ? state.resampling : { kind: 'none' } }
+      return {
+        ...state,
+        frequencyOrigin,
+        sampling: { ...state.sampling, frequency },
+        resampling: frequency === 'daily' ? state.resampling : { kind: 'none' },
+      }
     case 'regular-series-awaiting-time':
-      return { ...state, frequencyOrigin, sampling: { kind: 'regular-series-awaiting-time', frequency }, resampling: frequency === 'daily' ? state.resampling : { kind: 'none' } }
+      return {
+        ...state,
+        frequencyOrigin,
+        sampling: { kind: 'regular-series-awaiting-time', frequency },
+        resampling: frequency === 'daily' ? state.resampling : { kind: 'none' },
+      }
     case 'regular-panel':
     case 'regular-panel-awaiting-keys':
       return { ...state, frequencyOrigin, sampling: { ...state.sampling, frequency } }
     case 'cross-sectional':
     case 'unconfigured':
       return state
-    default: return assertNever(state.sampling)
+    default:
+      return assertNever(state.sampling)
   }
 }
 
-export function stepPreprocessing(state: PreprocessingDraft, event: PreprocessingEvent): PreprocessingDraft {
+export function stepPreprocessing(
+  state: PreprocessingDraft,
+  event: PreprocessingEvent,
+): PreprocessingDraft {
   switch (event.type) {
     case 'time-interpretation-selected':
       return state.sampling.kind === 'regular-series'
@@ -363,9 +470,11 @@ export function stepPreprocessing(state: PreprocessingDraft, event: Preprocessin
     case 'regular-series-selected':
       return {
         ...state,
-        sampling: state.sampling.kind === 'regular-series' || state.sampling.kind === 'regular-series-awaiting-time'
-          ? state.sampling
-          : { kind: 'regular-series-awaiting-time', frequency: 'monthly' },
+        sampling:
+          state.sampling.kind === 'regular-series' ||
+          state.sampling.kind === 'regular-series-awaiting-time'
+            ? state.sampling
+            : { kind: 'regular-series-awaiting-time', frequency: 'monthly' },
       }
     case 'cross-section-selected':
       return {
@@ -379,57 +488,118 @@ export function stepPreprocessing(state: PreprocessingDraft, event: Preprocessin
     case 'regular-panel-selected':
       return {
         ...state,
-        sampling: state.sampling.kind === 'regular-panel' || state.sampling.kind === 'regular-panel-awaiting-keys'
-          ? state.sampling
-          : { kind: 'regular-panel-awaiting-keys', unitColumn: null, timeColumn: null, frequency: 'yearly' },
-        seasonal: { kind: 'none' }, resampling: { kind: 'none' }, seriesTransforms: [], diagnosticTransform: { kind: 'levels' },
+        sampling:
+          state.sampling.kind === 'regular-panel' ||
+          state.sampling.kind === 'regular-panel-awaiting-keys'
+            ? state.sampling
+            : {
+                kind: 'regular-panel-awaiting-keys',
+                unitColumn: null,
+                timeColumn: null,
+                frequency: 'yearly',
+              },
+        seasonal: { kind: 'none' },
+        resampling: { kind: 'none' },
+        seriesTransforms: [],
+        diagnosticTransform: { kind: 'levels' },
       }
     case 'unit-column-selected': {
-      if (state.sampling.kind !== 'regular-panel' && state.sampling.kind !== 'regular-panel-awaiting-keys') return state
-      const timeColumn = state.sampling.timeColumn === event.unitColumn ? null : state.sampling.timeColumn
-      const sampling: SamplingDraft = timeColumn === null
-        ? { kind: 'regular-panel-awaiting-keys', unitColumn: event.unitColumn, timeColumn, frequency: state.sampling.frequency }
-        : { kind: 'regular-panel', unitColumn: event.unitColumn, timeColumn, frequency: state.sampling.frequency }
-      const variables = state.variables.kind === 'selected' && state.variables.columns.includes(event.unitColumn) ? toggleColumn(state.variables, event.unitColumn) : state.variables
+      if (
+        state.sampling.kind !== 'regular-panel' &&
+        state.sampling.kind !== 'regular-panel-awaiting-keys'
+      )
+        return state
+      const timeColumn =
+        state.sampling.timeColumn === event.unitColumn ? null : state.sampling.timeColumn
+      const sampling: SamplingDraft =
+        timeColumn === null
+          ? {
+              kind: 'regular-panel-awaiting-keys',
+              unitColumn: event.unitColumn,
+              timeColumn,
+              frequency: state.sampling.frequency,
+            }
+          : {
+              kind: 'regular-panel',
+              unitColumn: event.unitColumn,
+              timeColumn,
+              frequency: state.sampling.frequency,
+            }
+      const variables =
+        state.variables.kind === 'selected' && state.variables.columns.includes(event.unitColumn)
+          ? toggleColumn(state.variables, event.unitColumn)
+          : state.variables
       return { ...state, sampling, variables }
     }
     case 'time-column-selected': {
-      if (state.sampling.kind === 'regular-panel' || state.sampling.kind === 'regular-panel-awaiting-keys') {
-        const unitColumn = state.sampling.unitColumn === event.timeColumn ? null : state.sampling.unitColumn
-        const sampling: SamplingDraft = unitColumn === null
-          ? { kind: 'regular-panel-awaiting-keys', unitColumn, timeColumn: event.timeColumn, frequency: state.sampling.frequency }
-          : { kind: 'regular-panel', unitColumn, timeColumn: event.timeColumn, frequency: state.sampling.frequency }
-        const variables = state.variables.kind === 'selected' && state.variables.columns.includes(event.timeColumn) ? toggleColumn(state.variables, event.timeColumn) : state.variables
+      if (
+        state.sampling.kind === 'regular-panel' ||
+        state.sampling.kind === 'regular-panel-awaiting-keys'
+      ) {
+        const unitColumn =
+          state.sampling.unitColumn === event.timeColumn ? null : state.sampling.unitColumn
+        const sampling: SamplingDraft =
+          unitColumn === null
+            ? {
+                kind: 'regular-panel-awaiting-keys',
+                unitColumn,
+                timeColumn: event.timeColumn,
+                frequency: state.sampling.frequency,
+              }
+            : {
+                kind: 'regular-panel',
+                unitColumn,
+                timeColumn: event.timeColumn,
+                frequency: state.sampling.frequency,
+              }
+        const variables =
+          state.variables.kind === 'selected' && state.variables.columns.includes(event.timeColumn)
+            ? toggleColumn(state.variables, event.timeColumn)
+            : state.variables
         return { ...state, sampling, variables, frequencyOrigin: 'assumed' }
       }
-      if (state.sampling.kind !== 'regular-series' && state.sampling.kind !== 'regular-series-awaiting-time') return state
+      if (
+        state.sampling.kind !== 'regular-series' &&
+        state.sampling.kind !== 'regular-series-awaiting-time'
+      )
+        return state
       const frequency = state.sampling.frequency
       return {
         ...state,
         sampling: { kind: 'regular-series', timeColumn: event.timeColumn, frequency },
         frequencyOrigin: 'assumed',
-        variables: state.variables.kind === 'selected' && state.variables.columns.includes(event.timeColumn)
-          ? toggleColumn(state.variables, event.timeColumn)
-          : state.variables,
+        variables:
+          state.variables.kind === 'selected' && state.variables.columns.includes(event.timeColumn)
+            ? toggleColumn(state.variables, event.timeColumn)
+            : state.variables,
       }
     }
     case 'time-spacing-observed': {
       switch (event.suggestion.kind) {
         case 'suggested': {
-          if (state.sampling.kind !== 'regular-series' && state.sampling.kind !== 'regular-panel' && state.sampling.kind !== 'regular-panel-awaiting-keys') return state
+          if (
+            state.sampling.kind !== 'regular-series' &&
+            state.sampling.kind !== 'regular-panel' &&
+            state.sampling.kind !== 'regular-panel-awaiting-keys'
+          )
+            return state
           if (state.sampling.timeColumn !== event.timeColumn) return state
           switch (state.frequencyOrigin) {
-            case 'chosen': return state
+            case 'chosen':
+              return state
             case 'assumed':
-            case 'observed': return withFrequency(state, event.suggestion.frequency, 'observed')
-            default: return assertNever(state.frequencyOrigin)
+            case 'observed':
+              return withFrequency(state, event.suggestion.frequency, 'observed')
+            default:
+              return assertNever(state.frequencyOrigin)
           }
         }
         case 'ordinal':
         case 'single-period':
         case 'unrecognised':
           return state
-        default: return assertNever(event.suggestion)
+        default:
+          return assertNever(event.suggestion)
       }
     }
     case 'frequency-selected':
@@ -437,11 +607,25 @@ export function stepPreprocessing(state: PreprocessingDraft, event: Preprocessin
     case 'variable-toggled': {
       const variables = toggleColumn(state.variables, event.column)
       const kept: readonly ColumnId[] = variables.kind === 'selected' ? variables.columns : []
-      const seasonal: SeasonalAdjustmentDraft = state.seasonal.kind === 'stl' ? { ...state.seasonal, columns: state.seasonal.columns.filter((column) => kept.includes(column)) } : state.seasonal
-      const seriesTransforms = state.seriesTransforms.filter((candidate) => kept.includes(candidate.column))
-      const resampling: ResamplingDraft = state.resampling.kind === 'daily-downsample'
-        ? { ...state.resampling, aggregations: state.resampling.aggregations.filter((candidate) => kept.includes(candidate.column)) }
-        : state.resampling
+      const seasonal: SeasonalAdjustmentDraft =
+        state.seasonal.kind === 'stl'
+          ? {
+              ...state.seasonal,
+              columns: state.seasonal.columns.filter((column) => kept.includes(column)),
+            }
+          : state.seasonal
+      const seriesTransforms = state.seriesTransforms.filter((candidate) =>
+        kept.includes(candidate.column),
+      )
+      const resampling: ResamplingDraft =
+        state.resampling.kind === 'daily-downsample'
+          ? {
+              ...state.resampling,
+              aggregations: state.resampling.aggregations.filter((candidate) =>
+                kept.includes(candidate.column),
+              ),
+            }
+          : state.resampling
       return { ...state, variables, seasonal, resampling, seriesTransforms }
     }
     case 'column-selection-replaced':
@@ -451,26 +635,44 @@ export function stepPreprocessing(state: PreprocessingDraft, event: Preprocessin
     case 'missingness-selected':
       return { ...state, missingness: event.resolution }
     case 'resampling-selected':
-      if (state.sampling.kind !== 'regular-series' || state.sampling.frequency !== 'daily') return state
+      if (state.sampling.kind !== 'regular-series' || state.sampling.frequency !== 'daily')
+        return state
       return { ...state, resampling: event.resampling }
     case 'resampling-aggregation-selected':
-      if (state.resampling.kind !== 'daily-downsample' || state.variables.kind !== 'selected' || !state.variables.columns.includes(event.column)) return state
+      if (
+        state.resampling.kind !== 'daily-downsample' ||
+        state.variables.kind !== 'selected' ||
+        !state.variables.columns.includes(event.column)
+      )
+        return state
       return {
         ...state,
         resampling: {
           ...state.resampling,
           aggregations: [
-            ...state.resampling.aggregations.filter((candidate) => candidate.column !== event.column),
+            ...state.resampling.aggregations.filter(
+              (candidate) => candidate.column !== event.column,
+            ),
             { column: event.column, aggregation: event.aggregation },
           ],
         },
       }
     case 'series-transform-selected':
-      if (state.variables.kind !== 'selected' || !state.variables.columns.includes(event.column)) return state
-      return { ...state, seriesTransforms: setSeriesTransform(state.seriesTransforms, event.column, event.transform) }
+      if (state.variables.kind !== 'selected' || !state.variables.columns.includes(event.column))
+        return state
+      return {
+        ...state,
+        seriesTransforms: setSeriesTransform(state.seriesTransforms, event.column, event.transform),
+      }
     case 'all-series-transforms-selected':
       return state.variables.kind === 'selected'
-        ? { ...state, seriesTransforms: mapNonEmpty(state.variables.columns, (column) => ({ column, transform: event.transform })) }
+        ? {
+            ...state,
+            seriesTransforms: mapNonEmpty(state.variables.columns, (column) => ({
+              column,
+              transform: event.transform,
+            })),
+          }
         : state
     case 'diagnostic-transform-selected':
       return { ...state, diagnosticTransform: event.transform }
@@ -482,21 +684,31 @@ export function stepPreprocessing(state: PreprocessingDraft, event: Preprocessin
 export function readyPreprocessingRecipe(
   state: PreprocessingDraft,
 ): Result<ReadyPreprocessingRecipe, PreprocessingReadinessProblem> {
-  if (state.sampling.kind === 'unconfigured') return err({ kind: 'observational-structure-required' })
-  if (state.sampling.kind === 'regular-series-awaiting-time') return err({ kind: 'time-column-required' })
-  if (state.sampling.kind === 'regular-panel-awaiting-keys' && state.sampling.unitColumn === null) return err({ kind: 'unit-column-required' })
-  if (state.sampling.kind === 'regular-panel-awaiting-keys') return err({ kind: 'time-column-required' })
+  if (state.sampling.kind === 'unconfigured')
+    return err({ kind: 'observational-structure-required' })
+  if (state.sampling.kind === 'regular-series-awaiting-time')
+    return err({ kind: 'time-column-required' })
+  if (state.sampling.kind === 'regular-panel-awaiting-keys' && state.sampling.unitColumn === null)
+    return err({ kind: 'unit-column-required' })
+  if (state.sampling.kind === 'regular-panel-awaiting-keys')
+    return err({ kind: 'time-column-required' })
   if (state.variables.kind === 'empty') return err({ kind: 'variables-required' })
   if (state.sampling.kind === 'regular-panel' && state.missingness.kind !== 'not-present') {
     return err({ kind: 'panel-missingness-unsupported', cells: state.missingness.cells })
   }
   switch (state.missingness.kind) {
-    case 'unresolved': return err({ kind: 'missingness-unresolved', cells: state.missingness.cells })
+    case 'unresolved':
+      return err({ kind: 'missingness-unresolved', cells: state.missingness.cells })
     case 'lag-aware-exclusion': {
       if (state.sampling.kind !== 'regular-series') {
-        return err({ kind: 'lag-exclusion-needs-compatible-method', cells: state.missingness.cells })
+        return err({
+          kind: 'lag-exclusion-needs-compatible-method',
+          cells: state.missingness.cells,
+        })
       }
-      const transformed = state.variables.columns.some((column) => seriesTransformFor(state.seriesTransforms, column).kind !== 'levels')
+      const transformed = state.variables.columns.some(
+        (column) => seriesTransformFor(state.seriesTransforms, column).kind !== 'levels',
+      )
       if (state.resampling.kind !== 'none' || state.seasonal.kind !== 'none' || transformed) {
         return err({ kind: 'lag-exclusion-needs-untransformed-grid' })
       }
@@ -507,13 +719,20 @@ export function readyPreprocessingRecipe(
         missingness: state.missingness,
         resampling: { kind: 'none' },
         seasonalAdjustment: { kind: 'none' },
-        seriesTransforms: mapNonEmpty(state.variables.columns, (column) => ({ column, transform: { kind: 'levels' } })),
+        seriesTransforms: mapNonEmpty(state.variables.columns, (column) => ({
+          column,
+          transform: { kind: 'levels' },
+        })),
       })
     }
     case 'complete-interval':
     case 'imputation':
     case 'not-present': {
-      if (state.missingness.kind === 'imputation' && state.missingness.method === 'structuralZero' && !state.missingness.confirmedStructuralZero) {
+      if (
+        state.missingness.kind === 'imputation' &&
+        state.missingness.method === 'structuralZero' &&
+        !state.missingness.confirmedStructuralZero
+      ) {
         return err({ kind: 'structural-zero-unconfirmed' })
       }
       switch (state.sampling.kind) {
@@ -525,13 +744,26 @@ export function readyPreprocessingRecipe(
             missingness: state.missingness,
           })
         case 'regular-series': {
-          const resampling = readyResamplingRecipe(state.sampling.frequency, state.variables.columns, state.resampling)
-          if (!resampling.ok) return err({ kind: 'resampling-aggregations-required', columns: resampling.error.columns })
-          const period = seasonalPeriodOf(effectiveFrequency(state.sampling.frequency, resampling.value))
+          const resampling = readyResamplingRecipe(
+            state.sampling.frequency,
+            state.variables.columns,
+            state.resampling,
+          )
+          if (!resampling.ok)
+            return err({
+              kind: 'resampling-aggregations-required',
+              columns: resampling.error.columns,
+            })
+          const period = seasonalPeriodOf(
+            effectiveFrequency(state.sampling.frequency, resampling.value),
+          )
           let seasonalAdjustment: SeasonalAdjustmentRecord = { kind: 'none' }
           if (state.seasonal.kind === 'stl') {
             if (period === null) return err({ kind: 'seasonal-period-unavailable' })
-            const columns = state.seasonal.columns.filter((column) => state.variables.kind === 'selected' && state.variables.columns.includes(column))
+            const columns = state.seasonal.columns.filter(
+              (column) =>
+                state.variables.kind === 'selected' && state.variables.columns.includes(column),
+            )
             if (!isNonEmpty(columns)) return err({ kind: 'seasonal-columns-required' })
             seasonalAdjustment = { kind: 'stl', period, robust: state.seasonal.robust, columns }
           }
@@ -549,8 +781,14 @@ export function readyPreprocessingRecipe(
           })
         }
         case 'regular-panel':
-          return ok({ kind: 'regular-panel', sampling: state.sampling, columns: state.variables.columns, missingness: state.missingness })
-        default: return assertNever(state.sampling)
+          return ok({
+            kind: 'regular-panel',
+            sampling: state.sampling,
+            columns: state.variables.columns,
+            missingness: state.missingness,
+          })
+        default:
+          return assertNever(state.sampling)
       }
     }
     default:
@@ -569,10 +807,12 @@ export const newStationarityEvidenceId = (): StationarityEvidenceId =>
 
 export function transformSeries(values: Float64Array, transform: SeriesTransform): Float64Array {
   switch (transform.kind) {
-    case 'levels': return values.slice()
+    case 'levels':
+      return values.slice()
     case 'difference': {
       const output = new Float64Array(Math.max(0, values.length - 1))
-      for (let index = 1; index < values.length; index += 1) output[index - 1] = values[index] - values[index - 1]
+      for (let index = 1; index < values.length; index += 1)
+        output[index - 1] = values[index] - values[index - 1]
       return output
     }
     case 'linear-detrend': {
@@ -602,34 +842,56 @@ export type PreparationAction =
   | { readonly kind: 'running' }
   | { readonly kind: 'blocked'; readonly reason: string }
 
-export function preparationAction(readiness: Result<ReadyPreprocessingRecipe, PreprocessingReadinessProblem>, savedRecipe: string | null, activity: 'idle' | 'running' | 'busy'): PreparationAction {
+export function preparationAction(
+  readiness: Result<ReadyPreprocessingRecipe, PreprocessingReadinessProblem>,
+  savedRecipe: string | null,
+  activity: 'idle' | 'running' | 'busy',
+): PreparationAction {
   switch (activity) {
-    case 'running': return { kind: 'running' }
-    case 'busy': return { kind: 'blocked', reason: 'Wait for the current calculation to finish, or cancel it before preparing data.' }
+    case 'running':
+      return { kind: 'running' }
+    case 'busy':
+      return {
+        kind: 'blocked',
+        reason: 'Wait for the current calculation to finish, or cancel it before preparing data.',
+      }
     case 'idle': {
-      if (!readiness.ok) return { kind: 'blocked', reason: describeReadinessProblem(readiness.error) }
-      return JSON.stringify(readiness.value) === savedRecipe
-        ? { kind: 'saved' }
-        : { kind: 'ready' }
+      if (!readiness.ok)
+        return { kind: 'blocked', reason: describeReadinessProblem(readiness.error) }
+      return JSON.stringify(readiness.value) === savedRecipe ? { kind: 'saved' } : { kind: 'ready' }
     }
-    default: return assertNever(activity)
+    default:
+      return assertNever(activity)
   }
 }
 
 export function describeReadinessProblem(problem: PreprocessingReadinessProblem): string {
   switch (problem.kind) {
-    case 'observational-structure-required': return 'Choose a time series, a panel, or independent observations.'
-    case 'time-column-required': return 'Choose the time column.'
-    case 'unit-column-required': return 'Choose the unit column for this panel.'
-    case 'variables-required': return 'Choose at least one numeric analysis variable.'
-    case 'missingness-unresolved': return `${problem.cells} missing values still need a policy.`
-    case 'lag-exclusion-needs-compatible-method': return 'Choose a complete interval or approved imputation for dense diagnostics. Lag-aware exclusion keeps the original time grid.'
-    case 'lag-exclusion-needs-untransformed-grid': return 'Lag-aware exclusion currently requires the original time grid and values. Turn off resampling, seasonal adjustment, differencing, and detrending.'
-    case 'panel-missingness-unsupported': return `This panel has ${problem.cells} missing values. Complete them separately within each unit before preparing the panel.`
-    case 'structural-zero-unconfirmed': return 'Confirm that each missing value represents a true zero.'
-    case 'seasonal-period-unavailable': return 'Yearly rows have no seasonal period, so seasonal-trend decomposition using loess (STL) does not apply.'
-    case 'seasonal-columns-required': return 'Choose at least one selected column to adjust seasonally, or switch the adjustment off.'
-    case 'resampling-aggregations-required': return `Choose how to aggregate ${problem.columns.length === 1 ? 'the selected column' : 'every selected column'} into the new calendar interval.`
-    default: return assertNever(problem)
+    case 'observational-structure-required':
+      return 'Choose a time series, a panel, or independent observations.'
+    case 'time-column-required':
+      return 'Choose the time column.'
+    case 'unit-column-required':
+      return 'Choose the unit column for this panel.'
+    case 'variables-required':
+      return 'Choose at least one numeric analysis variable.'
+    case 'missingness-unresolved':
+      return `${problem.cells} missing values still need a policy.`
+    case 'lag-exclusion-needs-compatible-method':
+      return 'Choose a complete interval or approved imputation for dense diagnostics. Lag-aware exclusion keeps the original time grid.'
+    case 'lag-exclusion-needs-untransformed-grid':
+      return 'Lag-aware exclusion currently requires the original time grid and values. Turn off resampling, seasonal adjustment, differencing, and detrending.'
+    case 'panel-missingness-unsupported':
+      return `This panel has ${problem.cells} missing values. Complete them separately within each unit before preparing the panel.`
+    case 'structural-zero-unconfirmed':
+      return 'Confirm that each missing value represents a true zero.'
+    case 'seasonal-period-unavailable':
+      return 'Yearly rows have no seasonal period, so seasonal-trend decomposition using loess (STL) does not apply.'
+    case 'seasonal-columns-required':
+      return 'Choose at least one selected column to adjust seasonally, or switch the adjustment off.'
+    case 'resampling-aggregations-required':
+      return `Choose how to aggregate ${problem.columns.length === 1 ? 'the selected column' : 'every selected column'} into the new calendar interval.`
+    default:
+      return assertNever(problem)
   }
 }

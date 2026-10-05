@@ -1,12 +1,26 @@
-import {surrogatePathEvidenceSchema,surrogatePathMatches} from '@/domain/surrogatePath'
-import {surrogateDiagnosticEvidenceSchema,surrogateDiagnosticMatches} from '@/domain/surrogateDiagnostics'
+import { surrogatePathEvidenceSchema, surrogatePathMatches } from '@/domain/surrogatePath'
+import {
+  surrogateDiagnosticEvidenceSchema,
+  surrogateDiagnosticMatches,
+} from '@/domain/surrogateDiagnostics'
 import { surrogateEvidenceSchema, surrogateEvidenceMatchesRequest } from '@/domain/surrogate'
-import {countRegressionEvidenceSchema,sameCountRequest} from '@/domain/countRegression'
-import {panelRegressionEvidenceSchema,baconEvidenceSchema,sameSpecification} from '@/domain/panelRegression'
+import { countRegressionEvidenceSchema, sameCountRequest } from '@/domain/countRegression'
+import {
+  panelRegressionEvidenceSchema,
+  baconEvidenceSchema,
+  sameSpecification,
+} from '@/domain/panelRegression'
 import { z } from 'zod'
 import { sunAbrahamEvidenceSchema, ridgeAugmentedEvidenceSchema } from '@/domain/remixExtensions'
-import { predictorSyntheticEvidenceSchema, samePredictorSyntheticRequest } from '@/domain/predictorSyntheticControl'
-import { causalForestEvidenceSchema, sameCausalForestTarget, causalForestSettingsMatch } from '@/domain/causalForest'
+import {
+  predictorSyntheticEvidenceSchema,
+  samePredictorSyntheticRequest,
+} from '@/domain/predictorSyntheticControl'
+import {
+  causalForestEvidenceSchema,
+  sameCausalForestTarget,
+  causalForestSettingsMatch,
+} from '@/domain/causalForest'
 import { sameStructuralModel } from '@/domain/structuralImpact'
 import { ardlModelResponseSchema } from '@/domain/ardlModel'
 import { rootCauseResponseSchema } from '@/domain/rootCauseAnalysis'
@@ -34,25 +48,65 @@ import {
   parseVarLingamEvidence,
 } from '@/domain/discovery'
 import { assertNever } from '@/domain/dop'
-import { gridSliceEvidenceSchema, parseBackdoorLinearEvidence, parseCausalEffectsEvidence, parseContinuousGpsEvidence, parseDoublyRobustEvidence, parsePropensityMatchingEvidence, parsePropensityWeightingEvidence, parseCausalImpactEvidence, parseCountGlmEvidence, parseFrontdoorTwoStageEvidence, parseInstrumentalVariableEvidence, parseNegativeBinomialIngarchEvidence } from '@/domain/estimation'
+import {
+  gridSliceEvidenceSchema,
+  parseBackdoorLinearEvidence,
+  parseCausalEffectsEvidence,
+  parseContinuousGpsEvidence,
+  parseDoublyRobustEvidence,
+  parsePropensityMatchingEvidence,
+  parsePropensityWeightingEvidence,
+  parseCausalImpactEvidence,
+  parseCountGlmEvidence,
+  parseFrontdoorTwoStageEvidence,
+  parseInstrumentalVariableEvidence,
+  parseNegativeBinomialIngarchEvidence,
+} from '@/domain/estimation'
 import { parseCountSeriesInterventionScanEvidence } from '@/domain/countSeries'
 import { parseInterruptedSeriesEvidence } from '@/domain/interruptedSeries'
 import { parseMissingnessResolvedEvidence } from '@/domain/missingness'
 import { parseSeasonalAdjustedEvidence } from '@/domain/seasonal'
 import { parsePandasResamplingEvidence } from '@/domain/resampling'
-import { ardlEvidenceSchema, bayesianGaussianEvidenceSchema, binaryEttEvidenceSchema, discreteBnEvidenceSchema, doubleMlEvidenceSchema, negbinNutsEvidenceSchema, panelInterventionEvidenceSchema, syntheticControlEvidenceSchema, tLearnerEvidenceSchema, crossFittedTLearnerEvidenceSchema, vecmEvidenceSchema } from '@/domain/estimation'
+import {
+  ardlEvidenceSchema,
+  bayesianGaussianEvidenceSchema,
+  binaryEttEvidenceSchema,
+  discreteBnEvidenceSchema,
+  doubleMlEvidenceSchema,
+  negbinNutsEvidenceSchema,
+  panelInterventionEvidenceSchema,
+  syntheticControlEvidenceSchema,
+  tLearnerEvidenceSchema,
+  crossFittedTLearnerEvidenceSchema,
+  vecmEvidenceSchema,
+} from '@/domain/estimation'
 import { parseDmlRefutationEvidence } from '@/domain/sensitivity'
-import {honestEvidenceSchema} from '@/domain/honestDid'
-import {didSensitivityEvidenceSchema} from '@/domain/didSensitivity'
-import { dynamicCounterfactualUncertaintyMatches, dynamicLinearScmEvidenceSchema, linearScmEvidenceSchema } from '@/domain/counterfactual'
-import { parseLinearRefutationEvidence, parseSeriesStructureEvidence, parseUnobservedConfoundingEvidence } from '@/domain/sensitivity'
+import { honestEvidenceSchema } from '@/domain/honestDid'
+import { didSensitivityEvidenceSchema } from '@/domain/didSensitivity'
+import {
+  dynamicCounterfactualUncertaintyMatches,
+  dynamicLinearScmEvidenceSchema,
+  linearScmEvidenceSchema,
+} from '@/domain/counterfactual'
+import {
+  parseLinearRefutationEvidence,
+  parseSeriesStructureEvidence,
+  parseUnobservedConfoundingEvidence,
+} from '@/domain/sensitivity'
 import { parseStationarityBattery } from '@/domain/stationarity'
 import { parseBackdoorIdentificationEvidence } from '@/domain/study'
 import { dagCheckEvidenceSchema } from '@/domain/dagValidation'
 import { identifiedDiscreteQueryEvidenceSchema } from '@/domain/intervention'
 import { networkQueryEvidenceSchema } from '@/domain/networkQuery'
-import {conditionalGaussianEvidenceSchema} from '@/domain/conditionalGaussianQuery'
-import { parseComparisonSurvivalEvidence, parseCoxRegressionEvidence, parseFlexSurvEvidence, parseMultiStateSurvivalEvidence, parseNonparametricSurvivalEvidence, parsePenalizedAftEvidence } from '@/domain/survival'
+import { conditionalGaussianEvidenceSchema } from '@/domain/conditionalGaussianQuery'
+import {
+  parseComparisonSurvivalEvidence,
+  parseCoxRegressionEvidence,
+  parseFlexSurvEvidence,
+  parseMultiStateSurvivalEvidence,
+  parseNonparametricSurvivalEvidence,
+  parsePenalizedAftEvidence,
+} from '@/domain/survival'
 import { parseAalenEvidence, parseForestEvidence } from '@/domain/survivalRegression'
 import {
   analysisProgressSchema,
@@ -68,7 +122,8 @@ import {
 const emit = (event: AnalysisWorkerEvent) => self.postMessage(event)
 let wasmReady: Promise<unknown> | null = null
 
-const detailOf = (cause: unknown): string => cause instanceof Error ? cause.message : String(cause)
+const detailOf = (cause: unknown): string =>
+  cause instanceof Error ? cause.message : String(cause)
 
 const fail = (request: WorkerRequestId, problem: AnalysisWorkerProblem) =>
   emit({ kind: 'analysis-failed', request, problem })
@@ -83,19 +138,25 @@ const loadWasm = (): Promise<unknown> => {
 
 const rustTemporalSamples = (samples: TemporalSamples): object => {
   switch (samples.kind) {
-    case 'dense': return { kind: 'dense' }
-    case 'role-aware': return {
-      kind: 'roleAware',
-      cutOff: samples.cutOff,
-      propagateThroughMaxLag: samples.propagateThroughMaxLag,
-      maskType: samples.maskType,
-    }
-    default: return assertNever(samples)
+    case 'dense':
+      return { kind: 'dense' }
+    case 'role-aware':
+      return {
+        kind: 'roleAware',
+        cutOff: samples.cutOff,
+        propagateThroughMaxLag: samples.propagateThroughMaxLag,
+        maskType: samples.maskType,
+      }
+    default:
+      return assertNever(samples)
   }
 }
 
 const sampleArrays = (command: AnalysisWorkerCommand): readonly [Uint8Array, Uint8Array] => {
-  if ((command.kind === 'pcmci-plus' || command.kind === 'lpcmci') && command.samples.kind === 'role-aware') {
+  if (
+    (command.kind === 'pcmci-plus' || command.kind === 'lpcmci') &&
+    command.samples.kind === 'role-aware'
+  ) {
     return [command.samples.validity, command.samples.analysisMask]
   }
   if (command.kind === 'cdnots' || command.kind === 'cdnots-plus' || command.kind === 'grace') {
@@ -106,20 +167,78 @@ const sampleArrays = (command: AnalysisWorkerCommand): readonly [Uint8Array, Uin
 
 const rustCommand = (command: AnalysisWorkerCommand): object => {
   switch (command.kind) {
-    case 'aalen': return { kind: 'aalen', rows: command.rows, columns: command.columns, ...command.design }
-    case 'survival-forest': return { kind: 'survivalForest', rows: command.rows, columns: command.columns, ...command.design }
+    case 'aalen':
+      return { kind: 'aalen', rows: command.rows, columns: command.columns, ...command.design }
+    case 'survival-forest':
+      return {
+        kind: 'survivalForest',
+        rows: command.rows,
+        columns: command.columns,
+        ...command.design,
+      }
     case 'flexsurv':
-      return { kind: 'flexSurv', rows: command.rows, columns: command.columns, observation: command.observation, rowFrequency: command.rowFrequency, covariates: command.covariates, family: command.family, predictionTimes: command.predictionTimes }
+      return {
+        kind: 'flexSurv',
+        rows: command.rows,
+        columns: command.columns,
+        observation: command.observation,
+        rowFrequency: command.rowFrequency,
+        covariates: command.covariates,
+        family: command.family,
+        predictionTimes: command.predictionTimes,
+      }
     case 'cox-regression':
-      return { kind: 'coxRegression', rows: command.rows, columns: command.columns, ...command.design }
+      return {
+        kind: 'coxRegression',
+        rows: command.rows,
+        columns: command.columns,
+        ...command.design,
+      }
     case 'penalized-aft':
-      return { kind: 'penalizedAft', rows: command.rows, columns: command.columns, duration: command.duration, event: command.event, covariates: command.covariates, family: command.family, penalizer: command.penalizer, confidenceLevel: command.confidenceLevel, predictionTimes: command.predictionTimes }
+      return {
+        kind: 'penalizedAft',
+        rows: command.rows,
+        columns: command.columns,
+        duration: command.duration,
+        event: command.event,
+        covariates: command.covariates,
+        family: command.family,
+        penalizer: command.penalizer,
+        confidenceLevel: command.confidenceLevel,
+        predictionTimes: command.predictionTimes,
+      }
     case 'nonparametric-survival':
-      return { kind: 'nonparametricSurvival', rows: command.rows, columns: command.columns, duration: command.duration, event: command.event, rowFrequency: command.rowFrequency, predictionTimes: command.predictionTimes, ties: command.ties }
+      return {
+        kind: 'nonparametricSurvival',
+        rows: command.rows,
+        columns: command.columns,
+        duration: command.duration,
+        event: command.event,
+        rowFrequency: command.rowFrequency,
+        predictionTimes: command.predictionTimes,
+        ties: command.ties,
+      }
     case 'comparison-survival':
-      return { kind: 'comparisonSurvival', rows: command.rows, columns: command.columns, duration: command.duration, event: command.event, group: command.group, truncationTime: command.truncationTime, permutations: command.permutations, seed: command.seed }
+      return {
+        kind: 'comparisonSurvival',
+        rows: command.rows,
+        columns: command.columns,
+        duration: command.duration,
+        event: command.event,
+        group: command.group,
+        truncationTime: command.truncationTime,
+        permutations: command.permutations,
+        seed: command.seed,
+      }
     case 'multi-state-survival':
-      return { kind: 'multiStateSurvival', rows: command.rows, columns: command.columns, input: command.input, family: command.family, predictionTimes: command.predictionTimes }
+      return {
+        kind: 'multiStateSurvival',
+        rows: command.rows,
+        columns: command.columns,
+        input: command.input,
+        family: command.family,
+        predictionTimes: command.predictionTimes,
+      }
     case 'stationarity-battery':
       return { kind: 'stationarityBattery' }
     case 'multicollinearity':
@@ -340,15 +459,67 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
         fixedEffects: command.fixedEffects,
       }
     case 'propensity-weighting':
-      return { kind: 'propensityWeighting', target: command.target, rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, scale: command.scale, fit: command.fit }
+      return {
+        kind: 'propensityWeighting',
+        target: command.target,
+        rows: command.rows,
+        columns: command.columns,
+        treatment: command.treatment,
+        outcome: command.outcome,
+        adjustment: command.adjustment,
+        scale: command.scale,
+        fit: command.fit,
+      }
     case 'propensity-matching':
-      return { kind: 'propensityMatching', target: command.target, rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, model: command.model }
+      return {
+        kind: 'propensityMatching',
+        target: command.target,
+        rows: command.rows,
+        columns: command.columns,
+        treatment: command.treatment,
+        outcome: command.outcome,
+        adjustment: command.adjustment,
+        model: command.model,
+      }
     case 'propensity-grid-slice':
-      return { kind: 'propensityGridSlice', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, learningRate: command.learningRate, maxDepth: command.maxDepth, nEstimators: command.nEstimators, splits: command.splits, minSamplesLeaf: command.minSamplesLeaf, minSamplesSplit: command.minSamplesSplit, seed: command.seed }
+      return {
+        kind: 'propensityGridSlice',
+        rows: command.rows,
+        columns: command.columns,
+        treatment: command.treatment,
+        outcome: command.outcome,
+        adjustment: command.adjustment,
+        learningRate: command.learningRate,
+        maxDepth: command.maxDepth,
+        nEstimators: command.nEstimators,
+        splits: command.splits,
+        minSamplesLeaf: command.minSamplesLeaf,
+        minSamplesSplit: command.minSamplesSplit,
+        seed: command.seed,
+      }
     case 'doubly-robust':
-      return { kind: 'doublyRobust', target: command.target, rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, model: command.model, bootstrap: command.bootstrap }
+      return {
+        kind: 'doublyRobust',
+        target: command.target,
+        rows: command.rows,
+        columns: command.columns,
+        treatment: command.treatment,
+        outcome: command.outcome,
+        adjustment: command.adjustment,
+        model: command.model,
+        bootstrap: command.bootstrap,
+      }
     case 'continuous-gps':
-      return { kind: 'continuousGps', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, scale: command.scale, bootstrap: command.bootstrap }
+      return {
+        kind: 'continuousGps',
+        rows: command.rows,
+        columns: command.columns,
+        treatment: command.treatment,
+        outcome: command.outcome,
+        adjustment: command.adjustment,
+        scale: command.scale,
+        bootstrap: command.bootstrap,
+      }
     case 'frontdoor-two-stage':
       return {
         kind: 'frontdoorTwoStage',
@@ -374,44 +545,241 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
         uncertainty: command.uncertainty,
       }
     case 'count-glm':
-      return { kind: 'countGlm', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, family: command.family }
+      return {
+        kind: 'countGlm',
+        rows: command.rows,
+        columns: command.columns,
+        treatment: command.treatment,
+        outcome: command.outcome,
+        adjustment: command.adjustment,
+        family: command.family,
+      }
     case 'negative-binomial-ingarch':
-      return { kind: 'negativeBinomialIngarch', rows: command.rows, columns: command.columns, outcome: command.outcome, link: command.link, regressors: command.regressors, pastObservationLags: command.pastObservationLags, pastMeanLags: command.pastMeanLags, externalRegressors: command.externalRegressors, horizon: command.horizon, baselineRegressors: command.baselineRegressors, interventionRegressor: command.interventionRegressor, controlValue: command.controlValue, treatmentValue: command.treatmentValue, schedule: command.schedule }
+      return {
+        kind: 'negativeBinomialIngarch',
+        rows: command.rows,
+        columns: command.columns,
+        outcome: command.outcome,
+        link: command.link,
+        regressors: command.regressors,
+        pastObservationLags: command.pastObservationLags,
+        pastMeanLags: command.pastMeanLags,
+        externalRegressors: command.externalRegressors,
+        horizon: command.horizon,
+        baselineRegressors: command.baselineRegressors,
+        interventionRegressor: command.interventionRegressor,
+        controlValue: command.controlValue,
+        treatmentValue: command.treatmentValue,
+        schedule: command.schedule,
+      }
     case 'count-series-intervention-scan':
-      return { kind: 'countSeriesInterventionScan', rows: command.rows, columns: command.columns, outcome: command.outcome, link: command.link, pastObservationLags: command.pastObservationLags, pastMeanLags: command.pastMeanLags, candidateReferencePoints: command.candidateReferencePoints, delta: command.delta }
+      return {
+        kind: 'countSeriesInterventionScan',
+        rows: command.rows,
+        columns: command.columns,
+        outcome: command.outcome,
+        link: command.link,
+        pastObservationLags: command.pastObservationLags,
+        pastMeanLags: command.pastMeanLags,
+        candidateReferencePoints: command.candidateReferencePoints,
+        delta: command.delta,
+      }
     case 'interrupted-series':
-      return { kind: 'interruptedSeries', rows: command.rows, columns: command.columns, outcome: command.outcome, model: command.model, interventionRow: command.interventionRow, lag: command.lag, impact: command.impact, seasonal: command.seasonal, ljungBoxLags: command.ljungBoxLags }
+      return {
+        kind: 'interruptedSeries',
+        rows: command.rows,
+        columns: command.columns,
+        outcome: command.outcome,
+        model: command.model,
+        interventionRow: command.interventionRow,
+        lag: command.lag,
+        impact: command.impact,
+        seasonal: command.seasonal,
+        ljungBoxLags: command.ljungBoxLags,
+      }
     case 'causal-effects-total':
-      return { kind: 'causalEffectsTotal', rows: command.rows, columns: command.columns, statLag: command.statLag, graph: command.graph, x: command.x, y: command.y, hidden: command.hidden, estimator: command.estimator, interventions: command.interventions, uncertainty: command.uncertainty }
-    case 'sharp-rd': return { kind: 'sharpRd', rows: command.rows, cutoff: command.cutoff }
+      return {
+        kind: 'causalEffectsTotal',
+        rows: command.rows,
+        columns: command.columns,
+        statLag: command.statLag,
+        graph: command.graph,
+        x: command.x,
+        y: command.y,
+        hidden: command.hidden,
+        estimator: command.estimator,
+        interventions: command.interventions,
+        uncertainty: command.uncertainty,
+      }
+    case 'sharp-rd':
+      return { kind: 'sharpRd', rows: command.rows, cutoff: command.cutoff }
     case 'causal-impact':
-      return { kind: 'causalImpact', rows: command.rows, columns: command.columns, outcome: command.outcome, controls: command.controls, nPre: command.nPre, postEnd: command.postEnd, maxIter: command.maxIter }
+      return {
+        kind: 'causalImpact',
+        rows: command.rows,
+        columns: command.columns,
+        outcome: command.outcome,
+        controls: command.controls,
+        nPre: command.nPre,
+        postEnd: command.postEnd,
+        maxIter: command.maxIter,
+      }
     case 'structural-causal-impact':
-      return { kind:'structuralCausalImpact', rows:command.rows, columns:command.columns, outcome:command.outcome, controls:command.controls, nPre:command.nPre, postEnd:command.postEnd, draws:command.draws, warmup:command.warmup, seed:command.seed, model:command.model }
+      return {
+        kind: 'structuralCausalImpact',
+        rows: command.rows,
+        columns: command.columns,
+        outcome: command.outcome,
+        controls: command.controls,
+        nPre: command.nPre,
+        postEnd: command.postEnd,
+        draws: command.draws,
+        warmup: command.warmup,
+        seed: command.seed,
+        model: command.model,
+      }
     case 'bayesian-causal-impact':
-      return { kind: 'bayesianCausalImpact', rows: command.rows, columns: command.columns, outcome: command.outcome, controls: command.controls, nPre: command.nPre, postEnd: command.postEnd, draws: command.draws, warmup: command.warmup, seed: command.seed, priorLevelSd: command.priorLevelSd }
+      return {
+        kind: 'bayesianCausalImpact',
+        rows: command.rows,
+        columns: command.columns,
+        outcome: command.outcome,
+        controls: command.controls,
+        nPre: command.nPre,
+        postEnd: command.postEnd,
+        draws: command.draws,
+        warmup: command.warmup,
+        seed: command.seed,
+        priorLevelSd: command.priorLevelSd,
+      }
     case 'linear-refutation':
-      return { kind: 'linearRefutation', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, simulations: command.simulations, subsetFraction: command.subsetFraction, seed: command.seed, ljungBoxLags: command.ljungBoxLags }
+      return {
+        kind: 'linearRefutation',
+        rows: command.rows,
+        columns: command.columns,
+        treatment: command.treatment,
+        outcome: command.outcome,
+        adjustment: command.adjustment,
+        simulations: command.simulations,
+        subsetFraction: command.subsetFraction,
+        seed: command.seed,
+        ljungBoxLags: command.ljungBoxLags,
+      }
     case 'unobserved-confounding':
-      return { kind: 'unobservedConfounding', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, seed: command.seed, kappaT: command.kappaT, kappaY: command.kappaY }
+      return {
+        kind: 'unobservedConfounding',
+        rows: command.rows,
+        columns: command.columns,
+        treatment: command.treatment,
+        outcome: command.outcome,
+        adjustment: command.adjustment,
+        seed: command.seed,
+        kappaT: command.kappaT,
+        kappaY: command.kappaY,
+      }
     case 'series-structure':
-      return { kind: 'seriesStructure', rows: command.rows, columns: command.columns, period: command.period, robust: command.robust, correlationMaxLag: command.correlationMaxLag, peltMinSize: command.peltMinSize, peltJump: command.peltJump, peltPenalty: command.peltPenalty }
+      return {
+        kind: 'seriesStructure',
+        rows: command.rows,
+        columns: command.columns,
+        period: command.period,
+        robust: command.robust,
+        correlationMaxLag: command.correlationMaxLag,
+        peltMinSize: command.peltMinSize,
+        peltJump: command.peltJump,
+        peltPenalty: command.peltPenalty,
+      }
     case 'seasonal-adjust':
-      return { kind: 'seasonalAdjust', rows: command.rows, columns: command.columns, period: command.period, robust: command.robust, adjust: command.adjust }
+      return {
+        kind: 'seasonalAdjust',
+        rows: command.rows,
+        columns: command.columns,
+        period: command.period,
+        robust: command.robust,
+        adjust: command.adjust,
+      }
     case 'double-ml':
-      return { kind: 'doubleMl', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, model: command.model, att: command.att, seed: command.seed, groups: command.groups }
+      return {
+        kind: 'doubleMl',
+        rows: command.rows,
+        columns: command.columns,
+        treatment: command.treatment,
+        outcome: command.outcome,
+        adjustment: command.adjustment,
+        model: command.model,
+        att: command.att,
+        seed: command.seed,
+        groups: command.groups,
+      }
     case 'causal-forest':
-      return { kind: 'causalForest', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, target: command.target, configuration: command.configuration, columnNames: command.columnNames ?? [] }
+      return {
+        kind: 'causalForest',
+        rows: command.rows,
+        columns: command.columns,
+        treatment: command.treatment,
+        outcome: command.outcome,
+        adjustment: command.adjustment,
+        target: command.target,
+        configuration: command.configuration,
+        columnNames: command.columnNames ?? [],
+      }
     case 't-learner':
-      return { kind: 'tLearner', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, seed: command.seed, uncertainty: command.uncertainty }
+      return {
+        kind: 'tLearner',
+        rows: command.rows,
+        columns: command.columns,
+        treatment: command.treatment,
+        outcome: command.outcome,
+        adjustment: command.adjustment,
+        seed: command.seed,
+        uncertainty: command.uncertainty,
+      }
     case 'cross-fitted-t-learner':
-      return { kind: 'crossFittedTLearner', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, learningRate: command.learningRate, maxDepth: command.maxDepth, nEstimators: command.nEstimators, splits: command.splits, minSamplesLeaf: command.minSamplesLeaf, minSamplesSplit: command.minSamplesSplit, seed: command.seed, selection: command.selection }
+      return {
+        kind: 'crossFittedTLearner',
+        rows: command.rows,
+        columns: command.columns,
+        treatment: command.treatment,
+        outcome: command.outcome,
+        adjustment: command.adjustment,
+        learningRate: command.learningRate,
+        maxDepth: command.maxDepth,
+        nEstimators: command.nEstimators,
+        splits: command.splits,
+        minSamplesLeaf: command.minSamplesLeaf,
+        minSamplesSplit: command.minSamplesSplit,
+        seed: command.seed,
+        selection: command.selection,
+      }
     case 'ardl-pss':
-      return { kind: 'ardlPss', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, maxLag: command.maxLag, trend: command.trend, case: command.case }
+      return {
+        kind: 'ardlPss',
+        rows: command.rows,
+        columns: command.columns,
+        treatment: command.treatment,
+        outcome: command.outcome,
+        maxLag: command.maxLag,
+        trend: command.trend,
+        case: command.case,
+      }
     case 'ardl-model':
-      return { kind: 'ardlModel', rows: command.rows, columns: command.columns, model: command.model }
-    case 'honest-did': return {kind:'honestDid',model:command.model}
-    case 'did-sensitivity': return {kind:'didSensitivity',rows:command.rows,columns:command.columns,units:command.units,times:command.times,model:command.model}
+      return {
+        kind: 'ardlModel',
+        rows: command.rows,
+        columns: command.columns,
+        model: command.model,
+      }
+    case 'honest-did':
+      return { kind: 'honestDid', model: command.model }
+    case 'did-sensitivity':
+      return {
+        kind: 'didSensitivity',
+        rows: command.rows,
+        columns: command.columns,
+        units: command.units,
+        times: command.times,
+        model: command.model,
+      }
     case 'root-cause':
       return { kind: 'rootCause', request: command.model }
     case 'gcm-effects':
@@ -421,44 +789,182 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
     case 'root-cause-checks':
       return { kind: 'rootCauseChecks', request: command.model }
     case 'vecm':
-      return { kind: 'vecm', rows: command.rows, columns: command.columns, endogenous: command.endogenous, maxLags: command.maxLags, deterministic: command.deterministic, significance: command.significance, breakIndex: command.breakIndex, forecastSteps: command.forecastSteps ?? null }
+      return {
+        kind: 'vecm',
+        rows: command.rows,
+        columns: command.columns,
+        endogenous: command.endogenous,
+        maxLags: command.maxLags,
+        deterministic: command.deterministic,
+        significance: command.significance,
+        breakIndex: command.breakIndex,
+        forecastSteps: command.forecastSteps ?? null,
+      }
     case 'predictor-synthetic-control':
-      return {kind:'predictorSyntheticControl',request:command.model}
+      return { kind: 'predictorSyntheticControl', request: command.model }
     case 'synthetic-control':
-      return { kind: 'syntheticControl', rows: command.rows, columns: command.columns, treated: command.treated, donors: command.donors, nPre: command.nPre, crossFitFolds: command.crossFitFolds, alpha: command.alpha }
+      return {
+        kind: 'syntheticControl',
+        rows: command.rows,
+        columns: command.columns,
+        treated: command.treated,
+        donors: command.donors,
+        nPre: command.nPre,
+        crossFitFolds: command.crossFitFolds,
+        alpha: command.alpha,
+      }
     case 'panel-intervention':
-      return { kind: 'panelIntervention', rows: command.rows, units: command.units, times: command.times, placeboReplications: command.placeboReplications, seed: command.seed, primary: command.primary ?? 'syntheticDid' }
-    case 'count-regression': return {kind:'countRegression',request:command.model}
-    case 'sun-abraham': return {kind:'sunAbraham',request:command.model}
-    case 'surrogate-path': return {kind:'surrogatePath',request:command.model}
-    case 'surrogate-diagnostics': return {kind:'surrogateDiagnostics',request:command.model}
-    case 'surrogate': return {kind:'surrogate',request:command.model}
-    case 'ridge-augmented-synthetic': return {kind:'ridgeAugmentedSynthetic',request:command.model}
-    case 'panel-regression': return {kind:'panelRegression',request:command.model}
-    case 'bacon': return {kind:'bacon',request:command.model}
-    case 'staggered-did': return {kind:'staggeredDid',request:command.model}
+      return {
+        kind: 'panelIntervention',
+        rows: command.rows,
+        units: command.units,
+        times: command.times,
+        placeboReplications: command.placeboReplications,
+        seed: command.seed,
+        primary: command.primary ?? 'syntheticDid',
+      }
+    case 'count-regression':
+      return { kind: 'countRegression', request: command.model }
+    case 'sun-abraham':
+      return { kind: 'sunAbraham', request: command.model }
+    case 'surrogate-path':
+      return { kind: 'surrogatePath', request: command.model }
+    case 'surrogate-diagnostics':
+      return { kind: 'surrogateDiagnostics', request: command.model }
+    case 'surrogate':
+      return { kind: 'surrogate', request: command.model }
+    case 'ridge-augmented-synthetic':
+      return { kind: 'ridgeAugmentedSynthetic', request: command.model }
+    case 'panel-regression':
+      return { kind: 'panelRegression', request: command.model }
+    case 'bacon':
+      return { kind: 'bacon', request: command.model }
+    case 'staggered-did':
+      return { kind: 'staggeredDid', request: command.model }
     case 'panel-adjusted':
-      return { kind: 'panelAdjusted', rows: command.rows, columns: command.columns, units: command.units, times: command.times, specification: command.specification }
+      return {
+        kind: 'panelAdjusted',
+        rows: command.rows,
+        columns: command.columns,
+        units: command.units,
+        times: command.times,
+        specification: command.specification,
+      }
     case 'negbin-nuts':
-      return { kind: 'negbinNuts', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, confounder: command.confounder, warmup: command.warmup, samples: command.samples, seed: command.seed }
+      return {
+        kind: 'negbinNuts',
+        rows: command.rows,
+        columns: command.columns,
+        treatment: command.treatment,
+        outcome: command.outcome,
+        confounder: command.confounder,
+        warmup: command.warmup,
+        samples: command.samples,
+        seed: command.seed,
+      }
     case 'bayesian-gaussian':
-      return { kind: 'bayesianGaussian', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, warmup: command.warmup, samples: command.samples, seed: command.seed }
-    case 'network-query': return {kind:'networkQuery',query:command.query}
-    case 'conditional-gaussian-query': return {kind:'conditionalGaussianQuery',query:command.query}
+      return {
+        kind: 'bayesianGaussian',
+        rows: command.rows,
+        columns: command.columns,
+        treatment: command.treatment,
+        outcome: command.outcome,
+        adjustment: command.adjustment,
+        warmup: command.warmup,
+        samples: command.samples,
+        seed: command.seed,
+      }
+    case 'network-query':
+      return { kind: 'networkQuery', query: command.query }
+    case 'conditional-gaussian-query':
+      return { kind: 'conditionalGaussianQuery', query: command.query }
     case 'discrete-bn-query':
-      return { kind: 'discreteBnQuery', rows: command.rows, columns: command.columns, nodes: command.nodes, names: command.names, edges: command.edges, treatment: command.treatment, outcome: command.outcome, bins: command.bins, equivalentSampleSize: command.equivalentSampleSize }
+      return {
+        kind: 'discreteBnQuery',
+        rows: command.rows,
+        columns: command.columns,
+        nodes: command.nodes,
+        names: command.names,
+        edges: command.edges,
+        treatment: command.treatment,
+        outcome: command.outcome,
+        bins: command.bins,
+        equivalentSampleSize: command.equivalentSampleSize,
+      }
     case 'identified-discrete-query':
-      return { kind: 'identifiedDiscreteQuery', rows: command.rows, columns: command.columns, observedNodes: command.observedNodes, names: command.names, edges: command.edges, treatment: command.treatment, outcome: command.outcome, unobserved: command.unobserved, bins: command.bins, condition: command.condition }
+      return {
+        kind: 'identifiedDiscreteQuery',
+        rows: command.rows,
+        columns: command.columns,
+        observedNodes: command.observedNodes,
+        names: command.names,
+        edges: command.edges,
+        treatment: command.treatment,
+        outcome: command.outcome,
+        unobserved: command.unobserved,
+        bins: command.bins,
+        condition: command.condition,
+      }
     case 'binary-ett':
-      return { kind: 'binaryEtt', rows: command.rows, columns: command.columns, observedNodes: command.observedNodes, names: command.names, edges: command.edges, treatment: command.treatment, outcome: command.outcome, unobserved: command.unobserved }
+      return {
+        kind: 'binaryEtt',
+        rows: command.rows,
+        columns: command.columns,
+        observedNodes: command.observedNodes,
+        names: command.names,
+        edges: command.edges,
+        treatment: command.treatment,
+        outcome: command.outcome,
+        unobserved: command.unobserved,
+      }
     case 'linear-scm-counterfactual':
-      return { kind: 'linearScmCounterfactual', rows: command.rows, columns: command.columns, nodes: command.nodes, names: command.names, edges: command.edges, treatment: command.treatment, outcome: command.outcome, interventions: command.interventions, observationNoise: command.observationNoise }
+      return {
+        kind: 'linearScmCounterfactual',
+        rows: command.rows,
+        columns: command.columns,
+        nodes: command.nodes,
+        names: command.names,
+        edges: command.edges,
+        treatment: command.treatment,
+        outcome: command.outcome,
+        interventions: command.interventions,
+        observationNoise: command.observationNoise,
+      }
     case 'dynamic-linear-scm-counterfactual':
-      return { kind: 'dynamicLinearScmCounterfactual', rows: command.rows, columns: command.columns, nodes: command.nodes, statLag: command.statLag, graph: command.graph, treatment: command.treatment, outcome: command.outcome, timing: command.timing, steps: command.steps, interventions: command.interventions, uncertainty: command.uncertainty }
+      return {
+        kind: 'dynamicLinearScmCounterfactual',
+        rows: command.rows,
+        columns: command.columns,
+        nodes: command.nodes,
+        statLag: command.statLag,
+        graph: command.graph,
+        treatment: command.treatment,
+        outcome: command.outcome,
+        timing: command.timing,
+        steps: command.steps,
+        interventions: command.interventions,
+        uncertainty: command.uncertainty,
+      }
     case 'dml-refutation-batch':
-      return { kind: 'dmlRefutationBatch', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, model: command.model, att: command.att, seed: command.seed }
+      return {
+        kind: 'dmlRefutationBatch',
+        rows: command.rows,
+        columns: command.columns,
+        treatment: command.treatment,
+        outcome: command.outcome,
+        adjustment: command.adjustment,
+        model: command.model,
+        att: command.att,
+        seed: command.seed,
+      }
     case 'resolve-missingness':
-      return { kind: 'resolveMissingness', rows: command.rows, columns: command.columns, validity: Array.from(command.validity), resolution: command.resolution }
+      return {
+        kind: 'resolveMissingness',
+        rows: command.rows,
+        columns: command.columns,
+        validity: Array.from(command.validity),
+        resolution: command.resolution,
+      }
     default:
       return assertNever(command)
   }
@@ -483,10 +989,17 @@ self.onmessage = (message: MessageEvent<unknown>) => {
     let raw: string
     try {
       const [validity, analysisMask] = sampleArrays(command)
-      raw = runAnalysis(JSON.stringify(rustCommand(command)), command.values, validity, analysisMask, (stage: unknown, completed: unknown, total: unknown) => {
-        const progress = analysisProgressSchema.safeParse({ stage, completed, total })
-        if (progress.success) emit({ kind: 'analysis-progress', request: command.request, progress: progress.data })
-      })
+      raw = runAnalysis(
+        JSON.stringify(rustCommand(command)),
+        command.values,
+        validity,
+        analysisMask,
+        (stage: unknown, completed: unknown, total: unknown) => {
+          const progress = analysisProgressSchema.safeParse({ stage, completed, total })
+          if (progress.success)
+            emit({ kind: 'analysis-progress', request: command.request, progress: progress.data })
+        },
+      )
     } catch (cause: unknown) {
       fail(command.request, { kind: 'kernel-refused', detail: detailOf(cause) })
       return
@@ -514,50 +1027,86 @@ self.onmessage = (message: MessageEvent<unknown>) => {
     switch (command.kind) {
       case 'flexsurv': {
         const result = parseFlexSurvEvidence(decoded)
-        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
         emit({ kind: 'flexsurv-succeeded', request: command.request, result: result.value })
         return
       }
       case 'cox-regression': {
         const result = parseCoxRegressionEvidence(decoded)
-        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
         emit({ kind: 'cox-regression-succeeded', request: command.request, result: result.value })
         return
       }
       case 'penalized-aft': {
         const result = parsePenalizedAftEvidence(decoded)
-        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
         emit({ kind: 'penalized-aft-succeeded', request: command.request, result: result.value })
         return
       }
       case 'aalen': {
         const result = parseAalenEvidence(decoded)
-        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
         emit({ kind: 'aalen-succeeded', request: command.request, result: result.value })
         return
       }
       case 'survival-forest': {
         const result = parseForestEvidence(decoded)
-        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
         emit({ kind: 'survival-forest-succeeded', request: command.request, result: result.value })
         return
       }
       case 'nonparametric-survival': {
         const result = parseNonparametricSurvivalEvidence(decoded)
-        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
-        emit({ kind: 'nonparametric-survival-succeeded', request: command.request, result: result.value })
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
+        emit({
+          kind: 'nonparametric-survival-succeeded',
+          request: command.request,
+          result: result.value,
+        })
         return
       }
       case 'comparison-survival': {
         const result = parseComparisonSurvivalEvidence(decoded)
-        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
-        emit({ kind: 'comparison-survival-succeeded', request: command.request, result: result.value })
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
+        emit({
+          kind: 'comparison-survival-succeeded',
+          request: command.request,
+          result: result.value,
+        })
         return
       }
       case 'multi-state-survival': {
         const result = parseMultiStateSurvivalEvidence(decoded)
-        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
-        emit({ kind: 'multi-state-survival-succeeded', request: command.request, result: result.value })
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
+        emit({
+          kind: 'multi-state-survival-succeeded',
+          request: command.request,
+          result: result.value,
+        })
         return
       }
       case 'stationarity-battery': {
@@ -572,10 +1121,20 @@ self.onmessage = (message: MessageEvent<unknown>) => {
       case 'multicollinearity': {
         const result = parseMulticollinearityEvidence(decoded)
         if (!result.ok) {
-          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.kind === 'invalid-evidence' ? result.error.detail : 'The multicollinearity result does not match its columns.' })
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail:
+              result.error.kind === 'invalid-evidence'
+                ? result.error.detail
+                : 'The multicollinearity result does not match its columns.',
+          })
           return
         }
-        emit({ kind: 'multicollinearity-succeeded', request: command.request, result: result.value })
+        emit({
+          kind: 'multicollinearity-succeeded',
+          request: command.request,
+          result: result.value,
+        })
         return
       }
       case 'pandas-resample-daily': {
@@ -584,7 +1143,11 @@ self.onmessage = (message: MessageEvent<unknown>) => {
           fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
           return
         }
-        emit({ kind: 'pandas-resampling-succeeded', request: command.request, result: result.value })
+        emit({
+          kind: 'pandas-resampling-succeeded',
+          request: command.request,
+          result: result.value,
+        })
         return
       }
       case 'pcmci-plus': {
@@ -737,13 +1300,20 @@ self.onmessage = (message: MessageEvent<unknown>) => {
           fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
           return
         }
-        emit({ kind: 'backdoor-identification-succeeded', request: command.request, result: result.value })
+        emit({
+          kind: 'backdoor-identification-succeeded',
+          request: command.request,
+          result: result.value,
+        })
         return
       }
       case 'dag-check': {
         const result = dagCheckEvidenceSchema.safeParse(decoded)
         if (!result.success) {
-          fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) })
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: z.prettifyError(result.error),
+          })
           return
         }
         emit({ kind: 'dag-check-succeeded', request: command.request, result: result.data })
@@ -760,76 +1330,165 @@ self.onmessage = (message: MessageEvent<unknown>) => {
       }
       case 'propensity-weighting': {
         const result = parsePropensityWeightingEvidence(decoded)
-        if (result.ok && result.value.target !== command.target) { fail(command.request, { kind: 'worker-protocol-failed', detail: 'The propensity result reports a different target from the request.' }); return }
-        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
-        emit({ kind: 'propensity-weighting-succeeded', request: command.request, result: result.value })
+        if (result.ok && result.value.target !== command.target) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: 'The propensity result reports a different target from the request.',
+          })
+          return
+        }
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
+        emit({
+          kind: 'propensity-weighting-succeeded',
+          request: command.request,
+          result: result.value,
+        })
         return
       }
       case 'propensity-grid-slice': {
         const result = gridSliceEvidenceSchema.safeParse(decoded)
-        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: 'The grid slice result did not parse.' }); return }
-        emit({ kind: 'propensity-grid-slice-succeeded', request: command.request, result: result.data })
+        if (!result.success) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: 'The grid slice result did not parse.',
+          })
+          return
+        }
+        emit({
+          kind: 'propensity-grid-slice-succeeded',
+          request: command.request,
+          result: result.data,
+        })
         return
       }
       case 'propensity-matching': {
         const result = parsePropensityMatchingEvidence(decoded)
-        if (result.ok && result.value.target !== command.target) { fail(command.request, { kind: 'worker-protocol-failed', detail: 'The propensity result reports a different target from the request.' }); return }
-        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
-        emit({ kind: 'propensity-matching-succeeded', request: command.request, result: result.value })
+        if (result.ok && result.value.target !== command.target) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: 'The propensity result reports a different target from the request.',
+          })
+          return
+        }
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
+        emit({
+          kind: 'propensity-matching-succeeded',
+          request: command.request,
+          result: result.value,
+        })
         return
       }
       case 'doubly-robust': {
         const result = parseDoublyRobustEvidence(decoded)
-        if (result.ok && result.value.target !== command.target) { fail(command.request, { kind: 'worker-protocol-failed', detail: 'The propensity result reports a different target from the request.' }); return }
-        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        if (result.ok && result.value.target !== command.target) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: 'The propensity result reports a different target from the request.',
+          })
+          return
+        }
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
         emit({ kind: 'doubly-robust-succeeded', request: command.request, result: result.value })
         return
       }
       case 'continuous-gps': {
         const result = parseContinuousGpsEvidence(decoded)
-        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
         emit({ kind: 'continuous-gps-succeeded', request: command.request, result: result.value })
         return
       }
       case 'frontdoor-two-stage': {
         const result = parseFrontdoorTwoStageEvidence(decoded)
-        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
-        emit({ kind: 'frontdoor-two-stage-succeeded', request: command.request, result: result.value })
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
+        emit({
+          kind: 'frontdoor-two-stage-succeeded',
+          request: command.request,
+          result: result.value,
+        })
         return
       }
       case 'instrumental-variable': {
         const result = parseInstrumentalVariableEvidence(decoded)
-        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
-        emit({ kind: 'instrumental-variable-succeeded', request: command.request, result: result.value })
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
+        emit({
+          kind: 'instrumental-variable-succeeded',
+          request: command.request,
+          result: result.value,
+        })
         return
       }
       case 'count-glm': {
         const result = parseCountGlmEvidence(decoded)
-        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
         emit({ kind: 'count-glm-succeeded', request: command.request, result: result.value })
         return
       }
       case 'negative-binomial-ingarch': {
         const result = parseNegativeBinomialIngarchEvidence(decoded)
-        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
-        emit({ kind: 'negative-binomial-ingarch-succeeded', request: command.request, result: result.value })
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
+        emit({
+          kind: 'negative-binomial-ingarch-succeeded',
+          request: command.request,
+          result: result.value,
+        })
         return
       }
       case 'count-series-intervention-scan': {
         const result = parseCountSeriesInterventionScanEvidence(decoded)
-        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
-        emit({ kind: 'count-series-intervention-scan-succeeded', request: command.request, result: result.value })
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
+        emit({
+          kind: 'count-series-intervention-scan-succeeded',
+          request: command.request,
+          result: result.value,
+        })
         return
       }
       case 'interrupted-series': {
         const result = parseInterruptedSeriesEvidence(decoded)
-        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
-        emit({ kind: 'interrupted-series-succeeded', request: command.request, result: result.value })
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
+        emit({
+          kind: 'interrupted-series-succeeded',
+          request: command.request,
+          result: result.value,
+        })
         return
       }
       case 'causal-effects-total': {
         const result = parseCausalEffectsEvidence(decoded)
-        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
         emit({ kind: 'causal-effects-succeeded', request: command.request, result: result.value })
         return
       }
@@ -837,7 +1496,11 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         const result = parseSharpRdEvidence(decoded)
         if (!result.ok) throw new Error(result.error.detail)
         if (result.value.cutoff !== command.cutoff || result.value.points.length !== command.rows) {
-          fail(command.request, { kind: 'worker-protocol-failed', detail: 'The RD result does not match the requested cutoff or sample.' }); return
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: 'The RD result does not match the requested cutoff or sample.',
+          })
+          return
         }
         emit({ kind: 'sharp-rd-succeeded', request: command.request, result: result.value })
         return
@@ -846,269 +1509,751 @@ self.onmessage = (message: MessageEvent<unknown>) => {
       case 'bayesian-causal-impact':
       case 'causal-impact': {
         const result = parseCausalImpactEvidence(decoded)
-        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
         const e = result.value
-        const settingsMatch = command.kind === 'structural-causal-impact'
-          ? e.kind === 'structuralCausalImpact' && e.draws === command.draws && e.warmup === command.warmup && e.seed === command.seed && sameStructuralModel(e.model,command.model)
-          : command.kind === 'bayesian-causal-impact'
-          ? e.kind === 'bayesianCausalImpact' && e.draws === command.draws && e.warmup === command.warmup && e.seed === command.seed && e.priorLevelSd === command.priorLevelSd
-          : e.kind === 'causalImpact'
-        if (!settingsMatch || e.observations !== command.rows || e.nPre !== command.nPre || e.postEnd !== command.postEnd || e.outcome !== command.outcome || e.controls.length !== command.controls.length || e.controls.some((value,index) => value !== command.controls[index])) {
-          fail(command.request, { kind: 'worker-protocol-failed', detail: 'The impact result does not match its requested model, columns or intervention window.' }); return
+        const settingsMatch =
+          command.kind === 'structural-causal-impact'
+            ? e.kind === 'structuralCausalImpact' &&
+              e.draws === command.draws &&
+              e.warmup === command.warmup &&
+              e.seed === command.seed &&
+              sameStructuralModel(e.model, command.model)
+            : command.kind === 'bayesian-causal-impact'
+              ? e.kind === 'bayesianCausalImpact' &&
+                e.draws === command.draws &&
+                e.warmup === command.warmup &&
+                e.seed === command.seed &&
+                e.priorLevelSd === command.priorLevelSd
+              : e.kind === 'causalImpact'
+        if (
+          !settingsMatch ||
+          e.observations !== command.rows ||
+          e.nPre !== command.nPre ||
+          e.postEnd !== command.postEnd ||
+          e.outcome !== command.outcome ||
+          e.controls.length !== command.controls.length ||
+          e.controls.some((value, index) => value !== command.controls[index])
+        ) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail:
+              'The impact result does not match its requested model, columns or intervention window.',
+          })
+          return
         }
         emit({ kind: 'causal-impact-succeeded', request: command.request, result: result.value })
         return
       }
       case 'linear-refutation': {
         const result = parseLinearRefutationEvidence(decoded)
-        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
-        emit({ kind: 'linear-refutation-succeeded', request: command.request, result: result.value })
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
+        emit({
+          kind: 'linear-refutation-succeeded',
+          request: command.request,
+          result: result.value,
+        })
         return
       }
       case 'unobserved-confounding': {
         const result = parseUnobservedConfoundingEvidence(decoded)
-        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
-        emit({ kind: 'unobserved-confounding-succeeded', request: command.request, result: result.value })
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
+        emit({
+          kind: 'unobserved-confounding-succeeded',
+          request: command.request,
+          result: result.value,
+        })
         return
       }
       case 'series-structure': {
         const result = parseSeriesStructureEvidence(decoded)
-        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
         emit({ kind: 'series-structure-succeeded', request: command.request, result: result.value })
         return
       }
       case 'double-ml': {
         const result = doubleMlEvidenceSchema.safeParse(decoded)
-        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
+        if (!result.success) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: z.prettifyError(result.error),
+          })
+          return
+        }
         emit({ kind: 'double-ml-succeeded', request: command.request, result: result.data })
         return
       }
       case 'causal-forest': {
-        const envelope = z.object({ kind: z.literal('causalForest'), evidence: causalForestEvidenceSchema }).strict().safeParse(decoded)
-        if (!envelope.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(envelope.error) }); return }
+        const envelope = z
+          .object({ kind: z.literal('causalForest'), evidence: causalForestEvidenceSchema })
+          .strict()
+          .safeParse(decoded)
+        if (!envelope.success) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: z.prettifyError(envelope.error),
+          })
+          return
+        }
         const result = envelope.data.evidence
-        if (!sameCausalForestTarget(result.target, command.target) || !causalForestSettingsMatch(command.configuration, result) || result.observations !== command.rows || result.variableImportance.length !== command.adjustment.length) {
-          fail(command.request, { kind: 'worker-protocol-failed', detail: 'The causal forest result does not match the requested target, confidence level or data dimensions.' }); return
+        if (
+          !sameCausalForestTarget(result.target, command.target) ||
+          !causalForestSettingsMatch(command.configuration, result) ||
+          result.observations !== command.rows ||
+          result.variableImportance.length !== command.adjustment.length
+        ) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail:
+              'The causal forest result does not match the requested target, confidence level or data dimensions.',
+          })
+          return
         }
         emit({ kind: 'causal-forest-succeeded', request: command.request, result })
         return
       }
       case 't-learner': {
         const result = tLearnerEvidenceSchema.safeParse(decoded)
-        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
+        if (!result.success) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: z.prettifyError(result.error),
+          })
+          return
+        }
         emit({ kind: 't-learner-succeeded', request: command.request, result: result.data })
         return
       }
       case 'cross-fitted-t-learner': {
         const result = crossFittedTLearnerEvidenceSchema.safeParse(decoded)
-        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
-        emit({ kind: 'cross-fitted-t-learner-succeeded', request: command.request, result: result.data })
+        if (!result.success) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: z.prettifyError(result.error),
+          })
+          return
+        }
+        emit({
+          kind: 'cross-fitted-t-learner-succeeded',
+          request: command.request,
+          result: result.data,
+        })
         return
       }
       case 'ardl-pss': {
         const result = ardlEvidenceSchema.safeParse(decoded)
-        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
+        if (!result.success) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: z.prettifyError(result.error),
+          })
+          return
+        }
         emit({ kind: 'ardl-succeeded', request: command.request, result: result.data })
         return
       }
       case 'ardl-model': {
         const result = ardlModelResponseSchema.safeParse(decoded)
-        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
-        emit({ kind: 'ardl-model-succeeded', request: command.request, result: result.data.evidence })
+        if (!result.success) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: z.prettifyError(result.error),
+          })
+          return
+        }
+        emit({
+          kind: 'ardl-model-succeeded',
+          request: command.request,
+          result: result.data.evidence,
+        })
         return
       }
       case 'honest-did': {
-        const envelope=z.object({kind:z.literal('honestDid'),evidence:honestEvidenceSchema}).strict().safeParse(decoded)
-        if(!envelope.success){fail(command.request,{kind:'worker-protocol-failed',detail:z.prettifyError(envelope.error)});return}
-        emit({kind:'honest-did-succeeded',request:command.request,result:envelope.data.evidence});return
+        const envelope = z
+          .object({ kind: z.literal('honestDid'), evidence: honestEvidenceSchema })
+          .strict()
+          .safeParse(decoded)
+        if (!envelope.success) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: z.prettifyError(envelope.error),
+          })
+          return
+        }
+        emit({
+          kind: 'honest-did-succeeded',
+          request: command.request,
+          result: envelope.data.evidence,
+        })
+        return
       }
       case 'did-sensitivity': {
-        const envelope=z.object({kind:z.literal('didSensitivity'),evidence:didSensitivityEvidenceSchema}).strict().safeParse(decoded)
-        if(!envelope.success){fail(command.request,{kind:'worker-protocol-failed',detail:z.prettifyError(envelope.error)});return}
-        emit({kind:'did-sensitivity-succeeded',request:command.request,result:envelope.data.evidence});return
+        const envelope = z
+          .object({ kind: z.literal('didSensitivity'), evidence: didSensitivityEvidenceSchema })
+          .strict()
+          .safeParse(decoded)
+        if (!envelope.success) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: z.prettifyError(envelope.error),
+          })
+          return
+        }
+        emit({
+          kind: 'did-sensitivity-succeeded',
+          request: command.request,
+          result: envelope.data.evidence,
+        })
+        return
       }
       case 'root-cause': {
         const result = rootCauseResponseSchema.safeParse(decoded)
-        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
-        emit({ kind: 'root-cause-succeeded', request: command.request, result: result.data.evidence })
+        if (!result.success) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: z.prettifyError(result.error),
+          })
+          return
+        }
+        emit({
+          kind: 'root-cause-succeeded',
+          request: command.request,
+          result: result.data.evidence,
+        })
         return
       }
       case 'gcm-effects': {
         const result = gcmEffectsResponseSchema.safeParse(decoded)
-        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
-        emit({ kind: 'gcm-effects-succeeded', request: command.request, result: result.data.evidence })
+        if (!result.success) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: z.prettifyError(result.error),
+          })
+          return
+        }
+        emit({
+          kind: 'gcm-effects-succeeded',
+          request: command.request,
+          result: result.data.evidence,
+        })
         return
       }
       case 'gcm-influence': {
         const result = gcmInfluenceResponseSchema.safeParse(decoded)
-        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
-        emit({ kind: 'gcm-influence-succeeded', request: command.request, result: result.data.evidence })
+        if (!result.success) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: z.prettifyError(result.error),
+          })
+          return
+        }
+        emit({
+          kind: 'gcm-influence-succeeded',
+          request: command.request,
+          result: result.data.evidence,
+        })
         return
       }
       case 'root-cause-checks': {
         const result = rootCauseChecksResponseSchema.safeParse(decoded)
-        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
-        emit({ kind: 'root-cause-checks-succeeded', request: command.request, result: result.data.evidence })
+        if (!result.success) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: z.prettifyError(result.error),
+          })
+          return
+        }
+        emit({
+          kind: 'root-cause-checks-succeeded',
+          request: command.request,
+          result: result.data.evidence,
+        })
         return
       }
       case 'vecm': {
         const result = vecmEvidenceSchema.safeParse(decoded)
-        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
+        if (!result.success) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: z.prettifyError(result.error),
+          })
+          return
+        }
         emit({ kind: 'vecm-succeeded', request: command.request, result: result.data })
         return
       }
       case 'predictor-synthetic-control': {
-        const result=z.object({kind:z.literal('predictorSyntheticControl'),evidence:predictorSyntheticEvidenceSchema}).strict().safeParse(decoded)
-        if(!result.success){fail(command.request,{kind:'worker-protocol-failed',detail:z.prettifyError(result.error)});return}
-        if(!samePredictorSyntheticRequest(result.data.evidence.request,command.model)){fail(command.request,{kind:'worker-protocol-failed',detail:'The synthetic-control result differs from the requested specification.'});return}
-        emit({kind:'predictor-synthetic-control-succeeded',request:command.request,result:result.data.evidence})
+        const result = z
+          .object({
+            kind: z.literal('predictorSyntheticControl'),
+            evidence: predictorSyntheticEvidenceSchema,
+          })
+          .strict()
+          .safeParse(decoded)
+        if (!result.success) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: z.prettifyError(result.error),
+          })
+          return
+        }
+        if (!samePredictorSyntheticRequest(result.data.evidence.request, command.model)) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: 'The synthetic-control result differs from the requested specification.',
+          })
+          return
+        }
+        emit({
+          kind: 'predictor-synthetic-control-succeeded',
+          request: command.request,
+          result: result.data.evidence,
+        })
         return
       }
       case 'synthetic-control': {
         const result = syntheticControlEvidenceSchema.safeParse(decoded)
-        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
+        if (!result.success) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: z.prettifyError(result.error),
+          })
+          return
+        }
         emit({ kind: 'synthetic-control-succeeded', request: command.request, result: result.data })
         return
       }
       case 'count-regression': {
-        const wrapper=z.object({kind:z.literal('countRegression'),evidence:countRegressionEvidenceSchema}).strict().safeParse(decoded)
-        if(!wrapper.success){fail(command.request,{kind:'worker-protocol-failed',detail:wrapper.error.message});return}
-        if(!sameCountRequest(wrapper.data.evidence.request,command.model)){fail(command.request,{kind:'worker-protocol-failed',detail:'The count regression result differs from the requested specification.'});return}
-        emit({kind:'count-regression-succeeded',request:command.request,result:wrapper.data.evidence});return
+        const wrapper = z
+          .object({ kind: z.literal('countRegression'), evidence: countRegressionEvidenceSchema })
+          .strict()
+          .safeParse(decoded)
+        if (!wrapper.success) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: wrapper.error.message })
+          return
+        }
+        if (!sameCountRequest(wrapper.data.evidence.request, command.model)) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: 'The count regression result differs from the requested specification.',
+          })
+          return
+        }
+        emit({
+          kind: 'count-regression-succeeded',
+          request: command.request,
+          result: wrapper.data.evidence,
+        })
+        return
       }
       case 'sun-abraham': {
-        const result=z.object({kind:z.literal('sunAbraham'),evidence:sunAbrahamEvidenceSchema}).strict().safeParse(decoded)
-        if(!result.success){fail(command.request,{kind:'worker-protocol-failed',detail:result.error.message});return}
-        if(!sameSpecification(result.data.evidence.request,command.model)){fail(command.request,{kind:'worker-protocol-failed',detail:'The event-study result does not match its request.'});return}
-        emit({kind:'sun-abraham-succeeded',request:command.request,result:result.data.evidence});return
+        const result = z
+          .object({ kind: z.literal('sunAbraham'), evidence: sunAbrahamEvidenceSchema })
+          .strict()
+          .safeParse(decoded)
+        if (!result.success) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.message })
+          return
+        }
+        if (!sameSpecification(result.data.evidence.request, command.model)) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: 'The event-study result does not match its request.',
+          })
+          return
+        }
+        emit({
+          kind: 'sun-abraham-succeeded',
+          request: command.request,
+          result: result.data.evidence,
+        })
+        return
       }
       case 'surrogate-path': {
-        const result=z.object({kind:z.literal('surrogatePath'),evidence:surrogatePathEvidenceSchema}).strict().safeParse(decoded)
-        if(!result.success){fail(command.request,{kind:'worker-protocol-failed',detail:result.error.message});return}
-        if(!surrogatePathMatches(result.data.evidence,command.model)){fail(command.request,{kind:'worker-protocol-failed',detail:'The surrogate path does not match its request.'});return}
-        emit({kind:'surrogate-path-succeeded',request:command.request,result:result.data.evidence});return
+        const result = z
+          .object({ kind: z.literal('surrogatePath'), evidence: surrogatePathEvidenceSchema })
+          .strict()
+          .safeParse(decoded)
+        if (!result.success) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.message })
+          return
+        }
+        if (!surrogatePathMatches(result.data.evidence, command.model)) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: 'The surrogate path does not match its request.',
+          })
+          return
+        }
+        emit({
+          kind: 'surrogate-path-succeeded',
+          request: command.request,
+          result: result.data.evidence,
+        })
+        return
       }
       case 'surrogate-diagnostics': {
-        const result=z.object({kind:z.literal('surrogateDiagnostics'),evidence:surrogateDiagnosticEvidenceSchema}).strict().safeParse(decoded)
-        if(!result.success){fail(command.request,{kind:'worker-protocol-failed',detail:result.error.message});return}
-        if(!surrogateDiagnosticMatches(result.data.evidence,command.model)){fail(command.request,{kind:'worker-protocol-failed',detail:'The surrogate diagnostic does not match its request.'});return}
-        emit({kind:'surrogate-diagnostics-succeeded',request:command.request,result:result.data.evidence});return
+        const result = z
+          .object({
+            kind: z.literal('surrogateDiagnostics'),
+            evidence: surrogateDiagnosticEvidenceSchema,
+          })
+          .strict()
+          .safeParse(decoded)
+        if (!result.success) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.message })
+          return
+        }
+        if (!surrogateDiagnosticMatches(result.data.evidence, command.model)) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: 'The surrogate diagnostic does not match its request.',
+          })
+          return
+        }
+        emit({
+          kind: 'surrogate-diagnostics-succeeded',
+          request: command.request,
+          result: result.data.evidence,
+        })
+        return
       }
       case 'surrogate': {
-        const result=z.object({kind:z.literal('surrogate'),evidence:surrogateEvidenceSchema}).strict().safeParse(decoded)
-        if(!result.success){fail(command.request,{kind:'worker-protocol-failed',detail:result.error.message});return}
-        if(!surrogateEvidenceMatchesRequest(result.data.evidence,command.model)){fail(command.request,{kind:'worker-protocol-failed',detail:'The surrogate result does not match its request.'});return}
-        emit({kind:'surrogate-succeeded',request:command.request,result:result.data.evidence});return
+        const result = z
+          .object({ kind: z.literal('surrogate'), evidence: surrogateEvidenceSchema })
+          .strict()
+          .safeParse(decoded)
+        if (!result.success) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.message })
+          return
+        }
+        if (!surrogateEvidenceMatchesRequest(result.data.evidence, command.model)) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: 'The surrogate result does not match its request.',
+          })
+          return
+        }
+        emit({
+          kind: 'surrogate-succeeded',
+          request: command.request,
+          result: result.data.evidence,
+        })
+        return
       }
       case 'ridge-augmented-synthetic': {
-        const result=z.object({kind:z.literal('ridgeAugmentedSynthetic'),evidence:ridgeAugmentedEvidenceSchema}).strict().safeParse(decoded)
-        if(!result.success){fail(command.request,{kind:'worker-protocol-failed',detail:result.error.message});return}
-        if(!sameSpecification(result.data.evidence.request,command.model)){fail(command.request,{kind:'worker-protocol-failed',detail:'The synthetic-control result does not match its request.'});return}
-        emit({kind:'ridge-augmented-synthetic-succeeded',request:command.request,result:result.data.evidence});return
+        const result = z
+          .object({
+            kind: z.literal('ridgeAugmentedSynthetic'),
+            evidence: ridgeAugmentedEvidenceSchema,
+          })
+          .strict()
+          .safeParse(decoded)
+        if (!result.success) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.message })
+          return
+        }
+        if (!sameSpecification(result.data.evidence.request, command.model)) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: 'The synthetic-control result does not match its request.',
+          })
+          return
+        }
+        emit({
+          kind: 'ridge-augmented-synthetic-succeeded',
+          request: command.request,
+          result: result.data.evidence,
+        })
+        return
       }
       case 'panel-regression': {
-        const result=z.object({kind:z.literal('panelRegression'),evidence:panelRegressionEvidenceSchema}).strict().safeParse(decoded)
-        if(!result.success){fail(command.request,{kind:'worker-protocol-failed',detail:result.error.message});return}
-        if(!sameSpecification(result.data.evidence.request,command.model)){fail(command.request,{kind:'worker-protocol-failed',detail:'The regression result does not match its request.'});return}
-        emit({kind:'panel-regression-succeeded',request:command.request,result:result.data.evidence});return
+        const result = z
+          .object({ kind: z.literal('panelRegression'), evidence: panelRegressionEvidenceSchema })
+          .strict()
+          .safeParse(decoded)
+        if (!result.success) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.message })
+          return
+        }
+        if (!sameSpecification(result.data.evidence.request, command.model)) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: 'The regression result does not match its request.',
+          })
+          return
+        }
+        emit({
+          kind: 'panel-regression-succeeded',
+          request: command.request,
+          result: result.data.evidence,
+        })
+        return
       }
       case 'bacon': {
-        const result=z.object({kind:z.literal('bacon'),evidence:baconEvidenceSchema}).strict().safeParse(decoded)
-        if(!result.success){fail(command.request,{kind:'worker-protocol-failed',detail:result.error.message});return}
-        if(!sameSpecification(result.data.evidence.specification,command.model.specification)||result.data.evidence.observations!==command.model.rows){fail(command.request,{kind:'worker-protocol-failed',detail:'The decomposition result does not match its request.'});return}
-        emit({kind:'bacon-succeeded',request:command.request,result:result.data.evidence});return
+        const result = z
+          .object({ kind: z.literal('bacon'), evidence: baconEvidenceSchema })
+          .strict()
+          .safeParse(decoded)
+        if (!result.success) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.message })
+          return
+        }
+        if (
+          !sameSpecification(result.data.evidence.specification, command.model.specification) ||
+          result.data.evidence.observations !== command.model.rows
+        ) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: 'The decomposition result does not match its request.',
+          })
+          return
+        }
+        emit({ kind: 'bacon-succeeded', request: command.request, result: result.data.evidence })
+        return
       }
       case 'staggered-did': {
-        const wrapper=z.object({kind:z.literal('staggeredDid'),evidence:z.unknown()}).safeParse(decoded)
-        const raw=wrapper.success && typeof wrapper.data.evidence==='object' && wrapper.data.evidence!==null ? {...wrapper.data.evidence,kind:'staggeredDid'} : null
-        const result=staggeredEvidenceSchema.safeParse(raw)
-        if(!result.success) {fail(command.request,{kind:'worker-protocol-failed',detail:result.error.message});return}
-        if(result.data.observations!==command.model.rows || result.data.covariates!==command.model.columns-1 || !sameStaggeredSpecification(result.data.specification,command.model.specification)) {fail(command.request,{kind:'worker-protocol-failed',detail:'The staggered DiD result does not match its requested specification.'});return}
+        const wrapper = z
+          .object({ kind: z.literal('staggeredDid'), evidence: z.unknown() })
+          .safeParse(decoded)
+        const raw =
+          wrapper.success &&
+          typeof wrapper.data.evidence === 'object' &&
+          wrapper.data.evidence !== null
+            ? { ...wrapper.data.evidence, kind: 'staggeredDid' }
+            : null
+        const result = staggeredEvidenceSchema.safeParse(raw)
+        if (!result.success) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.message })
+          return
+        }
+        if (
+          result.data.observations !== command.model.rows ||
+          result.data.covariates !== command.model.columns - 1 ||
+          !sameStaggeredSpecification(result.data.specification, command.model.specification)
+        ) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: 'The staggered DiD result does not match its requested specification.',
+          })
+          return
+        }
         const retained = new Set(result.data.units)
-        const clusterCount = new Set(command.model.units.flatMap((unit,i)=>retained.has(unit)?[command.model.clusters===null?unit:command.model.clusters[i]!]:[])).size
-        if(clusterCount!==result.data.clusterCount){fail(command.request,{kind:'worker-protocol-failed',detail:'The reported clusters do not match the retained panel units.'});return}
-        emit({kind:'staggered-did-succeeded',request:command.request,result:result.data});return
+        const clusterCount = new Set(
+          command.model.units.flatMap((unit, i) =>
+            retained.has(unit)
+              ? [command.model.clusters === null ? unit : command.model.clusters[i]!]
+              : [],
+          ),
+        ).size
+        if (clusterCount !== result.data.clusterCount) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: 'The reported clusters do not match the retained panel units.',
+          })
+          return
+        }
+        emit({ kind: 'staggered-did-succeeded', request: command.request, result: result.data })
+        return
       }
       case 'panel-adjusted':
       case 'panel-intervention': {
         const result = panelInterventionEvidenceSchema.safeParse(decoded)
-        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
+        if (!result.success) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: z.prettifyError(result.error),
+          })
+          return
+        }
         const evidence = result.data
-        const matches = command.kind === 'panel-adjusted'
-          ? evidence.kind === 'panelAdjusted' && sameDidSpecification(command.specification,evidence.specification) && evidence.covariates === command.columns-2
-          : command.primary === 'did' ? evidence.kind === 'panelDid' : evidence.kind === 'panelIntervention'
-        if (!matches || evidence.observations !== command.rows) { fail(command.request, { kind: 'worker-protocol-failed', detail: 'The panel result does not match the requested estimator and data dimensions.' }); return }
-        emit({ kind: 'panel-intervention-succeeded', request: command.request, result: result.data })
+        const matches =
+          command.kind === 'panel-adjusted'
+            ? evidence.kind === 'panelAdjusted' &&
+              sameDidSpecification(command.specification, evidence.specification) &&
+              evidence.covariates === command.columns - 2
+            : command.primary === 'did'
+              ? evidence.kind === 'panelDid'
+              : evidence.kind === 'panelIntervention'
+        if (!matches || evidence.observations !== command.rows) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: 'The panel result does not match the requested estimator and data dimensions.',
+          })
+          return
+        }
+        emit({
+          kind: 'panel-intervention-succeeded',
+          request: command.request,
+          result: result.data,
+        })
         return
       }
       case 'negbin-nuts': {
         const result = negbinNutsEvidenceSchema.safeParse(decoded)
-        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
+        if (!result.success) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: z.prettifyError(result.error),
+          })
+          return
+        }
         emit({ kind: 'negbin-nuts-succeeded', request: command.request, result: result.data })
         return
       }
       case 'bayesian-gaussian': {
         const result = bayesianGaussianEvidenceSchema.safeParse(decoded)
-        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
+        if (!result.success) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: z.prettifyError(result.error),
+          })
+          return
+        }
         emit({ kind: 'bayesian-gaussian-succeeded', request: command.request, result: result.data })
         return
       }
       case 'network-query': {
-        const result=networkQueryEvidenceSchema.safeParse(decoded)
-        if(!result.success){fail(command.request,{kind:'worker-protocol-failed',detail:z.prettifyError(result.error)});return}
-        emit({kind:'network-query-succeeded',request:command.request,result:result.data});return
+        const result = networkQueryEvidenceSchema.safeParse(decoded)
+        if (!result.success) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: z.prettifyError(result.error),
+          })
+          return
+        }
+        emit({ kind: 'network-query-succeeded', request: command.request, result: result.data })
+        return
       }
       case 'conditional-gaussian-query': {
-        const result=conditionalGaussianEvidenceSchema.safeParse(decoded)
-        if(!result.success){fail(command.request,{kind:'worker-protocol-failed',detail:z.prettifyError(result.error)});return}
-        emit({kind:'conditional-gaussian-query-succeeded',request:command.request,result:result.data});return
+        const result = conditionalGaussianEvidenceSchema.safeParse(decoded)
+        if (!result.success) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: z.prettifyError(result.error),
+          })
+          return
+        }
+        emit({
+          kind: 'conditional-gaussian-query-succeeded',
+          request: command.request,
+          result: result.data,
+        })
+        return
       }
       case 'discrete-bn-query': {
         const result = discreteBnEvidenceSchema.safeParse(decoded)
-        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
+        if (!result.success) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: z.prettifyError(result.error),
+          })
+          return
+        }
         emit({ kind: 'discrete-bn-succeeded', request: command.request, result: result.data })
         return
       }
       case 'identified-discrete-query': {
         const result = identifiedDiscreteQueryEvidenceSchema.safeParse(decoded)
-        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
-        emit({ kind: 'identified-discrete-query-succeeded', request: command.request, result: result.data })
+        if (!result.success) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: z.prettifyError(result.error),
+          })
+          return
+        }
+        emit({
+          kind: 'identified-discrete-query-succeeded',
+          request: command.request,
+          result: result.data,
+        })
         return
       }
       case 'binary-ett': {
         const result = binaryEttEvidenceSchema.safeParse(decoded)
-        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
+        if (!result.success) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: z.prettifyError(result.error),
+          })
+          return
+        }
         emit({ kind: 'binary-ett-succeeded', request: command.request, result: result.data })
         return
       }
       case 'linear-scm-counterfactual': {
         const result = linearScmEvidenceSchema.safeParse(decoded)
-        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
+        if (!result.success) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: z.prettifyError(result.error),
+          })
+          return
+        }
         emit({ kind: 'linear-scm-succeeded', request: command.request, result: result.data })
         return
       }
       case 'dynamic-linear-scm-counterfactual': {
         const result = dynamicLinearScmEvidenceSchema.safeParse(decoded)
-        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
-        if (!dynamicCounterfactualUncertaintyMatches(command.uncertainty, result.data.uncertainty)) { fail(command.request, { kind: 'worker-protocol-failed', detail: 'Dynamic counterfactual uncertainty evidence does not match the requested configuration.' }); return }
-        emit({ kind: 'dynamic-linear-scm-succeeded', request: command.request, result: result.data })
+        if (!result.success) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: z.prettifyError(result.error),
+          })
+          return
+        }
+        if (
+          !dynamicCounterfactualUncertaintyMatches(command.uncertainty, result.data.uncertainty)
+        ) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail:
+              'Dynamic counterfactual uncertainty evidence does not match the requested configuration.',
+          })
+          return
+        }
+        emit({
+          kind: 'dynamic-linear-scm-succeeded',
+          request: command.request,
+          result: result.data,
+        })
         return
       }
       case 'dml-refutation-batch': {
         const result = parseDmlRefutationEvidence(decoded)
-        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
         emit({ kind: 'dml-refutation-succeeded', request: command.request, result: result.value })
         return
       }
       case 'seasonal-adjust': {
         const result = parseSeasonalAdjustedEvidence(decoded)
-        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
         emit({ kind: 'seasonal-adjusted', request: command.request, result: result.value })
         return
       }
       case 'resolve-missingness': {
         const result = parseMissingnessResolvedEvidence(decoded)
-        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
         emit({ kind: 'missingness-resolved', request: command.request, result: result.value })
         return
       }

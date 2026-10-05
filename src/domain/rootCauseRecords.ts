@@ -2,8 +2,16 @@ import { z } from 'zod'
 import { assertNever, err, ok, type Result } from './dop'
 import type { DagDocument } from './dag'
 import type { PreparedDatasetArtifact } from './preprocessing'
-import { matchesRootCauseGraph, selectedRootCauseGraph, type RootCauseGraphProblem } from './rootCause'
-import { rootCauseRunSchema, rootCauseCheckRecordSchema, type RootCauseWorkspace } from './rootCauseAnalysis'
+import {
+  matchesRootCauseGraph,
+  selectedRootCauseGraph,
+  type RootCauseGraphProblem,
+} from './rootCause'
+import {
+  rootCauseRunSchema,
+  rootCauseCheckRecordSchema,
+  type RootCauseWorkspace,
+} from './rootCauseAnalysis'
 import { gcmEffectsRunSchema } from './gcmEffects'
 import { gcmInfluenceRunSchema } from './gcmInfluence'
 
@@ -42,12 +50,20 @@ export function bindRootCauseRecord(
 }
 
 /** Only a parsed record bound to the current dataset can enter the history. */
-export function appendRootCauseRecord(workspace: RootCauseWorkspace, value: BoundRecord): RootCauseWorkspace {
+export function appendRootCauseRecord(
+  workspace: RootCauseWorkspace,
+  value: BoundRecord,
+): RootCauseWorkspace {
   switch (value.kind) {
-    case 'run': return { ...workspace, runs: [...workspace.runs, value.record] }
-    case 'effects': return { ...workspace, effects: [...workspace.effects, value.record] }
-    case 'influence': return { ...workspace, influences: [...workspace.influences, value.record] }
-    case 'checks': return { ...workspace, checks: [...workspace.checks, value.record] }
-    default: return assertNever(value)
+    case 'run':
+      return { ...workspace, runs: [...workspace.runs, value.record] }
+    case 'effects':
+      return { ...workspace, effects: [...workspace.effects, value.record] }
+    case 'influence':
+      return { ...workspace, influences: [...workspace.influences, value.record] }
+    case 'checks':
+      return { ...workspace, checks: [...workspace.checks, value.record] }
+    default:
+      return assertNever(value)
   }
 }

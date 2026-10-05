@@ -18,75 +18,97 @@ export interface DagConditionalIndependenceImplication {
 
 const probabilitySchema = z.number().finite().min(0).max(1)
 
-export const dagCheckEvidenceSchema = z.object({
-  kind: z.literal('dagCheck'),
-  observations: z.number().int().positive(),
-  significanceLevel: z.number().gt(0).lt(1),
-  correction: z.literal('holm'),
-  implications: z.array(z.object({
-    x: z.number().int().nonnegative(),
-    y: z.number().int().nonnegative(),
-    given: z.array(z.number().int().nonnegative()),
-    pValue: probabilitySchema,
-    adjustedPValue: probabilitySchema,
+export const dagCheckEvidenceSchema = z
+  .object({
+    kind: z.literal('dagCheck'),
     observations: z.number().int().positive(),
-    decision: z.enum(['contradicted', 'notRefuted']),
-  }).strict().superRefine((value, context) => {
-    if (value.adjustedPValue < value.pValue) {
+    significanceLevel: z.number().gt(0).lt(1),
+    correction: z.literal('holm'),
+    implications: z
+      .array(
+        z
+          .object({
+            x: z.number().int().nonnegative(),
+            y: z.number().int().nonnegative(),
+            given: z.array(z.number().int().nonnegative()),
+            pValue: probabilitySchema,
+            adjustedPValue: probabilitySchema,
+            observations: z.number().int().positive(),
+            decision: z.enum(['contradicted', 'notRefuted']),
+          })
+          .strict()
+          .superRefine((value, context) => {
+            if (value.adjustedPValue < value.pValue) {
+              context.addIssue({
+                code: 'custom',
+                path: ['adjustedPValue'],
+                message: 'Holm-adjusted p-value cannot be smaller than the raw p-value.',
+              })
+            }
+          }),
+      )
+      .min(1),
+    uniformity: z
+      .object({
+        statistic: probabilitySchema,
+        pValue: probabilitySchema,
+        tests: z.number().int().positive(),
+      })
+      .strict(),
+    falsification: z.discriminatedUnion('kind', [
+      z
+        .object({
+          kind: z.literal('completed'),
+          permutations: z.number().int().positive(),
+          givenLmcViolations: z.number().int().nonnegative(),
+          givenLmcTests: z.number().int().positive(),
+          givenLmcViolationFraction: probabilitySchema,
+          permutationLmcViolationFractions: z.array(probabilitySchema).min(1),
+          permutationTpaViolationFractions: z.array(probabilitySchema).min(1),
+          pValueLmc: probabilitySchema,
+          pValueTpa: probabilitySchema,
+          permutationsInMarkovEquivalenceClass: z.number().int().nonnegative(),
+          falsifiable: z.boolean(),
+          falsified: z.boolean(),
+        })
+        .strict()
+        .superRefine((value, context) => {
+          if (
+            value.permutationLmcViolationFractions.length !== value.permutations ||
+            value.permutationTpaViolationFractions.length !== value.permutations
+          ) {
+            context.addIssue({
+              code: 'custom',
+              path: ['permutations'],
+              message: 'Permutation distributions must contain one score per relabeled graph.',
+            })
+          }
+          if (value.givenLmcViolations > value.givenLmcTests) {
+            context.addIssue({
+              code: 'custom',
+              path: ['givenLmcViolations'],
+              message: 'LMC violations cannot exceed the number of tested statements.',
+            })
+          }
+        }),
+      z
+        .object({
+          kind: z.literal('skipped'),
+          reason: z.string().min(1),
+        })
+        .strict(),
+    ]),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.uniformity.tests !== value.implications.length) {
       context.addIssue({
         code: 'custom',
-        path: ['adjustedPValue'],
-        message: 'Holm-adjusted p-value cannot be smaller than the raw p-value.',
+        path: ['uniformity', 'tests'],
+        message: 'The uniformity diagnostic must use every raw implication p-value.',
       })
     }
-  })).min(1),
-  uniformity: z.object({
-    statistic: probabilitySchema,
-    pValue: probabilitySchema,
-    tests: z.number().int().positive(),
-  }).strict(),
-  falsification: z.discriminatedUnion('kind', [z.object({
-    kind: z.literal('completed'),
-    permutations: z.number().int().positive(),
-    givenLmcViolations: z.number().int().nonnegative(),
-    givenLmcTests: z.number().int().positive(),
-    givenLmcViolationFraction: probabilitySchema,
-    permutationLmcViolationFractions: z.array(probabilitySchema).min(1),
-    permutationTpaViolationFractions: z.array(probabilitySchema).min(1),
-    pValueLmc: probabilitySchema,
-    pValueTpa: probabilitySchema,
-    permutationsInMarkovEquivalenceClass: z.number().int().nonnegative(),
-    falsifiable: z.boolean(),
-    falsified: z.boolean(),
-  }).strict().superRefine((value, context) => {
-    if (value.permutationLmcViolationFractions.length !== value.permutations
-      || value.permutationTpaViolationFractions.length !== value.permutations) {
-      context.addIssue({
-        code: 'custom',
-        path: ['permutations'],
-        message: 'Permutation distributions must contain one score per relabeled graph.',
-      })
-    }
-    if (value.givenLmcViolations > value.givenLmcTests) {
-      context.addIssue({
-        code: 'custom',
-        path: ['givenLmcViolations'],
-        message: 'LMC violations cannot exceed the number of tested statements.',
-      })
-    }
-  }), z.object({
-    kind: z.literal('skipped'),
-    reason: z.string().min(1),
-  }).strict()]),
-}).strict().superRefine((value, context) => {
-  if (value.uniformity.tests !== value.implications.length) {
-    context.addIssue({
-      code: 'custom',
-      path: ['uniformity', 'tests'],
-      message: 'The uniformity diagnostic must use every raw implication p-value.',
-    })
-  }
-})
+  })
 
 export type DagCheckEvidence = z.infer<typeof dagCheckEvidenceSchema>
 
@@ -102,7 +124,10 @@ export interface DagCheckArtifact {
   readonly evidence: DagCheckEvidence
 }
 
-export const recordDagCheck = (document: DagDocument, evidence: DagCheckEvidence): DagCheckArtifact => ({
+export const recordDagCheck = (
+  document: DagDocument,
+  evidence: DagCheckEvidence,
+): DagCheckArtifact => ({
   kind: 'dag-check-artifact',
   id: brand<string, 'DagCheckArtifactId'>(crypto.randomUUID()),
   createdAt: new Date().toISOString(),
@@ -115,7 +140,8 @@ export const recordDagCheck = (document: DagDocument, evidence: DagCheckEvidence
 export type DagImplicationPlan =
   | {
       readonly kind: 'not-testable'
-      readonly reason: 'no-observed-local-markov-implications' | 'all-implications-require-latent-parents'
+      readonly reason:
+        'no-observed-local-markov-implications' | 'all-implications-require-latent-parents'
       readonly skippedLatentImplications: number
     }
   | {
@@ -165,9 +191,14 @@ const reaches = (
     if (current === target) return true
     visited.add(current)
     for (const edge of edges) {
-      const next = direction === 'forward'
-        ? (edge.cause === current ? edge.effect : null)
-        : (edge.effect === current ? edge.cause : null)
+      const next =
+        direction === 'forward'
+          ? edge.cause === current
+            ? edge.effect
+            : null
+          : edge.effect === current
+            ? edge.cause
+            : null
       if (next !== null) pending.push(next)
     }
   }
@@ -185,9 +216,14 @@ const reachable = (
     const current = pending.pop()
     if (current === undefined) continue
     for (const edge of edges) {
-      const next = direction === 'forward'
-        ? (edge.cause === current ? edge.effect : null)
-        : (edge.effect === current ? edge.cause : null)
+      const next =
+        direction === 'forward'
+          ? edge.cause === current
+            ? edge.effect
+            : null
+          : edge.effect === current
+            ? edge.cause
+            : null
       if (next !== null && !result.has(next)) {
         result.add(next)
         pending.push(next)
@@ -204,12 +240,17 @@ const implicationKey = (implication: DagConditionalIndependenceImplication): str
 
 /** Octopus's observed local-Markov planner, with temporal graphs routed to CausalEffects instead. */
 export function planDagImplications(document: DagDocument): DagImplicationPlan {
-  if (document.dataset.kind === 'time-series' && document.current.graph.edges.some((edge) => edge.timing.kind === 'lagged')) {
+  if (
+    document.dataset.kind === 'time-series' &&
+    document.current.graph.edges.some((edge) => edge.timing.kind === 'lagged')
+  ) {
     return { kind: 'requires-lag-aware-validation', engine: 'tigramite-causal-effects' }
   }
   const graph = document.current.graph
   const edges = contemporaneousEdges(graph)
-  const observed = new Set(graph.nodes.filter((node) => node.kind === 'observed').map((node) => node.id))
+  const observed = new Set(
+    graph.nodes.filter((node) => node.kind === 'observed').map((node) => node.id),
+  )
   const parents = new Map<DagNodeId, DagNodeId[]>(graph.nodes.map((node) => [node.id, []]))
   const children = new Map<DagNodeId, DagNodeId[]>(graph.nodes.map((node) => [node.id, []]))
   for (const edge of edges) {
@@ -232,8 +273,10 @@ export function planDagImplications(document: DagDocument): DagImplicationPlan {
   for (const x of observed) {
     const xParents = parents.get(x) ?? []
     const descendants = descendantsOf(x)
-    const nonDescendants = [...observed].filter((candidate) =>
-      candidate !== x && !descendants.has(candidate) && !xParents.includes(candidate))
+    const nonDescendants = [...observed].filter(
+      (candidate) =>
+        candidate !== x && !descendants.has(candidate) && !xParents.includes(candidate),
+    )
     if (xParents.some((parent) => !observed.has(parent))) {
       skippedLatentImplications += nonDescendants.length
       continue
@@ -244,13 +287,16 @@ export function planDagImplications(document: DagDocument): DagImplicationPlan {
       unique.set(implicationKey(implication), implication)
     }
   }
-  const available = [...unique.values()].sort((left, right) => implicationKey(left).localeCompare(implicationKey(right)))
+  const available = [...unique.values()].sort((left, right) =>
+    implicationKey(left).localeCompare(implicationKey(right)),
+  )
   if (!isNonEmpty(available)) {
     return {
       kind: 'not-testable',
-      reason: skippedLatentImplications > 0
-        ? 'all-implications-require-latent-parents'
-        : 'no-observed-local-markov-implications',
+      reason:
+        skippedLatentImplications > 0
+          ? 'all-implications-require-latent-parents'
+          : 'no-observed-local-markov-implications',
       skippedLatentImplications,
     }
   }
@@ -269,11 +315,15 @@ export function inspectDagStudyBinding(
   document: DagDocument,
   treatment: DagNodeId,
   outcome: DagNodeId,
-): { readonly ok: true; readonly value: DagStudyBindingAnalysis } | { readonly ok: false; readonly error: DagStudyBindingProblem } {
+):
+  | { readonly ok: true; readonly value: DagStudyBindingAnalysis }
+  | { readonly ok: false; readonly error: DagStudyBindingProblem } {
   const nodes = new Set(document.current.graph.nodes.map((node) => node.id))
-  if (!nodes.has(treatment)) return { ok: false, error: { kind: 'unknown-treatment', node: treatment } }
+  if (!nodes.has(treatment))
+    return { ok: false, error: { kind: 'unknown-treatment', node: treatment } }
   if (!nodes.has(outcome)) return { ok: false, error: { kind: 'unknown-outcome', node: outcome } }
-  if (treatment === outcome) return { ok: false, error: { kind: 'same-treatment-and-outcome', node: treatment } }
+  if (treatment === outcome)
+    return { ok: false, error: { kind: 'same-treatment-and-outcome', node: treatment } }
   if (!reaches(document.current.graph.edges, treatment, outcome)) {
     return { ok: false, error: { kind: 'no-causal-path', treatment, outcome } }
   }
@@ -283,35 +333,49 @@ export function inspectDagStudyBinding(
       treatment,
       outcome,
       adjustment: canonicalAdjustment(document.current.graph, treatment, outcome),
-      laggedArrows: document.current.graph.edges.filter((edge) => edge.timing.kind === 'lagged').length,
+      laggedArrows: document.current.graph.edges.filter((edge) => edge.timing.kind === 'lagged')
+        .length,
     },
   }
 }
 
 export function affectedDagEdges(issue: DagStructuralIssue): readonly DagEdgeId[] {
   switch (issue.kind) {
-    case 'duplicate-node': return []
+    case 'duplicate-node':
+      return []
     case 'unknown-endpoint':
     case 'self-edge':
     case 'duplicate-edge':
     case 'temporal-edge-on-cross-section':
     case 'invalid-lag':
-    case 'lag-consumes-sample': return [issue.edge]
-    case 'directed-cycle': return issue.edges
-    default: return assertNever(issue)
+    case 'lag-consumes-sample':
+      return [issue.edge]
+    case 'directed-cycle':
+      return issue.edges
+    default:
+      return assertNever(issue)
   }
 }
 
 export function describeDagStructuralIssue(issue: DagStructuralIssue): string {
   switch (issue.kind) {
-    case 'duplicate-node': return 'Two variables share the same graph identity. Rename or remove one variable.'
-    case 'unknown-endpoint': return 'An arrow refers to a variable outside this graph revision. Remove the arrow or restore the variable.'
-    case 'self-edge': return 'A same-period variable cannot point to itself. Remove the arrow or add a lag.'
-    case 'duplicate-edge': return 'The same arrow appears more than once. Remove the duplicate.'
-    case 'directed-cycle': return 'Same-period arrows form a directed cycle. Use a lagged arrow to represent feedback.'
-    case 'temporal-edge-on-cross-section': return 'Remove the lagged arrow or prepare the data as a time series.'
-    case 'invalid-lag': return `Change lag ${issue.lag} to a positive integer.`
-    case 'lag-consumes-sample': return `Lag ${issue.lag} leaves no usable rows from ${issue.observations} rows. Choose a smaller lag.`
-    default: return assertNever(issue)
+    case 'duplicate-node':
+      return 'Two variables share the same graph identity. Rename or remove one variable.'
+    case 'unknown-endpoint':
+      return 'An arrow refers to a variable outside this graph revision. Remove the arrow or restore the variable.'
+    case 'self-edge':
+      return 'A same-period variable cannot point to itself. Remove the arrow or add a lag.'
+    case 'duplicate-edge':
+      return 'The same arrow appears more than once. Remove the duplicate.'
+    case 'directed-cycle':
+      return 'Same-period arrows form a directed cycle. Use a lagged arrow to represent feedback.'
+    case 'temporal-edge-on-cross-section':
+      return 'Remove the lagged arrow or prepare the data as a time series.'
+    case 'invalid-lag':
+      return `Change lag ${issue.lag} to a positive integer.`
+    case 'lag-consumes-sample':
+      return `Lag ${issue.lag} leaves no usable rows from ${issue.observations} rows. Choose a smaller lag.`
+    default:
+      return assertNever(issue)
   }
 }

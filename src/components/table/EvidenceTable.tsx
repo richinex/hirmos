@@ -1,7 +1,23 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
-import { flexRender, getCoreRowModel, getSortedRowModel, useReactTable, type ColumnDef, type SortingState } from '@tanstack/react-table'
+import {
+  flexRender,
+  getCoreRowModel,
+  getSortedRowModel,
+  useReactTable,
+  type ColumnDef,
+  type SortingState,
+} from '@tanstack/react-table'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { cellPadding, countLine, DensityToggle, FilterField, ROW_HEIGHT, SortHeader, TableShell, useTableDensity } from '@/components/table/primitives'
+import {
+  cellPadding,
+  countLine,
+  DensityToggle,
+  FilterField,
+  ROW_HEIGHT,
+  SortHeader,
+  TableShell,
+  useTableDensity,
+} from '@/components/table/primitives'
 import { Icon } from '@/components/Icon'
 import { ParameterHelp } from '@/components/ui/ParameterLabel'
 import { button, literal, num, table as tableCn, td, tdText, tr } from '@/components/ui/recipes'
@@ -44,8 +60,18 @@ export interface EvidenceColumn<Row> {
 }
 
 /** A right-aligned figure column: sorted on the number, printed as a statistic unless told otherwise. */
-export const figureColumn = <Row,>(id: string, header: string, value: (row: Row) => number, print: (value: number) => string = (value) => formatStatistic('raw', value).text): EvidenceColumn<Row> =>
-  ({ id, header, align: 'right', value, format: (value) => print(typeof value === 'number' ? value : Number(value)) })
+export const figureColumn = <Row,>(
+  id: string,
+  header: string,
+  value: (row: Row) => number,
+  print: (value: number) => string = (value) => formatStatistic('raw', value).text,
+): EvidenceColumn<Row> => ({
+  id,
+  header,
+  align: 'right',
+  value,
+  format: (value) => print(typeof value === 'number' ? value : Number(value)),
+})
 
 type CellMeta = { readonly align: 'left' | 'right'; readonly mono: boolean }
 
@@ -55,7 +81,21 @@ const wraps = (meta: CellMeta): boolean => meta.align !== 'right' && !meta.mono
 /** Horizontal padding of a body cell, `px-3.5` either side. */
 const CELL_INSET = 28
 
-export function EvidenceTable<Row>({ title, help, rows, columns, rowKey, noun, empty, filters, total, exportName, maxHeight = 'max-h-96', frame = 'panel', appearance = 'minimal' }: {
+export function EvidenceTable<Row>({
+  title,
+  help,
+  rows,
+  columns,
+  rowKey,
+  noun,
+  empty,
+  filters,
+  total,
+  exportName,
+  maxHeight = 'max-h-96',
+  frame = 'panel',
+  appearance = 'minimal',
+}: {
   readonly title: string
   readonly help?: string
   readonly rows: readonly Row[]
@@ -86,18 +126,34 @@ export function EvidenceTable<Row>({ title, help, rows, columns, rowKey, noun, e
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase()
     if (needle.length === 0) return rows
-    return rows.filter((row) => textColumns.some((column) => String(column.value(row)).toLowerCase().includes(needle)))
+    return rows.filter((row) =>
+      textColumns.some((column) => String(column.value(row)).toLowerCase().includes(needle)),
+    )
   }, [query, rows, textColumns])
   const definitions = useMemo<ColumnDef<Row, EvidenceValue>[]>(
-    () => columns.map((column) => ({
-      id: column.id,
-      header: column.detail === undefined ? column.header : () => <span className="block"><span className="block">{column.header}</span><span className={literal('block text-micro font-normal text-faint')}>{column.detail}</span></span>,
-      accessorFn: column.value,
-      cell: (info) => (column.format ? column.format(info.getValue(), info.row.original) : String(info.getValue())),
-      sortingFn: column.align === 'right' ? 'basic' : 'alphanumeric',
-      sortUndefined: 'last',
-      meta: { align: column.align ?? 'left', mono: column.mono ?? false } satisfies CellMeta,
-    })),
+    () =>
+      columns.map((column) => ({
+        id: column.id,
+        header:
+          column.detail === undefined
+            ? column.header
+            : () => (
+                <span className="block">
+                  <span className="block">{column.header}</span>
+                  <span className={literal('block text-micro font-normal text-faint')}>
+                    {column.detail}
+                  </span>
+                </span>
+              ),
+        accessorFn: column.value,
+        cell: (info) =>
+          column.format
+            ? column.format(info.getValue(), info.row.original)
+            : String(info.getValue()),
+        sortingFn: column.align === 'right' ? 'basic' : 'alphanumeric',
+        sortUndefined: 'last',
+        meta: { align: column.align ?? 'left', mono: column.mono ?? false } satisfies CellMeta,
+      })),
     [columns],
   )
   const table = useReactTable({
@@ -120,8 +176,14 @@ export function EvidenceTable<Row>({ title, help, rows, columns, rowKey, noun, e
     const element = tableRef.current
     if (element === null || !virtualised) return undefined
     const read = () => {
-      const next = [...element.querySelectorAll('thead th')].map((cell) => Math.floor(cell.getBoundingClientRect().width))
-      setColumnWidths((current) => (current.length === next.length && current.every((width, index) => width === next[index]) ? current : next))
+      const next = [...element.querySelectorAll('thead th')].map((cell) =>
+        Math.floor(cell.getBoundingClientRect().width),
+      )
+      setColumnWidths((current) =>
+        current.length === next.length && current.every((width, index) => width === next[index])
+          ? current
+          : next,
+      )
     }
     read()
     const observer = new ResizeObserver(read)
@@ -131,37 +193,56 @@ export function EvidenceTable<Row>({ title, help, rows, columns, rowKey, noun, e
   const metricsVersion = useTextMetricsVersion()
   const cellFont = useMemo(() => fontFor('body'), [metricsVersion]) // eslint-disable-line react-hooks/exhaustive-deps -- the version is the invalidation
   const lineHeight = lineHeightFor('body', cellFont)
-  const wrapColumns = useMemo(() => columns.map((column, index) => ({ column, index })).filter(({ column }) => wraps({ align: column.align ?? 'left', mono: column.mono ?? false })), [columns])
-  const heightOf = useCallback((index: number): number => {
-    const row = modelRows[index]
-    if (row === undefined) return rowHeight
-    let lines = 1
-    for (const { column, index: columnIndex } of wrapColumns) {
-      const width = columnWidths[columnIndex]
-      if (width === undefined || width <= CELL_INSET) continue
-      lines = Math.max(lines, lineCountAt(String(column.value(row.original)), cellFont, width - CELL_INSET))
-    }
-    return rowHeight + (lines - 1) * lineHeight
-  }, [cellFont, columnWidths, lineHeight, modelRows, rowHeight, wrapColumns])
+  const wrapColumns = useMemo(
+    () =>
+      columns
+        .map((column, index) => ({ column, index }))
+        .filter(({ column }) =>
+          wraps({ align: column.align ?? 'left', mono: column.mono ?? false }),
+        ),
+    [columns],
+  )
+  const heightOf = useCallback(
+    (index: number): number => {
+      const row = modelRows[index]
+      if (row === undefined) return rowHeight
+      let lines = 1
+      for (const { column, index: columnIndex } of wrapColumns) {
+        const width = columnWidths[columnIndex]
+        if (width === undefined || width <= CELL_INSET) continue
+        lines = Math.max(
+          lines,
+          lineCountAt(String(column.value(row.original)), cellFont, width - CELL_INSET),
+        )
+      }
+      return rowHeight + (lines - 1) * lineHeight
+    },
+    [cellFont, columnWidths, lineHeight, modelRows, rowHeight, wrapColumns],
+  )
   const virtualizer = useVirtualizer({
     count: virtualised ? modelRows.length : 0,
     getScrollElement: () => scrollRef.current,
     estimateSize: heightOf,
     overscan: 12,
   })
-  useEffect(() => { if (virtualised) virtualizer.measure() }, [heightOf, virtualised, virtualizer])
+  useEffect(() => {
+    if (virtualised) virtualizer.measure()
+  }, [heightOf, virtualised, virtualizer])
 
   // Recycling replaces the focused cell's element, so remember which cell held focus by its
   // row and column and restore it after the window repaints. The frame retry covers the paint
   // that has not happened yet when the effect runs.
   const focusToken = useRef<string | null>(null)
-  const rememberFocus = useCallback((token: string) => { focusToken.current = token }, [])
+  const rememberFocus = useCallback((token: string) => {
+    focusToken.current = token
+  }, [])
   useEffect(() => {
     const token = focusToken.current
     if (!virtualised || token === null) return undefined
     const scroller = scrollRef.current
     if (scroller === null) return undefined
-    if (scroller.querySelector(`[data-cell="${CSS.escape(token)}"]`) === document.activeElement) return undefined
+    if (scroller.querySelector(`[data-cell="${CSS.escape(token)}"]`) === document.activeElement)
+      return undefined
     const frame = requestAnimationFrame(() => {
       const target = scroller.querySelector<HTMLElement>(`[data-cell="${CSS.escape(token)}"]`)
       if (target !== null) target.focus({ preventScroll: true })
@@ -172,7 +253,15 @@ export function EvidenceTable<Row>({ title, help, rows, columns, rowKey, noun, e
   const download = useCallback(() => {
     if (exportName === undefined) return
     const body = modelRows.map((row) => columns.map((column) => column.value(row.original)))
-    const blob = new Blob([toCsv(columns.map((column) => column.header), body)], { type: 'text/csv;charset=utf-8' })
+    const blob = new Blob(
+      [
+        toCsv(
+          columns.map((column) => column.header),
+          body,
+        ),
+      ],
+      { type: 'text/csv;charset=utf-8' },
+    )
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
@@ -181,20 +270,36 @@ export function EvidenceTable<Row>({ title, help, rows, columns, rowKey, noun, e
     URL.revokeObjectURL(url)
   }, [columns, exportName, modelRows])
 
-  const sortText = sorting[0] === undefined ? undefined : `sorted by ${columns.find((column) => column.id === sorting[0]?.id)?.header.toLowerCase() ?? sorting[0].id} ${sorting[0].desc ? 'descending' : 'ascending'}`
+  const sortText =
+    sorting[0] === undefined
+      ? undefined
+      : `sorted by ${columns.find((column) => column.id === sorting[0]?.id)?.header.toLowerCase() ?? sorting[0].id} ${sorting[0].desc ? 'descending' : 'ascending'}`
   const padding = cellPadding(density)
   const items = virtualizer.getVirtualItems()
   const leadHeight = items[0]?.start ?? 0
   const tailHeight = virtualizer.getTotalSize() - (items.at(-1)?.end ?? 0)
 
   const renderRow = (row: (typeof modelRows)[number], rowIndex: number, height?: number) => (
-    <tr key={row.id} className={tr('static')} style={height === undefined ? undefined : { height }} aria-rowindex={virtualised ? rowIndex + 2 : undefined}>
+    <tr
+      key={row.id}
+      className={tr('static')}
+      style={height === undefined ? undefined : { height }}
+      aria-rowindex={virtualised ? rowIndex + 2 : undefined}
+    >
       {row.getVisibleCells().map((cell) => {
         const meta = cell.column.columnDef.meta as CellMeta
         const token = `${row.id}:${cell.column.id}`
         const cellClass = wraps(meta)
           ? tdText(cn(padding, 'text-ink'))
-          : td(cn(padding, meta.align === 'right' ? num('whitespace-nowrap text-right text-muted') : 'text-ink', meta.mono && 'font-mono text-muted'))
+          : td(
+              cn(
+                padding,
+                meta.align === 'right'
+                  ? num('whitespace-nowrap text-right text-muted')
+                  : 'text-ink',
+                meta.mono && 'font-mono text-muted',
+              ),
+            )
         return (
           <td
             key={cell.id}
@@ -219,19 +324,41 @@ export function EvidenceTable<Row>({ title, help, rows, columns, rowKey, noun, e
       frame={frame}
       maxHeight={maxHeight}
       scrollRef={scrollRef}
-      toolbar={(
+      toolbar={
         <>
           {filters}
-          {textColumns.length > 0 && rows.length > 1 && <FilterField value={query} onChange={setQuery} placeholder="Search variables" label={`Search ${title.toLowerCase()}`} className="w-44" />}
+          {textColumns.length > 0 && rows.length > 1 && (
+            <FilterField
+              value={query}
+              onChange={setQuery}
+              placeholder="Search variables"
+              label={`Search ${title.toLowerCase()}`}
+              className="w-44"
+            />
+          )}
           <DensityToggle density={density} onChange={setDensity} />
           {exportName !== undefined && modelRows.length > 0 && (
-            <button type="button" className={button('quiet', 'gap-1', 'sm')} aria-label="Export CSV" title="Export the rows as CSV" onClick={download}><Icon name="download" size={13} />CSV</button>
+            <button
+              type="button"
+              className={button('quiet', 'gap-1', 'sm')}
+              aria-label="Export CSV"
+              title="Export the rows as CSV"
+              onClick={download}
+            >
+              <Icon name="download" size={13} />
+              CSV
+            </button>
           )}
         </>
-      )}
+      }
       count={countLine(visible.length, total ?? rows.length, noun, sortText)}
     >
-      <table ref={tableRef} className={cn(tableCn, 'tabular-nums')} aria-labelledby={titleId} aria-rowcount={virtualised ? modelRows.length + 1 : undefined}>
+      <table
+        ref={tableRef}
+        className={cn(tableCn, 'tabular-nums')}
+        aria-labelledby={titleId}
+        aria-rowcount={virtualised ? modelRows.length + 1 : undefined}
+      >
         <thead>
           {table.getHeaderGroups().map((group) => (
             <tr key={group.id}>
@@ -249,18 +376,43 @@ export function EvidenceTable<Row>({ title, help, rows, columns, rowKey, noun, e
           ))}
         </thead>
         <tbody>
-          {rows.length === 0 && <tr><td colSpan={columns.length} className="px-3.5 py-6 text-center text-body text-faint">{empty}</td></tr>}
-          {rows.length > 0 && visible.length === 0 && <tr><td colSpan={columns.length} className="px-3.5 py-6 text-center text-body text-faint">No row matches the search.</td></tr>}
+          {rows.length === 0 && (
+            <tr>
+              <td colSpan={columns.length} className="px-3.5 py-6 text-center text-body text-faint">
+                {empty}
+              </td>
+            </tr>
+          )}
+          {rows.length > 0 && visible.length === 0 && (
+            <tr>
+              <td colSpan={columns.length} className="px-3.5 py-6 text-center text-body text-faint">
+                No row matches the search.
+              </td>
+            </tr>
+          )}
           {!virtualised && modelRows.map((row, index) => renderRow(row, index))}
           {virtualised && leadHeight > 0 && (
-            <tr role="presentation" aria-hidden><td role="presentation" colSpan={columns.length} style={{ height: leadHeight, padding: 0, border: 0 }} /></tr>
+            <tr role="presentation" aria-hidden>
+              <td
+                role="presentation"
+                colSpan={columns.length}
+                style={{ height: leadHeight, padding: 0, border: 0 }}
+              />
+            </tr>
           )}
-          {virtualised && items.map((item) => {
-            const row = modelRows[item.index]
-            return row === undefined ? null : renderRow(row, item.index, item.size)
-          })}
+          {virtualised &&
+            items.map((item) => {
+              const row = modelRows[item.index]
+              return row === undefined ? null : renderRow(row, item.index, item.size)
+            })}
           {virtualised && tailHeight > 0 && (
-            <tr role="presentation" aria-hidden><td role="presentation" colSpan={columns.length} style={{ height: tailHeight, padding: 0, border: 0 }} /></tr>
+            <tr role="presentation" aria-hidden>
+              <td
+                role="presentation"
+                colSpan={columns.length}
+                style={{ height: tailHeight, padding: 0, border: 0 }}
+              />
+            </tr>
           )}
         </tbody>
       </table>

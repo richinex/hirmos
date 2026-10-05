@@ -5,7 +5,12 @@ import {
   type DagImport,
   type DagImportProblem,
 } from './dag'
-import { describeDagTextProblem, parseDagText, type DagTextEdge, type DagTextProblem } from './dagText'
+import {
+  describeDagTextProblem,
+  parseDagText,
+  type DagTextEdge,
+  type DagTextProblem,
+} from './dagText'
 import { err, isNonEmpty, ok, type NonEmptyArray, type Result } from './dop'
 
 /**
@@ -35,7 +40,10 @@ const only = (names: readonly string[]): string | null => (names.length === 1 ? 
  * that is neither is refused by name rather than guessed at, since marking it `[latent]` in the
  * text is what says it is unmeasured.
  */
-export function planDagImport(document: DagDocument, text: string): Result<DagImportPlan, DagImportPlanProblem> {
+export function planDagImport(
+  document: DagDocument,
+  text: string,
+): Result<DagImportPlan, DagImportPlanProblem> {
   const parsed = parseDagText(text)
   if (!parsed.ok) return err({ kind: 'text', problem: parsed.error })
   if (parsed.value.edges.length === 0) return err({ kind: 'no-arrows' })
@@ -61,17 +69,28 @@ export function planDagImport(document: DagDocument, text: string): Result<DagIm
   })
 }
 
-export const importOf = (plan: DagImportPlan): DagImport => ({ latent: plan.latent, arrows: plan.arrows })
+export const importOf = (plan: DagImportPlan): DagImport => ({
+  latent: plan.latent,
+  arrows: plan.arrows,
+})
 
-export const describeDagImportProblem = (problem: DagImportPlanProblem | DagImportProblem): string => {
+export const describeDagImportProblem = (
+  problem: DagImportPlanProblem | DagImportProblem,
+): string => {
   switch (problem.kind) {
-    case 'text': return describeDagTextProblem(problem.problem)
-    case 'no-arrows': return 'The text declares no arrows, so there is nothing to draw.'
-    case 'unmarked-variables': return problem.names.length === 1
-      ? `${problem.names[0]} is not a column of the prepared data. Mark it [latent] in the text if it is unmeasured, or rename it to match a column.`
-      : `${problem.names.join(', ')} are not columns of the prepared data. Mark each [latent] in the text if it is unmeasured, or rename it to match a column.`
-    case 'unknown-variable': return `${problem.name} is not a variable in this graph.`
-    case 'variable-refused': return `${problem.name}: ${describeDagVariableEditProblem(problem.problem)}`
-    case 'arrow-refused': return `${problem.from} → ${problem.to}: ${describeDagEditProblem(problem.problem)}`
+    case 'text':
+      return describeDagTextProblem(problem.problem)
+    case 'no-arrows':
+      return 'The text declares no arrows, so there is nothing to draw.'
+    case 'unmarked-variables':
+      return problem.names.length === 1
+        ? `${problem.names[0]} is not a column of the prepared data. Mark it [latent] in the text if it is unmeasured, or rename it to match a column.`
+        : `${problem.names.join(', ')} are not columns of the prepared data. Mark each [latent] in the text if it is unmeasured, or rename it to match a column.`
+    case 'unknown-variable':
+      return `${problem.name} is not a variable in this graph.`
+    case 'variable-refused':
+      return `${problem.name}: ${describeDagVariableEditProblem(problem.problem)}`
+    case 'arrow-refused':
+      return `${problem.from} → ${problem.to}: ${describeDagEditProblem(problem.problem)}`
   }
 }

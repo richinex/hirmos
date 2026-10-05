@@ -20,7 +20,15 @@ import { cn } from '@/lib/utils'
  * which makes them the containing block for fixed-position descendants: rendered in place it would
  * be inset from the pane and clipped by its neighbours rather than floating over the window.
  */
-export function FloatingFigure({ label, defaultWidth = 900, defaultHeight = 560, actions, notice = null, figure, children }: {
+export function FloatingFigure({
+  label,
+  defaultWidth = 900,
+  defaultHeight = 560,
+  actions,
+  notice = null,
+  figure,
+  children,
+}: {
   readonly label: string
   readonly defaultWidth?: number
   readonly defaultHeight?: number
@@ -36,17 +44,22 @@ export function FloatingFigure({ label, defaultWidth = 900, defaultHeight = 560,
   const [lifted, setLifted] = useState(false)
   const isMobile = useIsMobile()
   const layerId = `figure-${useId().replaceAll(':', '')}`
-  const { position, size, onDragStop, onResizeStop } = useFloatingRect(`hirmos_panel_${label}`, () => ({
-    x: Math.max(8, (window.innerWidth - defaultWidth) / 2),
-    y: Math.max(16, (window.innerHeight - defaultHeight) / 2 - 16),
-    width: defaultWidth,
-    height: Math.min(defaultHeight, window.innerHeight - 32),
-  }))
+  const { position, size, onDragStop, onResizeStop } = useFloatingRect(
+    `hirmos_panel_${label}`,
+    () => ({
+      x: Math.max(8, (window.innerWidth - defaultWidth) / 2),
+      y: Math.max(16, (window.innerHeight - defaultHeight) / 2 - 16),
+      width: defaultWidth,
+      height: Math.min(defaultHeight, window.innerHeight - 32),
+    }),
+  )
 
   useEffect(() => (lifted ? pushLayer(layerId) : undefined), [layerId, lifted])
   useEffect(() => {
     if (!lifted) return undefined
-    const key = (event: KeyboardEvent) => { if (event.key === 'Escape' && escapeFor(layerId, event)) setLifted(false) }
+    const key = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && escapeFor(layerId, event)) setLifted(false)
+    }
     window.addEventListener('keydown', key)
     return () => window.removeEventListener('keydown', key)
   }, [layerId, lifted])
@@ -64,9 +77,14 @@ export function FloatingFigure({ label, defaultWidth = 900, defaultHeight = 560,
   )
 
   const header = (
-    <div className={`${layerId}-drag flex shrink-0 select-none items-center justify-between gap-3 border-b border-hair px-3 py-2 ${isMobile ? '' : 'cursor-grab active:cursor-grabbing'}`}>
+    <div
+      className={`${layerId}-drag flex shrink-0 select-none items-center justify-between gap-3 border-b border-hair px-3 py-2 ${isMobile ? '' : 'cursor-grab active:cursor-grabbing'}`}
+    >
       <span className={cn(panelTitle, 'min-w-0 truncate text-nowrap')}>{label}</span>
-      <div className="flex shrink-0 items-center gap-1.5" onPointerDown={(event) => event.stopPropagation()}>
+      <div
+        className="flex shrink-0 items-center gap-1.5"
+        onPointerDown={(event) => event.stopPropagation()}
+      >
         {actions}
         <button
           type="button"
@@ -83,7 +101,11 @@ export function FloatingFigure({ label, defaultWidth = 900, defaultHeight = 560,
 
   const body = (
     <div className="flex min-h-0 flex-1 flex-col p-3">
-      {notice !== null && <p role="alert" className="mb-2 mt-0 text-body text-danger">{notice}</p>}
+      {notice !== null && (
+        <p role="alert" className="mb-2 mt-0 text-body text-danger">
+          {notice}
+        </p>
+      )}
       {figure}
     </div>
   )
@@ -91,37 +113,54 @@ export function FloatingFigure({ label, defaultWidth = 900, defaultHeight = 560,
   return (
     <>
       {children(openButton)}
-      {lifted && createPortal(
-        // Drag and resize do not suit touch, so a phone gets a plain inset layer instead.
-        isMobile ? (
-          <div className="pop float fixed inset-3 z-(--z-dialog) flex flex-col overflow-hidden rounded-xl border border-edge bg-panel" role="dialog" aria-label={label}>
-            {header}
-            {body}
-          </div>
-        ) : (
-          <Rnd
-            size={size}
-            position={position}
-            onDragStop={(_, data) => onDragStop(data.x, data.y)}
-            onResizeStop={(_, __, ref, ___, point) => onResizeStop(ref.offsetWidth, ref.offsetHeight, point.x, point.y)}
-            minWidth={Math.min(420, window.innerWidth - 16)}
-            minHeight={260}
-            maxWidth={window.innerWidth - 24}
-            maxHeight={window.innerHeight - 24}
-            bounds="window"
-            dragHandleClassName={`${layerId}-drag`}
-            enableResizing={{ left: true, right: true, bottom: true, bottomLeft: true, bottomRight: true }}
-            className="z-(--z-panel)"
-            style={{ position: 'fixed' }}
-          >
-            <div role="dialog" aria-label={label} className="pop float flex h-full flex-col overflow-hidden rounded-xl border border-edge bg-panel">
+      {lifted &&
+        createPortal(
+          // Drag and resize do not suit touch, so a phone gets a plain inset layer instead.
+          isMobile ? (
+            <div
+              className="pop float fixed inset-3 z-(--z-dialog) flex flex-col overflow-hidden rounded-xl border border-edge bg-panel"
+              role="dialog"
+              aria-label={label}
+            >
               {header}
               {body}
             </div>
-          </Rnd>
-        ),
-        document.body,
-      )}
+          ) : (
+            <Rnd
+              size={size}
+              position={position}
+              onDragStop={(_, data) => onDragStop(data.x, data.y)}
+              onResizeStop={(_, __, ref, ___, point) =>
+                onResizeStop(ref.offsetWidth, ref.offsetHeight, point.x, point.y)
+              }
+              minWidth={Math.min(420, window.innerWidth - 16)}
+              minHeight={260}
+              maxWidth={window.innerWidth - 24}
+              maxHeight={window.innerHeight - 24}
+              bounds="window"
+              dragHandleClassName={`${layerId}-drag`}
+              enableResizing={{
+                left: true,
+                right: true,
+                bottom: true,
+                bottomLeft: true,
+                bottomRight: true,
+              }}
+              className="z-(--z-panel)"
+              style={{ position: 'fixed' }}
+            >
+              <div
+                role="dialog"
+                aria-label={label}
+                className="pop float flex h-full flex-col overflow-hidden rounded-xl border border-edge bg-panel"
+              >
+                {header}
+                {body}
+              </div>
+            </Rnd>
+          ),
+          document.body,
+        )}
     </>
   )
 }

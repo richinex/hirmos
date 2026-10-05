@@ -1,11 +1,33 @@
 import type * as duckdb from '@duckdb/duckdb-wasm'
 import { isolatedDuckDbEngine, previewCell, type DuckDbEngine } from './duckdb'
-import { describeSqlPreparationProblem, materializeView, prepareSqlInputs, recoverSqlInputs, redeclareInput, registerInputs, type SqlPreparationProblem } from './sqlPreparation'
+import {
+  describeSqlPreparationProblem,
+  materializeView,
+  prepareSqlInputs,
+  recoverSqlInputs,
+  redeclareInput,
+  registerInputs,
+  type SqlPreparationProblem,
+} from './sqlPreparation'
 import type { PreviewCell } from '@/domain/dataset'
 import { err, isNonEmpty, ok, type NonEmptyArray, type Result } from '@/domain/dop'
-import { compileDraft, compilePipeline, describePipelineProblem, type CompiledPipeline, type PipelineBlockId, type PipelineGraph, type PipelineProblem, type PipelineRecipe, type PipelineStep } from '@/domain/pipeline'
+import {
+  compileDraft,
+  compilePipeline,
+  describePipelineProblem,
+  type CompiledPipeline,
+  type PipelineBlockId,
+  type PipelineGraph,
+  type PipelineProblem,
+  type PipelineRecipe,
+  type PipelineStep,
+} from '@/domain/pipeline'
 import type { ScriptShape } from '@/workers/pythonProtocol'
-import { inputDescriptor, type SqlInputAlias, type SqlPreparationInput } from '@/domain/sourceInputs'
+import {
+  inputDescriptor,
+  type SqlInputAlias,
+  type SqlPreparationInput,
+} from '@/domain/sourceInputs'
 import type { DeclaredType } from '@/domain/fileReading'
 
 export type PipelineRunProblem =
@@ -32,7 +54,13 @@ export interface BlockPreview {
 }
 
 export type BlockOutcome =
-  | { readonly kind: 'ran'; readonly rowCount: number; readonly columns: NonEmptyArray<PreviewColumn>; readonly stdout?: string; readonly shape?: ScriptShape }
+  | {
+      readonly kind: 'ran'
+      readonly rowCount: number
+      readonly columns: NonEmptyArray<PreviewColumn>
+      readonly stdout?: string
+      readonly shape?: ScriptShape
+    }
   | { readonly kind: 'failed'; readonly detail: string; readonly stdout?: string }
   | { readonly kind: 'skipped' }
   | { readonly kind: 'waiting'; readonly detail: string }
@@ -49,11 +77,21 @@ export interface PipelineRun {
  * Runs a script step: given the tables named by `inputs`, read from the connection, it registers the
  * rows the script assigned to `prepared` under `view`. The Python worker implements this.
  */
-export interface ScriptRun { readonly stdout: string; readonly shape: ScriptShape }
-export interface ScriptFailure { readonly detail: string; readonly stdout: string }
+export interface ScriptRun {
+  readonly stdout: string
+  readonly shape: ScriptShape
+}
+export interface ScriptFailure {
+  readonly detail: string
+  readonly stdout: string
+}
 
 export interface ScriptRuntime {
-  run(step: Extract<PipelineStep, { readonly kind: 'script' }>, connection: duckdb.AsyncDuckDBConnection, database: duckdb.AsyncDuckDB): Promise<Result<ScriptRun, ScriptFailure>>
+  run(
+    step: Extract<PipelineStep, { readonly kind: 'script' }>,
+    connection: duckdb.AsyncDuckDBConnection,
+    database: duckdb.AsyncDuckDB,
+  ): Promise<Result<ScriptRun, ScriptFailure>>
 }
 
 export interface PipelineSession {
@@ -74,15 +112,23 @@ const detailOf = (cause: unknown): string => {
 }
 const identifier = (value: string): string => `"${value.replaceAll('"', '""')}"`
 
-export async function openPipeline(inputs: readonly SqlPreparationInput[], scripts: ScriptRuntime): Promise<Result<PipelineSession, PipelineRunProblem>> {
+export async function openPipeline(
+  inputs: readonly SqlPreparationInput[],
+  scripts: ScriptRuntime,
+): Promise<Result<PipelineSession, PipelineRunProblem>> {
   let engine: DuckDbEngine
-  try { engine = await isolatedDuckDbEngine() } catch (cause) {
+  try {
+    engine = await isolatedDuckDbEngine()
+  } catch (cause) {
     return err({ kind: 'engine-unavailable', detail: detailOf(cause) })
   }
   const namespace = `pipeline-${crypto.randomUUID()}`
   try {
-    const registered = isNonEmpty(inputs) ? await registerInputs(engine, inputs, namespace) : ok(null)
-    if (registered.ok) return ok({ engine, inputs: [...inputs], lifecycle: { current: 'open' }, scripts, namespace })
+    const registered = isNonEmpty(inputs)
+      ? await registerInputs(engine, inputs, namespace)
+      : ok(null)
+    if (registered.ok)
+      return ok({ engine, inputs: [...inputs], lifecycle: { current: 'open' }, scripts, namespace })
     await engine.db.terminate()
     return err({ kind: 'input', problem: registered.error })
   } catch (cause) {
@@ -92,9 +138,15 @@ export async function openPipeline(inputs: readonly SqlPreparationInput[], scrip
 }
 
 /** Registers one more file under an alias no other input uses, and returns the input the block now refers to. */
-export async function addPipelineInput(session: PipelineSession, file: File): Promise<Result<SqlPreparationInput, PipelineRunProblem>> {
+export async function addPipelineInput(
+  session: PipelineSession,
+  file: File,
+): Promise<Result<SqlPreparationInput, PipelineRunProblem>> {
   if (session.lifecycle.current === 'closed') return err({ kind: 'session-closed' })
-  const prepared = await prepareSqlInputs([file], new Set(session.inputs.map((input) => input.alias as string)))
+  const prepared = await prepareSqlInputs(
+    [file],
+    new Set(session.inputs.map((input) => input.alias as string)),
+  )
   if (!prepared.ok) return err({ kind: 'input', problem: prepared.error })
   const input = prepared.value[0]
   const registered = await registerInputs(session.engine, [input], session.namespace)
@@ -104,18 +156,32 @@ export async function addPipelineInput(session: PipelineSession, file: File): Pr
 }
 
 /** Reads a registered file again with one column's declaration changed, under the same alias. */
-export async function redeclarePipelineInput(session: PipelineSession, alias: SqlInputAlias, column: string, type: DeclaredType | null): Promise<Result<SqlPreparationInput, PipelineRunProblem>> {
+export async function redeclarePipelineInput(
+  session: PipelineSession,
+  alias: SqlInputAlias,
+  column: string,
+  type: DeclaredType | null,
+): Promise<Result<SqlPreparationInput, PipelineRunProblem>> {
   if (session.lifecycle.current === 'closed') return err({ kind: 'session-closed' })
   const index = session.inputs.findIndex((input) => input.alias === alias)
   if (index === -1) return err({ kind: 'unknown-input', alias })
-  const updated = await redeclareInput(session.engine, session.namespace, session.inputs[index]!, column, type)
+  const updated = await redeclareInput(
+    session.engine,
+    session.namespace,
+    session.inputs[index]!,
+    column,
+    type,
+  )
   if (!updated.ok) return err({ kind: 'input', problem: updated.error })
   session.inputs[index] = updated.value
   return ok(updated.value)
 }
 
 /** Drops a registered file's view and forgets it; the block that held it is the caller's to update. */
-export async function removePipelineInput(session: PipelineSession, alias: SqlInputAlias): Promise<void> {
+export async function removePipelineInput(
+  session: PipelineSession,
+  alias: SqlInputAlias,
+): Promise<void> {
   const index = session.inputs.findIndex((input) => input.alias === alias)
   if (index === -1 || session.lifecycle.current === 'closed') return
   const [removed] = session.inputs.splice(index, 1)
@@ -123,17 +189,28 @@ export async function removePipelineInput(session: PipelineSession, alias: SqlIn
     await connection.query(`DROP VIEW IF EXISTS ${identifier(alias)}`)
     return ok(null)
   })
-  await session.engine.db.dropFile(`${session.namespace}-${removed!.fingerprint}.${removed!.format}`).catch(() => undefined)
+  await session.engine.db
+    .dropFile(`${session.namespace}-${removed!.fingerprint}.${removed!.format}`)
+    .catch(() => undefined)
 }
 
 /** One connection for the work, closed afterwards; a session closed under it reports that instead of throwing. */
-async function withConnection<Value>(session: PipelineSession, work: (connection: duckdb.AsyncDuckDBConnection) => Promise<Result<Value, PipelineRunProblem>>): Promise<Result<Value, PipelineRunProblem>> {
+async function withConnection<Value>(
+  session: PipelineSession,
+  work: (connection: duckdb.AsyncDuckDBConnection) => Promise<Result<Value, PipelineRunProblem>>,
+): Promise<Result<Value, PipelineRunProblem>> {
   const lifecycle: { readonly current: 'open' | 'closed' } = session.lifecycle
   if (lifecycle.current === 'closed') return err({ kind: 'session-closed' })
   const failure = (cause: unknown): Result<never, PipelineRunProblem> =>
-    lifecycle.current === 'closed' ? err({ kind: 'session-closed' }) : err({ kind: 'engine-unavailable', detail: detailOf(cause) })
+    lifecycle.current === 'closed'
+      ? err({ kind: 'session-closed' })
+      : err({ kind: 'engine-unavailable', detail: detailOf(cause) })
   let connection: duckdb.AsyncDuckDBConnection
-  try { connection = await session.engine.db.connect() } catch (cause) { return failure(cause) }
+  try {
+    connection = await session.engine.db.connect()
+  } catch (cause) {
+    return failure(cause)
+  }
   try {
     return await work(connection)
   } catch (cause) {
@@ -152,7 +229,10 @@ export async function closePipeline(session: PipelineSession): Promise<void> {
 type Described = { readonly rowCount: number; readonly columns: NonEmptyArray<PreviewColumn> }
 
 /** A view's columns and row count. A view can be created and still fail to run, since DuckDB binds columns when the view is read; that failure is the detail. */
-async function describeView(connection: duckdb.AsyncDuckDBConnection, view: string): Promise<Result<Described, { readonly detail: string }>> {
+async function describeView(
+  connection: duckdb.AsyncDuckDBConnection,
+  view: string,
+): Promise<Result<Described, { readonly detail: string }>> {
   try {
     const [description, countTable] = await Promise.all([
       connection.query(`DESCRIBE SELECT * FROM ${identifier(view)}`),
@@ -175,29 +255,54 @@ async function describeView(connection: duckdb.AsyncDuckDBConnection, view: stri
  * carries the message, the blocks after it are marked skipped, and the blocks before it keep their
  * outcomes, so the canvas can show where the pipeline broke and the last good preview stays readable.
  */
-export async function runPipeline(session: PipelineSession, graph: PipelineGraph): Promise<Result<PipelineRun, PipelineRunProblem>> {
+export async function runPipeline(
+  session: PipelineSession,
+  graph: PipelineGraph,
+): Promise<Result<PipelineRun, PipelineRunProblem>> {
   const aliases = new Set(session.inputs.map((input) => input.alias as string))
   const draft = compileDraft(graph, aliases)
   const complete = compilePipeline(graph, aliases)
   const outcomes = new Map<PipelineBlockId, BlockOutcome>()
   for (const [id, detail] of draft.waiting) outcomes.set(id, { kind: 'waiting', detail })
   return withConnection(session, async (connection) => {
-    const inputs = graph.nodes.filter((node) => node.block.kind === 'input' && draft.views.has(node.id))
-    const describedInputs = await Promise.all(inputs.map((node) => describeView(connection, draft.views.get(node.id) ?? '')))
+    const inputs = graph.nodes.filter(
+      (node) => node.block.kind === 'input' && draft.views.has(node.id),
+    )
+    const describedInputs = await Promise.all(
+      inputs.map((node) => describeView(connection, draft.views.get(node.id) ?? '')),
+    )
     inputs.forEach((node, index) => {
       const described = describedInputs[index]!
-      outcomes.set(node.id, described.ok ? { kind: 'ran', ...described.value } : { kind: 'failed', detail: `the input file could not be read: ${described.error.detail}` })
+      outcomes.set(
+        node.id,
+        described.ok
+          ? { kind: 'ran', ...described.value }
+          : {
+              kind: 'failed',
+              detail: `the input file could not be read: ${described.error.detail}`,
+            },
+      )
     })
     const stopped = new Set<PipelineBlockId>()
     for (const step of draft.steps) {
-      if (step.inputIds.some((from) => stopped.has(from))) { outcomes.set(step.id, { kind: 'skipped' }); stopped.add(step.id); continue }
-      const fail = (detail: string, stdout?: string) => { outcomes.set(step.id, { kind: 'failed', detail, stdout }); stopped.add(step.id) }
+      if (step.inputIds.some((from) => stopped.has(from))) {
+        outcomes.set(step.id, { kind: 'skipped' })
+        stopped.add(step.id)
+        continue
+      }
+      const fail = (detail: string, stdout?: string) => {
+        outcomes.set(step.id, { kind: 'failed', detail, stdout })
+        stopped.add(step.id)
+      }
       let stdout: string | undefined
       // Only a script can report a single value; every other block produces a table.
       let shape: ScriptShape | undefined
       if (step.kind === 'script') {
         const ran = await session.scripts.run(step, connection, session.engine.db)
-        if (!ran.ok) { fail(ran.error.detail, ran.error.stdout); continue }
+        if (!ran.ok) {
+          fail(ran.error.detail, ran.error.stdout)
+          continue
+        }
         stdout = ran.value.stdout
         shape = ran.value.shape
       } else {
@@ -217,13 +322,24 @@ export async function runPipeline(session: PipelineSession, graph: PipelineGraph
 }
 
 /** The first rows of a block that ran; its columns and count are already known from the run. */
-export async function previewBlock(session: PipelineSession, view: string, id: PipelineBlockId, known: Described): Promise<Result<BlockPreview, PipelineRunProblem>> {
+export async function previewBlock(
+  session: PipelineSession,
+  view: string,
+  id: PipelineBlockId,
+  known: Described,
+): Promise<Result<BlockPreview, PipelineRunProblem>> {
   return withConnection(session, async (connection) => {
     try {
-      const table = await connection.query(`SELECT * FROM ${identifier(view)} LIMIT ${PREVIEW_ROWS}`)
+      const table = await connection.query(
+        `SELECT * FROM ${identifier(view)} LIMIT ${PREVIEW_ROWS}`,
+      )
       const rows: PreviewCell[][] = []
       for (let row = 0; row < table.numRows; row += 1) {
-        rows.push(known.columns.map((column) => previewCell(table.getChild(column.name)?.get(row), column.type)))
+        rows.push(
+          known.columns.map((column) =>
+            previewCell(table.getChild(column.name)?.get(row), column.type),
+          ),
+        )
       }
       return ok({ id, rowCount: known.rowCount, columns: known.columns, rows })
     } catch (cause) {
@@ -239,11 +355,20 @@ export interface PipelineOutput {
   readonly columns: NonEmptyArray<PreviewColumn>
 }
 
-export async function materializePipeline(session: PipelineSession, graph: PipelineGraph): Promise<Result<PipelineOutput, PipelineRunProblem>> {
-  const compiled = compilePipeline(graph, new Set(session.inputs.map((input) => input.alias as string)))
+export async function materializePipeline(
+  session: PipelineSession,
+  graph: PipelineGraph,
+): Promise<Result<PipelineOutput, PipelineRunProblem>> {
+  const compiled = compilePipeline(
+    graph,
+    new Set(session.inputs.map((input) => input.alias as string)),
+  )
   if (!compiled.ok) return err({ kind: 'wiring', problem: compiled.error })
   const required = compiled.value.views
-  const sourceGraph = { nodes: graph.nodes.filter((node) => required.has(node.id)), edges: graph.edges.filter((edge) => required.has(edge.to)) }
+  const sourceGraph = {
+    nodes: graph.nodes.filter((node) => required.has(node.id)),
+    edges: graph.edges.filter((edge) => required.has(edge.to)),
+  }
   const ran = await runPipeline(session, sourceGraph)
   if (!ran.ok) return ran
   if (!ran.value.complete.ok) return err({ kind: 'wiring', problem: ran.value.complete.error })
@@ -252,12 +377,26 @@ export async function materializePipeline(session: PipelineSession, graph: Pipel
   }
   const outputView = ran.value.complete.value.outputView
   return withConnection(session, async (connection) => {
-    const materialized = await materializeView(session.engine, connection, outputView, 'pipeline_prepared.parquet')
+    const materialized = await materializeView(
+      session.engine,
+      connection,
+      outputView,
+      'pipeline_prepared.parquet',
+    )
     if (!materialized.ok) return err({ kind: 'materialization', problem: materialized.error })
     // The recipe records the files the graph reads, not every file that was ever chosen.
-    const used = new Set(sourceGraph.nodes.flatMap((node) => node.block.kind === 'input' && node.block.file.kind === 'chosen' ? [node.block.file.alias as string] : []))
+    const used = new Set(
+      sourceGraph.nodes.flatMap((node) =>
+        node.block.kind === 'input' && node.block.file.kind === 'chosen'
+          ? [node.block.file.alias as string]
+          : [],
+      ),
+    )
     const descriptors = session.inputs.filter((input) => used.has(input.alias)).map(inputDescriptor)
-    return ok({ ...materialized.value, recipe: { kind: 'pipeline-derived', graph, inputs: descriptors } })
+    return ok({
+      ...materialized.value,
+      recipe: { kind: 'pipeline-derived', graph, inputs: descriptors },
+    })
   })
 }
 
@@ -283,16 +422,30 @@ export async function replayPipelineRecipe(
   }
 }
 
-export function describePipelineRunProblem(problem: PipelineRunProblem, name: (id: PipelineBlockId) => string): string {
+export function describePipelineRunProblem(
+  problem: PipelineRunProblem,
+  name: (id: PipelineBlockId) => string,
+): string {
   switch (problem.kind) {
-    case 'engine-unavailable': return `DuckDB could not start: ${problem.detail}`
-    case 'input': return describeSqlPreparationProblem(problem.problem)
-    case 'wiring': return describePipelineProblem(problem.problem, name)
-    case 'block-failed': return `${name(problem.id)} failed: ${problem.detail}`
-    case 'preview-failed': return `${name(problem.id)} could not be previewed: ${problem.detail}`
-    case 'materialization': return `The output could not be written: ${describeSqlPreparationProblem(problem.problem)}`
-    case 'session-closed': return 'The pipeline session has been closed. Choose the input files again.'
-    case 'unknown-input': return `No input file is named ${problem.alias}.`
-    default: { const exhaustive: never = problem; return exhaustive }
+    case 'engine-unavailable':
+      return `DuckDB could not start: ${problem.detail}`
+    case 'input':
+      return describeSqlPreparationProblem(problem.problem)
+    case 'wiring':
+      return describePipelineProblem(problem.problem, name)
+    case 'block-failed':
+      return `${name(problem.id)} failed: ${problem.detail}`
+    case 'preview-failed':
+      return `${name(problem.id)} could not be previewed: ${problem.detail}`
+    case 'materialization':
+      return `The output could not be written: ${describeSqlPreparationProblem(problem.problem)}`
+    case 'session-closed':
+      return 'The pipeline session has been closed. Choose the input files again.'
+    case 'unknown-input':
+      return `No input file is named ${problem.alias}.`
+    default: {
+      const exhaustive: never = problem
+      return exhaustive
+    }
   }
 }

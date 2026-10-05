@@ -13,7 +13,10 @@ export interface InterventionBarsView {
 }
 
 /** The interventional distribution of the read variable under the two settings, side by side: the visible difference between do and see. */
-export function interventionBarsOption(view: InterventionBarsView, theme: ChartTheme): EChartsCoreOption {
+export function interventionBarsOption(
+  view: InterventionBarsView,
+  theme: ChartTheme,
+): EChartsCoreOption {
   const description = `${view.read} under ${view.set} set low and set high: ${view.states.length} bins; the largest probabilities are ${formatStatistic('score', Math.max(...view.low)).text} and ${formatStatistic('score', Math.max(...view.high)).text}.`
   const lowName = `${view.set} set low`
   const highName = `${view.set} set high`
@@ -32,11 +35,27 @@ export function interventionBarsOption(view: InterventionBarsView, theme: ChartT
         return `${view.read} bin ${view.states[index] ?? ''}<br/>${lowName}: ${formatStatistic('score', view.low[index] ?? 0).text}<br/>${highName}: ${formatStatistic('score', view.high[index] ?? 0).text}`
       },
     },
-    xAxis: categoryAxis(theme, view.states.map((state) => `bin ${state}`), `${view.read} bin`),
+    xAxis: categoryAxis(
+      theme,
+      view.states.map((state) => `bin ${state}`),
+      `${view.read} bin`,
+    ),
     yAxis: { ...valueAxis(theme, 'probability'), min: 0, max: 1 },
     series: [
-      { type: 'bar', name: lowName, data: [...view.low], barMaxWidth: 28, itemStyle: { color: seriesColour(theme, 0) } },
-      { type: 'bar', name: highName, data: [...view.high], barMaxWidth: 28, itemStyle: { color: seriesColour(theme, 1) } },
+      {
+        type: 'bar',
+        name: lowName,
+        data: [...view.low],
+        barMaxWidth: 28,
+        itemStyle: { color: seriesColour(theme, 0) },
+      },
+      {
+        type: 'bar',
+        name: highName,
+        data: [...view.high],
+        barMaxWidth: 28,
+        itemStyle: { color: seriesColour(theme, 1) },
+      },
     ],
   }
 }

@@ -1,5 +1,5 @@
 import { RunActions } from '@/components/ui/RunActions'
-import {CountRegressionPanel} from './CountRegressionPanel'
+import { CountRegressionPanel } from './CountRegressionPanel'
 import { useWorkflow } from '@/components/WorkflowProvider'
 import { useTimeSeriesDraft } from './useTimeSeriesDraft'
 import type { LongRunDraft, TimeSeriesDraft } from '@/domain/timeSeriesDraft'
@@ -19,12 +19,30 @@ import { Orb } from '@/components/ui/Orb'
 import { Select } from '@/components/ui/Select'
 import { ColumnChecklist } from '@/components/ui/ColumnChecklist'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
-import { actionGap, button, chapterIntroSingle, field, fieldHint, fieldLabel, fieldRow, panel, sectionTitle, stepsStack } from '@/components/ui/recipes'
+import {
+  actionGap,
+  button,
+  chapterIntroSingle,
+  field,
+  fieldHint,
+  fieldLabel,
+  fieldRow,
+  panel,
+  sectionTitle,
+  stepsStack,
+} from '@/components/ui/recipes'
 import { SettingsStep } from '@/components/ui/SettingsStep'
 import { cn } from '@/lib/utils'
 import { isNumericDuckDbType, type ColumnId, type DatasetProfile } from '@/domain/dataset'
 import { assertNever, type NonEmptyArray } from '@/domain/dop'
-import { ARDL_TERMS, newTimeSeriesRunId, parseTimeSeriesRun, type ArdlTerms, type TimeSeriesRun, type TimeSeriesRunId } from '@/domain/timeSeries'
+import {
+  ARDL_TERMS,
+  newTimeSeriesRunId,
+  parseTimeSeriesRun,
+  type ArdlTerms,
+  type TimeSeriesRun,
+  type TimeSeriesRunId,
+} from '@/domain/timeSeries'
 import type { CountSeriesModelArtifact, CountSeriesModelId } from '@/domain/countSeries'
 import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
 import type { SelectedSource } from '@/domain/workflow'
@@ -48,28 +66,53 @@ export type TimeSeriesPanelProps = {
 
 type Props = TimeSeriesPanelProps
 export function TimeSeriesHeading() {
-  return <div>
-    <ChapterHeading className="mb-2">Time-series analysis</ChapterHeading>
-    <p className={chapterIntroSingle}>Analyse how observations change over time and how current values relate to earlier values. Estimate short-run dynamics and long-run relationships between series.</p>
-  </div>
+  return (
+    <div>
+      <ChapterHeading className="mb-2">Time-series analysis</ChapterHeading>
+      <p className={chapterIntroSingle}>
+        Analyse how observations change over time and how current values relate to earlier values.
+        Estimate short-run dynamics and long-run relationships between series.
+      </p>
+    </div>
+  )
 }
 
-function LongRunModel({ model, selector, ...props }: Props & { readonly model: Model; readonly selector: ReactNode }) {
-  const columns = props.profile.columns.filter((c) => props.prepared.columns.includes(c.id) && isNumericDuckDbType(c.duckdbType))
-  const { selected, maxLag, terms, deterministic, significance, forecastSteps } = useTimeSeriesDraft(props.prepared.id, state => state.longRun[model])
-  const change = useWorkflow(state => state.changeTimeSeries)
-  const setSelected = (value: LongRunDraft['selected']) => change(props.prepared.id, { type: 'long-run', field: 'selected', value, model })
-  const setMaxLag = (value: LongRunDraft['maxLag']) => change(props.prepared.id, { type: 'long-run', field: 'maxLag', value, model })
-  const setTerms = (value: LongRunDraft['terms']) => change(props.prepared.id, { type: 'long-run', field: 'terms', value, model })
-  const setDeterministic = (value: LongRunDraft['deterministic']) => change(props.prepared.id, { type: 'long-run', field: 'deterministic', value, model })
-  const setSignificance = (value: LongRunDraft['significance']) => change(props.prepared.id, { type: 'long-run', field: 'significance', value, model })
-  const setForecastSteps = (value: LongRunDraft['forecastSteps']) => change(props.prepared.id, { type: 'long-run', field: 'forecastSteps', value, model })
+function LongRunModel({
+  model,
+  selector,
+  ...props
+}: Props & { readonly model: Model; readonly selector: ReactNode }) {
+  const columns = props.profile.columns.filter(
+    (c) => props.prepared.columns.includes(c.id) && isNumericDuckDbType(c.duckdbType),
+  )
+  const { selected, maxLag, terms, deterministic, significance, forecastSteps } =
+    useTimeSeriesDraft(props.prepared.id, (state) => state.longRun[model])
+  const change = useWorkflow((state) => state.changeTimeSeries)
+  const setSelected = (value: LongRunDraft['selected']) =>
+    change(props.prepared.id, { type: 'long-run', field: 'selected', value, model })
+  const setMaxLag = (value: LongRunDraft['maxLag']) =>
+    change(props.prepared.id, { type: 'long-run', field: 'maxLag', value, model })
+  const setTerms = (value: LongRunDraft['terms']) =>
+    change(props.prepared.id, { type: 'long-run', field: 'terms', value, model })
+  const setDeterministic = (value: LongRunDraft['deterministic']) =>
+    change(props.prepared.id, { type: 'long-run', field: 'deterministic', value, model })
+  const setSignificance = (value: LongRunDraft['significance']) =>
+    change(props.prepared.id, { type: 'long-run', field: 'significance', value, model })
+  const setForecastSteps = (value: LongRunDraft['forecastSteps']) =>
+    change(props.prepared.id, { type: 'long-run', field: 'forecastSteps', value, model })
   const session = useJob(`time-series:${model}`)
   const { job } = session
-  useRunActivity(props.onActivity, job.kind === 'running' ? { label: model.toUpperCase(), progress: null } : null)
+  useRunActivity(
+    props.onActivity,
+    job.kind === 'running' ? { label: model.toUpperCase(), progress: null } : null,
+  )
   const runs = props.runs.filter((run) => run.kind === model)
-  const minimumRows = model === 'ardl' ? 6 * (maxLag + 1) + 10 : (maxLag + 2) * selected.length * 3 + 10
-  const ready = selected.length >= 2 && (model !== 'ardl' || selected.length === 2) && props.prepared.observations >= minimumRows
+  const minimumRows =
+    model === 'ardl' ? 6 * (maxLag + 1) + 10 : (maxLag + 2) * selected.length * 3 + 10
+  const ready =
+    selected.length >= 2 &&
+    (model !== 'ardl' || selected.length === 2) &&
+    props.prepared.observations >= minimumRows
 
   const run = async () => {
     if (!ready || selected[0] === undefined) return
@@ -77,99 +120,419 @@ function LongRunModel({ model, selector, ...props }: Props & { readonly model: M
     if (current === null) return
     const fail = (detail: string) => session.fail(current, detail)
     try {
-      const [{ materialisePrepared, describePreparedMaterialisationProblem }, analysis] = await Promise.all([import('@/data/prepared'), import('@/analysis/client')])
-      const matrix = await materialisePrepared(props.source, props.profile, props.prepared, selected as NonEmptyArray<ColumnId>)
+      const [{ materialisePrepared, describePreparedMaterialisationProblem }, analysis] =
+        await Promise.all([import('@/data/prepared'), import('@/analysis/client')])
+      const matrix = await materialisePrepared(
+        props.source,
+        props.profile,
+        props.prepared,
+        selected as NonEmptyArray<ColumnId>,
+      )
       if (!session.current(current)) return
-      if (!matrix.ok) { fail(describePreparedMaterialisationProblem(matrix.error)); return }
+      if (!matrix.ok) {
+        fail(describePreparedMaterialisationProblem(matrix.error))
+        return
+      }
       const { values, rowCount, columns: used, timeAxis } = matrix.value
-      if (timeAxis === null) { fail('The prepared time series has no recorded time key.'); return }
-      const plotTime = { kind: timeAxis.kind, values: Array.from(timeAxis.kind === 'calendar' ? timeAxis.timestamps : timeAxis.values) }
+      if (timeAxis === null) {
+        fail('The prepared time series has no recorded time key.')
+        return
+      }
+      const plotTime = {
+        kind: timeAxis.kind,
+        values: Array.from(timeAxis.kind === 'calendar' ? timeAxis.timestamps : timeAxis.values),
+      }
       const variables = used.map(({ id, name }) => ({ id, name }))
-      const identity = { id: newTimeSeriesRunId(), preparedDataset: props.prepared.id, createdAt: new Date().toISOString(), plotTime }
+      const identity = {
+        id: newTimeSeriesRunId(),
+        preparedDataset: props.prepared.id,
+        createdAt: new Date().toISOString(),
+        plotTime,
+      }
       const fitted = await (async () => {
         switch (model) {
           case 'ardl': {
             const specification = { maxLag, terms }
             const choice = ARDL_TERMS[terms]
-            const evidence = await analysis.runArdlPss(values, rowCount, used.length, { outcome: 0, treatment: 1, maxLag, trend: choice.trend, case: choice.case })
-            return evidence.ok ? parseTimeSeriesRun({ ...identity, kind: 'ardl', outcome: variables[0], predictor: variables[1], specification, evidence: evidence.value }) : { ok: false as const, error: describeAnalysisWorkerProblem(evidence.error) }
+            const evidence = await analysis.runArdlPss(values, rowCount, used.length, {
+              outcome: 0,
+              treatment: 1,
+              maxLag,
+              trend: choice.trend,
+              case: choice.case,
+            })
+            return evidence.ok
+              ? parseTimeSeriesRun({
+                  ...identity,
+                  kind: 'ardl',
+                  outcome: variables[0],
+                  predictor: variables[1],
+                  specification,
+                  evidence: evidence.value,
+                })
+              : { ok: false as const, error: describeAnalysisWorkerProblem(evidence.error) }
           }
           case 'vecm': {
-            const specification = { maxLags: maxLag, deterministic, significance, forecastSteps:forecastSteps.trim()===''?null:Number(forecastSteps) }
-            const evidence = await analysis.runVecm(values, rowCount, used.length, { endogenous: used.map((_, i) => i), maxLags: maxLag, deterministic, significance: [90, 95, 99].indexOf(significance), breakIndex: null, forecastSteps:specification.forecastSteps })
-            return evidence.ok ? parseTimeSeriesRun({ ...identity, kind: 'vecm', variables, specification, evidence: evidence.value }) : { ok: false as const, error: describeAnalysisWorkerProblem(evidence.error) }
+            const specification = {
+              maxLags: maxLag,
+              deterministic,
+              significance,
+              forecastSteps: forecastSteps.trim() === '' ? null : Number(forecastSteps),
+            }
+            const evidence = await analysis.runVecm(values, rowCount, used.length, {
+              endogenous: used.map((_, i) => i),
+              maxLags: maxLag,
+              deterministic,
+              significance: [90, 95, 99].indexOf(significance),
+              breakIndex: null,
+              forecastSteps: specification.forecastSteps,
+            })
+            return evidence.ok
+              ? parseTimeSeriesRun({
+                  ...identity,
+                  kind: 'vecm',
+                  variables,
+                  specification,
+                  evidence: evidence.value,
+                })
+              : { ok: false as const, error: describeAnalysisWorkerProblem(evidence.error) }
           }
-          default: return assertNever(model)
+          default:
+            return assertNever(model)
         }
       })()
       if (!session.current(current)) return
-      if (!fitted.ok) { fail(fitted.error); return }
+      if (!fitted.ok) {
+        fail(fitted.error)
+        return
+      }
       props.onRun(fitted.value)
       session.finish(current)
-    } catch (cause: unknown) { fail(cause instanceof Error ? cause.message : String(cause)) }
+    } catch (cause: unknown) {
+      fail(cause instanceof Error ? cause.message : String(cause))
+    }
   }
 
-  const controls = <><fieldset disabled={job.kind === 'running'} className="m-0 mt-8 min-w-0 border-0 p-0">
-    <legend className="sr-only">Model specification</legend>
-    <div className={stepsStack}>
-      <SettingsStep number={1} title="Choose the series">
-        {model === 'ardl' ? <div className={fieldRow.two}>
-          <label className="block"><span className={fieldLabel}>Outcome series</span><Select className={field('text', 'mt-1')} value={selected[0] ?? ''} onChange={(e) => { const id = columns.find((c) => c.id === e.target.value)?.id; setSelected(id === undefined ? [] : [id, ...selected.slice(1).filter((other) => other !== id)]) }}><option value="">Choose outcome</option>{columns.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></label>
-          <label className="block"><span className={fieldLabel}>Predictor series</span><Select disabled={selected[0] === undefined} className={field('text', 'mt-1')} value={selected[1] ?? ''} onChange={(e) => { const id = columns.find((c) => c.id === e.target.value)?.id; if (selected[0] !== undefined) setSelected(id === undefined ? [selected[0]] : [selected[0], id]) }}><option value="">Choose predictor</option>{columns.filter((c) => c.id !== selected[0]).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></label>
-        </div> : <div className="min-w-0"><ColumnChecklist title="Series in the system" help="Choose at least two series. The model estimates their relationships jointly." columns={columns} selected={selected} onChange={setSelected} /></div>}
-      </SettingsStep>
-      <SettingsStep number={2} title="Fit the model">
-        <div className={fieldRow.three}>
-          {model === 'ardl' ? <label className="block"><span className={fieldLabel}>Deterministic terms</span><Select className={field('text', 'mt-1')} value={terms} onChange={(e) => { const entry = Object.keys(ARDL_TERMS).find((key) => key === e.target.value); if (entry !== undefined) setTerms(entry as ArdlTerms) }}>{Object.entries(ARDL_TERMS).map(([key, value]) => <option key={key} value={key}>{value.label}</option>)}</Select></label> : <>
-            <label className="block"><span className={fieldLabel}>Deterministic terms</span><Select className={field('text', 'mt-1')} value={deterministic} onChange={(e) => { const value = e.target.value; if (value === 'n' || value === 'co' || value === 'ci' || value === 'coli') setDeterministic(value) }}><option value="n">None</option><option value="ci">Constant within equilibrium</option><option value="co">Constant outside equilibrium</option><option value="coli">Constant outside, trend within equilibrium</option></Select></label>
-            <label className="block"><span className={fieldLabel}>Rank-test confidence level</span><Select className={field('text', 'mt-1')} value={significance} onChange={(e) => { const value = Number(e.target.value); if (value === 90 || value === 95 || value === 99) setSignificance(value) }}><option value={90}>90%</option><option value={95}>95%</option><option value={99}>99%</option></Select></label>
-          </>}
-          <label className="block"><span className={fieldLabel}>Maximum lag</span><input type="number" min={1} max={24} className={field('text', 'mt-1')} value={maxLag} onChange={(e) => setMaxLag(Math.max(1, Math.min(24, Math.floor(Number(e.target.value) || 1))))} /></label>
+  const controls = (
+    <>
+      <fieldset disabled={job.kind === 'running'} className="m-0 mt-8 min-w-0 border-0 p-0">
+        <legend className="sr-only">Model specification</legend>
+        <div className={stepsStack}>
+          <SettingsStep number={1} title="Choose the series">
+            {model === 'ardl' ? (
+              <div className={fieldRow.two}>
+                <label className="block">
+                  <span className={fieldLabel}>Outcome series</span>
+                  <Select
+                    className={field('text', 'mt-1')}
+                    value={selected[0] ?? ''}
+                    onChange={(e) => {
+                      const id = columns.find((c) => c.id === e.target.value)?.id
+                      setSelected(
+                        id === undefined
+                          ? []
+                          : [id, ...selected.slice(1).filter((other) => other !== id)],
+                      )
+                    }}
+                  >
+                    <option value="">Choose outcome</option>
+                    {columns.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </Select>
+                </label>
+                <label className="block">
+                  <span className={fieldLabel}>Predictor series</span>
+                  <Select
+                    disabled={selected[0] === undefined}
+                    className={field('text', 'mt-1')}
+                    value={selected[1] ?? ''}
+                    onChange={(e) => {
+                      const id = columns.find((c) => c.id === e.target.value)?.id
+                      if (selected[0] !== undefined)
+                        setSelected(id === undefined ? [selected[0]] : [selected[0], id])
+                    }}
+                  >
+                    <option value="">Choose predictor</option>
+                    {columns
+                      .filter((c) => c.id !== selected[0])
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                  </Select>
+                </label>
+              </div>
+            ) : (
+              <div className="min-w-0">
+                <ColumnChecklist
+                  title="Series in the system"
+                  help="Choose at least two series. The model estimates their relationships jointly."
+                  columns={columns}
+                  selected={selected}
+                  onChange={setSelected}
+                />
+              </div>
+            )}
+          </SettingsStep>
+          <SettingsStep number={2} title="Fit the model">
+            <div className={fieldRow.three}>
+              {model === 'ardl' ? (
+                <label className="block">
+                  <span className={fieldLabel}>Deterministic terms</span>
+                  <Select
+                    className={field('text', 'mt-1')}
+                    value={terms}
+                    onChange={(e) => {
+                      const entry = Object.keys(ARDL_TERMS).find((key) => key === e.target.value)
+                      if (entry !== undefined) setTerms(entry as ArdlTerms)
+                    }}
+                  >
+                    {Object.entries(ARDL_TERMS).map(([key, value]) => (
+                      <option key={key} value={key}>
+                        {value.label}
+                      </option>
+                    ))}
+                  </Select>
+                </label>
+              ) : (
+                <>
+                  <label className="block">
+                    <span className={fieldLabel}>Deterministic terms</span>
+                    <Select
+                      className={field('text', 'mt-1')}
+                      value={deterministic}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        if (value === 'n' || value === 'co' || value === 'ci' || value === 'coli')
+                          setDeterministic(value)
+                      }}
+                    >
+                      <option value="n">None</option>
+                      <option value="ci">Constant within equilibrium</option>
+                      <option value="co">Constant outside equilibrium</option>
+                      <option value="coli">Constant outside, trend within equilibrium</option>
+                    </Select>
+                  </label>
+                  <label className="block">
+                    <span className={fieldLabel}>Rank-test confidence level</span>
+                    <Select
+                      className={field('text', 'mt-1')}
+                      value={significance}
+                      onChange={(e) => {
+                        const value = Number(e.target.value)
+                        if (value === 90 || value === 95 || value === 99) setSignificance(value)
+                      }}
+                    >
+                      <option value={90}>90%</option>
+                      <option value={95}>95%</option>
+                      <option value={99}>99%</option>
+                    </Select>
+                  </label>
+                </>
+              )}
+              <label className="block">
+                <span className={fieldLabel}>Maximum lag</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={24}
+                  className={field('text', 'mt-1')}
+                  value={maxLag}
+                  onChange={(e) =>
+                    setMaxLag(Math.max(1, Math.min(24, Math.floor(Number(e.target.value) || 1))))
+                  }
+                />
+              </label>
+            </div>
+            {selected.length >= 2 && props.prepared.observations < minimumRows && (
+              <p role="status" className="m-0 text-body text-muted">
+                This specification needs at least {minimumRows} prepared observations.
+              </p>
+            )}
+          </SettingsStep>
+          {model === 'vecm' && (
+            <SettingsStep number={3} title="Forecast">
+              <label className="block max-w-xs">
+                <span className={fieldLabel}>Forecast periods</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={200}
+                  className={field('text', 'mt-1')}
+                  placeholder="No forecast"
+                  value={forecastSteps}
+                  onChange={(e) => setForecastSteps(e.target.value)}
+                />
+                <span className={fieldHint}>Leave blank to fit without forecasting.</span>
+              </label>
+            </SettingsStep>
+          )}
         </div>
-        {selected.length >= 2 && props.prepared.observations < minimumRows && <p role="status" className="m-0 text-body text-muted">This specification needs at least {minimumRows} prepared observations.</p>}
-      </SettingsStep>
-      {model === 'vecm' && <SettingsStep number={3} title="Forecast">
-        <label className="block max-w-xs"><span className={fieldLabel}>Forecast periods</span><input type="number" min={1} max={200} className={field('text','mt-1')} placeholder="No forecast" value={forecastSteps} onChange={e=>setForecastSteps(e.target.value)} /><span className={fieldHint}>Leave blank to fit without forecasting.</span></label>
-      </SettingsStep>}
-    </div>
-  </fieldset>
-  <RunActions className={actionGap} running={job.kind === 'running'} onCancel={session.cancel} orbLabel={`${model.toUpperCase()} running`}><button type="button" className={button('signal')} disabled={!ready || session.blocked} aria-busy={job.kind === 'running'} onClick={job.kind === 'running' ? undefined : () => void run()}>Fit {model.toUpperCase()}</button></RunActions></>
+      </fieldset>
+      <RunActions
+        className={actionGap}
+        running={job.kind === 'running'}
+        onCancel={session.cancel}
+        orbLabel={`${model.toUpperCase()} running`}
+      >
+        <button
+          type="button"
+          className={button('signal')}
+          disabled={!ready || session.blocked}
+          aria-busy={job.kind === 'running'}
+          onClick={job.kind === 'running' ? undefined : () => void run()}
+        >
+          Fit {model.toUpperCase()}
+        </button>
+      </RunActions>
+    </>
+  )
 
-  return <WorkbenchLayout id={`time-series-${model}`}
-    bottom={{ trigger: { label: 'History', icon: 'history' }, title: `Time-series runs (${runs.length})`, defaultSize: 150, body: <TimeSeriesHistory entries={runs} onDelete={(entry) => props.onDeleteRun(entry.id)} /> }}
-    inspector={{ trigger: { label: 'Requirements', icon: 'contract' }, title: 'Data and method requirements', body: <TimeSeriesRequirements method={TIME_SERIES_METHODS[model]} prepared={props.prepared} source={props.source.name} /> }}
-    stage={<section className="@container/panel flex flex-col gap-5">
-      <TimeSeriesHeading />
-      <section className={panel('p-(--panel-space)')} aria-label="Time-series setup">
-        {selector}
-        {controls}
-        <span role="status" className="sr-only">{job.kind === 'running' ? `Fitting ${model.toUpperCase()}…` : ''}</span>
-        <JobNotice job={job} />
-      </section>
-      {runs.length === 0 && <p className="text-body text-muted">Choose series and a model specification to begin.</p>}
-      {runs.length > 0 && <h3 className={`${sectionTitle} m-0`}>Results</h3>}
-      {runs.slice(-1).map((saved) => <TimeSeriesRunResult key={saved.id} run={saved} />)}
-    </section>} />
+  return (
+    <WorkbenchLayout
+      id={`time-series-${model}`}
+      bottom={{
+        trigger: { label: 'History', icon: 'history' },
+        title: `Time-series runs (${runs.length})`,
+        defaultSize: 150,
+        body: (
+          <TimeSeriesHistory entries={runs} onDelete={(entry) => props.onDeleteRun(entry.id)} />
+        ),
+      }}
+      inspector={{
+        trigger: { label: 'Requirements', icon: 'contract' },
+        title: 'Data and method requirements',
+        body: (
+          <TimeSeriesRequirements
+            method={TIME_SERIES_METHODS[model]}
+            prepared={props.prepared}
+            source={props.source.name}
+          />
+        ),
+      }}
+      stage={
+        <section className="@container/panel flex flex-col gap-5">
+          <TimeSeriesHeading />
+          <section className={panel('p-(--panel-space)')} aria-label="Time-series setup">
+            {selector}
+            {controls}
+            <span role="status" className="sr-only">
+              {job.kind === 'running' ? `Fitting ${model.toUpperCase()}…` : ''}
+            </span>
+            <JobNotice job={job} />
+          </section>
+          {runs.length === 0 && (
+            <p className="text-body text-muted">
+              Choose series and a model specification to begin.
+            </p>
+          )}
+          {runs.length > 0 && <h3 className={`${sectionTitle} m-0`}>Results</h3>}
+          {runs.slice(-1).map((saved) => (
+            <TimeSeriesRunResult key={saved.id} run={saved} />
+          ))}
+        </section>
+      }
+    />
+  )
 }
 
-export function TimeSeriesPanel(props:Omit<Props,'prepared'>&{readonly prepared:PreparedDatasetArtifact}) {
-  if(props.prepared.kind==='prepared-time-series') return <RegularTimeSeriesPanel {...props} prepared={props.prepared}/>
-  return <CountRegressionPanel {...props}/>
+export function TimeSeriesPanel(
+  props: Omit<Props, 'prepared'> & { readonly prepared: PreparedDatasetArtifact },
+) {
+  if (props.prepared.kind === 'prepared-time-series')
+    return <RegularTimeSeriesPanel {...props} prepared={props.prepared} />
+  return <CountRegressionPanel {...props} />
 }
 function RegularTimeSeriesPanel(props: Props) {
-  const analysis = useTimeSeriesDraft(props.prepared.id, state => state.analysis)
-  const change = useWorkflow(state => state.changeTimeSeries)
-  const setAnalysis = (analysis: TimeSeriesDraft['analysis']) => change(props.prepared.id, { type: 'analysis', analysis })
+  const analysis = useTimeSeriesDraft(props.prepared.id, (state) => state.analysis)
+  const change = useWorkflow((state) => state.changeTimeSeries)
+  const setAnalysis = (analysis: TimeSeriesDraft['analysis']) =>
+    change(props.prepared.id, { type: 'analysis', analysis })
   const [busy, setBusy] = useState(false)
   const report = props.onActivity
-  const onActivity = useCallback((activity: RunActivity | null) => { setBusy(activity !== null); report?.(activity) }, [report])
-  const selector = <SegmentedControl variant="line" size="sm" ariaLabel="Time-series analysis type" value={analysis} onChange={setAnalysis} disabled={busy} options={[{ value: 'count', label: 'Count models' }, { value: 'ardl', label: 'ARDL' }, { value: 'vecm', label: 'VECM' }, { value: 'interrupted', label: 'Interrupted series' }, {value:'regression',label:'Count regression'}]} />
-  if (analysis === 'regression') return <CountRegressionPanel {...props} selector={selector} onActivity={onActivity}/>
-  if (analysis === 'ardl') return <ArdlModelPanel {...props} selector={selector} onActivity={onActivity} />
-  if (analysis === 'interrupted') return <InterruptedSeriesPanel {...props} selector={selector} onActivity={onActivity} />
-  if (analysis === 'vecm') return <LongRunModel key={analysis} {...props} model={analysis} selector={selector} onActivity={onActivity} />
-  return <WorkbenchLayout id="time-series-count" bottom={{ trigger: { label: 'History', icon: 'history' }, title: `Count-model runs (${props.counts.length})`, defaultSize: 150, body: <TimeSeriesHistory entries={props.counts} onDelete={(entry) => props.onDeleteCount(entry.id)} /> }} inspector={{ trigger: { label: 'Requirements', icon: 'contract' }, title: 'Data and method requirements', body: <TimeSeriesRequirements method={COUNT_SERIES_DIAGNOSTIC_METHODS[0]} prepared={props.prepared} source={props.source.name} /> }} stage={<section className="@container/panel flex flex-col gap-5">
-    <TimeSeriesHeading />
-    <CountSeriesCard selector={selector} source={props.source} profile={props.profile} prepared={props.prepared} artifacts={props.counts} onArtifact={props.onCount} onActivity={onActivity} />
-  </section>} />
+  const onActivity = useCallback(
+    (activity: RunActivity | null) => {
+      setBusy(activity !== null)
+      report?.(activity)
+    },
+    [report],
+  )
+  const selector = (
+    <SegmentedControl
+      variant="line"
+      size="sm"
+      ariaLabel="Time-series analysis type"
+      value={analysis}
+      onChange={setAnalysis}
+      disabled={busy}
+      options={[
+        { value: 'count', label: 'Count models' },
+        { value: 'ardl', label: 'ARDL' },
+        { value: 'vecm', label: 'VECM' },
+        { value: 'interrupted', label: 'Interrupted series' },
+        { value: 'regression', label: 'Count regression' },
+      ]}
+    />
+  )
+  if (analysis === 'regression')
+    return <CountRegressionPanel {...props} selector={selector} onActivity={onActivity} />
+  if (analysis === 'ardl')
+    return <ArdlModelPanel {...props} selector={selector} onActivity={onActivity} />
+  if (analysis === 'interrupted')
+    return <InterruptedSeriesPanel {...props} selector={selector} onActivity={onActivity} />
+  if (analysis === 'vecm')
+    return (
+      <LongRunModel
+        key={analysis}
+        {...props}
+        model={analysis}
+        selector={selector}
+        onActivity={onActivity}
+      />
+    )
+  return (
+    <WorkbenchLayout
+      id="time-series-count"
+      bottom={{
+        trigger: { label: 'History', icon: 'history' },
+        title: `Count-model runs (${props.counts.length})`,
+        defaultSize: 150,
+        body: (
+          <TimeSeriesHistory
+            entries={props.counts}
+            onDelete={(entry) => props.onDeleteCount(entry.id)}
+          />
+        ),
+      }}
+      inspector={{
+        trigger: { label: 'Requirements', icon: 'contract' },
+        title: 'Data and method requirements',
+        body: (
+          <TimeSeriesRequirements
+            method={COUNT_SERIES_DIAGNOSTIC_METHODS[0]}
+            prepared={props.prepared}
+            source={props.source.name}
+          />
+        ),
+      }}
+      stage={
+        <section className="@container/panel flex flex-col gap-5">
+          <TimeSeriesHeading />
+          <CountSeriesCard
+            selector={selector}
+            source={props.source}
+            profile={props.profile}
+            prepared={props.prepared}
+            artifacts={props.counts}
+            onArtifact={props.onCount}
+            onActivity={onActivity}
+          />
+        </section>
+      }
+    />
+  )
 }

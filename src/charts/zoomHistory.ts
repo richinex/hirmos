@@ -20,16 +20,22 @@ const DEPTH = 20
 export const EMPTY_ZOOM_HISTORY: ZoomHistory = []
 
 /** Record the view being left; the oldest levels fall away beyond the depth. */
-export const pushZoom = (history: ZoomHistory, leaving: ZoomTarget): ZoomHistory => [...history, leaving].slice(-DEPTH)
+export const pushZoom = (history: ZoomHistory, leaving: ZoomTarget): ZoomHistory =>
+  [...history, leaving].slice(-DEPTH)
 
 /** Step back one level: the view to show again, and the history without it. */
-export const popZoom = (history: ZoomHistory): { readonly history: ZoomHistory; readonly target: ZoomTarget } =>
+export const popZoom = (
+  history: ZoomHistory,
+): { readonly history: ZoomHistory; readonly target: ZoomTarget } =>
   history.length === 0
     ? { history, target: WHOLE_AXIS }
     : { history: history.slice(0, -1), target: history[history.length - 1] }
 
 /** A brush is a zoom only when it spans something; a click or a hair-width drag is not a request to zoom. */
-export const rangeOf = (bounds: readonly [number, number], minimumSpan: number): ZoomRange | null => {
+export const rangeOf = (
+  bounds: readonly [number, number],
+  minimumSpan: number,
+): ZoomRange | null => {
   const start = Math.min(bounds[0], bounds[1])
   const end = Math.max(bounds[0], bounds[1])
   return end - start < minimumSpan ? null : { start, end }

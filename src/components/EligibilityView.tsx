@@ -7,14 +7,20 @@ import type { LevelIssueAction } from '@/domain/stationarityAssessment'
 
 const actionLabel = (action: LevelIssueAction): string => {
   switch (action) {
-    case 'run-stationarity-tests': return 'Run stationarity tests'
-    case 'test-first-difference': return 'Test the first difference'
-    default: return assertNever(action)
+    case 'run-stationarity-tests':
+      return 'Run stationarity tests'
+    case 'test-first-difference':
+      return 'Test the first difference'
+    default:
+      return assertNever(action)
   }
 }
 
 /** Concise pre-run status. Detailed conditions and evidence are centralised in MethodCaveats. */
-export function EligibilityView({ eligibility, subject = 'this prepared dataset' }: {
+export function EligibilityView({
+  eligibility,
+  subject = 'this prepared dataset',
+}: {
   readonly eligibility: MethodEligibility
   /** What the refusal is about, for the headline: "this prepared dataset", "this study". */
   readonly subject?: string
@@ -31,14 +37,24 @@ export function EligibilityView({ eligibility, subject = 'this prepared dataset'
       // One line per group of series that share a reason; the series are listed in the requirements panel,
       // and the one action is the test that is missing.
       const groups = eligibility.unresolved.flatMap(stageGroups)
-      const action = groups.map((group) => group.action).find((candidate) => candidate !== null) ?? null
+      const action =
+        groups.map((group) => group.action).find((candidate) => candidate !== null) ?? null
       return (
         <Alert tone="warn" live={false} className="mt-4" testId="eligibility-notice">
           <p className="m-0">Review required; the estimator remains runnable</p>
-          {groups.map((group) => <p key={group.summary} className="mb-0 mt-1 text-muted">{group.summary}</p>)}
+          {groups.map((group) => (
+            <p key={group.summary} className="mb-0 mt-1 text-muted">
+              {group.summary}
+            </p>
+          ))}
           {action !== null && openStationarityTests !== null && (
-            <button type="button" className="mt-2 inline-flex items-center gap-1 text-body font-medium text-link" onClick={openStationarityTests}>
-              {actionLabel(action)}<Icon name="arrow_forward" size={16} />
+            <button
+              type="button"
+              className="mt-2 inline-flex items-center gap-1 text-body font-medium text-link"
+              onClick={openStationarityTests}
+            >
+              {actionLabel(action)}
+              <Icon name="arrow_forward" size={16} />
             </button>
           )}
         </Alert>
@@ -55,6 +71,7 @@ export function EligibilityView({ eligibility, subject = 'this prepared dataset'
           </ul>
         </Alert>
       )
-    default: return assertNever(eligibility)
+    default:
+      return assertNever(eligibility)
   }
 }

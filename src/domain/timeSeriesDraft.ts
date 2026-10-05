@@ -1,5 +1,5 @@
-import {initialCountRegression,type CountRegressionDraft} from './countRegression'
-import {initialPanelRegression,type PanelRegressionDraft} from './panelRegression'
+import { initialCountRegression, type CountRegressionDraft } from './countRegression'
+import { initialPanelRegression, type PanelRegressionDraft } from './panelRegression'
 import type { ColumnId } from './dataset'
 import { assertNever, type NonEmptyArray } from './dop'
 import type { CountSeriesLink } from './countSeries'
@@ -7,8 +7,13 @@ import type { PreparedDatasetVersionId } from './preprocessing'
 import type { ArdlTerms, TimeSeriesRun } from './timeSeries'
 import type { Workflow } from './workflow'
 
-export type Role = { readonly kind: 'unused' } | { readonly kind: 'predictor'; readonly lag: string } | { readonly kind: 'fixed' }
-export type Future = { readonly kind: 'none' } | { readonly kind: 'scenario'; readonly columns: Readonly<Record<string, string>> }
+export type Role =
+  | { readonly kind: 'unused' }
+  | { readonly kind: 'predictor'; readonly lag: string }
+  | { readonly kind: 'fixed' }
+export type Future =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'scenario'; readonly columns: Readonly<Record<string, string>> }
 export type Mode = 'fixed' | 'search' | 'rFixed' | 'rHorizontal' | 'rGrid'
 export interface ArdlDraft {
   readonly outcome: ColumnId | null
@@ -22,7 +27,7 @@ export interface ArdlDraft {
   readonly terms: ArdlTerms
   readonly horizon: string
   readonly future: Future
-  readonly omitted: readonly {readonly column:ColumnId;readonly lag:number}[]
+  readonly omitted: readonly { readonly column: ColumnId; readonly lag: number }[]
 }
 export interface LongRunDraft {
   readonly selected: readonly ColumnId[]
@@ -73,12 +78,17 @@ export interface TimeSeriesDraft {
   readonly count: CountDraft
   readonly interrupted: InterruptedDraft
 }
-type FieldEvent<T, Kind extends string> = { [K in keyof T]: { readonly type: Kind; readonly field: K; readonly value: T[K] } }[keyof T]
+type FieldEvent<T, Kind extends string> = {
+  [K in keyof T]: { readonly type: Kind; readonly field: K; readonly value: T[K] }
+}[keyof T]
 export type TimeSeriesEvent =
-  | {readonly type:'panel-regression';readonly value:PanelRegressionDraft}
-  | {readonly type:'regression';readonly value:CountRegressionDraft}
-  | {readonly type:'cohort-regression';readonly value:CountRegressionDraft}
-  | {readonly type:'regression-design';readonly value:import('./regressionDesigns').RegressionDesign}
+  | { readonly type: 'panel-regression'; readonly value: PanelRegressionDraft }
+  | { readonly type: 'regression'; readonly value: CountRegressionDraft }
+  | { readonly type: 'cohort-regression'; readonly value: CountRegressionDraft }
+  | {
+      readonly type: 'regression-design'
+      readonly value: import('./regressionDesigns').RegressionDesign
+    }
   | { readonly type: 'analysis'; readonly analysis: TimeSeriesDraft['analysis'] }
   | FieldEvent<ArdlDraft, 'ardl'>
   | FieldEvent<CountDraft, 'count'>
@@ -86,10 +96,22 @@ export type TimeSeriesEvent =
   | (FieldEvent<LongRunDraft, 'long-run'> & { readonly model: 'ardl' | 'vecm' })
 
 function longRunDraft(model: 'ardl' | 'vecm', runs: readonly TimeSeriesRun[]): LongRunDraft {
-  const previous = runs.filter((run): run is Extract<TimeSeriesRun, { kind: 'ardl' | 'vecm' }> => run.kind === model).at(-1)
+  const previous = runs
+    .filter((run): run is Extract<TimeSeriesRun, { kind: 'ardl' | 'vecm' }> => run.kind === model)
+    .at(-1)
   return {
-    selected: previous === undefined ? [] : previous.kind === 'ardl' ? [previous.outcome.id, previous.predictor.id] : previous.variables.map(variable => variable.id),
-    maxLag: previous === undefined ? 2 : previous.kind === 'ardl' ? previous.specification.maxLag : previous.specification.maxLags,
+    selected:
+      previous === undefined
+        ? []
+        : previous.kind === 'ardl'
+          ? [previous.outcome.id, previous.predictor.id]
+          : previous.variables.map((variable) => variable.id),
+    maxLag:
+      previous === undefined
+        ? 2
+        : previous.kind === 'ardl'
+          ? previous.specification.maxLag
+          : previous.specification.maxLags,
     terms: previous?.kind === 'ardl' ? previous.specification.terms : 'constant',
     deterministic: previous?.kind === 'vecm' ? previous.specification.deterministic : 'ci',
     significance: previous?.kind === 'vecm' ? previous.specification.significance : 95,
@@ -97,39 +119,114 @@ function longRunDraft(model: 'ardl' | 'vecm', runs: readonly TimeSeriesRun[]): L
   }
 }
 
-const designOfLinearModel=(model:PanelRegressionDraft['model']):import('./regressionDesigns').RegressionDesign=>
-  model.kind==='eventStudy'?{kind:'linear-event-study'}:model.kind==='interactions'?{kind:'interactions'}:{kind:'bacon'}
+const designOfLinearModel = (
+  model: PanelRegressionDraft['model'],
+): import('./regressionDesigns').RegressionDesign =>
+  model.kind === 'eventStudy'
+    ? { kind: 'linear-event-study' }
+    : model.kind === 'interactions'
+      ? { kind: 'interactions' }
+      : { kind: 'bacon' }
 
-export function retainTimeSeriesDraft(current: TimeSeriesDraft | null, workflow: Workflow): TimeSeriesDraft | null {
-  if (workflow.kind !== 'profiled' || workflow.prepared===null) return null
+export function retainTimeSeriesDraft(
+  current: TimeSeriesDraft | null,
+  workflow: Workflow,
+): TimeSeriesDraft | null {
+  if (workflow.kind !== 'profiled' || workflow.prepared === null) return null
   const prepared = workflow.prepared
   if (current?.prepared === prepared.id) return current
-  const panelRegression:PanelRegressionDraft=workflow.timeSeriesRuns.filter(r=>r.kind==='panel-regression'||r.kind==='bacon').at(-1)?.controls??{...initialPanelRegression(),...(prepared.kind==='prepared-panel'?{}:{model:{kind:'interactions',predictors:[],terms:[]}})}
+  const panelRegression: PanelRegressionDraft = workflow.timeSeriesRuns
+    .filter((r) => r.kind === 'panel-regression' || r.kind === 'bacon')
+    .at(-1)?.controls ?? {
+    ...initialPanelRegression(),
+    ...(prepared.kind === 'prepared-panel'
+      ? {}
+      : { model: { kind: 'interactions', predictors: [], terms: [] } }),
+  }
   return {
-    prepared: prepared.id, analysis: prepared.kind === 'prepared-panel' ? 'regression' : prepared.kind==='prepared-time-series'?'count':'panel-regression',
+    prepared: prepared.id,
+    analysis:
+      prepared.kind === 'prepared-panel'
+        ? 'regression'
+        : prepared.kind === 'prepared-time-series'
+          ? 'count'
+          : 'panel-regression',
     panelRegression,
     regression: initialCountRegression(prepared.kind === 'prepared-panel'),
-    cohortRegression: {...initialCountRegression(true),model:{kind:'events',onset:null,cohort:'',window:{kind:'all'}}},
+    cohortRegression: {
+      ...initialCountRegression(true),
+      model: { kind: 'events', onset: null, cohort: '', window: { kind: 'all' } },
+    },
     // The selection follows the restored linear draft, so a project last left on Bacon reopens on Bacon.
     regressionDesign: designOfLinearModel(panelRegression.model),
-    ardl: { outcome: null, roles: {}, mode: 'search', starting: {}, fixedOrders: {}, minimum: '1', outcomeLag: '2', holdBack: '', terms: 'constant', horizon: '12', future: { kind: 'none' }, omitted:[] },
-    longRun: { ardl: longRunDraft('ardl', workflow.timeSeriesRuns), vecm: longRunDraft('vecm', workflow.timeSeriesRuns) },
-    count: { outcome: null, link: 'identity', pastObservationLags: [1], pastMeanLags: [1], candidateStart: Math.max(1, Math.floor(prepared.observations * 0.2)), candidateEnd: Math.max(1, Math.floor(prepared.observations * 0.8)), delta: 1 },
-    interrupted: { outcome: null, model: { kind: 'continuous', errors: { kind: 'neweyWest', maxLags: '' } }, interventionRow: '', lag: '0', impact: { kind: 'level' }, harmonicPairs: '2' },
+    ardl: {
+      outcome: null,
+      roles: {},
+      mode: 'search',
+      starting: {},
+      fixedOrders: {},
+      minimum: '1',
+      outcomeLag: '2',
+      holdBack: '',
+      terms: 'constant',
+      horizon: '12',
+      future: { kind: 'none' },
+      omitted: [],
+    },
+    longRun: {
+      ardl: longRunDraft('ardl', workflow.timeSeriesRuns),
+      vecm: longRunDraft('vecm', workflow.timeSeriesRuns),
+    },
+    count: {
+      outcome: null,
+      link: 'identity',
+      pastObservationLags: [1],
+      pastMeanLags: [1],
+      candidateStart: Math.max(1, Math.floor(prepared.observations * 0.2)),
+      candidateEnd: Math.max(1, Math.floor(prepared.observations * 0.8)),
+      delta: 1,
+    },
+    interrupted: {
+      outcome: null,
+      model: { kind: 'continuous', errors: { kind: 'neweyWest', maxLags: '' } },
+      interventionRow: '',
+      lag: '0',
+      impact: { kind: 'level' },
+      harmonicPairs: '2',
+    },
   }
 }
 
-export function stepTimeSeriesDraft(state: TimeSeriesDraft, event: TimeSeriesEvent): TimeSeriesDraft {
+export function stepTimeSeriesDraft(
+  state: TimeSeriesDraft,
+  event: TimeSeriesEvent,
+): TimeSeriesDraft {
   switch (event.type) {
-    case 'panel-regression': return {...state,panelRegression:event.value}
-    case 'regression': return {...state,regression:event.value}
-    case 'cohort-regression': return {...state,cohortRegression:event.value}
-    case 'regression-design': return {...state,regressionDesign:event.value}
-    case 'analysis': return { ...state, analysis: event.analysis }
-    case 'ardl': return { ...state, ardl: { ...state.ardl, [event.field]: event.value } }
-    case 'count': return { ...state, count: { ...state.count, [event.field]: event.value } }
-    case 'interrupted': return { ...state, interrupted: { ...state.interrupted, [event.field]: event.value } }
-    case 'long-run': return { ...state, longRun: { ...state.longRun, [event.model]: { ...state.longRun[event.model], [event.field]: event.value } } }
-    default: return assertNever(event)
+    case 'panel-regression':
+      return { ...state, panelRegression: event.value }
+    case 'regression':
+      return { ...state, regression: event.value }
+    case 'cohort-regression':
+      return { ...state, cohortRegression: event.value }
+    case 'regression-design':
+      return { ...state, regressionDesign: event.value }
+    case 'analysis':
+      return { ...state, analysis: event.analysis }
+    case 'ardl':
+      return { ...state, ardl: { ...state.ardl, [event.field]: event.value } }
+    case 'count':
+      return { ...state, count: { ...state.count, [event.field]: event.value } }
+    case 'interrupted':
+      return { ...state, interrupted: { ...state.interrupted, [event.field]: event.value } }
+    case 'long-run':
+      return {
+        ...state,
+        longRun: {
+          ...state.longRun,
+          [event.model]: { ...state.longRun[event.model], [event.field]: event.value },
+        },
+      }
+    default:
+      return assertNever(event)
   }
 }

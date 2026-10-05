@@ -39,7 +39,11 @@ const collect = (children: ReactNode, into: Option[]): void => {
     if (!isValidElement(child)) return
     if (child.type === 'option') {
       const props = (child as ReactElement<OptionProps>).props
-      into.push({ value: props.value === undefined ? textOf(props.children) : String(props.value), label: textOf(props.children), disabled: props.disabled === true })
+      into.push({
+        value: props.value === undefined ? textOf(props.children) : String(props.value),
+        label: textOf(props.children),
+        disabled: props.disabled === true,
+      })
       return
     }
     const nested = (child as ReactElement<{ readonly children?: ReactNode }>).props.children
@@ -47,7 +51,18 @@ const collect = (children: ReactNode, into: Option[]): void => {
   })
 }
 
-export function Select({ value, onChange, children, className, disabled, id, trigger, heading, 'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledBy }: {
+export function Select({
+  value,
+  onChange,
+  children,
+  className,
+  disabled,
+  id,
+  trigger,
+  heading,
+  'aria-label': ariaLabel,
+  'aria-labelledby': ariaLabelledBy,
+}: {
   readonly value: string | number
   readonly onChange: (event: { readonly target: { readonly value: string } }) => void
   readonly children?: ReactNode
@@ -68,17 +83,26 @@ export function Select({ value, onChange, children, className, disabled, id, tri
   const items = options.filter((option) => option.value !== '' || !option.disabled)
   const selected = options.find((option) => option.value === current)
   return (
-    <RadixSelect.Root value={current} onValueChange={(next) => onChange({ target: { value: next === EMPTY ? '' : next } })} disabled={disabled}>
+    <RadixSelect.Root
+      value={current}
+      onValueChange={(next) => onChange({ target: { value: next === EMPTY ? '' : next } })}
+      disabled={disabled}
+    >
       <RadixSelect.Trigger
         id={id}
         aria-label={ariaLabel}
         aria-labelledby={ariaLabelledBy}
-        className={cn('inline-flex max-w-full items-center justify-between gap-2 text-left data-[placeholder]:text-faint', className)}
+        className={cn(
+          'inline-flex max-w-full items-center justify-between gap-2 text-left data-[placeholder]:text-faint',
+          className,
+        )}
       >
         {trigger ?? (
           <>
             <span className="min-w-0 flex-1 truncate">
-              <RadixSelect.Value placeholder={placeholder?.label ?? ''}>{selected !== undefined && selected.value !== '' ? selected.label : undefined}</RadixSelect.Value>
+              <RadixSelect.Value placeholder={placeholder?.label ?? ''}>
+                {selected !== undefined && selected.value !== '' ? selected.label : undefined}
+              </RadixSelect.Value>
             </span>
             <RadixSelect.Icon aria-hidden className="flex shrink-0 text-faint">
               <Icon name="expand_more" size={14} />
@@ -87,10 +111,26 @@ export function Select({ value, onChange, children, className, disabled, id, tri
         )}
       </RadixSelect.Trigger>
       <RadixSelect.Portal>
-        <RadixSelect.Content position="popper" align="start" sideOffset={4} className={cn('float z-(--z-popover) max-h-[min(20rem,var(--radix-select-content-available-height))] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-lg border border-edge bg-panel text-body text-ink', trigger !== undefined && 'min-w-52')}>
-          <RadixSelect.ScrollUpButton aria-hidden className="flex justify-center py-0.5 text-faint"><Icon name="expand_less" size={14} /></RadixSelect.ScrollUpButton>
+        <RadixSelect.Content
+          position="popper"
+          align="start"
+          sideOffset={4}
+          className={cn(
+            'float z-(--z-popover) max-h-[min(20rem,var(--radix-select-content-available-height))] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-lg border border-edge bg-panel text-body text-ink',
+            trigger !== undefined && 'min-w-52',
+          )}
+        >
+          <RadixSelect.ScrollUpButton aria-hidden className="flex justify-center py-0.5 text-faint">
+            <Icon name="expand_less" size={14} />
+          </RadixSelect.ScrollUpButton>
           <RadixSelect.Viewport className="p-1">
-            {heading !== undefined && <RadixSelect.Group><RadixSelect.Label className="mb-1 border-b border-line px-2 pb-1.5 pt-1 text-label text-muted">{heading}</RadixSelect.Label></RadixSelect.Group>}
+            {heading !== undefined && (
+              <RadixSelect.Group>
+                <RadixSelect.Label className="mb-1 border-b border-line px-2 pb-1.5 pt-1 text-label text-muted">
+                  {heading}
+                </RadixSelect.Label>
+              </RadixSelect.Group>
+            )}
             {items.map((option) => (
               <RadixSelect.Item
                 key={option.value === '' ? EMPTY : option.value}
@@ -99,11 +139,21 @@ export function Select({ value, onChange, children, className, disabled, id, tri
                 className="relative flex cursor-pointer select-none items-center gap-2 rounded-md py-1.5 pl-2 pr-7 outline-none data-[disabled]:cursor-not-allowed data-[disabled]:text-dim data-[highlighted]:bg-well data-[state=checked]:text-ink"
               >
                 <RadixSelect.ItemText>{option.label}</RadixSelect.ItemText>
-                <RadixSelect.ItemIndicator aria-hidden className="absolute right-2 text-signal-text"><Icon name="check" size={13} /></RadixSelect.ItemIndicator>
+                <RadixSelect.ItemIndicator
+                  aria-hidden
+                  className="absolute right-2 text-signal-text"
+                >
+                  <Icon name="check" size={13} />
+                </RadixSelect.ItemIndicator>
               </RadixSelect.Item>
             ))}
           </RadixSelect.Viewport>
-          <RadixSelect.ScrollDownButton aria-hidden className="flex justify-center py-0.5 text-faint"><Icon name="expand_more" size={14} /></RadixSelect.ScrollDownButton>
+          <RadixSelect.ScrollDownButton
+            aria-hidden
+            className="flex justify-center py-0.5 text-faint"
+          >
+            <Icon name="expand_more" size={14} />
+          </RadixSelect.ScrollDownButton>
         </RadixSelect.Content>
       </RadixSelect.Portal>
     </RadixSelect.Root>

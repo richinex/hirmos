@@ -1,14 +1,20 @@
 import { useSyncExternalStore } from 'react'
 
-const subscribe = (query: string) => (notify: () => void): (() => void) => {
-  const list = window.matchMedia(query)
-  list.addEventListener('change', notify)
-  return () => list.removeEventListener('change', notify)
-}
+const subscribe =
+  (query: string) =>
+  (notify: () => void): (() => void) => {
+    const list = window.matchMedia(query)
+    list.addEventListener('change', notify)
+    return () => list.removeEventListener('change', notify)
+  }
 
 /** Live match state for one media query; the JS twin of a Tailwind breakpoint, for layout branching. */
 export function useMediaQuery(query: string): boolean {
-  return useSyncExternalStore(subscribe(query), () => window.matchMedia(query).matches, () => false)
+  return useSyncExternalStore(
+    subscribe(query),
+    () => window.matchMedia(query).matches,
+    () => false,
+  )
 }
 
 /** True below the md breakpoint: the phone layout. */

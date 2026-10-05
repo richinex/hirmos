@@ -1,6 +1,13 @@
 import type { EChartsCoreOption } from 'echarts/core'
 import { formatStatistic } from '@/lib/format/number'
-import { axisLabelStyle, axisNameStyle, baseOption, tooltip, valueAxis, rangeSelection } from '../grammar'
+import {
+  axisLabelStyle,
+  axisNameStyle,
+  baseOption,
+  tooltip,
+  valueAxis,
+  rangeSelection,
+} from '../grammar'
 import { variableColour, seriesColour, type ChartTheme } from '../theme'
 
 export interface StlChartView {
@@ -23,7 +30,12 @@ export function decompositionOption(view: StlChartView, theme: ChartTheme): ECha
     ['Seasonal', view.seasonal, seriesColour(theme, 1)],
     ['Remainder', view.remainder, seriesColour(theme, 3)],
   ] as const
-  const grids = components.map((_, index) => ({ left: 70, right: 18, top: `${3 + index * 24}%`, height: '18%' }))
+  const grids = components.map((_, index) => ({
+    left: 70,
+    right: 18,
+    top: `${3 + index * 24}%`,
+    height: '18%',
+  }))
   const xAxes = components.map((_, index) => ({
     type: 'value' as const,
     gridIndex: index,
@@ -31,7 +43,11 @@ export function decompositionOption(view: StlChartView, theme: ChartTheme): ECha
     max: 'dataMax',
     axisLine: { lineStyle: { color: theme.hair } },
     axisTick: { show: false },
-    axisLabel: { ...axisLabelStyle(theme), show: index === components.length - 1, formatter: view.calendar ? (value: number) => day(value) : undefined },
+    axisLabel: {
+      ...axisLabelStyle(theme),
+      show: index === components.length - 1,
+      formatter: view.calendar ? (value: number) => day(value) : undefined,
+    },
     splitLine: { show: false },
   }))
   const yAxes = components.map(([name], index) => ({
@@ -42,7 +58,10 @@ export function decompositionOption(view: StlChartView, theme: ChartTheme): ECha
     nameTextStyle: axisNameStyle(theme),
   }))
   return {
-    ...baseOption(theme, `${view.name} additive STL decomposition. Four aligned panels show the observed series, fitted trend, repeating seasonal component, and remainder. At each observation, observed equals trend plus seasonal plus remainder.`),
+    ...baseOption(
+      theme,
+      `${view.name} additive STL decomposition. Four aligned panels show the observed series, fitted trend, repeating seasonal component, and remainder. At each observation, observed equals trend plus seasonal plus remainder.`,
+    ),
     grid: grids,
     axisPointer: { link: [{ xAxisIndex: 'all' }] },
     tooltip: {
@@ -51,13 +70,18 @@ export function decompositionOption(view: StlChartView, theme: ChartTheme): ECha
         const rows = Array.isArray(raw) ? raw : []
         if (rows.length === 0) return ''
         const first = rows[0]
-        const point = first !== null && typeof first === 'object' ? Reflect.get(first, 'value') : null
+        const point =
+          first !== null && typeof first === 'object' ? Reflect.get(first, 'value') : null
         const time = Array.isArray(point) ? Number(point[0]) : Number.NaN
         const heading = view.calendar ? day(time) : `observation ${view.time.indexOf(time) + 1}`
         const values = rows.flatMap((row) => {
           if (row === null || typeof row !== 'object') return []
           const value = Reflect.get(row, 'value')
-          return Array.isArray(value) ? [`${String(Reflect.get(row, 'seriesName'))}: <strong>${formatStatistic('raw', Number(value[1])).text}</strong>`] : []
+          return Array.isArray(value)
+            ? [
+                `${String(Reflect.get(row, 'seriesName'))}: <strong>${formatStatistic('raw', Number(value[1])).text}</strong>`,
+              ]
+            : []
         })
         return `${heading}<br/>${values.join('<br/>')}`
       },

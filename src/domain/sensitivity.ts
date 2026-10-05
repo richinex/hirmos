@@ -1,8 +1,12 @@
 import { z } from 'zod'
-import type {HonestRun} from './honestDid'
-import type {DidSensitivityRun} from './didSensitivity'
+import type { HonestRun } from './honestDid'
+import type { DidSensitivityRun } from './didSensitivity'
 import { assertNever, brand, err, ok, type Brand, type NonEmptyArray, type Result } from './dop'
-import { contemporaneousAdjustmentVariables, type EstimationRunArtifact, type EstimationRunId } from './estimation'
+import {
+  contemporaneousAdjustmentVariables,
+  type EstimationRunArtifact,
+  type EstimationRunId,
+} from './estimation'
 import type { MethodId } from './methods'
 import type { PreparedDatasetVersionId } from './preprocessing'
 import type { StudyVariable } from './study'
@@ -14,7 +18,8 @@ import type { StudyVariable } from './study'
 
 export type SensitivityRunId = Brand<string, 'SensitivityRunId'>
 
-export const newSensitivityRunId = (): SensitivityRunId => brand<string, 'SensitivityRunId'>(crypto.randomUUID())
+export const newSensitivityRunId = (): SensitivityRunId =>
+  brand<string, 'SensitivityRunId'>(crypto.randomUUID())
 
 export interface RefutationConfiguration {
   readonly kind: 'linear-refutation'
@@ -40,7 +45,10 @@ export const kappaValues = (range: KappaRange): readonly number[] | null => {
   if (range.kind === 'inferred') return null
   const steps = Math.max(1, Math.min(200, Math.floor(range.steps)))
   if (steps === 1) return [range.from]
-  return Array.from({ length: steps }, (_, index) => range.from + ((range.to - range.from) * index) / (steps - 1))
+  return Array.from(
+    { length: steps },
+    (_, index) => range.from + ((range.to - range.from) * index) / (steps - 1),
+  )
 }
 
 export interface DmlRefutationConfiguration {
@@ -49,144 +57,233 @@ export interface DmlRefutationConfiguration {
   readonly seed: number
 }
 
-export type SensitivityConfiguration = RefutationConfiguration | UnobservedConfiguration | DmlRefutationConfiguration
+export type SensitivityConfiguration =
+  RefutationConfiguration | UnobservedConfiguration | DmlRefutationConfiguration
 
 export type SensitivityProbe = SensitivityConfiguration['kind']
 
-export const DEFAULT_REFUTATION: RefutationConfiguration = { kind: 'linear-refutation', simulations: 50, subsetFraction: 0.8, seed: 555, ljungBoxLags: 12 }
-export const DEFAULT_UNOBSERVED: UnobservedConfiguration = { kind: 'unobserved-confounding', seed: 100, kappaT: { kind: 'inferred' }, kappaY: { kind: 'inferred' } }
-export const DEFAULT_DML_REFUTATION: DmlRefutationConfiguration = { kind: 'dml-refutation', seed: 7 }
+export const DEFAULT_REFUTATION: RefutationConfiguration = {
+  kind: 'linear-refutation',
+  simulations: 50,
+  subsetFraction: 0.8,
+  seed: 555,
+  ljungBoxLags: 12,
+}
+export const DEFAULT_UNOBSERVED: UnobservedConfiguration = {
+  kind: 'unobserved-confounding',
+  seed: 100,
+  kappaT: { kind: 'inferred' },
+  kappaY: { kind: 'inferred' },
+}
+export const DEFAULT_DML_REFUTATION: DmlRefutationConfiguration = {
+  kind: 'dml-refutation',
+  seed: 7,
+}
 
-export const linearRefutationEvidenceSchema = z.object({
-  kind: z.literal('linearRefutation'),
-  observations: z.number().int().positive(),
-  estimate: z.number().finite(),
-  simulations: z.number().int().positive(),
-  seed: z.number().int().nonnegative(),
-  placeboEffect: z.number().finite(),
-  subsetFraction: z.number().gt(0).lt(1),
-  subsetEffect: z.number().finite(),
-  randomCommonCauseEffect: z.number().finite(),
-  ljungBoxLags: z.array(z.number().int().positive()),
-  ljungBoxStatistics: z.array(z.number().finite()),
-  ljungBoxPValues: z.array(z.number().min(0).max(1)),
-  shapiroW: z.number().finite().nullable(),
-  shapiroP: z.number().min(0).max(1).nullable(),
-  durbinWatson: z.number().finite().nonnegative(),
-}).strict()
+export const linearRefutationEvidenceSchema = z
+  .object({
+    kind: z.literal('linearRefutation'),
+    observations: z.number().int().positive(),
+    estimate: z.number().finite(),
+    simulations: z.number().int().positive(),
+    seed: z.number().int().nonnegative(),
+    placeboEffect: z.number().finite(),
+    subsetFraction: z.number().gt(0).lt(1),
+    subsetEffect: z.number().finite(),
+    randomCommonCauseEffect: z.number().finite(),
+    ljungBoxLags: z.array(z.number().int().positive()),
+    ljungBoxStatistics: z.array(z.number().finite()),
+    ljungBoxPValues: z.array(z.number().min(0).max(1)),
+    shapiroW: z.number().finite().nullable(),
+    shapiroP: z.number().min(0).max(1).nullable(),
+    durbinWatson: z.number().finite().nonnegative(),
+  })
+  .strict()
 
 export type LinearRefutationEvidence = z.infer<typeof linearRefutationEvidenceSchema>
 
-export const unobservedConfoundingEvidenceSchema = z.object({
-  kind: z.literal('unobservedConfounding'),
-  observations: z.number().int().positive(),
-  seed: z.number().int().nonnegative(),
-  kappaT: z.array(z.number().finite()).min(1),
-  kappaY: z.array(z.number().finite()).min(1),
-  effects: z.array(z.array(z.number().finite())),
-  originalEffect: z.number().finite(),
-}).strict()
+export const unobservedConfoundingEvidenceSchema = z
+  .object({
+    kind: z.literal('unobservedConfounding'),
+    observations: z.number().int().positive(),
+    seed: z.number().int().nonnegative(),
+    kappaT: z.array(z.number().finite()).min(1),
+    kappaY: z.array(z.number().finite()).min(1),
+    effects: z.array(z.array(z.number().finite())),
+    originalEffect: z.number().finite(),
+  })
+  .strict()
 
 export type UnobservedConfoundingEvidence = z.infer<typeof unobservedConfoundingEvidenceSchema>
 
-const dmlRefutationOutcomeSchema = z.object({
-  originalEffect: z.number().finite(),
-  refutedEffect: z.number().finite(),
-  pValue: z.number().min(0).max(1),
-}).strict()
+const dmlRefutationOutcomeSchema = z
+  .object({
+    originalEffect: z.number().finite(),
+    refutedEffect: z.number().finite(),
+    pValue: z.number().min(0).max(1),
+  })
+  .strict()
 
-export const dmlRefutationEvidenceSchema = z.object({
-  kind: z.literal('dmlRefutationBatch'),
-  // Absent only in saved runs from the former 1,000-row, unpaired probe design.
-  probeDesign: z.literal('full-sample-paired-folds').optional(),
-  observations: z.number().int().positive(),
-  model: z.enum(['plr', 'irm']),
-  att: z.boolean(),
-  seed: z.number().int().nonnegative(),
-  order: z.tuple([z.literal('mainFit'), z.literal('placebo'), z.literal('randomCommonCause'), z.literal('unobservedSensitivity')]),
-  mainEstimate: z.number().finite(),
-  placebo: dmlRefutationOutcomeSchema,
-  randomCommonCause: dmlRefutationOutcomeSchema,
-  sensitivity: z.object({
-    scenarios: z.array(z.object({
-      confounding: z.number().finite(),
-      effectLower: z.number().finite(),
-      effectUpper: z.number().finite(),
-      ciLower: z.number().finite(),
-      ciUpper: z.number().finite(),
-    }).strict()).min(1),
-    robustnessValue: z.number().min(0).max(1),
-    robustnessValueCi: z.number().min(0).max(1),
-  }).strict(),
-}).strict()
+export const dmlRefutationEvidenceSchema = z
+  .object({
+    kind: z.literal('dmlRefutationBatch'),
+    // Absent only in saved runs from the former 1,000-row, unpaired probe design.
+    probeDesign: z.literal('full-sample-paired-folds').optional(),
+    observations: z.number().int().positive(),
+    model: z.enum(['plr', 'irm']),
+    att: z.boolean(),
+    seed: z.number().int().nonnegative(),
+    order: z.tuple([
+      z.literal('mainFit'),
+      z.literal('placebo'),
+      z.literal('randomCommonCause'),
+      z.literal('unobservedSensitivity'),
+    ]),
+    mainEstimate: z.number().finite(),
+    placebo: dmlRefutationOutcomeSchema,
+    randomCommonCause: dmlRefutationOutcomeSchema,
+    sensitivity: z
+      .object({
+        scenarios: z
+          .array(
+            z
+              .object({
+                confounding: z.number().finite(),
+                effectLower: z.number().finite(),
+                effectUpper: z.number().finite(),
+                ciLower: z.number().finite(),
+                ciUpper: z.number().finite(),
+              })
+              .strict(),
+          )
+          .min(1),
+        robustnessValue: z.number().min(0).max(1),
+        robustnessValueCi: z.number().min(0).max(1),
+      })
+      .strict(),
+  })
+  .strict()
 
 export type DmlRefutationEvidence = z.infer<typeof dmlRefutationEvidenceSchema>
 
-const seriesStructureColumnSchema = z.object({
-  column: z.number().int().nonnegative(),
-  trendStrength: z.number().min(0).max(1).nullable(),
-  seasonalStrength: z.number().min(0).max(1).nullable(),
-  correlationMaxLag: z.number().int().positive(),
-  acf: z.array(z.number().finite()).min(2),
-  acfLimits: z.array(z.number().finite().nonnegative()).min(2),
-  pacf: z.array(z.number().finite()).min(2),
-  pacfLimits: z.array(z.number().finite().nonnegative()).min(2),
-  changePoints: z.array(z.number().int().positive()),
-  peltPenalty: z.number().finite().nonnegative(),
-}).strict()
+const seriesStructureColumnSchema = z
+  .object({
+    column: z.number().int().nonnegative(),
+    trendStrength: z.number().min(0).max(1).nullable(),
+    seasonalStrength: z.number().min(0).max(1).nullable(),
+    correlationMaxLag: z.number().int().positive(),
+    acf: z.array(z.number().finite()).min(2),
+    acfLimits: z.array(z.number().finite().nonnegative()).min(2),
+    pacf: z.array(z.number().finite()).min(2),
+    pacfLimits: z.array(z.number().finite().nonnegative()).min(2),
+    changePoints: z.array(z.number().int().positive()),
+    peltPenalty: z.number().finite().nonnegative(),
+  })
+  .strict()
 
-export const seriesStructureEvidenceSchema = z.object({
-  kind: z.literal('seriesStructure'),
-  observations: z.number().int().positive(),
-  period: z.number().int().min(2).nullable(),
-  series: z.tuple([seriesStructureColumnSchema]).rest(seriesStructureColumnSchema),
-}).strict()
+export const seriesStructureEvidenceSchema = z
+  .object({
+    kind: z.literal('seriesStructure'),
+    observations: z.number().int().positive(),
+    period: z.number().int().min(2).nullable(),
+    series: z.tuple([seriesStructureColumnSchema]).rest(seriesStructureColumnSchema),
+  })
+  .strict()
 
 export type SeriesStructureEvidence = z.infer<typeof seriesStructureEvidenceSchema>
 
-export type SensitivityEvidenceProblem = { readonly kind: 'invalid-sensitivity-evidence'; readonly detail: string }
-
-const parseWith = <Schema extends z.ZodTypeAny>(schema: Schema, value: unknown): Result<z.infer<Schema>, SensitivityEvidenceProblem> => {
-  const parsed = schema.safeParse(value)
-  return parsed.success ? ok(parsed.data) : err({ kind: 'invalid-sensitivity-evidence', detail: z.prettifyError(parsed.error) })
+export type SensitivityEvidenceProblem = {
+  readonly kind: 'invalid-sensitivity-evidence'
+  readonly detail: string
 }
 
-export function parseLinearRefutationEvidence(value: unknown): Result<LinearRefutationEvidence, SensitivityEvidenceProblem> {
+const parseWith = <Schema extends z.ZodTypeAny>(
+  schema: Schema,
+  value: unknown,
+): Result<z.infer<Schema>, SensitivityEvidenceProblem> => {
+  const parsed = schema.safeParse(value)
+  return parsed.success
+    ? ok(parsed.data)
+    : err({ kind: 'invalid-sensitivity-evidence', detail: z.prettifyError(parsed.error) })
+}
+
+export function parseLinearRefutationEvidence(
+  value: unknown,
+): Result<LinearRefutationEvidence, SensitivityEvidenceProblem> {
   const parsed = parseWith(linearRefutationEvidenceSchema, value)
   if (!parsed.ok) return parsed
   const { ljungBoxLags, ljungBoxStatistics, ljungBoxPValues } = parsed.value
-  if (ljungBoxLags.length !== ljungBoxStatistics.length || ljungBoxLags.length !== ljungBoxPValues.length) {
-    return err({ kind: 'invalid-sensitivity-evidence', detail: 'The Ljung-Box lags, statistics, and p-values differ in length.' })
+  if (
+    ljungBoxLags.length !== ljungBoxStatistics.length ||
+    ljungBoxLags.length !== ljungBoxPValues.length
+  ) {
+    return err({
+      kind: 'invalid-sensitivity-evidence',
+      detail: 'The Ljung-Box lags, statistics, and p-values differ in length.',
+    })
   }
   return parsed
 }
 
-export const parseDmlRefutationEvidence = (value: unknown): Result<DmlRefutationEvidence, SensitivityEvidenceProblem> => parseWith(dmlRefutationEvidenceSchema, value)
+export const parseDmlRefutationEvidence = (
+  value: unknown,
+): Result<DmlRefutationEvidence, SensitivityEvidenceProblem> =>
+  parseWith(dmlRefutationEvidenceSchema, value)
 
-export function parseUnobservedConfoundingEvidence(value: unknown): Result<UnobservedConfoundingEvidence, SensitivityEvidenceProblem> {
+export function parseUnobservedConfoundingEvidence(
+  value: unknown,
+): Result<UnobservedConfoundingEvidence, SensitivityEvidenceProblem> {
   const parsed = parseWith(unobservedConfoundingEvidenceSchema, value)
   if (!parsed.ok) return parsed
   const { kappaT, kappaY, effects } = parsed.value
   if (effects.length !== kappaT.length || effects.some((row) => row.length !== kappaY.length)) {
-    return err({ kind: 'invalid-sensitivity-evidence', detail: 'The simulated grid does not match its kappa axes.' })
+    return err({
+      kind: 'invalid-sensitivity-evidence',
+      detail: 'The simulated grid does not match its kappa axes.',
+    })
   }
   return parsed
 }
 
-export function parseSeriesStructureEvidence(value: unknown): Result<SeriesStructureEvidence, SensitivityEvidenceProblem> {
+export function parseSeriesStructureEvidence(
+  value: unknown,
+): Result<SeriesStructureEvidence, SensitivityEvidenceProblem> {
   const parsed = parseWith(seriesStructureEvidenceSchema, value)
   if (!parsed.ok) return parsed
-  if (new Set(parsed.value.series.map(({ column }) => column)).size !== parsed.value.series.length) return err({ kind: 'invalid-sensitivity-evidence', detail: 'A time-series column appears more than once in the structure evidence.' })
+  if (new Set(parsed.value.series.map(({ column }) => column)).size !== parsed.value.series.length)
+    return err({
+      kind: 'invalid-sensitivity-evidence',
+      detail: 'A time-series column appears more than once in the structure evidence.',
+    })
   for (const series of parsed.value.series) {
     const expected = series.correlationMaxLag + 1
-    if ([series.acf, series.acfLimits, series.pacf, series.pacfLimits].some((values) => values.length !== expected)) {
-      return err({ kind: 'invalid-sensitivity-evidence', detail: 'The ACF, PACF, and confidence bands must contain lag zero through the requested maximum lag.' })
+    if (
+      [series.acf, series.acfLimits, series.pacf, series.pacfLimits].some(
+        (values) => values.length !== expected,
+      )
+    ) {
+      return err({
+        kind: 'invalid-sensitivity-evidence',
+        detail:
+          'The ACF, PACF, and confidence bands must contain lag zero through the requested maximum lag.',
+      })
     }
     if (series.correlationMaxLag >= parsed.value.observations / 2) {
-      return err({ kind: 'invalid-sensitivity-evidence', detail: 'The maximum correlation lag must be below half the observation count.' })
+      return err({
+        kind: 'invalid-sensitivity-evidence',
+        detail: 'The maximum correlation lag must be below half the observation count.',
+      })
     }
-    if (series.changePoints.some((point, index, points) => point >= parsed.value.observations || (index > 0 && point <= points[index - 1]))) {
-      return err({ kind: 'invalid-sensitivity-evidence', detail: 'PELT change points must be strictly increasing and precede the final observation.' })
+    if (
+      series.changePoints.some(
+        (point, index, points) =>
+          point >= parsed.value.observations || (index > 0 && point <= points[index - 1]),
+      )
+    ) {
+      return err({
+        kind: 'invalid-sensitivity-evidence',
+        detail: 'PELT change points must be strictly increasing and precede the final observation.',
+      })
     }
   }
   return parsed
@@ -202,21 +299,21 @@ interface RefuterFactBase {
 
 /** Each refuter carries only the interpretation its procedure actually supports. */
 export type RefuterFact =
-  | RefuterFactBase & {
+  | (RefuterFactBase & {
       readonly interpretation: {
         readonly kind: 'reference-distance'
         readonly reference: 'zero' | 'original-estimate'
         readonly reading: string
       }
-    }
-  | RefuterFactBase & {
+    })
+  | (RefuterFactBase & {
       readonly interpretation: {
         readonly kind: 'mean-shift-test'
         readonly nullHypothesis: string
         readonly pValue: number
         readonly alpha: 0.05
       }
-    }
+    })
 
 export interface DiagnosticFact {
   readonly id: 'ljung-box' | 'shapiro-wilk' | 'durbin-watson'
@@ -233,35 +330,78 @@ interface RunIdentity {
 }
 
 export type LegacySensitivityRunArtifact =
-  | RunIdentity & { readonly kind: 'linear-refutation-run'; readonly configuration: RefutationConfiguration; readonly evidence: LinearRefutationEvidence; readonly refuters: NonEmptyArray<RefuterFact>; readonly diagnostics: NonEmptyArray<DiagnosticFact> }
-  | RunIdentity & { readonly kind: 'unobserved-confounding-run'; readonly configuration: UnobservedConfiguration; readonly evidence: UnobservedConfoundingEvidence }
-  | RunIdentity & { readonly kind: 'dml-refutation-run'; readonly configuration: DmlRefutationConfiguration; readonly evidence: DmlRefutationEvidence; readonly refuters: NonEmptyArray<RefuterFact> }
-export type SensitivityRunArtifact=LegacySensitivityRunArtifact|HonestRun|DidSensitivityRun
-export function sensitivityEstimationRun(run:SensitivityRunArtifact):EstimationRunId|null{
-  return run.kind==='honest-did-run'?(run.source.kind==='estimation'?brand<string,'EstimationRunId'>(run.source.run):null):run.estimationRun
+  | (RunIdentity & {
+      readonly kind: 'linear-refutation-run'
+      readonly configuration: RefutationConfiguration
+      readonly evidence: LinearRefutationEvidence
+      readonly refuters: NonEmptyArray<RefuterFact>
+      readonly diagnostics: NonEmptyArray<DiagnosticFact>
+    })
+  | (RunIdentity & {
+      readonly kind: 'unobserved-confounding-run'
+      readonly configuration: UnobservedConfiguration
+      readonly evidence: UnobservedConfoundingEvidence
+    })
+  | (RunIdentity & {
+      readonly kind: 'dml-refutation-run'
+      readonly configuration: DmlRefutationConfiguration
+      readonly evidence: DmlRefutationEvidence
+      readonly refuters: NonEmptyArray<RefuterFact>
+    })
+export type SensitivityRunArtifact = LegacySensitivityRunArtifact | HonestRun | DidSensitivityRun
+export function sensitivityEstimationRun(run: SensitivityRunArtifact): EstimationRunId | null {
+  return run.kind === 'honest-did-run'
+    ? run.source.kind === 'estimation'
+      ? brand<string, 'EstimationRunId'>(run.source.run)
+      : null
+    : run.estimationRun
 }
 
 export type ProbeEligibility =
-  | { readonly kind: 'eligible' }
-  | { readonly kind: 'refused'; readonly reason: string }
+  { readonly kind: 'eligible' } | { readonly kind: 'refused'; readonly reason: string }
 
 /** Which probes an estimation run supports; a probe never reads a run it was not written for. */
-export function probeEligibility(probe: SensitivityProbe, run: EstimationRunArtifact | null, treatmentIsBinary: boolean | null): ProbeEligibility {
+export function probeEligibility(
+  probe: SensitivityProbe,
+  run: EstimationRunArtifact | null,
+  treatmentIsBinary: boolean | null,
+): ProbeEligibility {
   if (run === null) return { kind: 'refused', reason: 'Choose an estimation run first.' }
   switch (probe) {
     case 'linear-refutation':
       return run.kind === 'backdoor-linear-run'
         ? { kind: 'eligible' }
-        : { kind: 'refused', reason: 'The refuters refit the linear back-door estimate; choose an adjusted linear regression run.' }
+        : {
+            kind: 'refused',
+            reason:
+              'The refuters refit the linear back-door estimate; choose an adjusted linear regression run.',
+          }
     case 'unobserved-confounding':
-      if (run.kind !== 'backdoor-linear-run') return { kind: 'refused', reason: 'The simulated confounder refits the linear back-door estimate; choose an adjusted linear regression run.' }
-      if ((contemporaneousAdjustmentVariables(run.estimate.adjustment)?.length ?? 0) === 0) return { kind: 'refused', reason: 'The simulated confounder is sized from the observed common causes, and this study adjusts for none.' }
-      if (treatmentIsBinary === false) return { kind: 'refused', reason: 'The simulation flips a binary treatment; this treatment is not 0 or 1.' }
+      if (run.kind !== 'backdoor-linear-run')
+        return {
+          kind: 'refused',
+          reason:
+            'The simulated confounder refits the linear back-door estimate; choose an adjusted linear regression run.',
+        }
+      if ((contemporaneousAdjustmentVariables(run.estimate.adjustment)?.length ?? 0) === 0)
+        return {
+          kind: 'refused',
+          reason:
+            'The simulated confounder is sized from the observed common causes, and this study adjusts for none.',
+        }
+      if (treatmentIsBinary === false)
+        return {
+          kind: 'refused',
+          reason: 'The simulation flips a binary treatment; this treatment is not 0 or 1.',
+        }
       return { kind: 'eligible' }
     case 'dml-refutation':
       return run.kind === 'double-ml-run'
         ? { kind: 'eligible' }
-        : { kind: 'refused', reason: 'The DML batch repeats a double machine learning fit; choose a DML run.' }
+        : {
+            kind: 'refused',
+            reason: 'The DML batch repeats a double machine learning fit; choose a DML run.',
+          }
     default:
       return assertNever(probe)
   }
@@ -269,10 +409,14 @@ export function probeEligibility(probe: SensitivityProbe, run: EstimationRunArti
 
 export const describeProbe = (probe: SensitivityProbe): string => {
   switch (probe) {
-    case 'linear-refutation': return 'Perturbation and residual probes'
-    case 'unobserved-confounding': return 'Simulated unmeasured confounder'
-    case 'dml-refutation': return 'Double machine learning probe batch'
-    default: return assertNever(probe)
+    case 'linear-refutation':
+      return 'Perturbation and residual probes'
+    case 'unobserved-confounding':
+      return 'Simulated unmeasured confounder'
+    case 'dml-refutation':
+      return 'Double machine learning probe batch'
+    default:
+      return assertNever(probe)
   }
 }
 

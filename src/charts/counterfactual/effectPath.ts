@@ -1,6 +1,13 @@
 import type { EChartsCoreOption } from 'echarts/core'
 import { formatCount, formatStatistic } from '@/lib/format/number'
-import { axisLabelStyle, baseOption, gridAuto, tooltip, valueAxis, rangeSelection } from '../grammar'
+import {
+  axisLabelStyle,
+  baseOption,
+  gridAuto,
+  tooltip,
+  valueAxis,
+  rangeSelection,
+} from '../grammar'
 import type { ChartTheme } from '../theme'
 
 export interface CounterfactualEffectPathView {
@@ -14,11 +21,17 @@ export interface CounterfactualEffectPathView {
 }
 
 /** High-minus-low dynamic contrast with an equal-tail pointwise block-bootstrap band. */
-export function counterfactualEffectPathOption(view: CounterfactualEffectPathView, theme: ChartTheme): EChartsCoreOption {
+export function counterfactualEffectPathOption(
+  view: CounterfactualEffectPathView,
+  theme: ChartTheme,
+): EChartsCoreOption {
   const lastStep = view.firstStep + view.effects.length - 1
   const level = Math.round(view.confidenceLevel * 100)
   return {
-    ...baseOption(theme, `${view.outcome} high-minus-low counterfactual contrast and its ${level}% pointwise block-bootstrap interval over ${formatCount(view.effects.length).text} ${view.stepLabel}s.`),
+    ...baseOption(
+      theme,
+      `${view.outcome} high-minus-low counterfactual contrast and its ${level}% pointwise block-bootstrap interval over ${formatCount(view.effects.length).text} ${view.stepLabel}s.`,
+    ),
     // No slider of its own: the outcome chart above carries it and this chart follows its window.
     grid: gridAuto({ bottom: 28 }),
     ...rangeSelection(theme, 0, { slider: false }),
@@ -66,7 +79,10 @@ export function counterfactualEffectPathOption(view: CounterfactualEffectPathVie
       {
         type: 'line',
         name: `${level}% pointwise CI`,
-        data: view.upper.map((value, index) => [view.firstStep + index, value - (view.lower[index] ?? value)]),
+        data: view.upper.map((value, index) => [
+          view.firstStep + index,
+          value - (view.lower[index] ?? value),
+        ]),
         lineStyle: { opacity: 0 },
         areaStyle: { color: theme.signal, opacity: 0.16 },
         symbol: 'none',

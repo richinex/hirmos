@@ -15,21 +15,46 @@ export const PYTHON_PACKAGES = ['numpy', 'pandas', 'pyarrow'] as const
  * What the script assigned. Both shapes travel as one Arrow table; a value is that table's single
  * cell, so this says how to read the result rather than where it lives.
  */
-export type ScriptShape = { readonly kind: 'table' } | { readonly kind: 'value'; readonly column: string }
+export type ScriptShape =
+  { readonly kind: 'table' } | { readonly kind: 'value'; readonly column: string }
 
-export interface PythonInput { readonly format: 'arrow-file'; readonly bytes: Uint8Array }
-export interface PythonOutput { readonly format: 'arrow-stream'; readonly bytes: Uint8Array }
+export interface PythonInput {
+  readonly format: 'arrow-file'
+  readonly bytes: Uint8Array
+}
+export interface PythonOutput {
+  readonly format: 'arrow-stream'
+  readonly bytes: Uint8Array
+}
 
 export type PythonCommand =
   | { readonly kind: 'start' }
-  | { readonly kind: 'run'; readonly request: string; readonly code: string; readonly inputs: readonly PythonInput[] }
+  | {
+      readonly kind: 'run'
+      readonly request: string
+      readonly code: string
+      readonly inputs: readonly PythonInput[]
+    }
 
 export type PythonEvent =
   | { readonly kind: 'loading'; readonly detail: string }
   | { readonly kind: 'ready'; readonly python: string }
   | { readonly kind: 'start-failed'; readonly detail: string }
-  | { readonly kind: 'ran'; readonly request: string; readonly prepared: PythonOutput; readonly rows: number; readonly columns: readonly string[]; readonly stdout: string; readonly shape: ScriptShape }
-  | { readonly kind: 'run-failed'; readonly request: string; readonly detail: string; readonly stdout: string }
+  | {
+      readonly kind: 'ran'
+      readonly request: string
+      readonly prepared: PythonOutput
+      readonly rows: number
+      readonly columns: readonly string[]
+      readonly stdout: string
+      readonly shape: ScriptShape
+    }
+  | {
+      readonly kind: 'run-failed'
+      readonly request: string
+      readonly detail: string
+      readonly stdout: string
+    }
 
 const bytes = z.custom<Uint8Array>((value) => value instanceof Uint8Array)
 
@@ -38,14 +63,28 @@ export const pythonEventSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('ready'), python: z.string() }),
   z.object({ kind: z.literal('start-failed'), detail: z.string() }),
   z.object({
-    kind: z.literal('ran'), request: z.string(), prepared: z.object({ format: z.literal('arrow-stream'), bytes }),
-    rows: z.number().int().nonnegative(), columns: z.array(z.string()).min(1), stdout: z.string(),
-    shape: z.discriminatedUnion('kind', [z.object({ kind: z.literal('table') }), z.object({ kind: z.literal('value'), column: z.string().min(1) })]),
+    kind: z.literal('ran'),
+    request: z.string(),
+    prepared: z.object({ format: z.literal('arrow-stream'), bytes }),
+    rows: z.number().int().nonnegative(),
+    columns: z.array(z.string()).min(1),
+    stdout: z.string(),
+    shape: z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('table') }),
+      z.object({ kind: z.literal('value'), column: z.string().min(1) }),
+    ]),
   }),
-  z.object({ kind: z.literal('run-failed'), request: z.string(), detail: z.string(), stdout: z.string() }),
+  z.object({
+    kind: z.literal('run-failed'),
+    request: z.string(),
+    detail: z.string(),
+    stdout: z.string(),
+  }),
 ])
 
-export const parsePythonEvent = (value: unknown): Result<PythonEvent, { readonly detail: string }> => {
+export const parsePythonEvent = (
+  value: unknown,
+): Result<PythonEvent, { readonly detail: string }> => {
   const parsed = pythonEventSchema.safeParse(value)
   return parsed.success ? ok(parsed.data) : err({ detail: parsed.error.message })
 }

@@ -40,7 +40,9 @@ export const responsive = (
   baseOption: base,
   media: [
     ...(variants.wide === undefined ? [] : [{ query: { maxWidth: 480 }, option: variants.wide }]),
-    ...(variants.narrow === undefined ? [] : [{ query: { maxWidth: 320 }, option: variants.narrow }]),
+    ...(variants.narrow === undefined
+      ? []
+      : [{ query: { maxWidth: 320 }, option: variants.narrow }]),
   ],
 })
 
@@ -53,7 +55,9 @@ export const axisNameStyle = (theme: ChartTheme) => ({
 export const valueAxis = (theme: ChartTheme, name?: string) => ({
   type: 'value' as const,
   scale: false,
-  ...(name === undefined ? {} : { name, nameLocation: 'middle' as const, nameGap: 40, nameTextStyle: axisNameStyle(theme) }),
+  ...(name === undefined
+    ? {}
+    : { name, nameLocation: 'middle' as const, nameGap: 40, nameTextStyle: axisNameStyle(theme) }),
   axisLine: { show: false },
   axisTick: { show: false },
   axisLabel: axisLabelStyle(theme),
@@ -63,7 +67,9 @@ export const valueAxis = (theme: ChartTheme, name?: string) => ({
 export const categoryAxis = (theme: ChartTheme, data: readonly string[], name?: string) => ({
   type: 'category' as const,
   data: [...data],
-  ...(name === undefined ? {} : { name, nameLocation: 'middle' as const, nameGap: 28, nameTextStyle: axisNameStyle(theme) }),
+  ...(name === undefined
+    ? {}
+    : { name, nameLocation: 'middle' as const, nameGap: 28, nameTextStyle: axisNameStyle(theme) }),
   axisLine: { lineStyle: { color: theme.hair } },
   axisTick: { show: false },
   axisLabel: axisLabelStyle(theme),
@@ -120,7 +126,14 @@ export const legend = (theme: ChartTheme, data?: readonly string[]) => ({
  * The grooves are drawn in the surface colour rather than in white, so they read as cut out of the
  * bar on a light theme as well as a dark one.
  */
-export const hatch = (theme: ChartTheme) => ({ symbol: 'rect', dashArrayX: [1, 0], dashArrayY: [2, 4], rotation: Math.PI / 4, color: theme.panel }) as const
+export const hatch = (theme: ChartTheme) =>
+  ({
+    symbol: 'rect',
+    dashArrayX: [1, 0],
+    dashArrayY: [2, 4],
+    rotation: Math.PI / 4,
+    color: theme.panel,
+  }) as const
 
 /** Every evidence chart starts here: deterministic (no animation), described for assistive technology. */
 /**
@@ -157,12 +170,13 @@ export const baseOption = (theme: ChartTheme, description: string) => ({
   backgroundColor: 'transparent',
 })
 
-export const escapeHtml = (value: string): string => value
-  .replaceAll('&', '&amp;')
-  .replaceAll('<', '&lt;')
-  .replaceAll('>', '&gt;')
-  .replaceAll('"', '&quot;')
-  .replaceAll("'", '&#039;')
+export const escapeHtml = (value: string): string =>
+  value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;')
 
 /** A named value drawn as a reference rule across a chart: a mean, a median, a threshold, a date. */
 export interface ReferenceMark {
@@ -175,7 +189,11 @@ export interface ReferenceMark {
  * turns into a zoom with a history. The brush draws in the signal colour because it is live state,
  * never a category.
  */
-export const rangeSelection = (theme: ChartTheme, xAxisIndex: number | readonly number[] = 0, { slider = true }: { readonly slider?: boolean } = {}) => ({
+export const rangeSelection = (
+  theme: ChartTheme,
+  xAxisIndex: number | readonly number[] = 0,
+  { slider = true }: { readonly slider?: boolean } = {},
+) => ({
   // A chart that follows another's window needs no slider of its own; the drag and the wheel remain.
   dataZoom: slider ? zoomPair(theme, xAxisIndex) : [zoomPair(theme, xAxisIndex)[0]],
   // The brush registers itself with the toolbox; the toolbox stays hidden and offers no buttons of its own.
@@ -205,7 +223,8 @@ function tickedAxis(axis: unknown, fallback: string): unknown {
   return { ...record, axisLabel: { ...label, formatter: formatAxisTick } }
 }
 
-const tickedAxes = (axes: unknown, fallback: string): unknown => Array.isArray(axes) ? axes.map(axis => tickedAxis(axis, fallback)) : tickedAxis(axes, fallback)
+const tickedAxes = (axes: unknown, fallback: string): unknown =>
+  Array.isArray(axes) ? axes.map((axis) => tickedAxis(axis, fallback)) : tickedAxis(axes, fallback)
 
 /**
  * ECharts writes a negative tick with a hyphen. Every option passes through here on its way to the
@@ -215,7 +234,8 @@ const tickedAxes = (axes: unknown, fallback: string): unknown => Array.isArray(a
 export function withAxisTicks<O extends object>(option: O): O {
   const root = option as Record<string, unknown>
   const base = root.baseOption
-  if (base !== null && typeof base === 'object') return { ...root, baseOption: withAxisTicks(base) } as O
+  if (base !== null && typeof base === 'object')
+    return { ...root, baseOption: withAxisTicks(base) } as O
   return {
     ...root,
     ...(root.xAxis === undefined ? {} : { xAxis: tickedAxes(root.xAxis, 'category') }),

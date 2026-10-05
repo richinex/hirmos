@@ -2,7 +2,8 @@ import { embed } from '@duckdb/duckdb-wasm-shell'
 import { Terminal, type ITheme, type ITerminalAddon } from 'xterm'
 import shellModule from '@duckdb/duckdb-wasm-shell/dist/shell_bg.wasm?url'
 
-const token = (name: string, fallback: string): string => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback
+const token = (name: string, fallback: string): string =>
+  getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback
 
 /**
  * The window quotes macOS Terminal in its chrome; its text takes the page's tokens, because Apple's
@@ -28,19 +29,32 @@ export const consoleTheme = (): ITheme => {
     cursorAccent: stage,
     selectionBackground: token('--color-raised', '#DFE7EF'),
     selectionForeground: ink,
-    black: stage, brightBlack: muted,
-    red: danger, brightRed: danger,
-    green: ok, brightGreen: ok,
-    yellow: warn, brightYellow: warn,
-    blue: info, brightBlue: info,
-    magenta: signal, brightMagenta: signal,
-    cyan: ok, brightCyan: ok,
-    white: ink, brightWhite: ink,
+    black: stage,
+    brightBlack: muted,
+    red: danger,
+    brightRed: danger,
+    green: ok,
+    brightGreen: ok,
+    yellow: warn,
+    brightYellow: warn,
+    blue: info,
+    brightBlue: info,
+    magenta: signal,
+    brightMagenta: signal,
+    cyan: ok,
+    brightCyan: ok,
+    white: ink,
+    brightWhite: ink,
   }
 }
 
 /** Capture the terminal created by the shell so its text and selection colours can follow the page theme. */
-const embedOnce = async (host: HTMLDivElement, resolveDatabase: () => Promise<Awaited<ReturnType<Parameters<typeof embed>[0]['resolveDatabase']>>>): Promise<Terminal | null> => {
+const embedOnce = async (
+  host: HTMLDivElement,
+  resolveDatabase: () => Promise<
+    Awaited<ReturnType<Parameters<typeof embed>[0]['resolveDatabase']>>
+  >,
+): Promise<Terminal | null> => {
   let caught: Terminal | null = null
   const open = Terminal.prototype.open
   const attach = Terminal.prototype.attachCustomKeyEventHandler
@@ -58,8 +72,18 @@ const embedOnce = async (host: HTMLDivElement, resolveDatabase: () => Promise<Aw
   // Android keyboards compose text: every key first arrives as a keydown named "Unidentified" (keyCode 229)
   // and the characters follow through composition events. The shell must not see those keydowns, or it
   // advances the cursor on them; xterm turns the composed text into data, and the bridge replays that.
-  Terminal.prototype.attachCustomKeyEventHandler = function (this: Terminal, handler: (event: KeyboardEvent) => boolean) {
-    return attach.call(this, (event: KeyboardEvent) => (event.isComposing || event.keyCode === 229 || event.key === 'Unidentified' || event.key === 'Process') ? true : handler(event))
+  Terminal.prototype.attachCustomKeyEventHandler = function (
+    this: Terminal,
+    handler: (event: KeyboardEvent) => boolean,
+  ) {
+    return attach.call(this, (event: KeyboardEvent) =>
+      event.isComposing ||
+      event.keyCode === 229 ||
+      event.key === 'Unidentified' ||
+      event.key === 'Process'
+        ? true
+        : handler(event),
+    )
   }
   try {
     await embed({
@@ -109,13 +133,17 @@ export const embedThemed: typeof embedOnce = (host, resolveDatabase) => {
  */
 export const bridgeSoftKeyboard = (terminal: Terminal): (() => void) => {
   let replaying = false
-  const keyFor = (char: string): string => (char === '\r' || char === '\n' ? 'Enter' : char === '\x7f' || char === '\b' ? 'Backspace' : char)
+  const keyFor = (char: string): string =>
+    char === '\r' || char === '\n' ? 'Enter' : char === '\x7f' || char === '\b' ? 'Backspace' : char
   const subscription = terminal.onData((data) => {
     const textarea = terminal.textarea
     if (replaying || textarea === undefined) return
     replaying = true
     try {
-      for (const char of data) textarea.dispatchEvent(new KeyboardEvent('keydown', { key: keyFor(char), bubbles: true, cancelable: true }))
+      for (const char of data)
+        textarea.dispatchEvent(
+          new KeyboardEvent('keydown', { key: keyFor(char), bubbles: true, cancelable: true }),
+        )
     } finally {
       replaying = false
     }
@@ -126,8 +154,14 @@ export const bridgeSoftKeyboard = (terminal: Terminal): (() => void) => {
 /** Subscribe to the page theme and the system theme used when the page has no explicit selection. */
 export const onThemeChange = (listener: () => void): (() => void) => {
   const observer = new MutationObserver(listener)
-  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class'] })
+  observer.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['data-theme', 'class'],
+  })
   const media = window.matchMedia('(prefers-color-scheme: dark)')
   media.addEventListener('change', listener)
-  return () => { observer.disconnect(); media.removeEventListener('change', listener) }
+  return () => {
+    observer.disconnect()
+    media.removeEventListener('change', listener)
+  }
 }

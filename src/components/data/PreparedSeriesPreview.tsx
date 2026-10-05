@@ -9,7 +9,11 @@ import { Icon } from '@/components/Icon'
 import { button, caption, label, panel, sectionTitle, well } from '@/components/ui/recipes'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import { mapNonEmpty, type NonEmptyArray } from '@/domain/dop'
-import { describeSeriesTransform, seriesTransformFor, type PreparedDatasetArtifact } from '@/domain/preprocessing'
+import {
+  describeSeriesTransform,
+  seriesTransformFor,
+  type PreparedDatasetArtifact,
+} from '@/domain/preprocessing'
 import type { SeasonalAdjustedEvidence } from '@/domain/seasonal'
 import type { SelectedSource } from '@/domain/workflow'
 import { formatCount } from '@/lib/format/number'
@@ -34,45 +38,98 @@ interface PreparedSeries {
 type PreviewJob =
   | { readonly kind: 'idle' }
   | { readonly kind: 'failed'; readonly detail: string }
-  | { readonly kind: 'ready'; readonly rows: number; readonly leadingRowsRemoved: number; readonly series: NonEmptyArray<PreparedSeries> }
+  | {
+      readonly kind: 'ready'
+      readonly rows: number
+      readonly leadingRowsRemoved: number
+      readonly series: NonEmptyArray<PreparedSeries>
+    }
 
-function StagePlot({ name, stage, final, labelled }: { readonly name: string; readonly stage: PreparedStage; readonly final: boolean; readonly labelled: boolean }) {
+function StagePlot({
+  name,
+  stage,
+  final,
+  labelled,
+}: {
+  readonly name: string
+  readonly stage: PreparedStage
+  readonly final: boolean
+  readonly labelled: boolean
+}) {
   const theme = useChartTheme()
-  const option = useMemo(() => changePointsOption({
-    name,
-    values: stage.values,
-    changePoints: [],
-    stepLabel: 'row',
-    zoom: false,
-  }, theme), [name, stage, theme])
+  const option = useMemo(
+    () =>
+      changePointsOption(
+        {
+          name,
+          values: stage.values,
+          changePoints: [],
+          stepLabel: 'row',
+          zoom: false,
+        },
+        theme,
+      ),
+    [name, stage, theme],
+  )
   return (
     <li className="min-w-0">
       {/* The stage name separates one step of the preparation from the next, so a lone stage is left unlabelled. */}
       {labelled && <span className={label('text-faint')}>{stage.label}</span>}
-      <ExpandableChart option={option} label={`${name}, ${stage.label}`} className={`${labelled ? 'mt-1' : ''} h-[110px]`} testId={final ? 'prepared-series' : undefined} />
+      <ExpandableChart
+        option={option}
+        label={`${name}, ${stage.label}`}
+        className={`${labelled ? 'mt-1' : ''} h-[110px]`}
+        testId={final ? 'prepared-series' : undefined}
+      />
     </li>
   )
 }
 
-function DecompositionPlot({ series }: { readonly series: PreparedSeries & { readonly decomposition: NonNullable<PreparedSeries['decomposition']> } }) {
+function DecompositionPlot({
+  series,
+}: {
+  readonly series: PreparedSeries & {
+    readonly decomposition: NonNullable<PreparedSeries['decomposition']>
+  }
+}) {
   const theme = useChartTheme()
-  const option = useMemo(() => decompositionOption({
-    name: series.name,
-    time: series.time,
-    calendar: series.calendar,
-    observed: series.decomposition.observed,
-    trend: series.decomposition.trend,
-    seasonal: series.decomposition.seasonal,
-    remainder: series.decomposition.remainder,
-  }, theme), [series, theme])
+  const option = useMemo(
+    () =>
+      decompositionOption(
+        {
+          name: series.name,
+          time: series.time,
+          calendar: series.calendar,
+          observed: series.decomposition.observed,
+          trend: series.decomposition.trend,
+          seasonal: series.decomposition.seasonal,
+          remainder: series.decomposition.remainder,
+        },
+        theme,
+      ),
+    [series, theme],
+  )
   return (
     <div className="mt-3 border-t border-hair pt-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <span className="text-body font-medium text-ink">STL decomposition</span>
-        <span className={caption()}><Metadata><span>trend strength {series.decomposition.trendStrength.toFixed(3)}</span><span>seasonal strength {series.decomposition.seasonalStrengthBefore.toFixed(3)}</span></Metadata></span>
+        <span className={caption()}>
+          <Metadata>
+            <span>trend strength {series.decomposition.trendStrength.toFixed(3)}</span>
+            <span>seasonal strength {series.decomposition.seasonalStrengthBefore.toFixed(3)}</span>
+          </Metadata>
+        </span>
       </div>
-      <p className="mb-0 mt-1 text-label text-muted">Observed = trend + seasonal + remainder at every retained time point. The components describe temporal structure; the decomposition does not imply causality.</p>
-      <ExpandableChart option={option} label={`${series.name} STL decomposition`} className="mt-2 h-[520px]" testId="stl-decomposition" />
+      <p className="mb-0 mt-1 text-label text-muted">
+        Observed = trend + seasonal + remainder at every retained time point. The components
+        describe temporal structure; the decomposition does not imply causality.
+      </p>
+      <ExpandableChart
+        option={option}
+        label={`${series.name} STL decomposition`}
+        className="mt-2 h-[520px]"
+        testId="stl-decomposition"
+      />
     </div>
   )
 }
@@ -81,15 +138,38 @@ function PreparedSeriesCell({ series }: { readonly series: PreparedSeries }) {
   return (
     <li className={well('min-w-0 p-(--panel-space)')}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <span className="min-w-0 text-body font-medium text-ink [overflow-wrap:anywhere]">{series.name}</span>
-        <span className={caption()}>{series.transform}{series.decomposition !== null ? <Metadata><span></span><span>STL-adjusted</span></Metadata> : ''}</span>
+        <span className="min-w-0 text-body font-medium text-ink [overflow-wrap:anywhere]">
+          {series.name}
+        </span>
+        <span className={caption()}>
+          {series.transform}
+          {series.decomposition !== null ? (
+            <Metadata>
+              <span></span>
+              <span>STL-adjusted</span>
+            </Metadata>
+          ) : (
+            ''
+          )}
+        </span>
       </div>
-      <ul className="m-0 mt-2 grid min-w-0 grid-cols-1 list-none gap-2 p-0" aria-label={`${series.name} preparation stages`}>
+      <ul
+        className="m-0 mt-2 grid min-w-0 grid-cols-1 list-none gap-2 p-0"
+        aria-label={`${series.name} preparation stages`}
+      >
         {series.stages.map((stage, index) => (
-          <StagePlot key={stage.label} name={series.name} stage={stage} final={index === series.stages.length - 1} labelled={series.stages.length > 1} />
+          <StagePlot
+            key={stage.label}
+            name={series.name}
+            stage={stage}
+            final={index === series.stages.length - 1}
+            labelled={series.stages.length > 1}
+          />
         ))}
       </ul>
-      {series.decomposition !== null && <DecompositionPlot series={{ ...series, decomposition: series.decomposition }} />}
+      {series.decomposition !== null && (
+        <DecompositionPlot series={{ ...series, decomposition: series.decomposition }} />
+      )}
     </li>
   )
 }
@@ -98,7 +178,11 @@ const columnValues = (values: Float64Array, rowCount: number, index: number): re
   Array.from(values.subarray(index * rowCount, (index + 1) * rowCount))
 
 /** Exact post-recipe values, drawn as aligned small multiples; an adjusted column stacks each station of its recipe. */
-export function PreparedSeriesPreview({ source, profile, prepared }: {
+export function PreparedSeriesPreview({
+  source,
+  profile,
+  prepared,
+}: {
   readonly source: SelectedSource
   readonly profile: DatasetProfile
   readonly prepared: Extract<PreparedDatasetArtifact, { readonly kind: 'prepared-time-series' }>
@@ -110,55 +194,112 @@ export function PreparedSeriesPreview({ source, profile, prepared }: {
   const load = useCallback(async () => {
     setBusy(true)
     try {
-      const { materialisePreparedStages, materialiseRoleAwarePrepared, describePreparedMaterialisationProblem } = await import('@/data/prepared')
+      const {
+        materialisePreparedStages,
+        materialiseRoleAwarePrepared,
+        describePreparedMaterialisationProblem,
+      } = await import('@/data/prepared')
       if (prepared.missingness.kind === 'lag-aware-exclusion') {
-        const result = await materialiseRoleAwarePrepared(source, profile, prepared, prepared.columns)
-        if (!result.ok) { setJob({ kind: 'failed', detail: describePreparedMaterialisationProblem(result.error) }); return }
+        const result = await materialiseRoleAwarePrepared(
+          source,
+          profile,
+          prepared,
+          prepared.columns,
+        )
+        if (!result.ok) {
+          setJob({ kind: 'failed', detail: describePreparedMaterialisationProblem(result.error) })
+          return
+        }
         const matrix = result.value
         const series = mapNonEmpty(matrix.columns, (column, index): PreparedSeries => ({
           column: column.id,
           name: column.name,
           transform: 'Lag-aware sample exclusion',
           decomposition: null,
-          time: Array.from(matrix.timeAxis.kind === 'calendar' ? matrix.timeAxis.timestamps : matrix.timeAxis.values),
+          time: Array.from(
+            matrix.timeAxis.kind === 'calendar'
+              ? matrix.timeAxis.timestamps
+              : matrix.timeAxis.values,
+          ),
           calendar: matrix.timeAxis.kind === 'calendar',
-          stages: [{ label: 'Saved values', values: Array.from({ length: matrix.rowCount }, (_, row) => {
-            const cell = index * matrix.rowCount + row
-            return matrix.validity[cell] === 0 ? null : matrix.values[cell]
-          }) }],
+          stages: [
+            {
+              label: 'Saved values',
+              values: Array.from({ length: matrix.rowCount }, (_, row) => {
+                const cell = index * matrix.rowCount + row
+                return matrix.validity[cell] === 0 ? null : matrix.values[cell]
+              }),
+            },
+          ],
         }))
         setJob({ kind: 'ready', rows: matrix.rowCount, leadingRowsRemoved: 0, series })
         return
       }
       const stages = await materialisePreparedStages(source, profile, prepared, prepared.columns)
-      if (!stages.ok) { setJob({ kind: 'failed', detail: describePreparedMaterialisationProblem(stages.error) }); return }
+      if (!stages.ok) {
+        setJob({ kind: 'failed', detail: describePreparedMaterialisationProblem(stages.error) })
+        return
+      }
       const { resolved, resampled, adjusted, stl, final } = stages.value
       const series = mapNonEmpty(final.columns, (column, index): PreparedSeries => {
         const transform = seriesTransformFor(prepared.seriesTransforms, column.id)
-        const seasonallyAdjusted = prepared.seasonalAdjustment.kind === 'stl' && prepared.seasonalAdjustment.columns.includes(column.id)
-        const finalStage = { label: transform.kind === 'levels' ? 'Final' : `Final, ${describeSeriesTransform(transform)}`, values: columnValues(final.values, final.rowCount, index) }
+        const seasonallyAdjusted =
+          prepared.seasonalAdjustment.kind === 'stl' &&
+          prepared.seasonalAdjustment.columns.includes(column.id)
+        const finalStage = {
+          label:
+            transform.kind === 'levels' ? 'Final' : `Final, ${describeSeriesTransform(transform)}`,
+          values: columnValues(final.values, final.rowCount, index),
+        }
         const prior = adjusted ?? resampled ?? resolved
         const timeAxis = prior.timeAxis
-        const stack: NonEmptyArray<PreparedStage> = seasonallyAdjusted || transform.kind !== 'levels' || resampled !== null
-          ? [
-            { label: 'Resolved source', values: columnValues(resolved.values, resolved.rowCount, index) },
-            ...(resampled !== null ? [{ label: `After ${prepared.sampling.frequency} resampling`, values: columnValues(resampled.values, resampled.rowCount, index) }] : []),
-            ...(seasonallyAdjusted && adjusted !== null ? [{ label: 'After STL', values: columnValues(adjusted.values, adjusted.rowCount, index) }] : []),
-            ...(transform.kind === 'levels' ? [] : [finalStage]),
-          ]
-          : [finalStage]
-        const decomposition = stl?.adjusted.find(({ column: adjustedColumn }) => adjustedColumn === index) ?? null
+        const stack: NonEmptyArray<PreparedStage> =
+          seasonallyAdjusted || transform.kind !== 'levels' || resampled !== null
+            ? [
+                {
+                  label: 'Resolved source',
+                  values: columnValues(resolved.values, resolved.rowCount, index),
+                },
+                ...(resampled !== null
+                  ? [
+                      {
+                        label: `After ${prepared.sampling.frequency} resampling`,
+                        values: columnValues(resampled.values, resampled.rowCount, index),
+                      },
+                    ]
+                  : []),
+                ...(seasonallyAdjusted && adjusted !== null
+                  ? [
+                      {
+                        label: 'After STL',
+                        values: columnValues(adjusted.values, adjusted.rowCount, index),
+                      },
+                    ]
+                  : []),
+                ...(transform.kind === 'levels' ? [] : [finalStage]),
+              ]
+            : [finalStage]
+        const decomposition =
+          stl?.adjusted.find(({ column: adjustedColumn }) => adjustedColumn === index) ?? null
         return {
           column: column.id,
           name: column.name,
           transform: describeSeriesTransform(transform),
           decomposition,
-          time: timeAxis === null ? Array.from({ length: prior.rowCount }, (_, row) => row + 1) : Array.from(timeAxis.kind === 'calendar' ? timeAxis.timestamps : timeAxis.values),
+          time:
+            timeAxis === null
+              ? Array.from({ length: prior.rowCount }, (_, row) => row + 1)
+              : Array.from(timeAxis.kind === 'calendar' ? timeAxis.timestamps : timeAxis.values),
           calendar: timeAxis?.kind === 'calendar',
           stages: stack,
         }
       })
-      setJob({ kind: 'ready', rows: final.rowCount, leadingRowsRemoved: final.leadingRowsRemoved, series })
+      setJob({
+        kind: 'ready',
+        rows: final.rowCount,
+        leadingRowsRemoved: final.leadingRowsRemoved,
+        series,
+      })
     } catch (cause: unknown) {
       setJob({ kind: 'failed', detail: cause instanceof Error ? cause.message : String(cause) })
     } finally {
@@ -166,37 +307,81 @@ export function PreparedSeriesPreview({ source, profile, prepared }: {
     }
   }, [prepared, profile, source])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    void load()
+  }, [load])
 
   return (
     <section className={panel('mt-4 p-(--panel-space)')} aria-labelledby="prepared-preview-title">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 id="prepared-preview-title" className={cn(sectionTitle, 'm-0')}>Prepared values</h3>
-          <p className="mb-0 mt-1 text-body text-faint">{prepared.missingness.kind === 'lag-aware-exclusion'
-            ? 'Missing values remain as gaps. Supported analyses exclude samples based on lags and variable roles.'
-            : 'Review the exact values provided to diagnostics, discovery methods, and estimators. An adjusted column shows each stage of processing.'}</p>
+          <h3 id="prepared-preview-title" className={cn(sectionTitle, 'm-0')}>
+            Prepared values
+          </h3>
+          <p className="mb-0 mt-1 text-body text-faint">
+            {prepared.missingness.kind === 'lag-aware-exclusion'
+              ? 'Missing values remain as gaps. Supported analyses exclude samples based on lags and variable roles.'
+              : 'Review the exact values provided to diagnostics, discovery methods, and estimators. An adjusted column shows each stage of processing.'}
+          </p>
         </div>
-        <button type="button" className={button('quiet')} aria-busy={busy} onClick={busy ? undefined : () => void load()}>
+        <button
+          type="button"
+          className={button('quiet')}
+          aria-busy={busy}
+          onClick={busy ? undefined : () => void load()}
+        >
           {busy ? 'Loading preview' : job.kind === 'failed' ? 'Retry preview' : 'Refresh preview'}
         </button>
       </div>
-      {job.kind === 'failed' ? <Alert tone="danger" className="mt-3">{job.detail}</Alert> : null}
+      {job.kind === 'failed' ? (
+        <Alert tone="danger" className="mt-3">
+          {job.detail}
+        </Alert>
+      ) : null}
       {job.kind === 'ready' && (
         <div className="mt-4 rounded-md border border-line">
           <button
             type="button"
             onClick={() => setOpen((value) => !value)}
             aria-expanded={open}
-            className={'flex w-full items-center gap-1.5 px-2.5 py-1.5 text-label text-muted transition-colors hover:text-ink'}
+            className={
+              'flex w-full items-center gap-1.5 px-2.5 py-1.5 text-label text-muted transition-colors hover:text-ink'
+            }
           >
-            <Icon name="expand_more" size={14} className={`shrink-0 transition-transform duration-(--motion-fast) ${open ? 'rotate-180' : ''}`} />
-            <span><Metadata><span>Prepared series</span><span>{formatCount(job.rows, { noun: 'aligned rows' }).text}{job.leadingRowsRemoved > 0 ? <Metadata><span></span><span>first source row removed for alignment</span></Metadata> : ''}</span></Metadata></span>
+            <Icon
+              name="expand_more"
+              size={14}
+              className={`shrink-0 transition-transform duration-(--motion-fast) ${open ? 'rotate-180' : ''}`}
+            />
+            <span>
+              <Metadata>
+                <span>Prepared series</span>
+                <span>
+                  {formatCount(job.rows, { noun: 'aligned rows' }).text}
+                  {job.leadingRowsRemoved > 0 ? (
+                    <Metadata>
+                      <span></span>
+                      <span>first source row removed for alignment</span>
+                    </Metadata>
+                  ) : (
+                    ''
+                  )}
+                </span>
+              </Metadata>
+            </span>
           </button>
-          <div className="grid transition-[grid-template-rows] duration-(--motion-base)" style={{ gridTemplateRows: open ? '1fr' : '0fr' }}>
+          <div
+            className="grid transition-[grid-template-rows] duration-(--motion-base)"
+            style={{ gridTemplateRows: open ? '1fr' : '0fr' }}
+          >
             <div className="overflow-hidden">
-              <ul className="m-0 grid list-none grid-cols-[repeat(auto-fit,minmax(min(28rem,100%),1fr))] gap-2 border-t border-hair p-2" aria-label="Prepared series plots">
-                {job.series.map((series) => <PreparedSeriesCell key={series.column} series={series} />)}
+              <ul
+                className="m-0 grid list-none grid-cols-[repeat(auto-fit,minmax(min(28rem,100%),1fr))] gap-2 border-t border-hair p-2"
+                aria-label="Prepared series plots"
+              >
+                {job.series.map((series) => (
+                  <PreparedSeriesCell key={series.column} series={series} />
+                ))}
               </ul>
             </div>
           </div>

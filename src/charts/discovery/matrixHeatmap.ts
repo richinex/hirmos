@@ -31,22 +31,31 @@ export function matrixHeatmapOption(view: MatrixHeatmapView, theme: ChartTheme):
   const cells: (readonly [number, number, number | null])[] = []
   let peak = 0
   let filled = 0
-  view.values.forEach((row, source) => row.forEach((value, target) => {
-    cells.push([target, view.sources.length - 1 - source, value])
-    if (value !== null) {
-      filled += 1
-      peak = Math.max(peak, Math.abs(value))
-    }
-  }))
+  view.values.forEach((row, source) =>
+    row.forEach((value, target) => {
+      cells.push([target, view.sources.length - 1 - source, value])
+      if (value !== null) {
+        filled += 1
+        peak = Math.max(peak, Math.abs(value))
+      }
+    }),
+  )
   const magnitude = Math.max(peak, 1e-9)
   // On a symmetric matrix the diagonal is a variable against itself, which no threshold is about.
   const reaches = (x: number, y: number, value: number | null): boolean =>
-    view.threshold !== undefined && value !== null && Math.abs(value) >= view.threshold && !(view.relation === 'symmetric' && view.sources.length - 1 - y === x)
+    view.threshold !== undefined &&
+    value !== null &&
+    Math.abs(value) >= view.threshold &&
+    !(view.relation === 'symmetric' && view.sources.length - 1 - y === x)
   const flagged = cells.filter(([x, y, value]) => reaches(x, y, value)).length
-  const thresholdNote = view.threshold === undefined ? '' : ` ${flagged} cells reach the threshold of ${formatStatistic('score', view.threshold).text} and are outlined.`
-  const description = view.relation === 'symmetric'
-    ? `${view.title}: ${view.sources.length} by ${view.targets.length}, ${filled} cells with a ${view.quantity}; the largest magnitude is ${formatStatistic('score', peak).text}.${thresholdNote}`
-    : `${view.title}: ${view.sources.length} sources by ${view.targets.length} targets, ${filled} cells with a ${view.quantity}; the largest magnitude is ${formatStatistic('score', peak).text}.${thresholdNote}`
+  const thresholdNote =
+    view.threshold === undefined
+      ? ''
+      : ` ${flagged} cells reach the threshold of ${formatStatistic('score', view.threshold).text} and are outlined.`
+  const description =
+    view.relation === 'symmetric'
+      ? `${view.title}: ${view.sources.length} by ${view.targets.length}, ${filled} cells with a ${view.quantity}; the largest magnitude is ${formatStatistic('score', peak).text}.${thresholdNote}`
+      : `${view.title}: ${view.sources.length} sources by ${view.targets.length} targets, ${filled} cells with a ${view.quantity}; the largest magnitude is ${formatStatistic('score', peak).text}.${thresholdNote}`
   const showLabels = view.sources.length * view.targets.length <= 64
   // Neither axis is named. The row and column labels already carry the variables, an axis name at the
   // grid's end would sit under the button that lifts the figure into a floating window, and on a
@@ -65,11 +74,15 @@ export function matrixHeatmapOption(view: MatrixHeatmapView, theme: ChartTheme):
         const target = Number(value[0])
         const source = view.sources.length - 1 - Number(value[1])
         const cell = value[2]
-        const text = cell === null || cell === undefined ? 'no relation' : `${view.quantity} <strong>${formatStatistic('score', Number(cell)).text}</strong>`
+        const text =
+          cell === null || cell === undefined
+            ? 'no relation'
+            : `${view.quantity} <strong>${formatStatistic('score', Number(cell)).text}</strong>`
         const mark = view.cellText?.(source, target)
-        const pair = view.relation === 'symmetric'
-          ? `${escapeHtml(view.sources[source] ?? '')} × ${escapeHtml(view.targets[target] ?? '')}`
-          : `${escapeHtml(view.sources[source] ?? '')} → ${escapeHtml(view.targets[target] ?? '')}`
+        const pair =
+          view.relation === 'symmetric'
+            ? `${escapeHtml(view.sources[source] ?? '')} × ${escapeHtml(view.targets[target] ?? '')}`
+            : `${escapeHtml(view.sources[source] ?? '')} → ${escapeHtml(view.targets[target] ?? '')}`
         return `${pair}<br/>${text}${mark ? `<br/>${escapeHtml(mark)}` : ''}`
       },
     },
@@ -80,7 +93,14 @@ export function matrixHeatmapOption(view: MatrixHeatmapView, theme: ChartTheme):
       axisLine: { show: false },
       axisTick: { show: false },
       // Every label while they fit; past six columns the auto interval thins them instead of forcing an overlap.
-      axisLabel: { color: theme.muted, fontFamily: theme.font, fontSize: theme.labelSize, hideOverlap: true, interval: view.targets.length <= 6 ? 0 : 'auto', rotate: 0 },
+      axisLabel: {
+        color: theme.muted,
+        fontFamily: theme.font,
+        fontSize: theme.labelSize,
+        hideOverlap: true,
+        interval: view.targets.length <= 6 ? 0 : 'auto',
+        rotate: 0,
+      },
       splitArea: { show: false },
     },
     yAxis: {
@@ -102,35 +122,46 @@ export function matrixHeatmapOption(view: MatrixHeatmapView, theme: ChartTheme):
       itemHeight: 120,
       text: view.scale === 'signed' ? ['positive', 'negative'] : ['strong', 'none'],
       textStyle: { color: theme.faint, fontFamily: theme.font, fontSize: theme.labelSize },
-      inRange: { color: view.scale === 'signed' ? [theme.info, theme.panel, theme.signal] : [theme.panel, theme.signal] },
+      inRange: {
+        color:
+          view.scale === 'signed'
+            ? [theme.info, theme.panel, theme.signal]
+            : [theme.panel, theme.signal],
+      },
       borderColor: theme.hair,
     },
-    series: [{
-      type: 'heatmap',
-      name: view.quantity,
-      data: cells.map(([x, y, value]) => (value === null
-        ? { value: [x, y, null], itemStyle: { color: theme.line } }
-        : reaches(x, y, value) ? { value: [x, y, value], itemStyle: { borderColor: theme.ink, borderWidth: 2 } } : [x, y, value])),
-      label: {
-        show: showLabels,
-        color: theme.ink,
-        fontFamily: theme.font,
-        fontSize: theme.labelSize,
-        formatter: (raw: unknown) => {
-          if (raw === null || typeof raw !== 'object') return ''
-          const value = Reflect.get(raw, 'value')
-          if (!Array.isArray(value)) return ''
-          const target = Number(value[0])
-          const source = view.sources.length - 1 - Number(value[1])
-          const mark = view.cellText?.(source, target)
-          if (mark !== undefined && mark !== null) return mark
-          return typeof value[2] === 'number' ? formatStatistic('score', value[2]).text : ''
+    series: [
+      {
+        type: 'heatmap',
+        name: view.quantity,
+        data: cells.map(([x, y, value]) =>
+          value === null
+            ? { value: [x, y, null], itemStyle: { color: theme.line } }
+            : reaches(x, y, value)
+              ? { value: [x, y, value], itemStyle: { borderColor: theme.ink, borderWidth: 2 } }
+              : [x, y, value],
+        ),
+        label: {
+          show: showLabels,
+          color: theme.ink,
+          fontFamily: theme.font,
+          fontSize: theme.labelSize,
+          formatter: (raw: unknown) => {
+            if (raw === null || typeof raw !== 'object') return ''
+            const value = Reflect.get(raw, 'value')
+            if (!Array.isArray(value)) return ''
+            const target = Number(value[0])
+            const source = view.sources.length - 1 - Number(value[1])
+            const mark = view.cellText?.(source, target)
+            if (mark !== undefined && mark !== null) return mark
+            return typeof value[2] === 'number' ? formatStatistic('score', value[2]).text : ''
+          },
         },
+        itemStyle: { borderColor: theme.hair, borderWidth: 1 },
+        emphasis: { itemStyle: { borderColor: theme.ink, borderWidth: 2 } },
+        labelLayout: { hideOverlap: true },
       },
-      itemStyle: { borderColor: theme.hair, borderWidth: 1 },
-      emphasis: { itemStyle: { borderColor: theme.ink, borderWidth: 2 } },
-      labelLayout: { hideOverlap: true },
-    }],
+    ],
   }
   return responsive(base, {
     wide: {
@@ -141,7 +172,14 @@ export function matrixHeatmapOption(view: MatrixHeatmapView, theme: ChartTheme):
     narrow: {
       grid: { right: 60, bottom: 8 },
       xAxis: { axisLabel: { rotate: 90, width: 60, overflow: 'truncate' } },
-      visualMap: { orient: 'vertical', left: 'auto', right: 0, top: 'middle', bottom: 'auto', itemHeight: 100 },
+      visualMap: {
+        orient: 'vertical',
+        left: 'auto',
+        right: 0,
+        top: 'middle',
+        bottom: 'auto',
+        itemHeight: 100,
+      },
       series: [{ label: { show: false } }],
     },
   })

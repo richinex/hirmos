@@ -7,7 +7,9 @@ import { navigate } from '@/lib/router'
  * run. Null when the prepared dataset is not a time series, since only a series has the pane.
  */
 export function useOpenStationarityTests(): (() => void) | null {
-  const prepared = useWorkflow((state) => (state.workflow.kind === 'profiled' ? state.workflow.prepared : null))
+  const prepared = useWorkflow((state) =>
+    state.workflow.kind === 'profiled' ? state.workflow.prepared : null,
+  )
   const changeDiagnostic = useWorkflow((state) => state.changeDiagnostic)
   if (prepared === null || prepared.kind !== 'prepared-time-series') return null
   return () => {

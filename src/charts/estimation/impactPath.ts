@@ -1,7 +1,15 @@
 import type { EChartsCoreOption } from 'echarts/core'
 import type { TimeEffectPoint } from '@/domain/estimation'
 import { formatCount, formatStatistic } from '@/lib/format/number'
-import { axisLabelStyle, baseOption, gridAuto, legend, rangeSelection, tooltip, valueAxis } from '../grammar'
+import {
+  axisLabelStyle,
+  baseOption,
+  gridAuto,
+  legend,
+  rangeSelection,
+  tooltip,
+  valueAxis,
+} from '../grammar'
 import type { ChartTheme } from '../theme'
 
 export interface ImpactPathView {
@@ -24,15 +32,25 @@ export function impactPathOption(view: ImpactPathView, theme: ChartTheme): EChar
   const last = drawn.at(-1)?.step ?? evaluatedFrom
   const ghost = view.ghost ?? null
   const ghostAt = new Map(ghost?.points.map((point) => [point.step, point]) ?? [])
-  const fitted = view.before.length === 0
-    ? ''
-    : ` The ${formatCount(view.before.length).text} ${view.stepLabel}s before it are the fitted window, where the two paths should agree.`
+  const fitted =
+    view.before.length === 0
+      ? ''
+      : ` The ${formatCount(view.before.length).text} ${view.stepLabel}s before it are the fitted window, where the two paths should agree.`
   const description = `${view.outcome} against its estimated no-intervention path over ${formatCount(view.points.length).text} post-intervention ${view.stepLabel}s, ${view.stepLabel} ${evaluatedFrom} to ${last}.${fitted}${ghost === null ? '' : ` The estimated no-intervention path from ${ghost.name} is drawn faintly for comparison.`}`
   return {
     ...baseOption(theme, description),
     // The slider sits under the axis name; the legend goes above the plot.
     grid: gridAuto({ top: 30, bottom: 64 }),
-    legend: { ...legend(theme, ghost === null ? ['estimated no intervention', 'observed'] : ['estimated no intervention', 'observed', ghost.name]), bottom: 'auto', top: 0 },
+    legend: {
+      ...legend(
+        theme,
+        ghost === null
+          ? ['estimated no intervention', 'observed']
+          : ['estimated no intervention', 'observed', ghost.name],
+      ),
+      bottom: 'auto',
+      top: 0,
+    },
     ...rangeSelection(theme),
     tooltip: {
       ...tooltip(theme, 'axis'),
@@ -45,7 +63,10 @@ export function impactPathOption(view: ImpactPathView, theme: ChartTheme): EChar
         const point = drawn[index]
         if (point === undefined) return ''
         const other = ghostAt.get(point.step)
-        const comparison = ghost === null || other === undefined ? '' : `<br/>${ghost.name}: no-intervention estimate ${formatStatistic('raw', other.counterfactual).text}, difference ${formatStatistic('raw', other.effect).text} (${formatStatistic('raw', point.effect - other.effect).text} apart)`
+        const comparison =
+          ghost === null || other === undefined
+            ? ''
+            : `<br/>${ghost.name}: no-intervention estimate ${formatStatistic('raw', other.counterfactual).text}, difference ${formatStatistic('raw', other.effect).text} (${formatStatistic('raw', point.effect - other.effect).text} apart)`
         const window = point.step < evaluatedFrom ? ' (fitted window)' : ''
         return `${view.stepLabel} ${point.step}${window}<br/>observed <strong>${formatStatistic('raw', point.actual).text}</strong><br/>estimated no intervention ${formatStatistic('raw', point.counterfactual).text} [${formatStatistic('raw', point.lower).text}, ${formatStatistic('raw', point.upper).text}]<br/>difference <strong>${formatStatistic('raw', point.effect).text}</strong>${comparison}`
       },
@@ -67,15 +88,19 @@ export function impactPathOption(view: ImpactPathView, theme: ChartTheme): EChar
     yAxis: { ...valueAxis(theme), scale: true },
     series: [
       // The ghost is the other run's no-intervention path: faint and dashed behind this run.
-      ...(ghost === null ? [] : [{
-        type: 'line',
-        name: ghost.name,
-        data: ghost.points.map((point) => [point.step, point.counterfactual]),
-        lineStyle: { color: theme.faint, width: 1, type: 'dotted' },
-        itemStyle: { color: theme.faint },
-        symbol: 'none',
-        z: 1,
-      }]),
+      ...(ghost === null
+        ? []
+        : [
+            {
+              type: 'line',
+              name: ghost.name,
+              data: ghost.points.map((point) => [point.step, point.counterfactual]),
+              lineStyle: { color: theme.faint, width: 1, type: 'dotted' },
+              itemStyle: { color: theme.faint },
+              symbol: 'none',
+              z: 1,
+            },
+          ]),
       {
         type: 'line',
         name: 'lower',
@@ -106,18 +131,26 @@ export function impactPathOption(view: ImpactPathView, theme: ChartTheme): EChar
         symbol: 'none',
         // The evaluated window is shaded, as the interrupted-series chart shades its post period,
         // and the intervention itself is ruled off so the fitted window reads as the run-up to it.
-        markArea: view.points.length === 0 || view.before.length === 0 ? undefined : {
-          silent: true,
-          itemStyle: { color: theme.well, opacity: 0.6 },
-          data: [[{ xAxis: evaluatedFrom }, { xAxis: view.points.at(-1)?.step ?? evaluatedFrom }]],
-        },
-        markLine: view.before.length === 0 ? undefined : {
-          silent: true,
-          symbol: 'none',
-          label: { show: false },
-          lineStyle: { color: theme.faint, type: 'dashed', width: 1 },
-          data: [{ xAxis: evaluatedFrom }],
-        },
+        markArea:
+          view.points.length === 0 || view.before.length === 0
+            ? undefined
+            : {
+                silent: true,
+                itemStyle: { color: theme.well, opacity: 0.6 },
+                data: [
+                  [{ xAxis: evaluatedFrom }, { xAxis: view.points.at(-1)?.step ?? evaluatedFrom }],
+                ],
+              },
+        markLine:
+          view.before.length === 0
+            ? undefined
+            : {
+                silent: true,
+                symbol: 'none',
+                label: { show: false },
+                lineStyle: { color: theme.faint, type: 'dashed', width: 1 },
+                data: [{ xAxis: evaluatedFrom }],
+              },
       },
       {
         type: 'line',

@@ -9,7 +9,11 @@ export type ThemeChoice = ThemeName | 'system'
 const KEY = 'hirmos-theme'
 export const THEMES: readonly ThemeName[] = ['light', 'dark']
 const CYCLE: readonly ThemeChoice[] = [...THEMES, 'system']
-export const THEME_LABELS: Record<ThemeChoice, string> = { light: 'Light', dark: 'Dark', system: 'System' }
+export const THEME_LABELS: Record<ThemeChoice, string> = {
+  light: 'Light',
+  dark: 'Dark',
+  system: 'System',
+}
 
 const isTheme = (value: unknown): value is ThemeName => THEMES.includes(value as ThemeName)
 
@@ -26,8 +30,12 @@ const sweep = (commit: () => void): void => {
   }
 
   root.dataset.themeTransition = ''
-  const transition = document.startViewTransition(() => { flushSync(commit) })
-  void transition.finished.finally(() => { delete root.dataset.themeTransition })
+  const transition = document.startViewTransition(() => {
+    flushSync(commit)
+  })
+  void transition.finished.finally(() => {
+    delete root.dataset.themeTransition
+  })
 }
 
 /** The OS preference resolves to one of the two faces; the boot script in index.html applies the same rule. */
@@ -57,7 +65,9 @@ export function useTheme(): {
     try {
       const stored = localStorage.getItem(KEY)
       if (stored === 'system' || isTheme(stored)) return stored
-    } catch { /* private mode */ }
+    } catch {
+      /* private mode */
+    }
     return 'light'
   })
   const osTheme = useSyncExternalStore(subscribeOsTheme, systemTheme, () => 'light' as ThemeName)
@@ -70,8 +80,14 @@ export function useTheme(): {
     root.dataset.themeSwitching = ''
     root.dataset.theme = theme
     void root.offsetHeight
-    const frame = requestAnimationFrame(() => { delete root.dataset.themeSwitching })
-    try { localStorage.setItem(KEY, choice) } catch { /* ignore */ }
+    const frame = requestAnimationFrame(() => {
+      delete root.dataset.themeSwitching
+    })
+    try {
+      localStorage.setItem(KEY, choice)
+    } catch {
+      /* ignore */
+    }
     return () => cancelAnimationFrame(frame)
   }, [theme, choice])
 
@@ -80,6 +96,7 @@ export function useTheme(): {
     choice,
     next: CYCLE[(CYCLE.indexOf(choice) + 1) % CYCLE.length],
     setChoice: (next: ThemeChoice) => sweep(() => setChoice(next)),
-    cycle: () => sweep(() => setChoice(current => CYCLE[(CYCLE.indexOf(current) + 1) % CYCLE.length])),
+    cycle: () =>
+      sweep(() => setChoice((current) => CYCLE[(CYCLE.indexOf(current) + 1) % CYCLE.length])),
   }
 }

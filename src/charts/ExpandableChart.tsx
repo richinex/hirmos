@@ -9,7 +9,17 @@ import { useChartExport } from './useChartExport'
  * A diagnostic chart that can be lifted into a floating window, where it fills the window and can be
  * exported as it stands. Builders that declare `dataZoom` gain wheel zoom and drag panning there.
  */
-export function ExpandableChart({ option, label, className = 'h-[260px]', style, testId, defaultWidth, defaultHeight, window: wanted, onWindow }: {
+export function ExpandableChart({
+  option,
+  label,
+  className = 'h-[260px]',
+  style,
+  testId,
+  defaultWidth,
+  defaultHeight,
+  window: wanted,
+  onWindow,
+}: {
   readonly option: EChartsCoreOption
   readonly label: string
   readonly className?: string
@@ -25,7 +35,9 @@ export function ExpandableChart({ option, label, className = 'h-[260px]', style,
 }) {
   const exporter = useChartExport(label, testId ?? null)
   const [lifted, setLifted] = useState<EChartsType | null>(null)
-  useEffect(() => { if (lifted !== null) exporter.register(lifted, option) }, [exporter, lifted, option])
+  useEffect(() => {
+    if (lifted !== null) exporter.register(lifted, option)
+  }, [exporter, lifted, option])
   return (
     <FloatingFigure
       label={label}
@@ -33,12 +45,29 @@ export function ExpandableChart({ option, label, className = 'h-[260px]', style,
       defaultHeight={defaultHeight}
       actions={exporter.buttons}
       notice={exporter.problem}
-      figure={<EChart option={option} label={label} className="min-h-0 flex-1" onReady={setLifted} window={wanted} onWindow={onWindow} />}
+      figure={
+        <EChart
+          option={option}
+          label={label}
+          className="min-h-0 flex-1"
+          onReady={setLifted}
+          window={wanted}
+          onWindow={onWindow}
+        />
+      }
     >
       {(openButton) => (
         <div className="relative">
           <div className="absolute right-1 top-1 z-10">{openButton}</div>
-          <EChart option={option} label={label} className={className} style={style} testId={testId} window={wanted} onWindow={onWindow} />
+          <EChart
+            option={option}
+            label={label}
+            className={className}
+            style={style}
+            testId={testId}
+            window={wanted}
+            onWindow={onWindow}
+          />
         </div>
       )}
     </FloatingFigure>

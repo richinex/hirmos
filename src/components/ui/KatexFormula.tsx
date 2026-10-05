@@ -15,5 +15,11 @@ export default function KatexFormula({ tex, plain }: FormulaProps) {
     }
   }, [tex])
   if (html === null) return <FormulaText plain={plain} />
-  return <p className="formula m-0 min-w-0" aria-label={plain} dangerouslySetInnerHTML={{ __html: html }} />
+  return (
+    <p
+      className="formula m-0 min-w-0"
+      aria-label={plain}
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  )
 }

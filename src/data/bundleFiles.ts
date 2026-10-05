@@ -5,8 +5,16 @@ export async function encodeSourceFile(file: File): Promise<BundleData> {
   const bytes = new Uint8Array(await file.arrayBuffer())
   let binary = ''
   const chunk = 0x8000
-  for (let offset = 0; offset < bytes.length; offset += chunk) binary += String.fromCharCode(...bytes.subarray(offset, offset + chunk))
-  return { kind: 'source-file', name: file.name, mediaType: file.type, lastModified: file.lastModified, bytes: file.size, base64: btoa(binary) }
+  for (let offset = 0; offset < bytes.length; offset += chunk)
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunk))
+  return {
+    kind: 'source-file',
+    name: file.name,
+    mediaType: file.type,
+    lastModified: file.lastModified,
+    bytes: file.size,
+    base64: btoa(binary),
+  }
 }
 
 export function decodeSourceFile(data: Extract<BundleData, { kind: 'source-file' }>): File {

@@ -13,39 +13,61 @@ interface InterpretationSection {
 
 type InterpretationContext = 'result' | 'sensitivity-check' | 'discovery-run'
 
-const SECTION_ORDER: readonly StatementKind[] = ['magnitude', 'comparison', 'uncertainty', 'qualification']
+const SECTION_ORDER: readonly StatementKind[] = [
+  'magnitude',
+  'comparison',
+  'uncertainty',
+  'qualification',
+]
 
 const sectionLabel = (kind: StatementKind): string => {
   switch (kind) {
-    case 'magnitude': return 'Bottom line'
-    case 'comparison': return 'Checks and comparisons'
-    case 'uncertainty': return 'Uncertainty'
-    case 'qualification': return 'What must be true'
-    default: return assertNever(kind)
+    case 'magnitude':
+      return 'Bottom line'
+    case 'comparison':
+      return 'Checks and comparisons'
+    case 'uncertainty':
+      return 'Uncertainty'
+    case 'qualification':
+      return 'What must be true'
+    default:
+      return assertNever(kind)
   }
 }
 
 const sectionClass = (kind: StatementKind): string => {
   switch (kind) {
-    case 'magnitude': return 'text-ink'
+    case 'magnitude':
+      return 'text-ink'
     case 'uncertainty':
-    case 'comparison': return 'text-muted'
-    case 'qualification': return 'text-faint'
-    default: return assertNever(kind)
+    case 'comparison':
+      return 'text-muted'
+    case 'qualification':
+      return 'text-faint'
+    default:
+      return assertNever(kind)
   }
 }
 
 const interpretationTitle = (context: InterpretationContext): string => {
   switch (context) {
-    case 'result': return 'What this result means'
-    case 'sensitivity-check': return 'What this check means'
-    case 'discovery-run': return 'What this discovery run means'
-    default: return assertNever(context)
+    case 'result':
+      return 'What this result means'
+    case 'sensitivity-check':
+      return 'What this check means'
+    case 'discovery-run':
+      return 'What this discovery run means'
+    default:
+      return assertNever(context)
   }
 }
 
 /** The shared prose companion to a numerical result. Every sentence comes from recorded facts. */
-export function ResultInterpretation({ interpretation, className = '', context = 'result' }: {
+export function ResultInterpretation({
+  interpretation,
+  className = '',
+  context = 'result',
+}: {
   readonly interpretation: ResultInterpretationModel
   readonly className?: string
   readonly context?: InterpretationContext
@@ -62,12 +84,19 @@ export function ResultInterpretation({ interpretation, className = '', context =
         {sections.map((section) => (
           <section key={section.kind} aria-label={sectionLabel(section.kind)}>
             <h5 className="m-0 flex items-center gap-1.5 text-label font-medium text-bone">
-              {section.kind === 'qualification' && <Icon name="gavel" size={14} className="text-faint" />}
+              {section.kind === 'qualification' && (
+                <Icon name="gavel" size={14} className="text-faint" />
+              )}
               {sectionLabel(section.kind)}
             </h5>
             <div className="mt-1 space-y-1.5">
               {section.statements.map((statement, statementIndex) => (
-                <p key={`${statement.kind}-${statementIndex}`} className={prose(`m-0 ${sectionClass(statement.kind)}`)}>{statement.text}</p>
+                <p
+                  key={`${statement.kind}-${statementIndex}`}
+                  className={prose(`m-0 ${sectionClass(statement.kind)}`)}
+                >
+                  {statement.text}
+                </p>
               ))}
             </div>
           </section>

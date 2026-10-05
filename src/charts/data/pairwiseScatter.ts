@@ -17,17 +17,24 @@ const MAX_POINTS = 2_000
 const displayedPoints = (view: PairwiseScatterView): readonly (readonly [number, number])[] => {
   const length = Math.min(view.x.length, view.y.length)
   const count = Math.min(length, MAX_POINTS)
-  if (count === length) return Array.from({ length }, (_, index) => [view.x[index] ?? 0, view.y[index] ?? 0] as const)
+  if (count === length)
+    return Array.from({ length }, (_, index) => [view.x[index] ?? 0, view.y[index] ?? 0] as const)
   return Array.from({ length: count }, (_, index) => {
-    const source = Math.round(index * (length - 1) / (count - 1))
+    const source = Math.round((index * (length - 1)) / (count - 1))
     return [view.x[source] ?? 0, view.y[source] ?? 0] as const
   })
 }
 
-export function pairwiseScatterOption(view: PairwiseScatterView, theme: ChartTheme): EChartsCoreOption {
+export function pairwiseScatterOption(
+  view: PairwiseScatterView,
+  theme: ChartTheme,
+): EChartsCoreOption {
   const points = displayedPoints(view)
   return {
-    ...baseOption(theme, `${view.yName} against ${view.xName}; Pearson correlation ${formatStatistic('score', view.correlation).text}; ${points.length} of ${Math.min(view.x.length, view.y.length)} observations shown.`),
+    ...baseOption(
+      theme,
+      `${view.yName} against ${view.xName}; Pearson correlation ${formatStatistic('score', view.correlation).text}; ${points.length} of ${Math.min(view.x.length, view.y.length)} observations shown.`,
+    ),
     grid: gridAuto(),
     tooltip: {
       ...tooltip(theme),
@@ -46,7 +53,12 @@ export function pairwiseScatterOption(view: PairwiseScatterView, theme: ChartThe
       nameTextStyle: axisNameStyle(theme),
       axisLine: { lineStyle: { color: theme.hair } },
       axisTick: { show: false },
-      axisLabel: { color: theme.faint, fontFamily: theme.font, fontSize: theme.labelSize, hideOverlap: true },
+      axisLabel: {
+        color: theme.faint,
+        fontFamily: theme.font,
+        fontSize: theme.labelSize,
+        hideOverlap: true,
+      },
       splitLine: { lineStyle: { color: theme.hair } },
     },
     yAxis: {
@@ -57,16 +69,23 @@ export function pairwiseScatterOption(view: PairwiseScatterView, theme: ChartThe
       nameTextStyle: axisNameStyle(theme),
       axisLine: { lineStyle: { color: theme.hair } },
       axisTick: { show: false },
-      axisLabel: { color: theme.faint, fontFamily: theme.font, fontSize: theme.labelSize, hideOverlap: true },
+      axisLabel: {
+        color: theme.faint,
+        fontFamily: theme.font,
+        fontSize: theme.labelSize,
+        hideOverlap: true,
+      },
       splitLine: { lineStyle: { color: theme.hair } },
     },
-    series: [{
-      type: 'scatter',
-      data: points,
-      symbolSize: 5,
-      itemStyle: { color: variableColour(theme, view.yName), opacity: 0.62 },
-      large: points.length >= 1_000,
-      largeThreshold: 1_000,
-    }],
+    series: [
+      {
+        type: 'scatter',
+        data: points,
+        symbolSize: 5,
+        itemStyle: { color: variableColour(theme, view.yName), opacity: 0.62 },
+        large: points.length >= 1_000,
+        largeThreshold: 1_000,
+      },
+    ],
   }
 }

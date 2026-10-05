@@ -76,7 +76,12 @@ const random = (() => {
   }
 })()
 
-function textSprite(text: string, colour: THREE.Color, width: number, fontSize: number): THREE.Sprite {
+function textSprite(
+  text: string,
+  colour: THREE.Color,
+  width: number,
+  fontSize: number,
+): THREE.Sprite {
   const canvas = document.createElement('canvas')
   canvas.width = 512
   canvas.height = 160
@@ -91,7 +96,9 @@ function textSprite(text: string, colour: THREE.Color, width: number, fontSize: 
   const texture = new THREE.CanvasTexture(canvas)
   texture.colorSpace = THREE.SRGBColorSpace
   texture.minFilter = THREE.LinearFilter
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false }))
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false }),
+  )
   sprite.scale.set(width, width * (canvas.height / canvas.width), 1)
   return sprite
 }
@@ -115,7 +122,11 @@ function discTexture(): THREE.Texture {
   return texture
 }
 
-function edgeCurve(from: THREE.Vector3, to: THREE.Vector3, bend: number): THREE.QuadraticBezierCurve3 {
+function edgeCurve(
+  from: THREE.Vector3,
+  to: THREE.Vector3,
+  bend: number,
+): THREE.QuadraticBezierCurve3 {
   const direction = to.clone().sub(from).normalize()
   const start = from.clone().addScaledVector(direction, NODE_RADIUS + 0.06)
   const end = to.clone().addScaledVector(direction, -(NODE_RADIUS + 0.2))
@@ -124,8 +135,15 @@ function edgeCurve(from: THREE.Vector3, to: THREE.Vector3, bend: number): THREE.
   return new THREE.QuadraticBezierCurve3(start, control, end)
 }
 
-function arrowHead(curve: THREE.QuadraticBezierCurve3, colour: THREE.Color, size: number): THREE.Mesh {
-  const mesh = new THREE.Mesh(new THREE.ConeGeometry(size * 0.42, size, 18), new THREE.MeshBasicMaterial({ color: colour }))
+function arrowHead(
+  curve: THREE.QuadraticBezierCurve3,
+  colour: THREE.Color,
+  size: number,
+): THREE.Mesh {
+  const mesh = new THREE.Mesh(
+    new THREE.ConeGeometry(size * 0.42, size, 18),
+    new THREE.MeshBasicMaterial({ color: colour }),
+  )
   const endpoint = curve.getPoint(1)
   const tangent = curve.getTangent(1).normalize()
   mesh.position.copy(endpoint).addScaledVector(tangent, size * 0.45)
@@ -161,7 +179,11 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
 
     let renderer: THREE.WebGLRenderer
     try {
-      renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'low-power' })
+      renderer = new THREE.WebGLRenderer({
+        alpha: true,
+        antialias: true,
+        powerPreference: 'low-power',
+      })
     } catch {
       return
     }
@@ -186,7 +208,9 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
 
     // The observations: each point starts scattered and belongs to one variable, where it settles
     // into a loose orbit around the node. Treatment and outcome carry the signal tint.
-    const nodePositions = new Map<GraphNode['id'], THREE.Vector3>(NODES.map((node) => [node.id, point(node.point)]))
+    const nodePositions = new Map<GraphNode['id'], THREE.Vector3>(
+      NODES.map((node) => [node.id, point(node.point)]),
+    )
     const count = compact ? 420 : 760
     const scatter = new Float32Array(count * 3)
     const home = new Float32Array(count * 3)
@@ -215,7 +239,9 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
       home[index * 3 + 2] = (random() - 0.5) * 0.3
       phase[index] = random() * Math.PI * 2
       delay[index] = 0.15 + random() * 1.1
-      const tint = (owner.id === 'X' || owner.id === 'Y' ? signal : bone).clone().lerp(stage, dark ? 0.15 : 0.05)
+      const tint = (owner.id === 'X' || owner.id === 'Y' ? signal : bone)
+        .clone()
+        .lerp(stage, dark ? 0.15 : 0.05)
       colours[index * 3] = tint.r
       colours[index * 3 + 1] = tint.g
       colours[index * 3 + 2] = tint.b
@@ -225,15 +251,18 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
     positionAttribute.setUsage(THREE.DynamicDrawUsage)
     cloudGeometry.setAttribute('position', positionAttribute)
     cloudGeometry.setAttribute('color', new THREE.BufferAttribute(colours, 3))
-    const cloud = new THREE.Points(cloudGeometry, new THREE.PointsMaterial({
-      map: discTexture(),
-      vertexColors: true,
-      size: compact ? 0.06 : 0.07,
-      sizeAttenuation: true,
-      transparent: true,
-      opacity: dark ? 0.55 : 0.62,
-      depthWrite: false,
-    }))
+    const cloud = new THREE.Points(
+      cloudGeometry,
+      new THREE.PointsMaterial({
+        map: discTexture(),
+        vertexColors: true,
+        size: compact ? 0.06 : 0.07,
+        sizeAttenuation: true,
+        transparent: true,
+        opacity: dark ? 0.55 : 0.62,
+        depthWrite: false,
+      }),
+    )
     graph.add(cloud)
 
     // The variables: flat discs so the glyph sits in front, a ring in the node's tone, the caption below.
@@ -242,8 +271,18 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
       const group = new THREE.Group()
       group.position.copy(nodePositions.get(node.id) ?? new THREE.Vector3())
       const live = node.id === 'X' || node.id === 'Y'
-      const disc = new THREE.Mesh(new THREE.CircleGeometry(NODE_RADIUS, 64), new THREE.MeshBasicMaterial({ color: stage.clone().lerp(ink, dark ? 0.06 : 0.02) }))
-      const ring = new THREE.Mesh(new THREE.RingGeometry(NODE_RADIUS, NODE_RADIUS + 0.018, 96), new THREE.MeshBasicMaterial({ color: live ? signal : bone, transparent: true, opacity: live ? 0.95 : 0.8 }))
+      const disc = new THREE.Mesh(
+        new THREE.CircleGeometry(NODE_RADIUS, 64),
+        new THREE.MeshBasicMaterial({ color: stage.clone().lerp(ink, dark ? 0.06 : 0.02) }),
+      )
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(NODE_RADIUS, NODE_RADIUS + 0.018, 96),
+        new THREE.MeshBasicMaterial({
+          color: live ? signal : bone,
+          transparent: true,
+          opacity: live ? 0.95 : 0.8,
+        }),
+      )
       ring.position.z = 0.002
       const glyph = textSprite(node.id, live ? signal : ink, 0.4, 118)
       glyph.position.z = 0.03
@@ -251,7 +290,12 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
       caption.position.set(0, -(NODE_RADIUS + 0.22), 0.03)
       group.add(disc, ring, glyph, caption)
       group.scale.setScalar(0)
-      group.userData = { ring, live, pulseSpeed: 0.42 + Math.random() * 0.34, pulseOffset: Math.random() * Math.PI * 2 }
+      group.userData = {
+        ring,
+        live,
+        pulseSpeed: 0.42 + Math.random() * 0.34,
+        pulseOffset: Math.random() * Math.PI * 2,
+      }
       graph.add(group)
       nodeGroups.push(group)
     }
@@ -259,7 +303,12 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
     // The arrows: fat lines with a constant pixel width, drawn on segment by segment.
     const lineResolution = new THREE.Vector2(1, 1)
     const lineMaterials: LineMaterial[] = []
-    const edges: Array<{ readonly line: Line2; readonly head: THREE.Mesh; readonly curve: THREE.QuadraticBezierCurve3; readonly emphasis: GraphEdge['emphasis'] }> = []
+    const edges: Array<{
+      readonly line: Line2
+      readonly head: THREE.Mesh
+      readonly curve: THREE.QuadraticBezierCurve3
+      readonly emphasis: GraphEdge['emphasis']
+    }> = []
     for (const edge of EDGES) {
       const from = nodePositions.get(edge.from)
       const to = nodePositions.get(edge.to)
@@ -284,12 +333,17 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
       graph.add(line, head)
       edges.push({ line, head, curve, emphasis: edge.emphasis })
     }
-    const pulses = edges.filter((edge) => edge.emphasis === 'effect').map((edge, index) => {
-      const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.045, 16, 10), new THREE.MeshBasicMaterial({ color: signal }))
-      mesh.visible = false
-      graph.add(mesh)
-      return { mesh, curve: edge.curve, offset: index * 0.31 }
-    })
+    const pulses = edges
+      .filter((edge) => edge.emphasis === 'effect')
+      .map((edge, index) => {
+        const mesh = new THREE.Mesh(
+          new THREE.SphereGeometry(0.045, 16, 10),
+          new THREE.MeshBasicMaterial({ color: signal }),
+        )
+        mesh.visible = false
+        graph.add(mesh)
+        return { mesh, curve: edge.curve, offset: index * 0.31 }
+      })
 
     // Entrance clock: cloud condenses, nodes spring in as their points arrive, arrows draw on, pulses follow.
     const CONDENSE = 1.5
@@ -322,7 +376,10 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
 
     const layoutGraph = (time: number) => {
       springs.forEach((spring, index) => {
-        if (still) { nodeGroups[index]?.scale.setScalar(1); return }
+        if (still) {
+          nodeGroups[index]?.scale.setScalar(1)
+          return
+        }
         if (time < NODE_AT + index * NODE_STEP) return
         const force = -0.16 * (spring.scale - 1)
         spring.velocity = (spring.velocity + force) * 0.84
@@ -355,7 +412,8 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
       lineResolution.set(width, height)
       camera.aspect = width / height
       camera.updateProjectionMatrix()
-      const visibleHeight = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.position.z
+      const visibleHeight =
+        2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.position.z
       const visibleWidth = visibleHeight * camera.aspect
       if (width < 900) {
         graph.position.set(0.1, visibleHeight * 0.19, 0)
@@ -396,7 +454,12 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
       layoutCloud(time)
       layoutGraph(time)
       for (const group of nodeGroups) {
-        const { ring, live, pulseSpeed, pulseOffset } = group.userData as { ring: THREE.Mesh; live: boolean; pulseSpeed: number; pulseOffset: number }
+        const { ring, live, pulseSpeed, pulseOffset } = group.userData as {
+          ring: THREE.Mesh
+          live: boolean
+          pulseSpeed: number
+          pulseOffset: number
+        }
         const material = ring.material as THREE.MeshBasicMaterial
         const pulse = (Math.sin(time * pulseSpeed + pulseOffset) + 1) / 2
         material.opacity = (live ? 0.78 : 0.62) + pulse * (live ? 0.22 : 0.2)
@@ -432,19 +495,31 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
       pausedAt = performance.now()
       cancelAnimationFrame(frame)
     }
-    const sync = () => { if (heroVisible && pageVisible) start(); else stop() }
+    const sync = () => {
+      if (heroVisible && pageVisible) start()
+      else stop()
+    }
     const hero = document.querySelector('.landing-band')
-    const intersectionObserver = new IntersectionObserver((entries) => {
-      const entry = entries.at(0)
-      if (entry !== undefined) heroVisible = entry.isIntersecting
-      sync()
-    }, { threshold: 0.01 })
+    const intersectionObserver = new IntersectionObserver(
+      (entries) => {
+        const entry = entries.at(0)
+        if (entry !== undefined) heroVisible = entry.isIntersecting
+        sync()
+      },
+      { threshold: 0.01 },
+    )
     intersectionObserver.observe(hero ?? element)
-    const onVisibility = () => { pageVisible = !document.hidden; sync() }
+    const onVisibility = () => {
+      pageVisible = !document.hidden
+      sync()
+    }
     document.addEventListener('visibilitychange', onVisibility)
 
     const canvas = renderer.domElement
-    const onContextLost = (event: Event) => { event.preventDefault(); stop() }
+    const onContextLost = (event: Event) => {
+      event.preventDefault()
+      stop()
+    }
     const onContextRestored = () => sync()
     canvas.addEventListener('webglcontextlost', onContextLost)
     canvas.addEventListener('webglcontextrestored', onContextRestored)
@@ -474,11 +549,20 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
       canvas.removeEventListener('webglcontextlost', onContextLost)
       canvas.removeEventListener('webglcontextrestored', onContextRestored)
       scene.traverse((object) => {
-        if (object instanceof THREE.Mesh || object instanceof THREE.Line || object instanceof THREE.Points || object instanceof THREE.Sprite) {
+        if (
+          object instanceof THREE.Mesh ||
+          object instanceof THREE.Line ||
+          object instanceof THREE.Points ||
+          object instanceof THREE.Sprite
+        ) {
           object.geometry?.dispose()
           const materials = Array.isArray(object.material) ? object.material : [object.material]
           materials.forEach((material) => {
-            if (material instanceof THREE.SpriteMaterial || material instanceof THREE.PointsMaterial) material.map?.dispose()
+            if (
+              material instanceof THREE.SpriteMaterial ||
+              material instanceof THREE.PointsMaterial
+            )
+              material.map?.dispose()
             material.dispose()
           })
         }

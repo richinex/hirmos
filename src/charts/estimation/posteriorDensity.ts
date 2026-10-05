@@ -15,7 +15,10 @@ export interface PosteriorDensityView {
 }
 
 /** The pooled posterior draws of the effect as a density histogram, the 94% highest-density band, and lines at no effect and the posterior mean. */
-export function posteriorDensityOption(view: PosteriorDensityView, theme: ChartTheme): EChartsCoreOption {
+export function posteriorDensityOption(
+  view: PosteriorDensityView,
+  theme: ChartTheme,
+): EChartsCoreOption {
   const total = view.histogramCounts.reduce((sum, count) => sum + count, 0) || 1
   const bars = view.histogramCounts.map((count, index) => [
     view.histogramStart + (index + 0.5) * view.histogramBinWidth,
@@ -55,16 +58,36 @@ export function posteriorDensityOption(view: PosteriorDensityView, theme: ChartT
         markArea: {
           silent: true,
           itemStyle: { color: theme.info, opacity: 0.14 },
-          label: { show: true, position: 'insideBottomLeft', color: theme.muted, fontFamily: theme.font, fontSize: theme.labelSize, formatter: '94% HDI' },
+          label: {
+            show: true,
+            position: 'insideBottomLeft',
+            color: theme.muted,
+            fontFamily: theme.font,
+            fontSize: theme.labelSize,
+            formatter: '94% HDI',
+          },
           data: [[{ xAxis: view.hdiLower }, { xAxis: view.hdiUpper }]],
         },
         markLine: {
           silent: true,
           symbol: 'none',
-          label: { color: theme.muted, fontFamily: theme.font, fontSize: theme.labelSize, formatter: (entry: { name?: string }) => entry.name ?? '' },
+          label: {
+            color: theme.muted,
+            fontFamily: theme.font,
+            fontSize: theme.labelSize,
+            formatter: (entry: { name?: string }) => entry.name ?? '',
+          },
           data: [
-            { name: 'no effect', xAxis: 0, lineStyle: { color: theme.muted, type: 'dashed', width: 1 } },
-            { name: `mean ${formatStatistic('raw', view.mean).text}`, xAxis: view.mean, lineStyle: { color: theme.signal, type: 'solid', width: 1.5 } },
+            {
+              name: 'no effect',
+              xAxis: 0,
+              lineStyle: { color: theme.muted, type: 'dashed', width: 1 },
+            },
+            {
+              name: `mean ${formatStatistic('raw', view.mean).text}`,
+              xAxis: view.mean,
+              lineStyle: { color: theme.signal, type: 'solid', width: 1.5 },
+            },
           ],
         },
       },

@@ -1,14 +1,27 @@
-import {categoricalMembershipSchema,type CategoricalMembership} from '@/domain/sampleMembership'
+import { categoricalMembershipSchema, type CategoricalMembership } from '@/domain/sampleMembership'
 import * as duckdb from '@duckdb/duckdb-wasm'
 import { fileRelation } from './fileRelation'
 import { fileReading } from '@/domain/fileReading'
 import { inspectCalendar } from './calendar'
-import { timestampSql, type TimeInterpretation, type TimePreview, type TimeSpacing } from '@/domain/timeInterpretation'
+import {
+  timestampSql,
+  type TimeInterpretation,
+  type TimePreview,
+  type TimeSpacing,
+} from '@/domain/timeInterpretation'
 import { DUCKDB_PACKAGE_VERSION, DUCKDB_ENGINE_VERSION } from '@/domain/dataEngine'
 import duckdbEhWorker from '@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js?url'
 import duckdbMvpWorker from '@duckdb/duckdb-wasm/dist/duckdb-browser-mvp.worker.js?url'
 import { fingerprintFile } from './fingerprint'
-import { assertNever, err, isNonEmpty, mapNonEmpty, ok, type NonEmptyArray, type Result } from '@/domain/dop'
+import {
+  assertNever,
+  err,
+  isNonEmpty,
+  mapNonEmpty,
+  ok,
+  type NonEmptyArray,
+  type Result,
+} from '@/domain/dop'
 import {
   columnId,
   datasetProfileId,
@@ -35,14 +48,21 @@ import {
   type ColumnId,
 } from '@/domain/dataset'
 import type { SelectedSource } from '@/domain/workflow'
-import type { PanelDataProblem, PanelKeyMatrix, PanelLongMatrix, PanelPeriod, PanelStructureEvidence } from '@/domain/panel'
+import type {
+  PanelDataProblem,
+  PanelKeyMatrix,
+  PanelLongMatrix,
+  PanelPeriod,
+  PanelStructureEvidence,
+} from '@/domain/panel'
 
 const MILLISECONDS_PER_DAY = 86_400_000
 
 const PREVIEW_ROWS = 12
 
 /** The engine binaries are served under the app's own origin at this path: from node_modules by the dev and preview servers, from R2 by the deployment. */
-const engineBinary = (file: string): string => new URL(`/duckdb/${DUCKDB_PACKAGE_VERSION}/${file}`, self.location.origin).href
+const engineBinary = (file: string): string =>
+  new URL(`/duckdb/${DUCKDB_PACKAGE_VERSION}/${file}`, self.location.origin).href
 
 const LOCAL_BUNDLES: duckdb.DuckDBBundles = {
   mvp: { mainModule: engineBinary('duckdb-mvp.wasm'), mainWorker: duckdbMvpWorker },
@@ -67,7 +87,9 @@ const scalarBigInt = (value: unknown, label: string): bigint => {
 
 async function configureOfflineEngine(db: duckdb.AsyncDuckDB, version: string): Promise<void> {
   if (version !== DUCKDB_ENGINE_VERSION) {
-    throw new Error(`DuckDB engine ${version} does not match the self-hosted ${DUCKDB_ENGINE_VERSION} extensions.`)
+    throw new Error(
+      `DuckDB engine ${version} does not match the self-hosted ${DUCKDB_ENGINE_VERSION} extensions.`,
+    )
   }
 
   const connection = await db.connect()
@@ -105,7 +127,11 @@ const startEngine = async (): Promise<DuckDbEngine> => {
   const db = new duckdb.AsyncDuckDB(new duckdb.VoidLogger(), worker)
   try {
     await db.instantiate(bundle.mainModule, bundle.pthreadWorker)
-    await db.open({ allowUnsignedExtensions: false, arrowLosslessConversion: true, maximumThreads: 1 })
+    await db.open({
+      allowUnsignedExtensions: false,
+      arrowLosslessConversion: true,
+      maximumThreads: 1,
+    })
     const version = await db.getVersion()
     await configureOfflineEngine(db, version)
     return { db, version }
@@ -113,7 +139,9 @@ const startEngine = async (): Promise<DuckDbEngine> => {
     try {
       await db.terminate()
     } catch (terminationCause) {
-      throw new Error(`${detailOf(cause)}; worker termination also failed: ${detailOf(terminationCause)}`)
+      throw new Error(
+        `${detailOf(cause)}; worker termination also failed: ${detailOf(terminationCause)}`,
+      )
     }
     throw cause
   }
@@ -143,7 +171,8 @@ const temporalPreview = (value: number, duckdbType: string): PreviewCell | null 
 const wideInteger = (view: ArrayBufferView, signed: boolean): bigint => {
   const bytes = new Uint8Array(view.buffer, view.byteOffset, view.byteLength)
   let value = 0n
-  for (let index = bytes.length - 1; index >= 0; index -= 1) value = (value << 8n) | BigInt(bytes[index]!)
+  for (let index = bytes.length - 1; index >= 0; index -= 1)
+    value = (value << 8n) | BigInt(bytes[index]!)
   if (signed && (bytes[bytes.length - 1]! & 0x80) !== 0) value -= 1n << BigInt(bytes.length * 8)
   return value
 }
@@ -157,7 +186,9 @@ const wideValue = (value: ArrayBufferView, duckdbType: string): PreviewCell => {
   const magnitude = (integer < 0n ? -integer : integer).toString().padStart(scale + 1, '0')
   const text = `${integer < 0n ? '-' : ''}${magnitude.slice(0, -scale)}.${magnitude.slice(-scale)}`
   // Past fifteen digits a double would round the value, so the digits are shown as written instead.
-  return magnitude.length > 15 ? { kind: 'text', value: text } : { kind: 'number', value: Number(text) }
+  return magnitude.length > 15
+    ? { kind: 'text', value: text }
+    : { kind: 'number', value: Number(text) }
 }
 
 const isWideNumberType = (duckdbType: string): boolean => /^(U?HUGEINT|DECIMAL\()/.test(duckdbType)
@@ -168,7 +199,8 @@ export const previewCell = (value: unknown, duckdbType: string): PreviewCell => 
     if (isWideNumberType(duckdbType) && value.byteLength === 16) return wideValue(value, duckdbType)
     return { kind: 'text', value: `${value.byteLength} bytes` }
   }
-  if (typeof value === 'number') return temporalPreview(value, duckdbType) ?? { kind: 'number', value }
+  if (typeof value === 'number')
+    return temporalPreview(value, duckdbType) ?? { kind: 'number', value }
   if (typeof value === 'bigint') return { kind: 'integer', value: value.toString() }
   if (typeof value === 'boolean') return { kind: 'boolean', value }
   if (value instanceof Date) return { kind: 'temporal', value: value.toISOString() }
@@ -181,14 +213,19 @@ type CountProblem =
 
 const safeCount = (value: unknown): Result<number, CountProblem> => {
   if (typeof value === 'bigint') {
-    if (value > BigInt(Number.MAX_SAFE_INTEGER)) return err({ kind: 'unsafe-row-count', value: value.toString() })
+    if (value > BigInt(Number.MAX_SAFE_INTEGER))
+      return err({ kind: 'unsafe-row-count', value: value.toString() })
     return ok(Number(value))
   }
   if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) return ok(value)
-  return err({ kind: 'parse-failed', detail: `DuckDB returned an invalid row count: ${String(value)}` })
+  return err({
+    kind: 'parse-failed',
+    detail: `DuckDB returned an invalid row count: ${String(value)}`,
+  })
 }
 
-const detailOf = (cause: unknown): string => cause instanceof Error ? cause.message : String(cause)
+const detailOf = (cause: unknown): string =>
+  cause instanceof Error ? cause.message : String(cause)
 
 const requiredString = (value: unknown, field: string): Result<string, DatasetProfileProblem> =>
   typeof value === 'string' && value.length > 0
@@ -210,11 +247,15 @@ async function readProfile(
   const describedNames = described.getChild('column_name')
   const describedTypes = described.getChild('column_type')
   if (!describedNames || !describedTypes || described.numRows !== fields.length) {
-    return err({ kind: 'parse-failed', detail: 'DuckDB physical schema did not match the Arrow preview schema.' })
+    return err({
+      kind: 'parse-failed',
+      detail: 'DuckDB physical schema did not match the Arrow preview schema.',
+    })
   }
 
-  const countExpressions = fields.map((field, index) =>
-    `(count(*) - count(${sqlIdentifier(field.name)}))::UBIGINT AS ${sqlIdentifier(`null_${index}`)}`,
+  const countExpressions = fields.map(
+    (field, index) =>
+      `(count(*) - count(${sqlIdentifier(field.name)}))::UBIGINT AS ${sqlIdentifier(`null_${index}`)}`,
   )
   const counts = await connection.query(
     `SELECT count(*)::UBIGINT AS total_rows, ${countExpressions.join(', ')} FROM ${relation}`,
@@ -228,9 +269,15 @@ async function readProfile(
     const describedName = requiredString(describedNames.get(index), 'column name')
     if (!describedName.ok) return describedName
     if (describedName.value !== field.name) {
-      return err({ kind: 'parse-failed', detail: `DuckDB described ${describedName.value} where Arrow returned ${field.name}.` })
+      return err({
+        kind: 'parse-failed',
+        detail: `DuckDB described ${describedName.value} where Arrow returned ${field.name}.`,
+      })
     }
-    const describedType = requiredString(describedTypes.get(index), `physical type for ${field.name}`)
+    const describedType = requiredString(
+      describedTypes.get(index),
+      `physical type for ${field.name}`,
+    )
     if (!describedType.ok) return describedType
     const parsedNullCount = safeCount(counts.getChild(`null_${index}`)?.get(0))
     if (!parsedNullCount.ok) return parsedNullCount
@@ -247,13 +294,19 @@ async function readProfile(
   const builtPreview: NonEmptyArray<PreviewCell>[] = []
   for (let rowIndex = 0; rowIndex < previewTable.numRows; rowIndex += 1) {
     const row = builtColumns.map((_, columnIndex) =>
-      previewCell(previewTable.getChildAt(columnIndex)?.get(rowIndex), builtColumns[columnIndex].duckdbType),
+      previewCell(
+        previewTable.getChildAt(columnIndex)?.get(rowIndex),
+        builtColumns[columnIndex].duckdbType,
+      ),
     )
     if (!isNonEmpty(row)) return err({ kind: 'no-columns' })
     builtPreview.push(row)
   }
   if (!isNonEmpty(builtPreview)) {
-    return err({ kind: 'parse-failed', detail: 'DuckDB counted data rows but returned an empty bounded preview.' })
+    return err({
+      kind: 'parse-failed',
+      detail: 'DuckDB counted data rows but returned an empty bounded preview.',
+    })
   }
 
   return ok({
@@ -278,7 +331,9 @@ async function readProfile(
 
 /** Canonical CSV/TSV/Parquet profile. DuckDB reads from the browser File handle. Arrow vectors are
  * accessed with `get(row)`, which applies logical validity; `toArray()` is intentionally forbidden. */
-export async function profileSource(source: SelectedSource): Promise<Result<DatasetProfile, DatasetProfileProblem>> {
+export async function profileSource(
+  source: SelectedSource,
+): Promise<Result<DatasetProfile, DatasetProfileProblem>> {
   const fingerprint = await fingerprintFile(source.file)
   if (!fingerprint.ok) return fingerprint
 
@@ -345,10 +400,13 @@ const selectedNumericColumns = (
     seen.add(id)
     const column = profile.columns.find((candidate) => candidate.id === id)
     if (!column) return err({ kind: 'column-not-found', id })
-    if (column.id!==membership?.column && !isNumericDuckDbType(column.duckdbType)) return err({ kind: 'non-numeric-column', name: column.name, duckdbType: column.duckdbType })
+    if (column.id !== membership?.column && !isNumericDuckDbType(column.duckdbType))
+      return err({ kind: 'non-numeric-column', name: column.name, duckdbType: column.duckdbType })
     selected.push(column)
   }
-  return isNonEmpty(selected) ? ok(selected) : err({ kind: 'materialization-failed', detail: 'No numeric columns were selected.' })
+  return isNonEmpty(selected)
+    ? ok(selected)
+    : err({ kind: 'materialization-failed', detail: 'No numeric columns were selected.' })
 }
 
 interface NumericQueryTable {
@@ -361,16 +419,28 @@ const numericMatrixFromTable = (
   profile: DatasetProfile,
   selected: NonEmptyArray<PhysicalColumnProfile>,
 ): Result<NullableNumericMatrix, NumericMaterializationProblem> => {
-  if (table.numRows !== profile.rowCount) return err({ kind: 'materialization-failed', detail: 'The materialized row count changed since profiling.' })
+  if (table.numRows !== profile.rowCount)
+    return err({
+      kind: 'materialization-failed',
+      detail: 'The materialized row count changed since profiling.',
+    })
   const cellCount = profile.rowCount * selected.length
-  if (!Number.isSafeInteger(cellCount)) return err({ kind: 'materialization-failed', detail: 'The selected matrix is too large for browser-safe indexing.' })
+  if (!Number.isSafeInteger(cellCount))
+    return err({
+      kind: 'materialization-failed',
+      detail: 'The selected matrix is too large for browser-safe indexing.',
+    })
   const values = new Float64Array(cellCount)
   values.fill(Number.NaN)
   const validity = new Uint8Array(Math.ceil(cellCount / 8))
   let missingCells = 0
   for (const [columnIndex, column] of selected.entries()) {
     const vector = table.getChild(`hirmos_numeric_${columnIndex}`)
-    if (!vector) return err({ kind: 'materialization-failed', detail: `DuckDB omitted numeric column ${column.name}.` })
+    if (!vector)
+      return err({
+        kind: 'materialization-failed',
+        detail: `DuckDB omitted numeric column ${column.name}.`,
+      })
     for (let row = 0; row < profile.rowCount; row += 1) {
       const value = vector.get(row)
       const target = columnIndex * profile.rowCount + row
@@ -402,83 +472,152 @@ export async function materializeNumericColumns(
   requestedColumnIds: NonEmptyArray<string>,
   membership?: CategoricalMembership,
 ): Promise<Result<NullableNumericMatrix, NumericMaterializationProblem>> {
-  if(membership!==undefined && (!categoricalMembershipSchema.safeParse(membership).success || !requestedColumnIds.includes(membership.column)))
-    return err({kind:'materialization-failed',detail:'Choose disjoint, non-empty sample categories and include their membership column.'})
+  if (
+    membership !== undefined &&
+    (!categoricalMembershipSchema.safeParse(membership).success ||
+      !requestedColumnIds.includes(membership.column))
+  )
+    return err({
+      kind: 'materialization-failed',
+      detail: 'Choose disjoint, non-empty sample categories and include their membership column.',
+    })
   const selected = selectedNumericColumns(profile, requestedColumnIds, membership)
   if (!selected.ok) return selected
   const projections = selected.value.map((column, index) => {
-    const name=sqlIdentifier(column.name)
+    const name = sqlIdentifier(column.name)
     // Reuse the preview's exact categorical comparison and SQL escaping. Preserve nulls and all rows.
-    const expression=membership!==undefined && column.id===membership.column
-      ? `CASE WHEN ${name} IS NULL THEN NULL WHEN ${filterClause(column.name,{kind:'one-of',column:column.id,values:membership.experimental})} THEN 1 WHEN ${filterClause(column.name,{kind:'one-of',column:column.id,values:membership.observational})} THEN 0 ELSE 2 END`
-      : `CAST(${name} AS DOUBLE)`
+    const expression =
+      membership !== undefined && column.id === membership.column
+        ? `CASE WHEN ${name} IS NULL THEN NULL WHEN ${filterClause(column.name, { kind: 'one-of', column: column.id, values: membership.experimental })} THEN 1 WHEN ${filterClause(column.name, { kind: 'one-of', column: column.id, values: membership.observational })} THEN 0 ELSE 2 END`
+        : `CAST(${name} AS DOUBLE)`
     return `CAST((${expression}) AS DOUBLE) AS ${sqlIdentifier(`hirmos_numeric_${index}`)}`
   })
   return withSource(
     source,
     profile,
     (detail): NumericMaterializationProblem => ({ kind: 'materialization-failed', detail }),
-    (expected, actual): NumericMaterializationProblem => ({ kind: 'source-changed', expected, actual }),
-    async (connection, relation) => numericMatrixFromTable(await connection.query(`SELECT ${projections.join(', ')} FROM ${relation}`), profile, selected.value),
+    (expected, actual): NumericMaterializationProblem => ({
+      kind: 'source-changed',
+      expected,
+      actual,
+    }),
+    async (connection, relation) =>
+      numericMatrixFromTable(
+        await connection.query(`SELECT ${projections.join(', ')} FROM ${relation}`),
+        profile,
+        selected.value,
+      ),
   )
 }
 
 /** DuckDB owns calendar arithmetic; the round trip rejects overflowing ISO week numbers. */
-function timeExpression(column: string, numeric: boolean, interpretation: TimeInterpretation): { readonly kind: 'ordinal' | 'calendar'; readonly sql: string } {
+function timeExpression(
+  column: string,
+  numeric: boolean,
+  interpretation: TimeInterpretation,
+): { readonly kind: 'ordinal' | 'calendar'; readonly sql: string } {
   switch (interpretation.kind) {
-    case 'source-type': return timeExpression(column, numeric, { kind: numeric ? 'ordinal' : 'timestamp' })
-    case 'ordinal': return { kind: 'ordinal', sql: `TRY_CAST(${column} AS DOUBLE)` }
+    case 'source-type':
+      return timeExpression(column, numeric, { kind: numeric ? 'ordinal' : 'timestamp' })
+    case 'ordinal':
+      return { kind: 'ordinal', sql: `TRY_CAST(${column} AS DOUBLE)` }
     case 'timestamp':
     case 'date-format':
-    case 'iso-week': return { kind: 'calendar', sql: `epoch_ms(${timestampSql(column, interpretation, sqlString)})` }
-    default: return assertNever(interpretation)
+    case 'iso-week':
+      return {
+        kind: 'calendar',
+        sql: `epoch_ms(${timestampSql(column, interpretation, sqlString)})`,
+      }
+    default:
+      return assertNever(interpretation)
   }
 }
 
-export async function previewTimeColumn(source: SelectedSource, profile: DatasetProfile, columnId: ColumnId, interpretation: TimeInterpretation, calendar?: import('@/domain/calendar').CalendarRequest): Promise<Result<TimePreview, TimeSeriesMaterializationProblem>> {
+export async function previewTimeColumn(
+  source: SelectedSource,
+  profile: DatasetProfile,
+  columnId: ColumnId,
+  interpretation: TimeInterpretation,
+  calendar?: import('@/domain/calendar').CalendarRequest,
+): Promise<Result<TimePreview, TimeSeriesMaterializationProblem>> {
   const column = profile.columns.find((candidate) => candidate.id === columnId)
   if (column === undefined) return err({ kind: 'column-not-found', id: columnId })
   const time = sqlIdentifier(column.name)
   const parsed = timeExpression(time, isNumericDuckDbType(column.duckdbType), interpretation)
   return withSource(
-    source, profile,
+    source,
+    profile,
     (detail): TimeSeriesMaterializationProblem => ({ kind: 'materialization-failed', detail }),
-    (expected, actual): TimeSeriesMaterializationProblem => ({ kind: 'source-changed', expected, actual }),
+    (expected, actual): TimeSeriesMaterializationProblem => ({
+      kind: 'source-changed',
+      expected,
+      actual,
+    }),
     async (connection, relation) => {
-      const result = await connection.query(`SELECT CAST(${time} AS VARCHAR) AS original, ${parsed.sql} AS parsed FROM ${relation} LIMIT 12`)
+      const result = await connection.query(
+        `SELECT CAST(${time} AS VARCHAR) AS original, ${parsed.sql} AS parsed FROM ${relation} LIMIT 12`,
+      )
       const rows = Array.from({ length: result.numRows }, (_, index) => {
         const original = result.getChild('original')?.get(index)
         const value = result.getChild('parsed')?.get(index)
         const number = value == null ? NaN : Number(value)
-        return { original: original == null ? null : String(original), parsed: Number.isFinite(number) ? number : null }
+        return {
+          original: original == null ? null : String(original),
+          parsed: Number.isFinite(number) ? number : null,
+        }
       })
       const spacing = await ((): Promise<TimeSpacing> => {
         if (parsed.kind === 'ordinal') return Promise.resolve({ kind: 'ordinal' })
-        return connection.query(`
+        return connection
+          .query(
+            `
           WITH distinct_times AS (SELECT DISTINCT ${parsed.sql} AS time FROM ${relation} WHERE ${parsed.sql} IS NOT NULL),
                gaps AS (SELECT time - lag(time) OVER (ORDER BY time) AS gap FROM distinct_times)
           SELECT gap FROM gaps WHERE gap IS NOT NULL GROUP BY gap ORDER BY count(*) DESC, gap ASC LIMIT 1
-        `).then((gaps) => {
-          const gap = gaps.numRows === 0 ? null : gaps.getChild('gap')?.get(0)
-          return gap == null ? { kind: 'single-period' } : { kind: 'days', modal: Number(gap) / MILLISECONDS_PER_DAY }
-        })
+        `,
+          )
+          .then((gaps) => {
+            const gap = gaps.numRows === 0 ? null : gaps.getChild('gap')?.get(0)
+            return gap == null
+              ? { kind: 'single-period' }
+              : { kind: 'days', modal: Number(gap) / MILLISECONDS_PER_DAY }
+          })
       })()
-      if (calendar === undefined || parsed.kind === 'ordinal') return ok({ kind: parsed.kind, rows, spacing })
-      const unit = calendar.unitColumn === undefined ? undefined : profile.columns.find((candidate) => candidate.id === calendar.unitColumn)
-      if (calendar.unitColumn !== undefined && unit === undefined) return err({ kind: 'materialization-failed', detail: 'The unit column is outside the supplied profile.' })
-      const unitSql = unit === undefined ? "'Series'" : `CAST(${sqlIdentifier(unit.name)} AS VARCHAR)`
-      const axis = await connection.query(`SELECT ${unitSql} AS unit, ${parsed.sql} AS time FROM ${relation} ORDER BY unit, time`)
+      if (calendar === undefined || parsed.kind === 'ordinal')
+        return ok({ kind: parsed.kind, rows, spacing })
+      const unit =
+        calendar.unitColumn === undefined
+          ? undefined
+          : profile.columns.find((candidate) => candidate.id === calendar.unitColumn)
+      if (calendar.unitColumn !== undefined && unit === undefined)
+        return err({
+          kind: 'materialization-failed',
+          detail: 'The unit column is outside the supplied profile.',
+        })
+      const unitSql =
+        unit === undefined ? "'Series'" : `CAST(${sqlIdentifier(unit.name)} AS VARCHAR)`
+      const axis = await connection.query(
+        `SELECT ${unitSql} AS unit, ${parsed.sql} AS time FROM ${relation} ORDER BY unit, time`,
+      )
       const groups = new Map<string, number[]>()
       for (let index = 0; index < axis.numRows; index++) {
         const name = axis.getChild('unit')?.get(index)
         const value = axis.getChild('time')?.get(index)
-        if (name == null || value == null || !Number.isSafeInteger(Number(value))) return err({ kind: 'materialization-failed', detail: 'Calendar coverage needs valid dates and non-missing unit identifiers on every row.' })
+        if (name == null || value == null || !Number.isSafeInteger(Number(value)))
+          return err({
+            kind: 'materialization-failed',
+            detail:
+              'Calendar coverage needs valid dates and non-missing unit identifiers on every row.',
+          })
         const key = String(name)
         const times = groups.get(key)
         if (times === undefined) groups.set(key, [Number(value)])
         else times.push(Number(value))
       }
-      const report = await inspectCalendar(calendar.schedule, Array.from(groups, ([name, times]) => ({ name, times })))
+      const report = await inspectCalendar(
+        calendar.schedule,
+        Array.from(groups, ([name, times]) => ({ name, times })),
+      )
       return ok({ kind: parsed.kind, rows, spacing, calendar: report })
     },
     interpretation.kind === 'source-type' ? undefined : column.name,
@@ -497,18 +636,27 @@ export async function materializeTimeSeriesColumns(
   if (timeColumn === undefined) return err({ kind: 'column-not-found', id: timeColumnId })
   const selected = selectedNumericColumns(profile, requestedColumnIds)
   if (!selected.ok) return selected
-  const projections = selected.value.map((column, index) =>
-    `CAST(${sqlIdentifier(column.name)} AS DOUBLE) AS ${sqlIdentifier(`hirmos_numeric_${index}`)}`,
+  const projections = selected.value.map(
+    (column, index) =>
+      `CAST(${sqlIdentifier(column.name)} AS DOUBLE) AS ${sqlIdentifier(`hirmos_numeric_${index}`)}`,
   )
   const time = sqlIdentifier(timeColumn.name)
-  const parsedTime = timeExpression(time, isNumericDuckDbType(timeColumn.duckdbType), interpretation)
+  const parsedTime = timeExpression(
+    time,
+    isNumericDuckDbType(timeColumn.duckdbType),
+    interpretation,
+  )
   const ordinal = parsedTime.kind === 'ordinal'
   const timeProjection = parsedTime.sql
   return withSource(
     source,
     profile,
     (detail): TimeSeriesMaterializationProblem => ({ kind: 'materialization-failed', detail }),
-    (expected, actual): TimeSeriesMaterializationProblem => ({ kind: 'source-changed', expected, actual }),
+    (expected, actual): TimeSeriesMaterializationProblem => ({
+      kind: 'source-changed',
+      expected,
+      actual,
+    }),
     async (connection, relation) => {
       const table = await connection.query(`
         SELECT ${timeProjection} AS hirmos_time, ${projections.join(', ')}
@@ -518,28 +666,40 @@ export async function materializeTimeSeriesColumns(
       const base = numericMatrixFromTable(table, profile, selected.value)
       if (!base.ok) return base
       const vector = table.getChild('hirmos_time')
-      if (vector === null) return err({ kind: 'materialization-failed', detail: `DuckDB omitted parsed time column ${timeColumn.name}.` })
+      if (vector === null)
+        return err({
+          kind: 'materialization-failed',
+          detail: `DuckDB omitted parsed time column ${timeColumn.name}.`,
+        })
       const times = new Float64Array(profile.rowCount)
       for (let row = 0; row < profile.rowCount; row += 1) {
         const value = vector.get(row)
-        if (value === null || value === undefined) return err({ kind: 'time-value-unparseable', name: timeColumn.name, row })
+        if (value === null || value === undefined)
+          return err({ kind: 'time-value-unparseable', name: timeColumn.name, row })
         const timestamp = scalarNumber(value, 'time value')
-        if (!Number.isFinite(timestamp)) return err({ kind: 'time-value-unparseable', name: timeColumn.name, row })
-        if (row > 0 && timestamp === times[row - 1]) return err({ kind: 'duplicate-time-value', name: timeColumn.name, row })
+        if (!Number.isFinite(timestamp))
+          return err({ kind: 'time-value-unparseable', name: timeColumn.name, row })
+        if (row > 0 && timestamp === times[row - 1])
+          return err({ kind: 'duplicate-time-value', name: timeColumn.name, row })
         times[row] = timestamp
       }
       return ok({
         ...base.value,
         kind: 'time-ordered-numeric-matrix',
         timeColumn: { id: timeColumn.id, name: timeColumn.name },
-        timeAxis: ordinal ? { kind: 'ordinal', values: times } : { kind: 'calendar', timestamps: times },
+        timeAxis: ordinal
+          ? { kind: 'ordinal', values: times }
+          : { kind: 'calendar', timestamps: times },
       })
     },
     interpretation.kind === 'source-type' ? undefined : timeColumn.name,
   )
 }
 
-const panelColumn = (profile: DatasetProfile, id: ColumnId): Result<PhysicalColumnProfile, PanelDataProblem> => {
+const panelColumn = (
+  profile: DatasetProfile,
+  id: ColumnId,
+): Result<PhysicalColumnProfile, PanelDataProblem> => {
   const column = profile.columns.find((candidate) => candidate.id === id)
   return column === undefined ? err({ kind: 'column-not-found', id }) : ok(column)
 }
@@ -560,11 +720,18 @@ async function verifiedPanelSource(
   const fingerprint = await fingerprintFile(source.file)
   if (!fingerprint.ok) return err({ kind: 'panel-data-failed', detail: fingerprint.error.detail })
   if (fingerprint.value !== profile.source.fingerprint) {
-    return err({ kind: 'source-changed', expected: profile.source.fingerprint, actual: fingerprint.value })
+    return err({
+      kind: 'source-changed',
+      expected: profile.source.fingerprint,
+      actual: fingerprint.value,
+    })
   }
-  try { return ok(await engine()) } catch (cause) { return err({ kind: 'panel-data-failed', detail: detailOf(cause) }) }
+  try {
+    return ok(await engine())
+  } catch (cause) {
+    return err({ kind: 'panel-data-failed', detail: detailOf(cause) })
+  }
 }
-
 
 /** Validate the observational panel keys without reading the scientific values. */
 export async function inspectPanelStructure(
@@ -585,8 +752,15 @@ export async function inspectPanelStructure(
   if (!running.ok) return running
   const registeredPath = `hirmos-${crypto.randomUUID()}.${source.format}`
   try {
-    await running.value.db.registerFileHandle(registeredPath, source.file, duckdb.DuckDBDataProtocol.BROWSER_FILEREADER, true)
-  } catch (cause) { return err({ kind: 'panel-data-failed', detail: detailOf(cause) }) }
+    await running.value.db.registerFileHandle(
+      registeredPath,
+      source.file,
+      duckdb.DuckDBDataProtocol.BROWSER_FILEREADER,
+      true,
+    )
+  } catch (cause) {
+    return err({ kind: 'panel-data-failed', detail: detailOf(cause) })
+  }
   const relation = fileRelation(profile.source, registeredPath)
   const unit = sqlIdentifier(unitColumn.name)
   const time = sqlIdentifier(timeColumn.name)
@@ -617,13 +791,29 @@ export async function inspectPanelStructure(
     const missingUnitKeys = number('missing_units')
     const missingTimeKeys = number('missing_times')
     outcome = ok({
-      kind: 'panel-structure', sourceFingerprint: profile.source.fingerprint,
-      unitColumn: unitColumn.id, timeColumn: timeColumn.id, observations, units, periods,
-      duplicateKeys, missingUnitKeys, missingTimeKeys,
-      balanced: duplicateKeys === 0 && missingUnitKeys === 0 && missingTimeKeys === 0 && observations === units * periods,
+      kind: 'panel-structure',
+      sourceFingerprint: profile.source.fingerprint,
+      unitColumn: unitColumn.id,
+      timeColumn: timeColumn.id,
+      observations,
+      units,
+      periods,
+      duplicateKeys,
+      missingUnitKeys,
+      missingTimeKeys,
+      balanced:
+        duplicateKeys === 0 &&
+        missingUnitKeys === 0 &&
+        missingTimeKeys === 0 &&
+        observations === units * periods,
     })
-  } catch (cause) { outcome = err({ kind: 'panel-data-failed', detail: detailOf(cause) }) }
-  try { if (connection !== null) await connection.close(); await running.value.db.dropFile(registeredPath) } catch (cause) {
+  } catch (cause) {
+    outcome = err({ kind: 'panel-data-failed', detail: detailOf(cause) })
+  }
+  try {
+    if (connection !== null) await connection.close()
+    await running.value.db.dropFile(registeredPath)
+  } catch (cause) {
     return err({ kind: 'panel-data-failed', detail: `Panel cleanup failed: ${detailOf(cause)}` })
   }
   return outcome
@@ -647,8 +837,15 @@ export async function materializePanelKeys(
   if (!running.ok) return running
   const registeredPath = `hirmos-${crypto.randomUUID()}.${source.format}`
   try {
-    await running.value.db.registerFileHandle(registeredPath, source.file, duckdb.DuckDBDataProtocol.BROWSER_FILEREADER, true)
-  } catch (cause) { return err({ kind: 'panel-data-failed', detail: detailOf(cause) }) }
+    await running.value.db.registerFileHandle(
+      registeredPath,
+      source.file,
+      duckdb.DuckDBDataProtocol.BROWSER_FILEREADER,
+      true,
+    )
+  } catch (cause) {
+    return err({ kind: 'panel-data-failed', detail: detailOf(cause) })
+  }
   const relation = fileRelation(profile.source, registeredPath)
   const unit = sqlIdentifier(unitColumn.name)
   const time = sqlIdentifier(timeColumn.name)
@@ -676,25 +873,59 @@ export async function materializePanelKeys(
       const unitValue = unitVector?.get(row)
       const timeValue = timeVector?.get(row)
       const timeLabel = timeLabelVector?.get(row)
-      if (unitValue === null || unitValue === undefined || String(unitValue) === '') { problem = { kind: 'missing-key', name: unitColumn.name, row }; break }
-      if (timeValue === null || timeValue === undefined || timeLabel === null || timeLabel === undefined) { problem = { kind: 'missing-key', name: timeColumn.name, row }; break }
+      if (unitValue === null || unitValue === undefined || String(unitValue) === '') {
+        problem = { kind: 'missing-key', name: unitColumn.name, row }
+        break
+      }
+      if (
+        timeValue === null ||
+        timeValue === undefined ||
+        timeLabel === null ||
+        timeLabel === undefined
+      ) {
+        problem = { kind: 'missing-key', name: timeColumn.name, row }
+        break
+      }
       const periodCode = scalarNumber(timeValue, 'panel time code')
       const periodLabel = String(timeLabel)
       const recordedLabel = periodsByCode.get(periodCode)
       if (recordedLabel !== undefined && recordedLabel !== periodLabel) {
-        problem = { kind: 'panel-data-failed', detail: `Panel period code ${periodCode} is associated with both ${recordedLabel} and ${periodLabel}.` }
+        problem = {
+          kind: 'panel-data-failed',
+          detail: `Panel period code ${periodCode} is associated with both ${recordedLabel} and ${periodLabel}.`,
+        }
         break
       }
       units.push(String(unitValue))
       periodCodes.push(periodCode)
       periodsByCode.set(periodCode, periodLabel)
     }
-    const periods = [...periodsByCode].sort(([left], [right]) => left - right).map(([code, label]): PanelPeriod => ({ code, label }))
-    outcome = problem !== null || !isNonEmpty(units) || !isNonEmpty(periodCodes) || !isNonEmpty(periods)
-      ? err(problem ?? { kind: 'panel-data-failed', detail: 'The panel-key query returned no rows.' })
-      : ok({ kind: 'panel-key-matrix', sourceFingerprint: profile.source.fingerprint, rowCount: table.numRows, units, periodCodes, periods })
-  } catch (cause) { outcome = err({ kind: 'panel-data-failed', detail: detailOf(cause) }) }
-  try { if (connection !== null) await connection.close(); await running.value.db.dropFile(registeredPath) } catch (cause) {
+    const periods = [...periodsByCode]
+      .sort(([left], [right]) => left - right)
+      .map(([code, label]): PanelPeriod => ({ code, label }))
+    outcome =
+      problem !== null || !isNonEmpty(units) || !isNonEmpty(periodCodes) || !isNonEmpty(periods)
+        ? err(
+            problem ?? {
+              kind: 'panel-data-failed',
+              detail: 'The panel-key query returned no rows.',
+            },
+          )
+        : ok({
+            kind: 'panel-key-matrix',
+            sourceFingerprint: profile.source.fingerprint,
+            rowCount: table.numRows,
+            units,
+            periodCodes,
+            periods,
+          })
+  } catch (cause) {
+    outcome = err({ kind: 'panel-data-failed', detail: detailOf(cause) })
+  }
+  try {
+    if (connection !== null) await connection.close()
+    await running.value.db.dropFile(registeredPath)
+  } catch (cause) {
     return err({ kind: 'panel-data-failed', detail: `Panel cleanup failed: ${detailOf(cause)}` })
   }
   return outcome
@@ -711,7 +942,13 @@ export async function materializePanelLong(
   covariateIds: readonly ColumnId[] = [],
   clusterColumnId?: ColumnId,
 ): Promise<Result<PanelLongMatrix, PanelDataProblem>> {
-  const duplicate = firstDuplicate([unitColumnId, timeColumnId, outcomeColumnId, treatmentColumnId, ...covariateIds])
+  const duplicate = firstDuplicate([
+    unitColumnId,
+    timeColumnId,
+    outcomeColumnId,
+    treatmentColumnId,
+    ...covariateIds,
+  ])
   if (duplicate !== null) return err({ kind: 'duplicate-column', id: duplicate })
   const boundUnit = panelColumn(profile, unitColumnId)
   if (!boundUnit.ok) return boundUnit
@@ -735,18 +972,28 @@ export async function materializePanelLong(
     numericColumns.push(bound.value)
   }
   for (const column of numericColumns) {
-    if (!isNumericDuckDbType(column.duckdbType)) return err({ kind: 'non-numeric-column', name: column.name, duckdbType: column.duckdbType })
+    if (!isNumericDuckDbType(column.duckdbType))
+      return err({ kind: 'non-numeric-column', name: column.name, duckdbType: column.duckdbType })
   }
   const running = await verifiedPanelSource(source, profile)
   if (!running.ok) return running
   const registeredPath = `hirmos-${crypto.randomUUID()}.${source.format}`
   try {
-    await running.value.db.registerFileHandle(registeredPath, source.file, duckdb.DuckDBDataProtocol.BROWSER_FILEREADER, true)
-  } catch (cause) { return err({ kind: 'panel-data-failed', detail: detailOf(cause) }) }
+    await running.value.db.registerFileHandle(
+      registeredPath,
+      source.file,
+      duckdb.DuckDBDataProtocol.BROWSER_FILEREADER,
+      true,
+    )
+  } catch (cause) {
+    return err({ kind: 'panel-data-failed', detail: detailOf(cause) })
+  }
   const relation = fileRelation(profile.source, registeredPath)
   const unit = sqlIdentifier(unitColumn.name)
   const time = sqlIdentifier(timeColumn.name)
-  const numericProjection = numericColumns.map((column, index) => `CAST(${sqlIdentifier(column.name)} AS DOUBLE) AS value_${index}`).join(', ')
+  const numericProjection = numericColumns
+    .map((column, index) => `CAST(${sqlIdentifier(column.name)} AS DOUBLE) AS value_${index}`)
+    .join(', ')
   let connection: duckdb.AsyncDuckDBConnection | null = null
   let outcome: Result<PanelLongMatrix, PanelDataProblem>
   try {
@@ -762,7 +1009,10 @@ export async function materializePanelLong(
     const unitVector = table.getChild('unit_label')
     const timeVector = table.getChild('time_code')
     const timeLabelVector = table.getChild('time_label')
-    const numericVectors = numericColumns.map((column, index) => ({ column, vector: table.getChild(`value_${index}`) }))
+    const numericVectors = numericColumns.map((column, index) => ({
+      column,
+      vector: table.getChild(`value_${index}`),
+    }))
     const clusterVector = clusterColumn === null ? null : table.getChild('cluster_label')
     const clusterLabels: string[] = []
     const units: string[] = []
@@ -774,18 +1024,35 @@ export async function materializePanelLong(
       const unitValue = unitVector?.get(row)
       if (clusterColumn !== null) {
         const label = clusterVector?.get(row)
-        if (label === null || label === undefined || String(label) === '') { problem = { kind: 'missing-key', name: clusterColumn.name, row }; break }
+        if (label === null || label === undefined || String(label) === '') {
+          problem = { kind: 'missing-key', name: clusterColumn.name, row }
+          break
+        }
         clusterLabels.push(String(label))
       }
       const timeValue = timeVector?.get(row)
       const timeLabel = timeLabelVector?.get(row)
-      if (unitValue === null || unitValue === undefined || String(unitValue) === '') { problem = { kind: 'missing-key', name: unitColumn.name, row }; break }
-      if (timeValue === null || timeValue === undefined || timeLabel === null || timeLabel === undefined) { problem = { kind: 'missing-key', name: timeColumn.name, row }; break }
+      if (unitValue === null || unitValue === undefined || String(unitValue) === '') {
+        problem = { kind: 'missing-key', name: unitColumn.name, row }
+        break
+      }
+      if (
+        timeValue === null ||
+        timeValue === undefined ||
+        timeLabel === null ||
+        timeLabel === undefined
+      ) {
+        problem = { kind: 'missing-key', name: timeColumn.name, row }
+        break
+      }
       const periodCode = scalarNumber(timeValue, 'panel time code')
       const periodLabel = String(timeLabel)
       const recordedLabel = periodsByCode.get(periodCode)
       if (recordedLabel !== undefined && recordedLabel !== periodLabel) {
-        problem = { kind: 'panel-data-failed', detail: `Panel period code ${periodCode} is associated with both ${recordedLabel} and ${periodLabel}.` }
+        problem = {
+          kind: 'panel-data-failed',
+          detail: `Panel period code ${periodCode} is associated with both ${recordedLabel} and ${periodLabel}.`,
+        }
         break
       }
       units.push(String(unitValue))
@@ -793,8 +1060,14 @@ export async function materializePanelLong(
       periodsByCode.set(periodCode, periodLabel)
       for (const [columnIndex, pair] of numericVectors.entries()) {
         const value = pair.vector?.get(row)
-        if (value === null || value === undefined) { problem = { kind: 'missing-value', name: pair.column.name, row }; break }
-        if (typeof value !== 'number' || !Number.isFinite(value)) { problem = { kind: 'non-finite-value', name: pair.column.name, row }; break }
+        if (value === null || value === undefined) {
+          problem = { kind: 'missing-value', name: pair.column.name, row }
+          break
+        }
+        if (typeof value !== 'number' || !Number.isFinite(value)) {
+          problem = { kind: 'non-finite-value', name: pair.column.name, row }
+          break
+        }
         values[columnIndex * table.numRows + row] = value
       }
       if (problem !== null) break
@@ -802,11 +1075,29 @@ export async function materializePanelLong(
     const periods = [...periodsByCode]
       .sort(([left], [right]) => left - right)
       .map(([code, label]): PanelPeriod => ({ code, label }))
-    outcome = problem !== null || !isNonEmpty(units) || !isNonEmpty(periodCodes) || !isNonEmpty(periods)
-      ? err(problem ?? { kind: 'panel-data-failed', detail: 'The panel query returned no rows.' })
-      : ok({ kind: 'panel-long-matrix', sourceFingerprint: profile.source.fingerprint, rowCount: table.numRows, units, periodCodes, periods, values, covariates: covariateIds, ...(clusterColumnId === undefined ? {} : { cluster: { column: clusterColumnId, labels: clusterLabels } }) })
-  } catch (cause) { outcome = err({ kind: 'panel-data-failed', detail: detailOf(cause) }) }
-  try { if (connection !== null) await connection.close(); await running.value.db.dropFile(registeredPath) } catch (cause) {
+    outcome =
+      problem !== null || !isNonEmpty(units) || !isNonEmpty(periodCodes) || !isNonEmpty(periods)
+        ? err(problem ?? { kind: 'panel-data-failed', detail: 'The panel query returned no rows.' })
+        : ok({
+            kind: 'panel-long-matrix',
+            sourceFingerprint: profile.source.fingerprint,
+            rowCount: table.numRows,
+            units,
+            periodCodes,
+            periods,
+            values,
+            covariates: covariateIds,
+            ...(clusterColumnId === undefined
+              ? {}
+              : { cluster: { column: clusterColumnId, labels: clusterLabels } }),
+          })
+  } catch (cause) {
+    outcome = err({ kind: 'panel-data-failed', detail: detailOf(cause) })
+  }
+  try {
+    if (connection !== null) await connection.close()
+    await running.value.db.dropFile(registeredPath)
+  } catch (cause) {
     return err({ kind: 'panel-data-failed', detail: `Panel cleanup failed: ${detailOf(cause)}` })
   }
   return outcome
@@ -818,7 +1109,8 @@ const scalarNumber = (value: unknown, label: string): number => {
   throw new Error(`DuckDB returned an invalid ${label}: ${String(value)}`)
 }
 
-const optionalNumber = (value: unknown): number | null => (value === null || value === undefined ? null : scalarNumber(value, 'statistic'))
+const optionalNumber = (value: unknown): number | null =>
+  value === null || value === undefined ? null : scalarNumber(value, 'statistic')
 
 const MAX_HISTOGRAM_BINS = 32
 const TOP_VALUES = 8
@@ -830,9 +1122,14 @@ export async function profileColumn(
   requestedColumnId: string,
 ): Promise<Result<ColumnProfile, ColumnProfileProblem>> {
   const fingerprint = await fingerprintFile(source.file)
-  if (!fingerprint.ok) return err({ kind: 'column-profile-failed', detail: fingerprint.error.detail })
+  if (!fingerprint.ok)
+    return err({ kind: 'column-profile-failed', detail: fingerprint.error.detail })
   if (fingerprint.value !== profile.source.fingerprint) {
-    return err({ kind: 'source-changed', expected: profile.source.fingerprint, actual: fingerprint.value })
+    return err({
+      kind: 'source-changed',
+      expected: profile.source.fingerprint,
+      actual: fingerprint.value,
+    })
   }
   const column = profile.columns.find((candidate) => candidate.id === requestedColumnId)
   if (!column) return err({ kind: 'column-not-found', id: requestedColumnId })
@@ -845,7 +1142,12 @@ export async function profileColumn(
   }
   const registeredPath = `hirmos-${crypto.randomUUID()}.${source.format}`
   try {
-    await running.db.registerFileHandle(registeredPath, source.file, duckdb.DuckDBDataProtocol.BROWSER_FILEREADER, true)
+    await running.db.registerFileHandle(
+      registeredPath,
+      source.file,
+      duckdb.DuckDBDataProtocol.BROWSER_FILEREADER,
+      true,
+    )
   } catch (cause) {
     return err({ kind: 'column-profile-failed', detail: detailOf(cause) })
   }
@@ -875,11 +1177,17 @@ export async function profileColumn(
       const row = (field: string) => summary.getChild(field)?.get(0)
       const present = scalarNumber(row('present'), 'count')
       if (present === 0) {
-        outcome = err({ kind: 'column-profile-failed', detail: `${column.name} has no non-null values to describe.` })
+        outcome = err({
+          kind: 'column-profile-failed',
+          detail: `${column.name} has no non-null values to describe.`,
+        })
       } else {
         const minimum = scalarNumber(row('minimum'), 'minimum')
         const maximum = scalarNumber(row('maximum'), 'maximum')
-        const bins = minimum === maximum ? 1 : Math.max(4, Math.min(MAX_HISTOGRAM_BINS, Math.ceil(Math.sqrt(present))))
+        const bins =
+          minimum === maximum
+            ? 1
+            : Math.max(4, Math.min(MAX_HISTOGRAM_BINS, Math.ceil(Math.sqrt(present))))
         const width = (maximum - minimum) / bins
         const counts = new Array<number>(bins).fill(0)
         if (bins === 1) {
@@ -901,7 +1209,9 @@ export async function profileColumn(
             counts[bucket] = scalarNumber(countVector?.get(index), 'bucket count')
           }
         }
-        const edges = Array.from({ length: bins + 1 }, (_, index) => (index === bins ? maximum : minimum + width * index))
+        const edges = Array.from({ length: bins + 1 }, (_, index) =>
+          index === bins ? maximum : minimum + width * index,
+        )
         outcome = ok({
           kind: 'numeric-column-profile',
           column: column.id,
@@ -978,12 +1288,16 @@ async function withSource<Value, Problem>(
   profile: DatasetProfile,
   failure: (detail: string) => Problem,
   changed: (expected: SourceFingerprint, actual: SourceFingerprint) => Problem,
-  work: (connection: duckdb.AsyncDuckDBConnection, relation: string) => Promise<Result<Value, Problem>>,
+  work: (
+    connection: duckdb.AsyncDuckDBConnection,
+    relation: string,
+  ) => Promise<Result<Value, Problem>>,
   textColumn?: string,
 ): Promise<Result<Value, Problem>> {
   const fingerprint = await fingerprintFile(source.file)
   if (!fingerprint.ok) return err(failure(fingerprint.error.detail))
-  if (fingerprint.value !== profile.source.fingerprint) return err(changed(profile.source.fingerprint, fingerprint.value))
+  if (fingerprint.value !== profile.source.fingerprint)
+    return err(changed(profile.source.fingerprint, fingerprint.value))
   let running: DuckDbEngine
   try {
     running = await engine()
@@ -992,7 +1306,12 @@ async function withSource<Value, Problem>(
   }
   const registeredPath = `hirmos-${crypto.randomUUID()}.${source.format}`
   try {
-    await running.db.registerFileHandle(registeredPath, source.file, duckdb.DuckDBDataProtocol.BROWSER_FILEREADER, true)
+    await running.db.registerFileHandle(
+      registeredPath,
+      source.file,
+      duckdb.DuckDBDataProtocol.BROWSER_FILEREADER,
+      true,
+    )
   } catch (cause) {
     return err(failure(detailOf(cause)))
   }
@@ -1023,7 +1342,11 @@ const CATEGORY_LIMIT = 30
 const SUMMARY_BINS = 16
 
 /** One `SUMMARIZE` pass for distinct counts and extremes, then a bucket query per numeric column and a value count per low-cardinality column. */
-export async function summarizeColumns(source: SelectedSource, profile: DatasetProfile, categoryColumn?: import('@/domain/dataset').ColumnId): Promise<Result<DatasetSummary, DatasetSummaryProblem>> {
+export async function summarizeColumns(
+  source: SelectedSource,
+  profile: DatasetProfile,
+  categoryColumn?: import('@/domain/dataset').ColumnId,
+): Promise<Result<DatasetSummary, DatasetSummaryProblem>> {
   return withSource<DatasetSummary, DatasetSummaryProblem>(
     source,
     profile,
@@ -1037,21 +1360,32 @@ export async function summarizeColumns(source: SelectedSource, profile: DatasetP
       const uniques = summarized.getChild('approx_unique')
       const counts = summarized.getChild('count')
       const byName = new Map<string, number>()
-      for (let index = 0; index < summarized.numRows; index += 1) byName.set(String(names?.get(index)), index)
+      for (let index = 0; index < summarized.numRows; index += 1)
+        byName.set(String(names?.get(index)), index)
       // `approx_unique` can exceed the row count on small files; below the threshold the exact count is cheap.
-      const exact = profile.rowCount <= EXACT_DISTINCT_ROWS
-        ? await connection.query(`SELECT ${profile.columns.map((column, index) => `count(DISTINCT ${sqlIdentifier(column.name)})::UBIGINT AS ${sqlIdentifier(`d_${index}`)}`).join(', ')} FROM ${relation}`)
-        : null
+      const exact =
+        profile.rowCount <= EXACT_DISTINCT_ROWS
+          ? await connection.query(
+              `SELECT ${profile.columns.map((column, index) => `count(DISTINCT ${sqlIdentifier(column.name)})::UBIGINT AS ${sqlIdentifier(`d_${index}`)}`).join(', ')} FROM ${relation}`,
+            )
+          : null
       const columns: ColumnSummary[] = []
       let histograms = 0
-      for (const column of profile.columns.filter(c=>categoryColumn===undefined||c.id===categoryColumn)) {
+      for (const column of profile.columns.filter(
+        (c) => categoryColumn === undefined || c.id === categoryColumn,
+      )) {
         const row = byName.get(column.name)
-        if (row === undefined) return err({ kind: 'summary-failed', detail: `SUMMARIZE returned no row for ${column.name}.` })
+        if (row === undefined)
+          return err({
+            kind: 'summary-failed',
+            detail: `SUMMARIZE returned no row for ${column.name}.`,
+          })
         const present = scalarNumber(counts?.get(row) ?? 0, 'count')
         const columnIndex = profile.columns.indexOf(column)
-        const distinctCount = exact !== null
-          ? scalarNumber(exact.getChild(`d_${columnIndex}`)?.get(0) ?? 0, 'distinct count')
-          : Math.min(present, scalarNumber(uniques?.get(row) ?? 0, 'distinct count'))
+        const distinctCount =
+          exact !== null
+            ? scalarNumber(exact.getChild(`d_${columnIndex}`)?.get(0) ?? 0, 'distinct count')
+            : Math.min(present, scalarNumber(uniques?.get(row) ?? 0, 'distinct count'))
         const minRaw = mins?.get(row)
         const maxRaw = maxes?.get(row)
         const min = minRaw === null || minRaw === undefined ? null : String(minRaw)
@@ -1059,12 +1393,26 @@ export async function summarizeColumns(source: SelectedSource, profile: DatasetP
         const name = sqlIdentifier(column.name)
         let histogram: ColumnSummary['histogram'] = null
         let categories: ColumnSummary['categories'] = null
-        if (isNumericDuckDbType(column.duckdbType) && present > 0 && histograms < MAX_SUMMARY_HISTOGRAMS) {
+        if (
+          isNumericDuckDbType(column.duckdbType) &&
+          present > 0 &&
+          histograms < MAX_SUMMARY_HISTOGRAMS
+        ) {
           histograms += 1
           const minimum = Number(min)
           const maximum = Number(max)
           if (Number.isFinite(minimum) && Number.isFinite(maximum)) {
-            const bins = minimum === maximum ? 1 : Math.max(1, Math.min(distinctCount, SUMMARY_BINS, Math.max(4, Math.ceil(Math.sqrt(present)))))
+            const bins =
+              minimum === maximum
+                ? 1
+                : Math.max(
+                    1,
+                    Math.min(
+                      distinctCount,
+                      SUMMARY_BINS,
+                      Math.max(4, Math.ceil(Math.sqrt(present))),
+                    ),
+                  )
             const width = (maximum - minimum) / bins
             const binCounts = new Array<number>(bins).fill(0)
             if (bins === 1) {
@@ -1079,22 +1427,31 @@ export async function summarizeColumns(source: SelectedSource, profile: DatasetP
               const bucketVector = buckets.getChild('bucket')
               const countVector = buckets.getChild('n')
               for (let index = 0; index < buckets.numRows; index += 1) {
-                binCounts[scalarNumber(bucketVector?.get(index), 'bucket')] = scalarNumber(countVector?.get(index), 'bucket count')
+                binCounts[scalarNumber(bucketVector?.get(index), 'bucket')] = scalarNumber(
+                  countVector?.get(index),
+                  'bucket count',
+                )
               }
             }
             histogram = {
-              edges: Array.from({ length: bins + 1 }, (_, index) => (index === bins ? maximum : minimum + width * index)),
+              edges: Array.from({ length: bins + 1 }, (_, index) =>
+                index === bins ? maximum : minimum + width * index,
+              ),
               counts: binCounts,
             }
           }
-        } else if (!isNumericDuckDbType(column.duckdbType) && present > 0 && (distinctCount <= CATEGORY_LIMIT || column.id===categoryColumn)) {
+        } else if (
+          !isNumericDuckDbType(column.duckdbType) &&
+          present > 0 &&
+          (distinctCount <= CATEGORY_LIMIT || column.id === categoryColumn)
+        ) {
           const top = await connection.query(`
             SELECT CAST(${name} AS VARCHAR) AS value, count(*) AS n
             FROM ${relation}
             WHERE ${name} IS NOT NULL
             GROUP BY value
             ORDER BY n DESC, value ASC
-            ${column.id===categoryColumn?'':`LIMIT ${CATEGORY_LIMIT}`}
+            ${column.id === categoryColumn ? '' : `LIMIT ${CATEGORY_LIMIT}`}
           `)
           const valueVector = top.getChild('value')
           const countVector = top.getChild('n')
@@ -1121,55 +1478,95 @@ const filterClause = (columnName: string, filter: PreviewFilter): string => {
       if (filter.max !== null) parts.push(`CAST(${name} AS DOUBLE) <= ${sqlNumber(filter.max)}`)
       return parts.length === 0 ? 'TRUE' : `(${parts.join(' AND ')})`
     }
-    case 'contains': return `CAST(${name} AS VARCHAR) ILIKE ${sqlString(`%${filter.text.replaceAll('%', '\\%').replaceAll('_', '\\_')}%`)} ESCAPE '\\'`
-    case 'one-of': return filter.values.length === 0 ? 'TRUE' : `CAST(${name} AS VARCHAR) IN (${filter.values.map(sqlString).join(', ')})`
-    case 'missing': return filter.missing ? `${name} IS NULL` : `${name} IS NOT NULL`
-    default: return assertNever(filter)
+    case 'contains':
+      return `CAST(${name} AS VARCHAR) ILIKE ${sqlString(`%${filter.text.replaceAll('%', '\\%').replaceAll('_', '\\_')}%`)} ESCAPE '\\'`
+    case 'one-of':
+      return filter.values.length === 0
+        ? 'TRUE'
+        : `CAST(${name} AS VARCHAR) IN (${filter.values.map(sqlString).join(', ')})`
+    case 'missing':
+      return filter.missing ? `${name} IS NULL` : `${name} IS NOT NULL`
+    default:
+      return assertNever(filter)
   }
 }
 
 /** A sorted, filtered window onto the whole file; the row index is the file position before either. */
-export async function previewWindow(source: SelectedSource, profile: DatasetProfile, query: PreviewQuery): Promise<Result<PreviewWindow, PreviewWindowProblem>> {
+export async function previewWindow(
+  source: SelectedSource,
+  profile: DatasetProfile,
+  query: PreviewQuery,
+): Promise<Result<PreviewWindow, PreviewWindowProblem>> {
   return withSource<PreviewWindow, PreviewWindowProblem>(
     source,
     profile,
     (detail) => ({ kind: 'preview-failed', detail }),
     (expected, actual) => ({ kind: 'source-changed', expected, actual }),
     async (connection, relation) => {
-      const columnName = (id: string): string | null => profile.columns.find((column) => column.id === id)?.name ?? null
+      const columnName = (id: string): string | null =>
+        profile.columns.find((column) => column.id === id)?.name ?? null
       const clauses: string[] = []
       for (const filter of query.filters) {
         const name = columnName(filter.column)
-        if (name === null) return err({ kind: 'preview-failed', detail: `Filter names an unknown column ${filter.column}.` })
+        if (name === null)
+          return err({
+            kind: 'preview-failed',
+            detail: `Filter names an unknown column ${filter.column}.`,
+          })
         clauses.push(filterClause(name, filter))
       }
       const search = query.search.trim()
       if (search.length > 0) {
         const pattern = sqlString(`%${search.replaceAll('%', '\\%').replaceAll('_', '\\_')}%`)
-        clauses.push(`(${profile.columns.map((column) => `CAST(${sqlIdentifier(column.name)} AS VARCHAR) ILIKE ${pattern} ESCAPE '\\'`).join(' OR ')})`)
+        clauses.push(
+          `(${profile.columns.map((column) => `CAST(${sqlIdentifier(column.name)} AS VARCHAR) ILIKE ${pattern} ESCAPE '\\'`).join(' OR ')})`,
+        )
       }
       const where = clauses.length === 0 ? '' : `WHERE ${clauses.join(' AND ')}`
       let order = 'ORDER BY __row'
       if (query.sort !== null) {
         const name = columnName(query.sort.column)
-        if (name === null) return err({ kind: 'preview-failed', detail: `Sort names an unknown column ${query.sort.column}.` })
+        if (name === null)
+          return err({
+            kind: 'preview-failed',
+            detail: `Sort names an unknown column ${query.sort.column}.`,
+          })
         order = `ORDER BY ${sqlIdentifier(name)} ${query.sort.direction === 'asc' ? 'ASC' : 'DESC'} NULLS LAST, __row`
       }
       const projection = profile.columns.map((column) => sqlIdentifier(column.name)).join(', ')
       const base = `WITH source AS (SELECT row_number() OVER () AS __row, ${projection} FROM ${relation})`
-      const counted = await connection.query(`${base} SELECT count(*)::UBIGINT AS total FROM source ${where}`)
+      const counted = await connection.query(
+        `${base} SELECT count(*)::UBIGINT AS total FROM source ${where}`,
+      )
       const total = safeCount(counted.getChild('total')?.get(0))
-      if (!total.ok) return err({ kind: 'preview-failed', detail: total.error.kind === 'unsafe-row-count' ? 'The row count is outside the safe range.' : total.error.detail })
-      const table = await connection.query(`${base} SELECT * FROM source ${where} ${order} LIMIT ${query.limit} OFFSET ${query.offset}`)
+      if (!total.ok)
+        return err({
+          kind: 'preview-failed',
+          detail:
+            total.error.kind === 'unsafe-row-count'
+              ? 'The row count is outside the safe range.'
+              : total.error.detail,
+        })
+      const table = await connection.query(
+        `${base} SELECT * FROM source ${where} ${order} LIMIT ${query.limit} OFFSET ${query.offset}`,
+      )
       const indexVector = table.getChild('__row')
       const rows: PreviewRow[] = []
       for (let rowIndex = 0; rowIndex < table.numRows; rowIndex += 1) {
         rows.push({
           index: scalarNumber(indexVector?.get(rowIndex), 'row index'),
-          cells: profile.columns.map((column, columnIndex) => previewCell(table.getChildAt(columnIndex + 1)?.get(rowIndex), column.duckdbType)),
+          cells: profile.columns.map((column, columnIndex) =>
+            previewCell(table.getChildAt(columnIndex + 1)?.get(rowIndex), column.duckdbType),
+          ),
         })
       }
-      return ok({ kind: 'preview-window', sourceFingerprint: profile.source.fingerprint, offset: query.offset, total: total.value, rows })
+      return ok({
+        kind: 'preview-window',
+        sourceFingerprint: profile.source.fingerprint,
+        offset: query.offset,
+        total: total.value,
+        rows,
+      })
     },
   )
 }

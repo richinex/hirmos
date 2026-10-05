@@ -10,11 +10,23 @@ const subscribeTheme = (notify: () => void): (() => void) => {
 
 const isDarkTheme = (): boolean => document.documentElement.dataset.theme !== 'light'
 
-export function Orb({ state, className, 'aria-label': ariaLabel }: {
+export function Orb({
+  state,
+  className,
+  'aria-label': ariaLabel,
+}: {
   readonly state: OrbState
   readonly className?: string
   readonly 'aria-label': string
 }) {
   const dark = useSyncExternalStore(subscribeTheme, isDarkTheme, () => true)
-  return <ThinkingOrb state={state} size={20} theme={dark ? 'dark' : 'light'} aria-label={ariaLabel} className={cn('shrink-0', className)} />
+  return (
+    <ThinkingOrb
+      state={state}
+      size={20}
+      theme={dark ? 'dark' : 'light'}
+      aria-label={ariaLabel}
+      className={cn('shrink-0', className)}
+    />
+  )
 }

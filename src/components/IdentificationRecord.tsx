@@ -2,7 +2,11 @@ import { Metadata } from '@/components/ui/Metadata'
 import { Icon } from '@/components/Icon'
 import { label, num } from '@/components/ui/recipes'
 import { assertNever } from '@/domain/dop'
-import { describeIdentificationFailure, type Identification, type IdentificationBasisEntry } from '@/domain/study'
+import {
+  describeIdentificationFailure,
+  type Identification,
+  type IdentificationBasisEntry,
+} from '@/domain/study'
 import { cn } from '@/lib/utils'
 
 /**
@@ -24,9 +28,12 @@ const ROW_LABEL: Record<string, string> = {
   'lags-collapsed': 'Lagged arrows',
 }
 
-const rowLabel = (entry: IdentificationBasisEntry): string => ROW_LABEL[entry.id] ?? (entry.id.startsWith('kept-out-') ? 'Left out' : entry.kind.replace('-', ' '))
+const rowLabel = (entry: IdentificationBasisEntry): string =>
+  ROW_LABEL[entry.id] ??
+  (entry.id.startsWith('kept-out-') ? 'Left out' : entry.kind.replace('-', ' '))
 
-const isPath = (entry: IdentificationBasisEntry): entry is PathEntry => entry.kind === 'backdoor-path'
+const isPath = (entry: IdentificationBasisEntry): entry is PathEntry =>
+  entry.kind === 'backdoor-path'
 
 const isOwned = (entry: IdentificationBasisEntry): boolean => {
   switch (entry.kind) {
@@ -47,7 +54,10 @@ const PATHS_SHOWN = 8
 
 function PathRow({ entry }: { readonly entry: PathEntry }) {
   return (
-    <li title={entry.statement} className="grid grid-cols-1 items-baseline gap-x-3 px-2 py-1 @sm/record:grid-cols-[minmax(0,1fr)_auto]">
+    <li
+      title={entry.statement}
+      className="grid grid-cols-1 items-baseline gap-x-3 px-2 py-1 @sm/record:grid-cols-[minmax(0,1fr)_auto]"
+    >
       <span className="min-w-0 text-muted [overflow-wrap:anywhere]">
         {entry.nodes.map((node, index) => (
           <span key={`${node}-${index}`}>
@@ -56,8 +66,15 @@ function PathRow({ entry }: { readonly entry: PathEntry }) {
           </span>
         ))}
       </span>
-      <span className={num('min-w-0 text-ink [overflow-wrap:anywhere] @sm/record:whitespace-nowrap @sm/record:text-right')}>
-        <span className="sr-only">{entry.closure === 'collider' ? 'blocked at collider ' : 'blocked at '}</span>{entry.blockedAt.join(', ')}
+      <span
+        className={num(
+          'min-w-0 text-ink [overflow-wrap:anywhere] @sm/record:whitespace-nowrap @sm/record:text-right',
+        )}
+      >
+        <span className="sr-only">
+          {entry.closure === 'collider' ? 'blocked at collider ' : 'blocked at '}
+        </span>
+        {entry.blockedAt.join(', ')}
       </span>
     </li>
   )
@@ -73,16 +90,24 @@ function PathTable({ paths }: { readonly paths: readonly PathEntry[] }) {
         <span className={num('text-label text-faint')}>{paths.length}</span>
       </div>
       <ol className="m-0 list-none divide-y divide-hair p-0 text-body" aria-label="Back-door paths">
-        {shown.map((entry) => <PathRow key={entry.id} entry={entry} />)}
+        {shown.map((entry) => (
+          <PathRow key={entry.id} entry={entry} />
+        ))}
       </ol>
       {rest.length > 0 && (
         <details className="group border-t border-hair">
           <summary className="flex cursor-pointer list-none items-center gap-1.5 px-2 py-1 text-body text-muted hover:text-ink [&::-webkit-details-marker]:hidden">
-            <Icon name="expand_more" size={14} className="transition-transform duration-(--motion-fast) group-open:rotate-180" />
+            <Icon
+              name="expand_more"
+              size={14}
+              className="transition-transform duration-(--motion-fast) group-open:rotate-180"
+            />
             Show all {paths.length} paths
           </summary>
           <ol className="m-0 list-none divide-y divide-hair border-t border-hair p-0 text-body">
-            {rest.map((entry) => <PathRow key={entry.id} entry={entry} />)}
+            {rest.map((entry) => (
+              <PathRow key={entry.id} entry={entry} />
+            ))}
           </ol>
         </details>
       )}
@@ -96,9 +121,15 @@ function OwnedRow({ entry }: { readonly entry: IdentificationBasisEntry }) {
     <li className="border-l border-edge pl-2.5">
       <span className={label('text-faint')}>{rowLabel(entry)}</span>
       <p className="mb-0 mt-0.5 text-body text-muted">{entry.statement}</p>
-      {rationale === undefined ? null : rationale === null
-        ? <p className="mb-0 mt-1 flex items-center gap-1.5 text-body text-warn"><Icon name="warning" size={14} /> Rationale not recorded</p>
-        : <p className="mb-0 mt-1 text-body text-muted"><span className="text-faint">Rationale</span> {rationale}</p>}
+      {rationale === undefined ? null : rationale === null ? (
+        <p className="mb-0 mt-1 flex items-center gap-1.5 text-body text-warn">
+          <Icon name="warning" size={14} /> Rationale not recorded
+        </p>
+      ) : (
+        <p className="mb-0 mt-1 text-body text-muted">
+          <span className="text-faint">Rationale</span> {rationale}
+        </p>
+      )}
     </li>
   )
 }
@@ -115,47 +146,98 @@ function DerivedRow({ entry }: { readonly entry: IdentificationBasisEntry }) {
 
 const plural = (count: number, noun: string): string => `${count} ${noun}${count === 1 ? '' : 's'}`
 
-export function IdentificationRecord({ identification }: { readonly identification: Identification }) {
-  if (identification.kind === 'cutoff-design') return <section aria-label="Identification record" className="mb-3">
-    <span className="block text-body font-medium text-ink">Cutoff design</span>
-    <ul className="mt-2 list-none space-y-2 p-0">{identification.basis.map(entry => <DerivedRow key={entry.id} entry={entry} />)}</ul>
-  </section>
+export function IdentificationRecord({
+  identification,
+}: {
+  readonly identification: Identification
+}) {
+  if (identification.kind === 'cutoff-design')
+    return (
+      <section aria-label="Identification record" className="mb-3">
+        <span className="block text-body font-medium text-ink">Cutoff design</span>
+        <ul className="mt-2 list-none space-y-2 p-0">
+          {identification.basis.map((entry) => (
+            <DerivedRow key={entry.id} entry={entry} />
+          ))}
+        </ul>
+      </section>
+    )
   if (identification.kind === 'backdoor-not-identified') {
     return (
       <section aria-label="Identification record" className="@container/record mb-3">
         <span className="block text-body font-medium text-ink">Identification record</span>
-        <p className="mb-1 mt-1 flex items-center gap-2 text-body text-ink"><Icon name="block" size={16} className="text-muted" /> No measured back-door adjustment set</p>
-        <p className="mb-1 mt-1 text-body text-muted">Below, you can find the general ID result and its hedge if one is available.</p>
+        <p className="mb-1 mt-1 flex items-center gap-2 text-body text-ink">
+          <Icon name="block" size={16} className="text-muted" /> No measured back-door adjustment
+          set
+        </p>
+        <p className="mb-1 mt-1 text-body text-muted">
+          Below, you can find the general ID result and its hedge if one is available.
+        </p>
         <ul className="m-0 list-disc pl-4 text-body text-muted">
-          {identification.reasons.map((reason) => <li key={reason.kind + describeIdentificationFailure(reason)}>{describeIdentificationFailure(reason)}</li>)}
+          {identification.reasons.map((reason) => (
+            <li key={reason.kind + describeIdentificationFailure(reason)}>
+              {describeIdentificationFailure(reason)}
+            </li>
+          ))}
         </ul>
       </section>
     )
   }
-  if (identification.kind === 'graphically-identified' || identification.kind === 'counterfactually-identified' || identification.kind === 'instrument-identified') {
+  if (
+    identification.kind === 'graphically-identified' ||
+    identification.kind === 'counterfactually-identified' ||
+    identification.kind === 'instrument-identified'
+  ) {
     const assumed = identification.basis.filter(isOwned)
     const derived = identification.basis.filter((entry) => !isOwned(entry))
-    const headline = identification.kind === 'graphically-identified'
-      ? 'The ID algorithm returned an observational expression'
-      : identification.kind === 'counterfactually-identified'
-        ? 'IDC* returned the two expressions required for binary ETT'
-        : `Instrumental variable estimand through ${identification.instruments.map((variable) => variable.name).join(', ')}`
-    const enabled = identification.kind === 'graphically-identified'
-      ? 'A back-door adjustment estimator is not enabled for this expression.'
-      : identification.kind === 'counterfactually-identified'
-        ? 'The binary ETT evaluator is enabled when all observed graph variables have values of only 0 or 1.'
-        : 'The instrumental variable estimator is enabled. However, level 2 graphical assumptions alone do not identify the effect estimated here. Additional parametric assumptions are required.'
+    const headline =
+      identification.kind === 'graphically-identified'
+        ? 'The ID algorithm returned an observational expression'
+        : identification.kind === 'counterfactually-identified'
+          ? 'IDC* returned the two expressions required for binary ETT'
+          : `Instrumental variable estimand through ${identification.instruments.map((variable) => variable.name).join(', ')}`
+    const enabled =
+      identification.kind === 'graphically-identified'
+        ? 'A back-door adjustment estimator is not enabled for this expression.'
+        : identification.kind === 'counterfactually-identified'
+          ? 'The binary ETT evaluator is enabled when all observed graph variables have values of only 0 or 1.'
+          : 'The instrumental variable estimator is enabled. However, level 2 graphical assumptions alone do not identify the effect estimated here. Additional parametric assumptions are required.'
     return (
       <section aria-label="Identification record" className="@container/record mb-3">
         <span className="block text-body font-medium text-ink">Identification record</span>
-        <p className="mb-1 mt-1 flex items-center gap-2 text-body text-ink"><Icon name="check_circle" size={16} className="text-ok" /> {headline}</p>
+        <p className="mb-1 mt-1 flex items-center gap-2 text-body text-ink">
+          <Icon name="check_circle" size={16} className="text-ok" /> {headline}
+        </p>
         <p className="mb-2 mt-1 text-body text-muted">{enabled}</p>
         <details className="group">
-          <summary className="flex cursor-pointer list-none items-center gap-1.5 text-body text-muted hover:text-ink [&::-webkit-details-marker]:hidden"><Metadata><span><Icon name="expand_more" size={14} className="transition-transform duration-(--motion-fast) group-open:rotate-180" />
-            Show the full record</span><span>{plural(identification.basis.length, 'entry').replace('entrys', 'entries')}</span></Metadata></summary>
+          <summary className="flex cursor-pointer list-none items-center gap-1.5 text-body text-muted hover:text-ink [&::-webkit-details-marker]:hidden">
+            <Metadata>
+              <span>
+                <Icon
+                  name="expand_more"
+                  size={14}
+                  className="transition-transform duration-(--motion-fast) group-open:rotate-180"
+                />
+                Show the full record
+              </span>
+              <span>
+                {plural(identification.basis.length, 'entry').replace('entrys', 'entries')}
+              </span>
+            </Metadata>
+          </summary>
           <div className="mt-2 space-y-3">
-            {assumed.length > 0 && <ul className="m-0 list-none space-y-2 p-0">{assumed.map((entry) => <OwnedRow key={entry.id} entry={entry} />)}</ul>}
-            <ul className="m-0 list-none space-y-2 p-0">{derived.map((entry) => <DerivedRow key={entry.id} entry={entry} />)}</ul>
+            {assumed.length > 0 && (
+              <ul className="m-0 list-none space-y-2 p-0">
+                {assumed.map((entry) => (
+                  <OwnedRow key={entry.id} entry={entry} />
+                ))}
+              </ul>
+            )}
+            <ul className="m-0 list-none space-y-2 p-0">
+              {derived.map((entry) => (
+                <DerivedRow key={entry.id} entry={entry} />
+              ))}
+            </ul>
           </div>
         </details>
       </section>
@@ -165,41 +247,87 @@ export function IdentificationRecord({ identification }: { readonly identificati
   const adjustmentSet = adjustment.variables
   const paths = basis.filter(isPath)
   const owned = basis.filter(isOwned)
-  const derived = basis.filter((entry) => !isOwned(entry) && !isPath(entry) && entry.kind !== 'qualification')
+  const derived = basis.filter(
+    (entry) => !isOwned(entry) && !isPath(entry) && entry.kind !== 'qualification',
+  )
   const qualification = basis.find((entry) => entry.kind === 'qualification')
-  const assumptions = basis.filter((entry) => entry.kind === 'graph-assumption' || entry.kind === 'design-assumption')
-  const missing = basis.filter((entry) => entry.kind === 'design-assumption' && entry.rationale === null).length
+  const assumptions = basis.filter(
+    (entry) => entry.kind === 'graph-assumption' || entry.kind === 'design-assumption',
+  )
+  const missing = basis.filter(
+    (entry) => entry.kind === 'design-assumption' && entry.rationale === null,
+  ).length
   const setNames = adjustmentSet.map((variable) => variable.name)
-  const closers = [...new Set(paths.filter((entry) => entry.closure === 'adjustment').flatMap((entry) => entry.blockedAt))]
-  const closersAreTheSet = closers.length === setNames.length && closers.every((name) => setNames.includes(name))
-  const pathSummary = paths.length === 0
-    ? 'No open back-door path; no adjustment needed'
-    : `${plural(paths.length, 'back-door path')}, ${closersAreTheSet ? `blocked at ${closers.join(', ')}` : 'all blocked'}`
+  const closers = [
+    ...new Set(
+      paths.filter((entry) => entry.closure === 'adjustment').flatMap((entry) => entry.blockedAt),
+    ),
+  ]
+  const closersAreTheSet =
+    closers.length === setNames.length && closers.every((name) => setNames.includes(name))
+  const pathSummary =
+    paths.length === 0
+      ? 'No open back-door path; no adjustment needed'
+      : `${plural(paths.length, 'back-door path')}, ${closersAreTheSet ? `blocked at ${closers.join(', ')}` : 'all blocked'}`
 
   return (
     <section aria-label="Identification record" className="@container/record mb-3">
       <span className="block text-body font-medium text-ink">Identification record</span>
       <ul className="m-0 mt-1 list-none space-y-0.5 p-0 text-body">
-        <li className="flex items-center gap-2 text-ink"><Icon name="check_circle" size={16} className="text-ok" /> {pathSummary}</li>
+        <li className="flex items-center gap-2 text-ink">
+          <Icon name="check_circle" size={16} className="text-ok" /> {pathSummary}
+        </li>
         <li className={cn('flex items-center gap-2', missing > 0 ? 'text-warn' : 'text-muted')}>
           {missing > 0 && <Icon name="warning" size={16} />}
-          {plural(assumptions.length, 'assumption')} recorded, {missing > 0 ? `${missing} without rationale` : 'all with rationale'}
+          {plural(assumptions.length, 'assumption')} recorded,{' '}
+          {missing > 0 ? `${missing} without rationale` : 'all with rationale'}
         </li>
-        {qualification !== undefined && <li className="flex items-center gap-2 text-warn"><Icon name="warning" size={16} /> {qualification.statement.split(';')[0]}</li>}
+        {qualification !== undefined && (
+          <li className="flex items-center gap-2 text-warn">
+            <Icon name="warning" size={16} /> {qualification.statement.split(';')[0]}
+          </li>
+        )}
       </ul>
       <details className="group mt-2">
-        <summary className="flex cursor-pointer list-none items-center gap-1.5 text-body text-muted hover:text-ink [&::-webkit-details-marker]:hidden"><Metadata><span><Icon name="expand_more" size={14} className="transition-transform duration-(--motion-fast) group-open:rotate-180" />
-          Show the full record</span><span>{plural(basis.length, 'entry').replace('entrys', 'entries')}</span></Metadata></summary>
+        <summary className="flex cursor-pointer list-none items-center gap-1.5 text-body text-muted hover:text-ink [&::-webkit-details-marker]:hidden">
+          <Metadata>
+            <span>
+              <Icon
+                name="expand_more"
+                size={14}
+                className="transition-transform duration-(--motion-fast) group-open:rotate-180"
+              />
+              Show the full record
+            </span>
+            <span>{plural(basis.length, 'entry').replace('entrys', 'entries')}</span>
+          </Metadata>
+        </summary>
         <div className="mt-2 space-y-3">
           <div>
             <span className={label('block text-muted')}>Assumed by you</span>
-            <ul className="m-0 mt-1 list-none space-y-2 p-0">{owned.map((entry) => <OwnedRow key={entry.id} entry={entry} />)}</ul>
+            <ul className="m-0 mt-1 list-none space-y-2 p-0">
+              {owned.map((entry) => (
+                <OwnedRow key={entry.id} entry={entry} />
+              ))}
+            </ul>
           </div>
           <div>
             <span className={label('block text-muted')}>Derived from the graph</span>
-            <ul className="m-0 mt-1 list-none space-y-2 p-0">{derived.map((entry) => <DerivedRow key={entry.id} entry={entry} />)}</ul>
-            {paths.length > 0 && <div className="mt-2"><PathTable paths={paths} /></div>}
-            {qualification !== undefined && <ul className="m-0 mt-2 list-none p-0"><DerivedRow entry={qualification} /></ul>}
+            <ul className="m-0 mt-1 list-none space-y-2 p-0">
+              {derived.map((entry) => (
+                <DerivedRow key={entry.id} entry={entry} />
+              ))}
+            </ul>
+            {paths.length > 0 && (
+              <div className="mt-2">
+                <PathTable paths={paths} />
+              </div>
+            )}
+            {qualification !== undefined && (
+              <ul className="m-0 mt-2 list-none p-0">
+                <DerivedRow entry={qualification} />
+              </ul>
+            )}
           </div>
         </div>
       </details>

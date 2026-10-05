@@ -17,7 +17,15 @@ import { useDatasetSummary } from './useDatasetSummary'
  * onto the whole file, and the preparation cards passed as children. Selecting a column in either
  * table drives the column profile in the inspector.
  */
-export function DataProfileView({ source, profile, selectedColumn, onSelectColumn, onEditSource, onDeclare, children }: {
+export function DataProfileView({
+  source,
+  profile,
+  selectedColumn,
+  onSelectColumn,
+  onEditSource,
+  onDeclare,
+  children,
+}: {
   readonly source: SelectedSource
   readonly profile: DatasetProfile
   readonly selectedColumn: ColumnId | null
@@ -26,7 +34,9 @@ export function DataProfileView({ source, profile, selectedColumn, onSelectColum
   readonly onDeclare?: (column: string, type: DeclaredType | null) => void
   readonly children?: ReactNode
 }) {
-  const numericColumns = profile.columns.filter((column) => isNumericDuckDbType(column.duckdbType)).length
+  const numericColumns = profile.columns.filter((column) =>
+    isNumericDuckDbType(column.duckdbType),
+  ).length
   const summary = useDatasetSummary(source, profile)
   const sizeFigures = [
     { name: 'Rows', figure: formatCount(profile.rowCount) },
@@ -34,36 +44,72 @@ export function DataProfileView({ source, profile, selectedColumn, onSelectColum
     { name: 'Numeric', figure: formatCount(numericColumns) },
   ]
   return (
-    <section className="rise @container/studio flex w-full flex-col gap-5" aria-labelledby="data-profile-title">
+    <section
+      className="rise @container/studio flex w-full flex-col gap-5"
+      aria-labelledby="data-profile-title"
+    >
       <header className="flex min-w-0 flex-wrap items-center justify-between gap-x-6 gap-y-3">
         <div className="flex min-w-0 max-w-full items-center gap-2">
           <Icon name="description" size={22} className="text-muted" />
-          <h2 id="data-profile-title" className="m-0 min-w-0 text-heading text-ink [overflow-wrap:anywhere]">{profile.source.fileName}</h2>
-            {onEditSource !== null && (
-              <button type="button" className={iconControl('quiet', 'h-7 w-7')} aria-label="Edit data" title="Edit data" onClick={onEditSource}>
-                <Icon name="edit" size={15} />
-              </button>
-            )}
+          <h2
+            id="data-profile-title"
+            className="m-0 min-w-0 text-heading text-ink [overflow-wrap:anywhere]"
+          >
+            {profile.source.fileName}
+          </h2>
+          {onEditSource !== null && (
+            <button
+              type="button"
+              className={iconControl('quiet', 'h-7 w-7')}
+              aria-label="Edit data"
+              title="Edit data"
+              onClick={onEditSource}
+            >
+              <Icon name="edit" size={15} />
+            </button>
+          )}
         </div>
-        <dl aria-label="Dataset size" className="m-0 flex flex-wrap items-center gap-x-5 gap-y-2 text-label">
+        <dl
+          aria-label="Dataset size"
+          className="m-0 flex flex-wrap items-center gap-x-5 gap-y-2 text-label"
+        >
           {sizeFigures.map(({ name, figure }) => (
             <div key={name} className="flex items-baseline gap-1">
               <dt className="text-muted">{name.toLowerCase()}</dt>
-              <dd className={num('order-first m-0 text-ink')} title={figure.exact}><FigureParts value={figure} /></dd>
+              <dd className={num('order-first m-0 text-ink')} title={figure.exact}>
+                <FigureParts value={figure} />
+              </dd>
             </div>
           ))}
         </dl>
       </header>
 
       <div className="grid gap-3 @5xl/studio:grid-cols-[minmax(420px,0.9fr)_minmax(0,1.4fr)]">
-        <SchemaTable profile={profile} summary={summary} selectedColumn={selectedColumn} onSelectColumn={onSelectColumn} onDeclare={onDeclare} />
-        <PreviewTable source={source} profile={profile} summary={summary} selectedColumn={selectedColumn} onSelectColumn={onSelectColumn} />
+        <SchemaTable
+          profile={profile}
+          summary={summary}
+          selectedColumn={selectedColumn}
+          onSelectColumn={onSelectColumn}
+          onDeclare={onDeclare}
+        />
+        <PreviewTable
+          source={source}
+          profile={profile}
+          summary={summary}
+          selectedColumn={selectedColumn}
+          onSelectColumn={onSelectColumn}
+        />
       </div>
 
       {children}
 
       <p className="m-0 text-label text-faint" title={profile.source.fingerprint}>
-        <Metadata><span>SHA-256 <span className={literal()}>{profile.source.fingerprint.slice(0, 12)}</span></span><span>DuckDB {profile.parser.engineVersion}</span></Metadata>
+        <Metadata>
+          <span>
+            SHA-256 <span className={literal()}>{profile.source.fingerprint.slice(0, 12)}</span>
+          </span>
+          <span>DuckDB {profile.parser.engineVersion}</span>
+        </Metadata>
       </p>
     </section>
   )

@@ -14,7 +14,10 @@ export type SourceCacheProblem =
   | { readonly kind: 'cache-unavailable' }
   | { readonly kind: 'cache-write-failed'; readonly detail: string }
 
-export const sourceCacheAvailable = (): boolean => typeof navigator !== 'undefined' && 'storage' in navigator && typeof navigator.storage.getDirectory === 'function'
+export const sourceCacheAvailable = (): boolean =>
+  typeof navigator !== 'undefined' &&
+  'storage' in navigator &&
+  typeof navigator.storage.getDirectory === 'function'
 
 const directory = async (create: boolean): Promise<FileSystemDirectoryHandle | null> => {
   if (!sourceCacheAvailable()) return null
@@ -32,9 +35,13 @@ interface CachedMeta {
   readonly lastModified: number
 }
 
-const detailOf = (cause: unknown): string => (cause instanceof Error ? cause.message : String(cause))
+const detailOf = (cause: unknown): string =>
+  cause instanceof Error ? cause.message : String(cause)
 
-export async function cacheSource(fingerprint: SourceFingerprint, file: File): Promise<Result<null, SourceCacheProblem>> {
+export async function cacheSource(
+  fingerprint: SourceFingerprint,
+  file: File,
+): Promise<Result<null, SourceCacheProblem>> {
   const dir = await directory(true)
   if (dir === null) return err({ kind: 'cache-unavailable' })
   try {
@@ -65,7 +72,9 @@ export async function readCachedSource(fingerprint: SourceFingerprint): Promise<
     try {
       const metaHandle = await dir.getFileHandle(`${fingerprint}.json`)
       meta = JSON.parse(await (await metaHandle.getFile()).text()) as CachedMeta
-    } catch { /* the data file alone is still usable */ }
+    } catch {
+      /* the data file alone is still usable */
+    }
     return new File([blob], meta.name, { type: meta.type, lastModified: meta.lastModified })
   } catch {
     return null
@@ -76,6 +85,10 @@ export async function removeCachedSource(fingerprint: SourceFingerprint): Promis
   const dir = await directory(false)
   if (dir === null) return
   for (const name of [fingerprint, `${fingerprint}.json`]) {
-    try { await dir.removeEntry(name) } catch { /* already gone */ }
+    try {
+      await dir.removeEntry(name)
+    } catch {
+      /* already gone */
+    }
   }
 }

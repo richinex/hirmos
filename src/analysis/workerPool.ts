@@ -11,7 +11,13 @@ const activePools = new Set<AbortController>()
 export function createPoolScope() {
   const controller = new AbortController()
   activePools.add(controller)
-  return { signal: controller.signal, abort: () => controller.abort(), release: () => { activePools.delete(controller) } }
+  return {
+    signal: controller.signal,
+    abort: () => controller.abort(),
+    release: () => {
+      activePools.delete(controller)
+    },
+  }
 }
 
 export function cancelPooledAnalyses(): void {
@@ -33,7 +39,9 @@ export class AsyncSemaphore {
       this.permits -= 1
       return
     }
-    return new Promise<void>((resolve) => { this.waiters.push(resolve) })
+    return new Promise<void>((resolve) => {
+      this.waiters.push(resolve)
+    })
   }
 
   release(): void {
@@ -42,8 +50,12 @@ export class AsyncSemaphore {
     else this.permits += 1
   }
 
-  get available(): number { return this.permits }
-  get waiting(): number { return this.waiters.length }
+  get available(): number {
+    return this.permits
+  }
+  get waiting(): number {
+    return this.waiters.length
+  }
 }
 
 /** Each worker instantiates its own copy of the analysis module. */

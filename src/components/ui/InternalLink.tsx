@@ -13,15 +13,16 @@ export function InternalLink({ href, onClick, target, download, ...props }: Inte
   const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
     onClick?.(event)
     if (
-      event.defaultPrevented
-      || event.button !== 0
-      || event.metaKey
-      || event.ctrlKey
-      || event.shiftKey
-      || event.altKey
-      || (target !== undefined && target !== '_self')
-      || download !== undefined
-    ) return
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey ||
+      (target !== undefined && target !== '_self') ||
+      download !== undefined
+    )
+      return
 
     event.preventDefault()
     navigate(href)

@@ -1,4 +1,11 @@
-import { BarChart, CustomChart, GraphChart, HeatmapChart, LineChart, ScatterChart } from 'echarts/charts'
+import {
+  BarChart,
+  CustomChart,
+  GraphChart,
+  HeatmapChart,
+  LineChart,
+  ScatterChart,
+} from 'echarts/charts'
 import {
   AriaComponent,
   AxisPointerComponent,

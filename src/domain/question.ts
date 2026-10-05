@@ -38,7 +38,10 @@ export const EMPTY_QUESTION: QuestionState = {
   problem: null,
 }
 
-export function columnFromProfile(profile: DatasetProfile, raw: string): Result<ColumnId, QuestionProblem> {
+export function columnFromProfile(
+  profile: DatasetProfile,
+  raw: string,
+): Result<ColumnId, QuestionProblem> {
   const column = profile.columns.find((candidate) => candidate.id === raw)
   return column ? ok(column.id) : err({ kind: 'unknown-column', value: raw })
 }
@@ -102,16 +105,22 @@ export function stepQuestion(
 
 export function describeQuestionProblem(problem: QuestionProblem): string {
   switch (problem.kind) {
-    case 'missing-treatment': return 'Choose a treatment.'
-    case 'missing-outcome': return 'Choose an outcome.'
-    case 'same-column': return 'Treatment and outcome must be different columns.'
-    case 'unknown-column': return 'That column is not part of this dataset profile.'
-    default: return assertNever(problem)
+    case 'missing-treatment':
+      return 'Choose a treatment.'
+    case 'missing-outcome':
+      return 'Choose an outcome.'
+    case 'same-column':
+      return 'Treatment and outcome must be different columns.'
+    case 'unknown-column':
+      return 'That column is not part of this dataset profile.'
+    default:
+      return assertNever(problem)
   }
 }
 
 export function nameOfColumn(profile: DatasetProfile, id: ColumnId): string {
   const column = profile.columns.find((candidate) => candidate.id === id)
-  if (!column) throw new Error(`Question column ${id} is absent from dataset profile ${profile.id}.`)
+  if (!column)
+    throw new Error(`Question column ${id} is absent from dataset profile ${profile.id}.`)
   return column.name
 }

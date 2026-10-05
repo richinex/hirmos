@@ -105,21 +105,23 @@ export const designLayouts = (
   estimator: EstimatorId,
   encodings: Readonly<Record<ColumnId, CovariateEncoding>>,
 ): readonly DesignLayout[] =>
-  columns.map((column, index) => index < fixed
-    ? { kind: 'numeric' }
-    : designLayoutOf(estimator, encodings[column.column] ?? { kind: 'numeric' }))
+  columns.map((column, index) =>
+    index < fixed
+      ? { kind: 'numeric' }
+      : designLayoutOf(estimator, encodings[column.column] ?? { kind: 'numeric' }),
+  )
 
 /** Estimators whose run expands a declared encoding. The control appears only where it applies. */
 export const expandsDesign = (estimator: EstimatorId): boolean =>
-  estimator === 'backdoor-linear-regression'
-  || estimator === 'bayesian-gaussian'
-  || estimator === 'poisson-glm'
-  || estimator === 'negative-binomial-p'
-  || estimator === 'dml-plr'
-  || estimator === 'dml-irm'
-  || estimator === 't-learner'
-  || estimator === 'causal-forest'
-  || estimator === 'propensity-weighting'
-  || estimator === 'propensity-matching'
-  || estimator === 'doubly-robust'
-  || estimator === 'continuous-gps'
+  estimator === 'backdoor-linear-regression' ||
+  estimator === 'bayesian-gaussian' ||
+  estimator === 'poisson-glm' ||
+  estimator === 'negative-binomial-p' ||
+  estimator === 'dml-plr' ||
+  estimator === 'dml-irm' ||
+  estimator === 't-learner' ||
+  estimator === 'causal-forest' ||
+  estimator === 'propensity-weighting' ||
+  estimator === 'propensity-matching' ||
+  estimator === 'doubly-robust' ||
+  estimator === 'continuous-gps'

@@ -34,9 +34,8 @@ export function ParameterLabel({
   readonly htmlFor?: string
   readonly className?: string
 }) {
-  const text = htmlFor === undefined
-    ? <span>{label}</span>
-    : <label htmlFor={htmlFor}>{label}</label>
+  const text =
+    htmlFor === undefined ? <span>{label}</span> : <label htmlFor={htmlFor}>{label}</label>
 
   return (
     <span className={cn(className, 'flex w-fit items-center gap-1')}>

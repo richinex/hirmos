@@ -44,24 +44,40 @@ export function pValueBarsOption(view: PValueBarsView, theme: ChartTheme): EChar
       nameTextStyle: { color: theme.muted, fontFamily: theme.font, fontSize: theme.labelSize },
       axisLine: { show: false },
       axisTick: { show: false },
-      axisLabel: { color: theme.faint, fontFamily: theme.font, fontSize: theme.labelSize, hideOverlap: true, formatter: (value: number) => (value >= 0.001 ? String(value) : value.toExponential(0)) },
+      axisLabel: {
+        color: theme.faint,
+        fontFamily: theme.font,
+        fontSize: theme.labelSize,
+        hideOverlap: true,
+        formatter: (value: number) => (value >= 0.001 ? String(value) : value.toExponential(0)),
+      },
       splitLine: { lineStyle: { color: theme.hair } },
     },
-    series: [{
-      type: 'bar',
-      name: 'p-value',
-      barMaxWidth: 36,
-      barMinWidth: 3,
-      data: shown.map((p, index) => (view.pValues[index] < view.alpha
-        ? { value: p, itemStyle: { color: theme.signal, decal: hatch(theme) } }
-        : { value: p, itemStyle: { color: theme.bone } })),
-      markLine: {
-        silent: true,
-        symbol: 'none',
-        lineStyle: { color: theme.muted, type: 'dashed', width: 1 },
-        label: { formatter: `α ${view.alpha}`, color: theme.muted, fontFamily: theme.font, fontSize: theme.labelSize, position: 'insideStartTop' },
-        data: [{ yAxis: view.alpha }],
+    series: [
+      {
+        type: 'bar',
+        name: 'p-value',
+        barMaxWidth: 36,
+        barMinWidth: 3,
+        data: shown.map((p, index) =>
+          view.pValues[index] < view.alpha
+            ? { value: p, itemStyle: { color: theme.signal, decal: hatch(theme) } }
+            : { value: p, itemStyle: { color: theme.bone } },
+        ),
+        markLine: {
+          silent: true,
+          symbol: 'none',
+          lineStyle: { color: theme.muted, type: 'dashed', width: 1 },
+          label: {
+            formatter: `α ${view.alpha}`,
+            color: theme.muted,
+            fontFamily: theme.font,
+            fontSize: theme.labelSize,
+            position: 'insideStartTop',
+          },
+          data: [{ yAxis: view.alpha }],
+        },
       },
-    }],
+    ],
   }
 }

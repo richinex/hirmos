@@ -2,7 +2,13 @@ import { useEffect, useId, useState } from 'react'
 import { field, fieldHint, fieldLabel } from '@/components/ui/recipes'
 import { ParameterLabel } from '@/components/ui/ParameterLabel'
 import type { NonEmptyArray } from '@/domain/dop'
-import { describeBoostedGridProblem, formatBoostedGridAxis, parseBoostedGridAxis, type BoostedGridAxis, type BoostedGridProblem } from '@/domain/estimation'
+import {
+  describeBoostedGridProblem,
+  formatBoostedGridAxis,
+  parseBoostedGridAxis,
+  type BoostedGridAxis,
+  type BoostedGridProblem,
+} from '@/domain/estimation'
 
 interface BoostedGridAxisFieldProps {
   readonly axis: BoostedGridAxis
@@ -16,7 +22,13 @@ interface BoostedGridAxisFieldProps {
  * One axis of the boosted grid. A valid list reaches the configuration as it is typed; an invalid one
  * stays in the field with its reason, and leaving the field restores the values the run will search.
  */
-export function BoostedGridAxisField({ axis, label, help, values, onChange }: BoostedGridAxisFieldProps) {
+export function BoostedGridAxisField({
+  axis,
+  label,
+  help,
+  values,
+  onChange,
+}: BoostedGridAxisFieldProps) {
   const canonical = formatBoostedGridAxis(values)
   const [draft, setDraft] = useState(canonical)
   const [problem, setProblem] = useState<BoostedGridProblem | null>(null)
@@ -51,7 +63,11 @@ export function BoostedGridAxisField({ axis, label, help, values, onChange }: Bo
           setProblem(null)
         }}
       />
-      {problem !== null && <span id={hint} role="alert" className={fieldHint}>{describeBoostedGridProblem(axis, problem)}</span>}
+      {problem !== null && (
+        <span id={hint} role="alert" className={fieldHint}>
+          {describeBoostedGridProblem(axis, problem)}
+        </span>
+      )}
     </label>
   )
 }

@@ -27,18 +27,31 @@ export function Icon({
    */
   weight?: number
 }) {
-  if (name === 'root_cause') return (
-    <svg aria-hidden viewBox="0 0 26 26" width={size} height={size}
-      className={cn('shrink-0 select-none', className)} fill="none" stroke="currentColor"
-      strokeWidth={1.4} strokeLinecap="square" strokeLinejoin="miter">
-      <g transform="translate(-4 -4) scale(1.2)">
-        <path d="M9 4.8h2l.4 1.5 1 .6 1.5-.4 1 1.7-1.1 1.1v1.3l1.1 1.1-1 1.7-1.5-.4-1 .6-.4 1.5H9l-.4-1.5-1-.6-1.5.4-1-1.7 1.1-1.1V9.3L5.1 8.2l1-1.7 1.5.4 1-.6Z" strokeWidth={1.1} />
-        <circle cx="10" cy="10" r="1.8" fill={fill ? 'currentColor' : 'none'} strokeWidth={1.1} />
-      </g>
-      <circle cx="18.5" cy="16" r="4.5" />
-      <path d="m22 19.5 3 3" strokeWidth={fill ? 2 : 1.4} />
-    </svg>
-  )
+  if (name === 'root_cause')
+    return (
+      <svg
+        aria-hidden
+        viewBox="0 0 26 26"
+        width={size}
+        height={size}
+        className={cn('shrink-0 select-none', className)}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.4}
+        strokeLinecap="square"
+        strokeLinejoin="miter"
+      >
+        <g transform="translate(-4 -4) scale(1.2)">
+          <path
+            d="M9 4.8h2l.4 1.5 1 .6 1.5-.4 1 1.7-1.1 1.1v1.3l1.1 1.1-1 1.7-1.5-.4-1 .6-.4 1.5H9l-.4-1.5-1-.6-1.5.4-1-1.7 1.1-1.1V9.3L5.1 8.2l1-1.7 1.5.4 1-.6Z"
+            strokeWidth={1.1}
+          />
+          <circle cx="10" cy="10" r="1.8" fill={fill ? 'currentColor' : 'none'} strokeWidth={1.1} />
+        </g>
+        <circle cx="18.5" cy="16" r="4.5" />
+        <path d="m22 19.5 3 3" strokeWidth={fill ? 2 : 1.4} />
+      </svg>
+    )
   return (
     <span
       aria-hidden

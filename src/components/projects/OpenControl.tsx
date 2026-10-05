@@ -7,9 +7,31 @@ import { useIsMobile } from '@/lib/useMediaQuery'
  * and delete icon controls beside it, so the row reads as one control family; on a phone, where the
  * row has no room for a word, it becomes a glyph of the same family and the name moves to its label.
  */
-export function OpenControl({ name, onOpen }: { readonly name: string; readonly onOpen: () => void }) {
+export function OpenControl({
+  name,
+  onOpen,
+}: {
+  readonly name: string
+  readonly onOpen: () => void
+}) {
   const isMobile = useIsMobile()
-  return isMobile
-    ? <button type="button" className={iconControl('quiet')} aria-label={`Open ${name}`} onClick={onOpen}><Icon name="open_in_new" size={14} /></button>
-    : <button type="button" className={chromeAction('quiet')} aria-label={`Open ${name}`} onClick={onOpen}>Open</button>
+  return isMobile ? (
+    <button
+      type="button"
+      className={iconControl('quiet')}
+      aria-label={`Open ${name}`}
+      onClick={onOpen}
+    >
+      <Icon name="open_in_new" size={14} />
+    </button>
+  ) : (
+    <button
+      type="button"
+      className={chromeAction('quiet')}
+      aria-label={`Open ${name}`}
+      onClick={onOpen}
+    >
+      Open
+    </button>
+  )
 }

@@ -4,7 +4,8 @@ import { button } from '@/components/ui/recipes'
 import { isNonEmpty, type NonEmptyArray } from '@/domain/dop'
 import { cn } from '@/lib/utils'
 
-const ACCEPT = '.csv,.tsv,.parquet,text/csv,text/tab-separated-values,application/vnd.apache.parquet'
+const ACCEPT =
+  '.csv,.tsv,.parquet,text/csv,text/tab-separated-values,application/vnd.apache.parquet'
 
 interface DataDropZoneProps {
   /** The first line in the zone: what to drop here. */
@@ -20,7 +21,15 @@ interface DataDropZoneProps {
 }
 
 /** Accept files selected with the picker or dropped on the same control. */
-export function DataDropZone({ invitation, consequence, action, multiple = false, busy = false, onFiles, onIntent }: DataDropZoneProps) {
+export function DataDropZone({
+  invitation,
+  consequence,
+  action,
+  multiple = false,
+  busy = false,
+  onFiles,
+  onIntent,
+}: DataDropZoneProps) {
   const input = useRef<HTMLInputElement>(null)
   const [over, setOver] = useState(false)
 
@@ -42,20 +51,28 @@ export function DataDropZone({ invitation, consequence, action, multiple = false
         'flex min-h-[18rem] flex-col items-center justify-center gap-3 rounded-lg border border-dashed bg-well px-6 py-8 text-center transition-colors duration-(--motion-fast)',
         over ? 'border-signal' : 'border-line',
       )}
-      onDragOver={(event) => { event.preventDefault(); if (!over) setOver(true) }}
+      onDragOver={(event) => {
+        event.preventDefault()
+        if (!over) setOver(true)
+      }}
       onDragLeave={() => setOver(false)}
       onDrop={drop}
     >
       <Icon name="upload_file" size={28} className="text-faint" aria-hidden />
       <p className="m-0 text-body text-ink">{invitation}</p>
-      {consequence !== undefined && <p className="m-0 max-w-[40ch] text-body text-faint text-pretty">{consequence}</p>}
+      {consequence !== undefined && (
+        <p className="m-0 max-w-[40ch] text-body text-faint text-pretty">{consequence}</p>
+      )}
       <input
         ref={input}
         type="file"
         multiple={multiple}
         accept={ACCEPT}
         className="sr-only"
-        onChange={(event) => { take(event.target.files); event.target.value = '' }}
+        onChange={(event) => {
+          take(event.target.files)
+          event.target.value = ''
+        }}
       />
       <button
         type="button"

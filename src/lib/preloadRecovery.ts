@@ -2,11 +2,13 @@ const RELOADED_AT = 'hirmos:preload-reloaded-at'
 const RETRY_AFTER_MS = 60_000
 
 export type PreloadRecovery =
-  | { readonly kind: 'reload' }
-  | { readonly kind: 'surface'; readonly reloadedAgoMs: number }
+  { readonly kind: 'reload' } | { readonly kind: 'surface'; readonly reloadedAgoMs: number }
 
 /** One reload per minute: a stale tab is fixed by the first, a still-failing one is not hidden by a loop. */
-export const decidePreloadRecovery = (lastReloadAt: number | null, now: number): PreloadRecovery => {
+export const decidePreloadRecovery = (
+  lastReloadAt: number | null,
+  now: number,
+): PreloadRecovery => {
   if (lastReloadAt === null) return { kind: 'reload' }
   const reloadedAgoMs = now - lastReloadAt
   return reloadedAgoMs > RETRY_AFTER_MS ? { kind: 'reload' } : { kind: 'surface', reloadedAgoMs }

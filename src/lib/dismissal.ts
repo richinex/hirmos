@@ -23,9 +23,11 @@ const typingIn = (target: EventTarget | null): boolean => {
 /** True when this Escape belongs to someone else: already handled, typed into a field, or a
  * Radix layer (dialog, popover, palette) is open and owns the dismissal. */
 export const escapeClaimed = (e: KeyboardEvent): boolean =>
-  e.defaultPrevented
-  || typingIn(e.target)
-  || document.querySelector('[role="dialog"][data-state="open"], [data-radix-popper-content-wrapper]') !== null
+  e.defaultPrevented ||
+  typingIn(e.target) ||
+  document.querySelector(
+    '[role="dialog"][data-state="open"], [data-radix-popper-content-wrapper]',
+  ) !== null
 
 /** The gate for a window-level Escape handler on a stacked surface. */
 export const escapeFor = (id: string, e: KeyboardEvent): boolean => {

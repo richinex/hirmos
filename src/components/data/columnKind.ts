@@ -13,21 +13,31 @@ export const kindOf = (duckdbType: string): ColumnKind => {
 
 export const kindGlyph = (kind: ColumnKind): string => {
   switch (kind) {
-    case 'numeric': return '#'
-    case 'text': return 'Aa'
-    case 'temporal': return '⏱'
-    case 'boolean': return '◐'
-    default: return assertNever(kind)
+    case 'numeric':
+      return '#'
+    case 'text':
+      return 'Aa'
+    case 'temporal':
+      return '⏱'
+    case 'boolean':
+      return '◐'
+    default:
+      return assertNever(kind)
   }
 }
 
 export const kindText = (kind: ColumnKind): string => {
   switch (kind) {
-    case 'numeric': return 'Numeric'
-    case 'text': return 'Text'
-    case 'temporal': return 'Temporal'
-    case 'boolean': return 'Boolean'
-    default: return assertNever(kind)
+    case 'numeric':
+      return 'Numeric'
+    case 'text':
+      return 'Text'
+    case 'temporal':
+      return 'Temporal'
+    case 'boolean':
+      return 'Boolean'
+    default:
+      return assertNever(kind)
   }
 }
 

@@ -20,7 +20,10 @@ const subscribe = (notify: () => void): (() => void) => {
 
 let snapshot: Location = { pathname: '/app', search: '' }
 const readLocation = (): Location => {
-  if (snapshot.pathname !== window.location.pathname || snapshot.search !== window.location.search) {
+  if (
+    snapshot.pathname !== window.location.pathname ||
+    snapshot.search !== window.location.search
+  ) {
     snapshot = { pathname: window.location.pathname, search: window.location.search }
   }
   return snapshot
@@ -33,7 +36,10 @@ export function useLocation(): Location {
 }
 
 /** The live location as a parsed route, with the raw location beside it for canonical-URL checks. */
-export function useRoute(): { readonly location: Location; readonly route: Result<Route, RouteProblem> } {
+export function useRoute(): {
+  readonly location: Location
+  readonly route: Result<Route, RouteProblem>
+} {
   const location = useLocation()
   return { location, route: parseRoute(location.pathname, location.search) }
 }

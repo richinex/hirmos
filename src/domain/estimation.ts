@@ -1,22 +1,60 @@
 import { z } from 'zod'
 import { ridgeConfigurationSchema, ridgeMatches, type RidgeConfiguration } from './ridgeAugmented'
 import type { RidgeAugmentedEvidence } from './remixExtensions'
-import { sunAbrahamConfigurationSchema, sameSunAbraham, type SunAbrahamConfiguration } from './sunAbraham'
+import {
+  sunAbrahamConfigurationSchema,
+  sameSunAbraham,
+  type SunAbrahamConfiguration,
+} from './sunAbraham'
 import { sunAbrahamEvidenceSchema } from './remixExtensions'
 import { DEFAULT_BDEU_EQUIVALENT_SAMPLE_SIZE } from './discreteDefaults'
 import { CAUSAL_FOREST_METHOD_ID } from './methods'
-import { DEFAULT_CAUSAL_FOREST, causalForestConfigurationSchema, causalForestTarget, causalForestInputs, sameCausalForestTarget, type CausalForestConfiguration, type CausalForestEvidence } from './causalForest'
-import { sameStructuralModel, structuralModelSchema, structuralImpactSettingsSchema, structuralContributionSchema } from './structuralImpact'
+import {
+  DEFAULT_CAUSAL_FOREST,
+  causalForestConfigurationSchema,
+  causalForestTarget,
+  causalForestInputs,
+  sameCausalForestTarget,
+  type CausalForestConfiguration,
+  type CausalForestEvidence,
+} from './causalForest'
+import {
+  sameStructuralModel,
+  structuralModelSchema,
+  structuralImpactSettingsSchema,
+  structuralContributionSchema,
+} from './structuralImpact'
 import type { SharpRdConfiguration, SharpRdEvidence } from './sharpRd'
 import { SHARP_RD_METHOD_ID } from './methods'
-import { matchesTLearnerUncertainty, tLearnerUncertaintyEvidenceSchema, tLearnerUncertaintySchema } from './tLearner'
+import {
+  matchesTLearnerUncertainty,
+  tLearnerUncertaintyEvidenceSchema,
+  tLearnerUncertaintySchema,
+} from './tLearner'
 import { vecmForecastSchema } from './vecmForecast'
 import { ardlLongRunSchema, vecmLongRunSchema } from './longRun'
 import type { ColumnId } from './dataset'
 import { armaErrorFieldsSchema } from './interruptedSeries'
 import type { DagDocument, EditableDag } from './dag'
-import { assertNever, brand, err, flattenNonEmpty, mapNonEmpty, ok, type Brand, type NonEmptyArray, type Result } from './dop'
-import type { CaveatEvaluation, EvidenceGroup, MethodCaveat, MethodDefinition, MethodEligibility, MethodId } from './methods'
+import {
+  assertNever,
+  brand,
+  err,
+  flattenNonEmpty,
+  mapNonEmpty,
+  ok,
+  type Brand,
+  type NonEmptyArray,
+  type Result,
+} from './dop'
+import type {
+  CaveatEvaluation,
+  EvidenceGroup,
+  MethodCaveat,
+  MethodDefinition,
+  MethodEligibility,
+  MethodId,
+} from './methods'
 import { levelEvidence, nonEmptyGroups, summaries } from './levelEvidence'
 import {
   BACKDOOR_LINEAR_REGRESSION_METHOD_ID,
@@ -43,10 +81,35 @@ import {
   POISSON_GLM_METHOD_ID,
   PANEL_INTERVENTION_METHOD_ID,
 } from './methods'
-import { describeSeriesTransform, seriesTransformFor, type PreparedDatasetArtifact, type PreparedDatasetVersionId, type StationarityEvidenceArtifact } from './preprocessing'
+import {
+  describeSeriesTransform,
+  seriesTransformFor,
+  type PreparedDatasetArtifact,
+  type PreparedDatasetVersionId,
+  type StationarityEvidenceArtifact,
+} from './preprocessing'
 import { describePanelInterventionPreflight, type PanelInterventionPreflight } from './panel'
-import { describeStationarityConflict, levelModelVerdict, type LevelModelVerdict, type StationarityAssessment } from './stationarityAssessment'
-import { describeGrouping, identifiedInstruments, treatmentDescendants, type CovariateEncoding, type DesignLayout, type Estimand, type Identification, type IdentificationArtifact, type IdentificationId, type ModifierGrouping, type StudyId, type StudySpecification, type StudyVariable } from './study'
+import {
+  describeStationarityConflict,
+  levelModelVerdict,
+  type LevelModelVerdict,
+  type StationarityAssessment,
+} from './stationarityAssessment'
+import {
+  describeGrouping,
+  identifiedInstruments,
+  treatmentDescendants,
+  type CovariateEncoding,
+  type DesignLayout,
+  type Estimand,
+  type Identification,
+  type IdentificationArtifact,
+  type IdentificationId,
+  type ModifierGrouping,
+  type StudyId,
+  type StudySpecification,
+  type StudyVariable,
+} from './study'
 import { formatStatistic } from '@/lib/format/number'
 
 /**
@@ -77,19 +140,42 @@ export type FixedEffects =
   | { readonly kind: 'none' }
   | { readonly kind: 'time'; readonly column: ColumnId; readonly name: string }
   | { readonly kind: 'unit'; readonly column: ColumnId; readonly name: string }
-  | { readonly kind: 'unit-and-time'; readonly column: ColumnId; readonly name: string; readonly timeColumn: ColumnId; readonly timeName: string }
+  | {
+      readonly kind: 'unit-and-time'
+      readonly column: ColumnId
+      readonly name: string
+      readonly timeColumn: ColumnId
+      readonly timeName: string
+    }
 
 export const CONFIDENCE_LEVEL = 0.95
 
-export function selectFixedEffects(kind: FixedEffects['kind'], first: { readonly id: ColumnId; readonly name: string } | null, second: { readonly id: ColumnId; readonly name: string } | null): Result<FixedEffects, { readonly kind: 'missing-column' | 'duplicate-columns' }> {
+export function selectFixedEffects(
+  kind: FixedEffects['kind'],
+  first: { readonly id: ColumnId; readonly name: string } | null,
+  second: { readonly id: ColumnId; readonly name: string } | null,
+): Result<FixedEffects, { readonly kind: 'missing-column' | 'duplicate-columns' }> {
   switch (kind) {
-    case 'none': return ok({ kind })
+    case 'none':
+      return ok({ kind })
     case 'unit':
-    case 'time': return first === null ? err({ kind: 'missing-column' }) : ok({ kind, column: first.id, name: first.name })
+    case 'time':
+      return first === null
+        ? err({ kind: 'missing-column' })
+        : ok({ kind, column: first.id, name: first.name })
     case 'unit-and-time':
       if (first === null || second === null) return err({ kind: 'missing-column' })
-      return first.id === second.id ? err({ kind: 'duplicate-columns' }) : ok({ kind, column: first.id, name: first.name, timeColumn: second.id, timeName: second.name })
-    default: return assertNever(kind)
+      return first.id === second.id
+        ? err({ kind: 'duplicate-columns' })
+        : ok({
+            kind,
+            column: first.id,
+            name: first.name,
+            timeColumn: second.id,
+            timeName: second.name,
+          })
+    default:
+      return assertNever(kind)
   }
 }
 
@@ -101,24 +187,58 @@ export interface BackdoorLinearConfiguration {
 }
 
 /** Persisted configurations are parsed before they can become runnable state. */
-export const backdoorLinearConfigurationSchema = z.object({
-  kind: z.literal('backdoor-linear-regression'),
-  level: z.literal(0.95),
-  errors: z.discriminatedUnion('kind', [
-    z.object({ kind: z.literal('classical') }).strict(),
-    z.object({ kind: z.literal('hc1') }).strict(),
-    z.object({ kind: z.literal('hac') }).strict(),
-    z.object({ kind: z.literal('cluster'), column: z.string().min(1), name: z.string().min(1) }).strict(),
-    z.object({ kind: z.literal('arma'), p: z.number().int().nonnegative(), q: z.number().int().nonnegative(), maxIter: z.number().int().positive() }).strict(),
-  ]),
-  fixedEffects: z.discriminatedUnion('kind', [
-    z.object({ kind: z.literal('none') }).strict(),
-    z.object({ kind: z.literal('unit'), column: z.string().min(1), name: z.string().min(1) }).strict(),
-    z.object({ kind: z.literal('time'), column: z.string().min(1), name: z.string().min(1) }).strict(),
-    z.object({ kind: z.literal('unit-and-time'), column: z.string().min(1), name: z.string().min(1), timeColumn: z.string().min(1), timeName: z.string().min(1) }).strict(),
-  ]),
-}).strict().refine(value => value.fixedEffects.kind !== 'unit-and-time' || value.fixedEffects.column !== value.fixedEffects.timeColumn, 'Unit and time columns must differ.')
-  .refine(value => value.fixedEffects.kind === 'none' || value.errors.kind !== 'hac' && value.errors.kind !== 'arma', 'Fixed effects do not support series error models.')
+export const backdoorLinearConfigurationSchema = z
+  .object({
+    kind: z.literal('backdoor-linear-regression'),
+    level: z.literal(0.95),
+    errors: z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('classical') }).strict(),
+      z.object({ kind: z.literal('hc1') }).strict(),
+      z.object({ kind: z.literal('hac') }).strict(),
+      z
+        .object({ kind: z.literal('cluster'), column: z.string().min(1), name: z.string().min(1) })
+        .strict(),
+      z
+        .object({
+          kind: z.literal('arma'),
+          p: z.number().int().nonnegative(),
+          q: z.number().int().nonnegative(),
+          maxIter: z.number().int().positive(),
+        })
+        .strict(),
+    ]),
+    fixedEffects: z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('none') }).strict(),
+      z
+        .object({ kind: z.literal('unit'), column: z.string().min(1), name: z.string().min(1) })
+        .strict(),
+      z
+        .object({ kind: z.literal('time'), column: z.string().min(1), name: z.string().min(1) })
+        .strict(),
+      z
+        .object({
+          kind: z.literal('unit-and-time'),
+          column: z.string().min(1),
+          name: z.string().min(1),
+          timeColumn: z.string().min(1),
+          timeName: z.string().min(1),
+        })
+        .strict(),
+    ]),
+  })
+  .strict()
+  .refine(
+    (value) =>
+      value.fixedEffects.kind !== 'unit-and-time' ||
+      value.fixedEffects.column !== value.fixedEffects.timeColumn,
+    'Unit and time columns must differ.',
+  )
+  .refine(
+    (value) =>
+      value.fixedEffects.kind === 'none' ||
+      (value.errors.kind !== 'hac' && value.errors.kind !== 'arma'),
+    'Fixed effects do not support series error models.',
+  )
 
 export interface FrontdoorTwoStageConfiguration {
   readonly kind: 'frontdoor-two-stage'
@@ -158,7 +278,10 @@ export interface NegativeBinomialIngarchConfiguration {
   readonly schedule: IngarchInterventionSchedule
 }
 
-export const causalEffectsNodeSchema = z.tuple([z.number().int().nonnegative(), z.number().int().max(0)])
+export const causalEffectsNodeSchema = z.tuple([
+  z.number().int().nonnegative(),
+  z.number().int().max(0),
+])
 export type CausalEffectsNode = z.infer<typeof causalEffectsNodeSchema>
 
 export const causalEffectsAdjustmentSchema = z.discriminatedUnion('kind', [
@@ -171,7 +294,13 @@ export type CausalEffectsAdjustment = z.infer<typeof causalEffectsAdjustmentSche
 
 export const totalEffectEstimatorSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('linear'), adjustment: causalEffectsAdjustmentSchema }).strict(),
-  z.object({ kind: z.literal('knn'), k: z.number().int().min(1).max(100), adjustment: causalEffectsAdjustmentSchema }).strict(),
+  z
+    .object({
+      kind: z.literal('knn'),
+      k: z.number().int().min(1).max(100),
+      adjustment: causalEffectsAdjustmentSchema,
+    })
+    .strict(),
   z.object({ kind: z.literal('wrightParents') }).strict(),
 ])
 export type TotalEffectEstimator = z.infer<typeof totalEffectEstimatorSchema>
@@ -184,13 +313,15 @@ export type CausalEffectsBlockLength = z.infer<typeof causalEffectsBlockLengthSc
 
 export const causalEffectsUncertaintySchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('none') }).strict(),
-  z.object({
-    kind: z.literal('bootstrap'),
-    samples: z.number().int().positive(),
-    blockLength: causalEffectsBlockLengthSchema,
-    confidenceLevel: z.number().gt(0).lt(1),
-    seed: z.number().int().nonnegative(),
-  }).strict(),
+  z
+    .object({
+      kind: z.literal('bootstrap'),
+      samples: z.number().int().positive(),
+      blockLength: causalEffectsBlockLengthSchema,
+      confidenceLevel: z.number().gt(0).lt(1),
+      seed: z.number().int().nonnegative(),
+    })
+    .strict(),
 ])
 export type CausalEffectsUncertainty = z.infer<typeof causalEffectsUncertaintySchema>
 
@@ -205,34 +336,40 @@ export interface CausalEffectsConfiguration {
 }
 
 export type InterventionStart =
-  | { readonly kind: 'from-treatment' }
-  | { readonly kind: 'row'; readonly row: number }
+  { readonly kind: 'from-treatment' } | { readonly kind: 'row'; readonly row: number }
 
 /** Which post-intervention rows the effect is summarised over. The fit is unaffected. */
 export type EvaluationWindow =
-  | { readonly kind: 'through-last-row' }
-  | { readonly kind: 'to-row'; readonly row: number }
+  { readonly kind: 'through-last-row' } | { readonly kind: 'to-row'; readonly row: number }
 
 /** The exclusive end of the evaluated window, as a row count from the start of the series. */
 export const evaluatedEnd = (window: EvaluationWindow, observations: number): number => {
   switch (window.kind) {
-    case 'through-last-row': return observations
-    case 'to-row': return Math.min(window.row, observations)
-    default: return assertNever(window)
+    case 'through-last-row':
+      return observations
+    case 'to-row':
+      return Math.min(window.row, observations)
+    default:
+      return assertNever(window)
   }
 }
 
 export const describeEvaluationWindow = (window: EvaluationWindow): string =>
   window.kind === 'through-last-row' ? 'through the last row' : `through row ${window.row}`
 
-const localLevelImpactSettingsSchema = z.object({
-  kind: z.literal('bayesian'),
-  draws: z.number().int().min(2),
-  warmup: z.number().int().nonnegative(),
-  seed: z.number().int().min(0).max(0xffffffff),
-  priorLevelSd: z.number().finite().positive(),
-}).strict()
-export const bayesianImpactSettingsSchema = z.discriminatedUnion('kind', [localLevelImpactSettingsSchema, structuralImpactSettingsSchema])
+const localLevelImpactSettingsSchema = z
+  .object({
+    kind: z.literal('bayesian'),
+    draws: z.number().int().min(2),
+    warmup: z.number().int().nonnegative(),
+    seed: z.number().int().min(0).max(0xffffffff),
+    priorLevelSd: z.number().finite().positive(),
+  })
+  .strict()
+export const bayesianImpactSettingsSchema = z.discriminatedUnion('kind', [
+  localLevelImpactSettingsSchema,
+  structuralImpactSettingsSchema,
+])
 export type BayesianImpactSettings = z.infer<typeof bayesianImpactSettingsSchema>
 
 export type CausalImpactConfiguration = {
@@ -292,8 +429,15 @@ export interface VecmConfiguration {
   readonly breakIndex: number | null
 }
 
-import { defaultPredictorSyntheticConfiguration, predictorSyntheticRecordMatches, type PredictorSyntheticConfiguration, type PredictorSyntheticEvidence, type PredictorSyntheticCatalog } from './predictorSyntheticControl'
-export type SyntheticControlConfiguration = RidgeConfiguration | OutcomeHistorySyntheticConfiguration | PredictorSyntheticConfiguration
+import {
+  defaultPredictorSyntheticConfiguration,
+  predictorSyntheticRecordMatches,
+  type PredictorSyntheticConfiguration,
+  type PredictorSyntheticEvidence,
+  type PredictorSyntheticCatalog,
+} from './predictorSyntheticControl'
+export type SyntheticControlConfiguration =
+  RidgeConfiguration | OutcomeHistorySyntheticConfiguration | PredictorSyntheticConfiguration
 export interface OutcomeHistorySyntheticConfiguration {
   readonly specification?: 'outcome-history'
   readonly kind: 'synthetic-control'
@@ -303,20 +447,29 @@ export interface OutcomeHistorySyntheticConfiguration {
   readonly alpha: number
 }
 
-import { staggeredEvidenceSchema, staggeredConfigurationSchema, sameStaggeredSpecification, type StaggeredConfiguration } from './staggeredDid'
+import {
+  staggeredEvidenceSchema,
+  staggeredConfigurationSchema,
+  sameStaggeredSpecification,
+  type StaggeredConfiguration,
+} from './staggeredDid'
 
-export type PanelInterventionConfiguration = SunAbrahamConfiguration | StaggeredConfiguration | {
-  readonly kind: 'panel-intervention'
-  readonly primary: 'adjusted'
-  readonly covariates: readonly ColumnId[]
-  readonly specification: AdjustedDidSpecification
-} | {
-  readonly kind: 'panel-intervention'
-  /** Absent in older saved runs, whose primary result is synthetic DiD. */
-  readonly primary?: 'did' | 'syntheticDid'
-  readonly placeboReplications: number
-  readonly seed: number
-}
+export type PanelInterventionConfiguration =
+  | SunAbrahamConfiguration
+  | StaggeredConfiguration
+  | {
+      readonly kind: 'panel-intervention'
+      readonly primary: 'adjusted'
+      readonly covariates: readonly ColumnId[]
+      readonly specification: AdjustedDidSpecification
+    }
+  | {
+      readonly kind: 'panel-intervention'
+      /** Absent in older saved runs, whose primary result is synthetic DiD. */
+      readonly primary?: 'did' | 'syntheticDid'
+      readonly placeboReplications: number
+      readonly seed: number
+    }
 
 export interface NegbinNutsConfiguration {
   readonly kind: 'negbin-nuts'
@@ -376,7 +529,10 @@ export const boostedGridCommand = (grid: BoostedGridChoice) => ({
   seed: grid.seed,
 })
 
-export const boostedCommand = (chosen: BoostedTreatmentModelChoice, candidatesSearched: number | null = null) => ({
+export const boostedCommand = (
+  chosen: BoostedTreatmentModelChoice,
+  candidatesSearched: number | null = null,
+) => ({
   ...boostedGridCommand(chosen),
   scoring: chosen.scoring,
   candidatesSearched,
@@ -391,7 +547,10 @@ export const DEFAULT_BOOSTED_SEARCH: BoostedGridChoice = {
   seed: 7,
 }
 
-export const DEFAULT_BOOSTED_GRID: BoostedTreatmentModelChoice = { ...DEFAULT_BOOSTED_SEARCH, scoring: 'one-model' }
+export const DEFAULT_BOOSTED_GRID: BoostedTreatmentModelChoice = {
+  ...DEFAULT_BOOSTED_SEARCH,
+  scoring: 'one-model',
+}
 
 /** What a grid axis accepts: scikit-learn's own bounds for that `GradientBoostingClassifier` parameter. */
 export type BoostedGridAxis = 'learningRate' | 'maxDepth' | 'nEstimators'
@@ -399,8 +558,14 @@ export type BoostedGridAxis = 'learningRate' | 'maxDepth' | 'nEstimators'
 /** The largest search the workers accept: values per axis, tree depth and tree count. */
 export const BOOSTED_GRID_LIMITS = { values: 12, maxDepth: 16, nEstimators: 2000 } as const
 
-const gridAxis = (value: z.ZodNumber) => z.tuple([value], value).readonly()
-  .refine((values) => values.length <= BOOSTED_GRID_LIMITS.values, `A grid axis holds at most ${BOOSTED_GRID_LIMITS.values} values.`)
+const gridAxis = (value: z.ZodNumber) =>
+  z
+    .tuple([value], value)
+    .readonly()
+    .refine(
+      (values) => values.length <= BOOSTED_GRID_LIMITS.values,
+      `A grid axis holds at most ${BOOSTED_GRID_LIMITS.values} values.`,
+    )
 
 export const boostedGridAxisSchemas = {
   learningRate: gridAxis(z.number().finite().nonnegative()),
@@ -419,7 +584,10 @@ export type BoostedGridProblem =
   | { readonly kind: 'too-many'; readonly limit: number }
 
 /** Values separated by commas or spaces, in the order written; each axis accepts scikit-learn's range for that parameter. */
-export function parseBoostedGridAxis(axis: BoostedGridAxis, text: string): Result<NonEmptyArray<number>, BoostedGridProblem> {
+export function parseBoostedGridAxis(
+  axis: BoostedGridAxis,
+  text: string,
+): Result<NonEmptyArray<number>, BoostedGridProblem> {
   const tokens = text.split(/[\s,]+/).filter((token) => token.length > 0)
   const values: number[] = []
   for (const token of tokens) {
@@ -433,36 +601,55 @@ export function parseBoostedGridAxis(axis: BoostedGridAxis, text: string): Resul
       case 'nEstimators':
         if (!Number.isInteger(value)) return err({ kind: 'not-whole', value })
         if (value < 1) return err({ kind: 'below-one', value })
-        if (value > BOOSTED_GRID_LIMITS[axis]) return err({ kind: 'above-limit', value, limit: BOOSTED_GRID_LIMITS[axis] })
+        if (value > BOOSTED_GRID_LIMITS[axis])
+          return err({ kind: 'above-limit', value, limit: BOOSTED_GRID_LIMITS[axis] })
         break
-      default: return assertNever(axis)
+      default:
+        return assertNever(axis)
     }
     if (values.includes(value)) return err({ kind: 'repeated', value })
     values.push(value)
   }
-  if (values.length > BOOSTED_GRID_LIMITS.values) return err({ kind: 'too-many', limit: BOOSTED_GRID_LIMITS.values })
+  if (values.length > BOOSTED_GRID_LIMITS.values)
+    return err({ kind: 'too-many', limit: BOOSTED_GRID_LIMITS.values })
   return isNonEmpty(values) ? ok(values) : err({ kind: 'empty' })
 }
 
-export function describeBoostedGridProblem(axis: BoostedGridAxis, problem: BoostedGridProblem): string {
+export function describeBoostedGridProblem(
+  axis: BoostedGridAxis,
+  problem: BoostedGridProblem,
+): string {
   const noun = ((): string => {
     switch (axis) {
-      case 'learningRate': return 'learning rate'
-      case 'maxDepth': return 'tree depth'
-      case 'nEstimators': return 'tree count'
-      default: return assertNever(axis)
+      case 'learningRate':
+        return 'learning rate'
+      case 'maxDepth':
+        return 'tree depth'
+      case 'nEstimators':
+        return 'tree count'
+      default:
+        return assertNever(axis)
     }
   })()
   switch (problem.kind) {
-    case 'empty': return `Enter at least one ${noun}.`
-    case 'not-a-number': return `${problem.token} is not a number.`
-    case 'negative': return `Each ${noun} must be 0 or more; ${problem.value} is not.`
-    case 'below-one': return `Each ${noun} must be 1 or more; ${problem.value} is not.`
-    case 'not-whole': return `Each ${noun} must be a whole number; ${problem.value} is not.`
-    case 'above-limit': return `Each ${noun} must be ${problem.limit} or less; ${problem.value} is not.`
-    case 'repeated': return `${problem.value} appears twice.`
-    case 'too-many': return `Enter at most ${problem.limit} values.`
-    default: return assertNever(problem)
+    case 'empty':
+      return `Enter at least one ${noun}.`
+    case 'not-a-number':
+      return `${problem.token} is not a number.`
+    case 'negative':
+      return `Each ${noun} must be 0 or more; ${problem.value} is not.`
+    case 'below-one':
+      return `Each ${noun} must be 1 or more; ${problem.value} is not.`
+    case 'not-whole':
+      return `Each ${noun} must be a whole number; ${problem.value} is not.`
+    case 'above-limit':
+      return `Each ${noun} must be ${problem.limit} or less; ${problem.value} is not.`
+    case 'repeated':
+      return `${problem.value} appears twice.`
+    case 'too-many':
+      return `Enter at most ${problem.limit} values.`
+    default:
+      return assertNever(problem)
   }
 }
 
@@ -471,7 +658,12 @@ export const formatBoostedGridAxis = (values: readonly number[]): string => valu
 /** Rounds and seed for a percentile interval, or none when the point estimate is enough. */
 export type PropensityUncertainty =
   | { readonly kind: 'none' }
-  | { readonly kind: 'bootstrap'; readonly rounds: number; readonly seed: number; readonly level: number }
+  | {
+      readonly kind: 'bootstrap'
+      readonly rounds: number
+      readonly seed: number
+      readonly level: number
+    }
 
 export interface PropensityWeightingConfiguration {
   readonly kind: 'propensity-weighting'
@@ -534,7 +726,13 @@ export type EstimatorConfiguration =
 
 export type EstimatorId = EstimatorConfiguration['kind']
 
-export type EstimatorGroupId = 'adjusted-outcome' | 'propensity-score' | 'identified-functional' | 'graph-adjusted-temporal' | 'dynamic-time-series' | 'intervention-comparison'
+export type EstimatorGroupId =
+  | 'adjusted-outcome'
+  | 'propensity-score'
+  | 'identified-functional'
+  | 'graph-adjusted-temporal'
+  | 'dynamic-time-series'
+  | 'intervention-comparison'
 
 export interface EstimatorGroup {
   readonly id: EstimatorGroupId
@@ -547,25 +745,44 @@ export const ESTIMATOR_GROUPS: NonEmptyArray<EstimatorGroup> = [
   {
     id: 'adjusted-outcome',
     name: 'Covariate-adjusted outcome models',
-    description: 'Regression, count-model and orthogonal-score estimators using an identified adjustment set.',
-    estimators: ['backdoor-linear-regression', 'bayesian-gaussian', 'poisson-glm', 'negative-binomial-p', 'negbin-nuts', 'dml-plr', 'dml-irm', 't-learner', 'causal-forest'],
+    description:
+      'Regression, count-model and orthogonal-score estimators using an identified adjustment set.',
+    estimators: [
+      'backdoor-linear-regression',
+      'bayesian-gaussian',
+      'poisson-glm',
+      'negative-binomial-p',
+      'negbin-nuts',
+      'dml-plr',
+      'dml-irm',
+      't-learner',
+      'causal-forest',
+    ],
   },
   {
     id: 'propensity-score',
     name: 'Propensity-score estimators',
-    description: 'A fitted propensity score is used for weighting, matching and doubly robust estimation; the generalised score is used when the treatment is continuous.',
+    description:
+      'A fitted propensity score is used for weighting, matching and doubly robust estimation; the generalised score is used when the treatment is continuous.',
     estimators: ['propensity-weighting', 'propensity-matching', 'doubly-robust', 'continuous-gps'],
   },
   {
     id: 'identified-functional',
     name: 'Identified-function estimators',
-    description: 'Methods tied to a front-door, instrument, interventional-distribution, or counterfactual identification result.',
-    estimators: ['frontdoor-two-stage', 'instrumental-variable', 'discrete-bn-query', 'binary-ett-idc-star'],
+    description:
+      'Methods tied to a front-door, instrument, interventional-distribution, or counterfactual identification result.',
+    estimators: [
+      'frontdoor-two-stage',
+      'instrumental-variable',
+      'discrete-bn-query',
+      'binary-ett-idc-star',
+    ],
   },
   {
     id: 'graph-adjusted-temporal',
     name: 'Graph-adjusted temporal effects',
-    description: 'Total-effect estimation using a time-indexed causal graph and lag-resolved adjustment set.',
+    description:
+      'Total-effect estimation using a time-indexed causal graph and lag-resolved adjustment set.',
     estimators: ['causal-effects-total'],
   },
   {
@@ -577,16 +794,22 @@ export const ESTIMATOR_GROUPS: NonEmptyArray<EstimatorGroup> = [
   {
     id: 'intervention-comparison',
     name: 'Intervention and comparative designs',
-    description: 'Post-intervention comparisons using a forecast counterfactual or untreated comparison units.',
+    description:
+      'Post-intervention comparisons using a forecast counterfactual or untreated comparison units.',
     estimators: ['causal-impact', 'synthetic-control', 'panel-intervention', 'sharp-rd'],
   },
 ]
 
-export const ESTIMATOR_IDS: NonEmptyArray<EstimatorId> = flattenNonEmpty(mapNonEmpty(ESTIMATOR_GROUPS, (group) => group.estimators))
+export const ESTIMATOR_IDS: NonEmptyArray<EstimatorId> = flattenNonEmpty(
+  mapNonEmpty(ESTIMATOR_GROUPS, (group) => group.estimators),
+)
 
 /** The layout an estimator expands a categorical covariate into. A design with an intercept needs
  *  the baseline dropped; a forest takes every level. */
-export const designLayoutOf = (estimator: EstimatorId, encoding: CovariateEncoding): DesignLayout => {
+export const designLayoutOf = (
+  estimator: EstimatorId,
+  encoding: CovariateEncoding,
+): DesignLayout => {
   if (encoding.kind === 'numeric') return { kind: 'numeric' }
   switch (estimator) {
     case 'dml-plr':
@@ -624,71 +847,187 @@ export const designLayoutOf = (estimator: EstimatorId, encoding: CovariateEncodi
 
 export const methodIdOf = (estimator: EstimatorId): MethodId => {
   switch (estimator) {
-    case 'backdoor-linear-regression': return BACKDOOR_LINEAR_REGRESSION_METHOD_ID
-    case 'frontdoor-two-stage': return FRONTDOOR_TWO_STAGE_METHOD_ID
-    case 'instrumental-variable': return INSTRUMENTAL_VARIABLE_METHOD_ID
-    case 'poisson-glm': return POISSON_GLM_METHOD_ID
-    case 'negative-binomial-p': return NEGATIVE_BINOMIAL_METHOD_ID
-    case 'negative-binomial-ingarch': return NEGATIVE_BINOMIAL_INGARCH_METHOD_ID
-    case 'dml-plr': return DML_PLR_METHOD_ID
-    case 'dml-irm': return DML_IRM_METHOD_ID
-    case 't-learner': return T_LEARNER_METHOD_ID
-    case 'causal-forest': return CAUSAL_FOREST_METHOD_ID
-    case 'ardl-pss': return ARDL_PSS_METHOD_ID
-    case 'vecm': return VECM_METHOD_ID
-    case 'synthetic-control': return SYNTHETIC_CONTROL_METHOD_ID
-    case 'sharp-rd': return SHARP_RD_METHOD_ID
-    case 'panel-intervention': return PANEL_INTERVENTION_METHOD_ID
-    case 'negbin-nuts': return NEGBIN_NUTS_METHOD_ID
-    case 'bayesian-gaussian': return BAYESIAN_GAUSSIAN_METHOD_ID
-    case 'discrete-bn-query': return DISCRETE_BN_METHOD_ID
-    case 'binary-ett-idc-star': return BINARY_ETT_METHOD_ID
-    case 'causal-effects-total': return CAUSAL_EFFECTS_TOTAL_METHOD_ID
-    case 'propensity-weighting': return PROPENSITY_WEIGHTING_METHOD_ID
-    case 'propensity-matching': return PROPENSITY_MATCHING_METHOD_ID
-    case 'doubly-robust': return DOUBLY_ROBUST_METHOD_ID
-    case 'continuous-gps': return CONTINUOUS_GPS_METHOD_ID
-    case 'causal-impact': return CAUSAL_IMPACT_METHOD_ID
-    default: return assertNever(estimator)
+    case 'backdoor-linear-regression':
+      return BACKDOOR_LINEAR_REGRESSION_METHOD_ID
+    case 'frontdoor-two-stage':
+      return FRONTDOOR_TWO_STAGE_METHOD_ID
+    case 'instrumental-variable':
+      return INSTRUMENTAL_VARIABLE_METHOD_ID
+    case 'poisson-glm':
+      return POISSON_GLM_METHOD_ID
+    case 'negative-binomial-p':
+      return NEGATIVE_BINOMIAL_METHOD_ID
+    case 'negative-binomial-ingarch':
+      return NEGATIVE_BINOMIAL_INGARCH_METHOD_ID
+    case 'dml-plr':
+      return DML_PLR_METHOD_ID
+    case 'dml-irm':
+      return DML_IRM_METHOD_ID
+    case 't-learner':
+      return T_LEARNER_METHOD_ID
+    case 'causal-forest':
+      return CAUSAL_FOREST_METHOD_ID
+    case 'ardl-pss':
+      return ARDL_PSS_METHOD_ID
+    case 'vecm':
+      return VECM_METHOD_ID
+    case 'synthetic-control':
+      return SYNTHETIC_CONTROL_METHOD_ID
+    case 'sharp-rd':
+      return SHARP_RD_METHOD_ID
+    case 'panel-intervention':
+      return PANEL_INTERVENTION_METHOD_ID
+    case 'negbin-nuts':
+      return NEGBIN_NUTS_METHOD_ID
+    case 'bayesian-gaussian':
+      return BAYESIAN_GAUSSIAN_METHOD_ID
+    case 'discrete-bn-query':
+      return DISCRETE_BN_METHOD_ID
+    case 'binary-ett-idc-star':
+      return BINARY_ETT_METHOD_ID
+    case 'causal-effects-total':
+      return CAUSAL_EFFECTS_TOTAL_METHOD_ID
+    case 'propensity-weighting':
+      return PROPENSITY_WEIGHTING_METHOD_ID
+    case 'propensity-matching':
+      return PROPENSITY_MATCHING_METHOD_ID
+    case 'doubly-robust':
+      return DOUBLY_ROBUST_METHOD_ID
+    case 'continuous-gps':
+      return CONTINUOUS_GPS_METHOD_ID
+    case 'causal-impact':
+      return CAUSAL_IMPACT_METHOD_ID
+    default:
+      return assertNever(estimator)
   }
 }
 
-export const defaultConfiguration = (estimator: EstimatorId, prepared: PreparedDatasetArtifact, study: StudySpecification | null): EstimatorConfiguration => {
+export const defaultConfiguration = (
+  estimator: EstimatorId,
+  prepared: PreparedDatasetArtifact,
+  study: StudySpecification | null,
+): EstimatorConfiguration => {
   switch (estimator) {
-    case 'backdoor-linear-regression': return { kind: estimator, errors: { kind: prepared.kind === 'prepared-time-series' ? 'hac' : 'classical' }, fixedEffects: { kind: 'none' }, level: CONFIDENCE_LEVEL }
-    case 'frontdoor-two-stage': return { kind: estimator, interventions: [0, 1], simulations: 399, sampleSizeFraction: 1, level: CONFIDENCE_LEVEL, seed: 0 }
-    case 'instrumental-variable': return { kind: estimator, simulations: 399, sampleSizeFraction: 1, level: CONFIDENCE_LEVEL, seed: 0 }
+    case 'backdoor-linear-regression':
+      return {
+        kind: estimator,
+        errors: { kind: prepared.kind === 'prepared-time-series' ? 'hac' : 'classical' },
+        fixedEffects: { kind: 'none' },
+        level: CONFIDENCE_LEVEL,
+      }
+    case 'frontdoor-two-stage':
+      return {
+        kind: estimator,
+        interventions: [0, 1],
+        simulations: 399,
+        sampleSizeFraction: 1,
+        level: CONFIDENCE_LEVEL,
+        seed: 0,
+      }
+    case 'instrumental-variable':
+      return {
+        kind: estimator,
+        simulations: 399,
+        sampleSizeFraction: 1,
+        level: CONFIDENCE_LEVEL,
+        seed: 0,
+      }
     case 'poisson-glm':
-    case 'negative-binomial-p': return { kind: estimator }
-    case 'negative-binomial-ingarch': return { kind: estimator, link: 'identity', pastObservationLags: [1], pastMeanLags: [1], horizon: 12, controlValue: 0, treatmentValue: 1, schedule: { kind: 'persistent' } }
-    case 'propensity-weighting': return { kind: estimator, model: 'newton', maxIter: 1000, boosted: DEFAULT_BOOSTED_GRID, scale: 'inverseProbability', uncertainty: { kind: 'none' } }
-    case 'propensity-matching': return { kind: estimator, model: 'newton', maxIter: 1000, boosted: DEFAULT_BOOSTED_GRID }
-    case 'doubly-robust': return { kind: estimator, model: 'newton', maxIter: 1000, uncertainty: { kind: 'none' } }
-    case 'continuous-gps': return { kind: estimator, scale: 'stabilized', uncertainty: { kind: 'none' } }
-    case 'dml-plr': return { kind: estimator, att: false, seed: 7 }
-    case 'dml-irm': return { kind: estimator, att: study?.estimand.kind === 'average-treatment-effect-on-treated', seed: 7 }
-    case 't-learner': return { kind: estimator, model: { kind: 'forest', seed: 7, uncertainty: { kind: 'none' } } }
-    case 'causal-forest': return DEFAULT_CAUSAL_FOREST
-    case 'ardl-pss': return { kind: estimator, maxLag: 4, trend: 'ct', case: 4 }
-    case 'vecm': return { kind: estimator, maxLags: 4, deterministic: 'co', significance: 95, breakIndex: null }
+    case 'negative-binomial-p':
+      return { kind: estimator }
+    case 'negative-binomial-ingarch':
+      return {
+        kind: estimator,
+        link: 'identity',
+        pastObservationLags: [1],
+        pastMeanLags: [1],
+        horizon: 12,
+        controlValue: 0,
+        treatmentValue: 1,
+        schedule: { kind: 'persistent' },
+      }
+    case 'propensity-weighting':
+      return {
+        kind: estimator,
+        model: 'newton',
+        maxIter: 1000,
+        boosted: DEFAULT_BOOSTED_GRID,
+        scale: 'inverseProbability',
+        uncertainty: { kind: 'none' },
+      }
+    case 'propensity-matching':
+      return { kind: estimator, model: 'newton', maxIter: 1000, boosted: DEFAULT_BOOSTED_GRID }
+    case 'doubly-robust':
+      return { kind: estimator, model: 'newton', maxIter: 1000, uncertainty: { kind: 'none' } }
+    case 'continuous-gps':
+      return { kind: estimator, scale: 'stabilized', uncertainty: { kind: 'none' } }
+    case 'dml-plr':
+      return { kind: estimator, att: false, seed: 7 }
+    case 'dml-irm':
+      return {
+        kind: estimator,
+        att: study?.estimand.kind === 'average-treatment-effect-on-treated',
+        seed: 7,
+      }
+    case 't-learner':
+      return { kind: estimator, model: { kind: 'forest', seed: 7, uncertainty: { kind: 'none' } } }
+    case 'causal-forest':
+      return DEFAULT_CAUSAL_FOREST
+    case 'ardl-pss':
+      return { kind: estimator, maxLag: 4, trend: 'ct', case: 4 }
+    case 'vecm':
+      return {
+        kind: estimator,
+        maxLags: 4,
+        deterministic: 'co',
+        significance: 95,
+        breakIndex: null,
+      }
     case 'synthetic-control': {
       if (prepared.kind === 'prepared-panel') return defaultPredictorSyntheticConfiguration()
       const affected = affectedColumns(study)
       return {
         kind: estimator,
         start: { kind: 'from-treatment' },
-        donors: study === null ? [] : prepared.columns.filter((column) => column !== study.treatment.column && column !== study.outcome.column && !affected.has(column)),
+        donors:
+          study === null
+            ? []
+            : prepared.columns.filter(
+                (column) =>
+                  column !== study.treatment.column &&
+                  column !== study.outcome.column &&
+                  !affected.has(column),
+              ),
         crossFitFolds: 3,
         alpha: 0.05,
       }
     }
-    case 'sharp-rd': return { kind: estimator }
-    case 'panel-intervention': return { kind: estimator, primary: 'did', placeboReplications: 100, seed: 0 }
-    case 'negbin-nuts': return { kind: estimator, warmup: 500, samples: 1000, seed: 0 }
-    case 'bayesian-gaussian': return { kind: estimator, warmup: 500, samples: 1000, seed: 41 }
-    case 'discrete-bn-query': return { kind: estimator, bins: 3, equivalentSampleSize: DEFAULT_BDEU_EQUIVALENT_SAMPLE_SIZE }
-    case 'binary-ett-idc-star': return { kind: estimator }
-    case 'causal-effects-total': return { kind: estimator, estimator: { kind: 'linear', adjustment: { kind: 'optimal' } }, treatmentLag: 0, interventions: [0, 1], uncertainty: { kind: 'bootstrap', samples: 100, blockLength: { kind: 'fixed', length: 1 }, confidenceLevel: 0.9, seed: 4 } }
+    case 'sharp-rd':
+      return { kind: estimator }
+    case 'panel-intervention':
+      return { kind: estimator, primary: 'did', placeboReplications: 100, seed: 0 }
+    case 'negbin-nuts':
+      return { kind: estimator, warmup: 500, samples: 1000, seed: 0 }
+    case 'bayesian-gaussian':
+      return { kind: estimator, warmup: 500, samples: 1000, seed: 41 }
+    case 'discrete-bn-query':
+      return { kind: estimator, bins: 3, equivalentSampleSize: DEFAULT_BDEU_EQUIVALENT_SAMPLE_SIZE }
+    case 'binary-ett-idc-star':
+      return { kind: estimator }
+    case 'causal-effects-total':
+      return {
+        kind: estimator,
+        estimator: { kind: 'linear', adjustment: { kind: 'optimal' } },
+        treatmentLag: 0,
+        interventions: [0, 1],
+        uncertainty: {
+          kind: 'bootstrap',
+          samples: 100,
+          blockLength: { kind: 'fixed', length: 1 },
+          confidenceLevel: 0.9,
+          seed: 4,
+        },
+      }
     case 'causal-impact': {
       // A control the treatment itself moves would absorb the effect, so DAG descendants of the
       // treatment start unticked; columns outside the DAG stay in, as a judgement for the user.
@@ -697,87 +1036,150 @@ export const defaultConfiguration = (estimator: EstimatorId, prepared: PreparedD
         kind: estimator,
         start: { kind: 'from-treatment' },
         window: { kind: 'through-last-row' },
-        controls: study === null ? [] : prepared.columns.filter((column) => column !== study.treatment.column && column !== study.outcome.column && !affected.has(column)),
+        controls:
+          study === null
+            ? []
+            : prepared.columns.filter(
+                (column) =>
+                  column !== study.treatment.column &&
+                  column !== study.outcome.column &&
+                  !affected.has(column),
+              ),
         maxIter: 100,
       }
     }
-    default: return assertNever(estimator)
+    default:
+      return assertNever(estimator)
   }
 }
 
-export const backdoorLinearEvidenceSchema = z.object({
-  kind: z.literal('backdoorLinear'),
-  observations: z.number().int().positive(),
-  /** The fitted coefficients: at least the intercept and the treatment, or the treatment alone with fixed effects. */
-  parameters: z.number().int().min(1),
-  treatment: z.number().int().nonnegative(),
-  outcome: z.number().int().nonnegative(),
-  adjustment: z.array(z.number().int().nonnegative()),
-  level: z.number().gt(0.5).lt(1),
-  estimate: z.number().finite(),
-  standardError: z.number().finite().nonnegative(),
-  interval: z.tuple([z.number().finite(), z.number().finite()]),
-  degreesOfFreedom: z.number().int().positive(),
-  residualSd: z.number().finite().nonnegative(),
-  rSquared: z.number().finite(),
-  hacMaxLags: z.number().int().nonnegative(),
-  hacStandardError: z.number().finite().nonnegative(),
-  hacInterval: z.tuple([z.number().finite(), z.number().finite()]),
-  hacPValue: z.number().min(0).max(1),
-  durbinWatson: z.number().finite().nonnegative(),
-  /** The treatment coefficient's HC1 or clustered interval, or the design refitted with an ARMA error process, when one was requested. */
-  errorModel: z.discriminatedUnion('kind', [
-    z.object({ kind: z.literal('neweyWest') }).strict(),
-    z.object({ kind: z.literal('hc1'), standardError: z.number().finite().nonnegative(), interval: z.tuple([z.number().finite(), z.number().finite()]), pValue: z.number().min(0).max(1) }).strict(),
-    z.object({ kind: z.literal('cluster'), clusters: z.number().int().min(2), standardError: z.number().finite().nonnegative(), interval: z.tuple([z.number().finite(), z.number().finite()]), pValue: z.number().min(0).max(1) }).strict(),
-    z.object({
-      kind: z.literal('arma'),
-      estimate: z.number().finite(),
-      standardError: z.number().finite().nonnegative(),
-      interval: z.tuple([z.number().finite(), z.number().finite()]),
-      pValue: z.number().min(0).max(1),
-      errors: armaErrorFieldsSchema,
-    }).strict(),
-  ]),
-  /** The unit column absorbed as fixed effects, with the adjustment columns that do not vary within a unit. */
-  fixedEffects: z.discriminatedUnion('kind', [
-    z.object({ kind: z.literal('none') }).strict(),
-    z.object({ kind: z.literal('time'), column: z.number().int().nonnegative(), periods: z.number().int().min(2), absorbed: z.array(z.number().int().nonnegative()) }).strict(),
-    z.object({ kind: z.literal('unit'), column: z.number().int().nonnegative(), units: z.number().int().min(2), absorbed: z.array(z.number().int().nonnegative()) }).strict(),
-    z.object({ kind: z.literal('unitAndTime'), unit: z.number().int().nonnegative(), time: z.number().int().nonnegative(), units: z.number().int().min(2), periods: z.number().int().min(2), absorbed: z.array(z.number().int().nonnegative()) }).strict(),
-  ]),
-}).strict()
+export const backdoorLinearEvidenceSchema = z
+  .object({
+    kind: z.literal('backdoorLinear'),
+    observations: z.number().int().positive(),
+    /** The fitted coefficients: at least the intercept and the treatment, or the treatment alone with fixed effects. */
+    parameters: z.number().int().min(1),
+    treatment: z.number().int().nonnegative(),
+    outcome: z.number().int().nonnegative(),
+    adjustment: z.array(z.number().int().nonnegative()),
+    level: z.number().gt(0.5).lt(1),
+    estimate: z.number().finite(),
+    standardError: z.number().finite().nonnegative(),
+    interval: z.tuple([z.number().finite(), z.number().finite()]),
+    degreesOfFreedom: z.number().int().positive(),
+    residualSd: z.number().finite().nonnegative(),
+    rSquared: z.number().finite(),
+    hacMaxLags: z.number().int().nonnegative(),
+    hacStandardError: z.number().finite().nonnegative(),
+    hacInterval: z.tuple([z.number().finite(), z.number().finite()]),
+    hacPValue: z.number().min(0).max(1),
+    durbinWatson: z.number().finite().nonnegative(),
+    /** The treatment coefficient's HC1 or clustered interval, or the design refitted with an ARMA error process, when one was requested. */
+    errorModel: z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('neweyWest') }).strict(),
+      z
+        .object({
+          kind: z.literal('hc1'),
+          standardError: z.number().finite().nonnegative(),
+          interval: z.tuple([z.number().finite(), z.number().finite()]),
+          pValue: z.number().min(0).max(1),
+        })
+        .strict(),
+      z
+        .object({
+          kind: z.literal('cluster'),
+          clusters: z.number().int().min(2),
+          standardError: z.number().finite().nonnegative(),
+          interval: z.tuple([z.number().finite(), z.number().finite()]),
+          pValue: z.number().min(0).max(1),
+        })
+        .strict(),
+      z
+        .object({
+          kind: z.literal('arma'),
+          estimate: z.number().finite(),
+          standardError: z.number().finite().nonnegative(),
+          interval: z.tuple([z.number().finite(), z.number().finite()]),
+          pValue: z.number().min(0).max(1),
+          errors: armaErrorFieldsSchema,
+        })
+        .strict(),
+    ]),
+    /** The unit column absorbed as fixed effects, with the adjustment columns that do not vary within a unit. */
+    fixedEffects: z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('none') }).strict(),
+      z
+        .object({
+          kind: z.literal('time'),
+          column: z.number().int().nonnegative(),
+          periods: z.number().int().min(2),
+          absorbed: z.array(z.number().int().nonnegative()),
+        })
+        .strict(),
+      z
+        .object({
+          kind: z.literal('unit'),
+          column: z.number().int().nonnegative(),
+          units: z.number().int().min(2),
+          absorbed: z.array(z.number().int().nonnegative()),
+        })
+        .strict(),
+      z
+        .object({
+          kind: z.literal('unitAndTime'),
+          unit: z.number().int().nonnegative(),
+          time: z.number().int().nonnegative(),
+          units: z.number().int().min(2),
+          periods: z.number().int().min(2),
+          absorbed: z.array(z.number().int().nonnegative()),
+        })
+        .strict(),
+    ]),
+  })
+  .strict()
 
 export type BackdoorLinearEvidence = z.infer<typeof backdoorLinearEvidenceSchema>
 
 /** A percentile interval over refitted rounds, naming the rounds whose treatment model stopped early. */
-const propensityIntervalSchema = z.object({
-  lower: z.number().finite(),
-  upper: z.number().finite(),
-  rounds: z.number().int().positive(),
-  level: z.number().gt(0.5).lt(1),
-  unconverged: z.array(z.number().int().nonnegative()),
-}).strict()
+const propensityIntervalSchema = z
+  .object({
+    lower: z.number().finite(),
+    upper: z.number().finite(),
+    rounds: z.number().int().positive(),
+    level: z.number().gt(0.5).lt(1),
+    unconverged: z.array(z.number().int().nonnegative()),
+  })
+  .strict()
 
 export const treatmentModelEvidenceSchema = z.discriminatedUnion('kind', [
-  z.object({
-    kind: z.literal('logistic'),
-    parameters: z.number().int().positive(),
-    converged: z.boolean(),
-  }).strict(),
-  z.object({
-    kind: z.literal('boosted'),
-    learningRate: z.number().finite().nonnegative(),
-    maxDepth: z.number().int().positive(),
-    nEstimators: z.number().int().positive(),
-    candidates: z.number().int().positive(),
-    scoring: z.discriminatedUnion('kind', [
-      /** The chosen candidate's mean cross-validated ROC AUC, and the ROC AUC on the rows it was fitted on. */
-      z.object({ kind: z.literal('oneModel'), validationAuc: z.number().min(0).max(1), fittedAuc: z.number().min(0).max(1) }).strict(),
-      /** ROC AUC of the scores each half received from the model fitted on the other half. */
-      z.object({ kind: z.literal('crossFitted'), auc: z.number().min(0).max(1) }).strict(),
-    ]),
-  }).strict(),
+  z
+    .object({
+      kind: z.literal('logistic'),
+      parameters: z.number().int().positive(),
+      converged: z.boolean(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('boosted'),
+      learningRate: z.number().finite().nonnegative(),
+      maxDepth: z.number().int().positive(),
+      nEstimators: z.number().int().positive(),
+      candidates: z.number().int().positive(),
+      scoring: z.discriminatedUnion('kind', [
+        /** The chosen candidate's mean cross-validated ROC AUC, and the ROC AUC on the rows it was fitted on. */
+        z
+          .object({
+            kind: z.literal('oneModel'),
+            validationAuc: z.number().min(0).max(1),
+            fittedAuc: z.number().min(0).max(1),
+          })
+          .strict(),
+        /** ROC AUC of the scores each half received from the model fitted on the other half. */
+        z.object({ kind: z.literal('crossFitted'), auc: z.number().min(0).max(1) }).strict(),
+      ]),
+    })
+    .strict(),
 ])
 
 export type TreatmentModelEvidence = z.infer<typeof treatmentModelEvidenceSchema>
@@ -790,84 +1192,100 @@ export const treatmentModelParameters = (model: TreatmentModelEvidence): number 
 export const treatmentModelStoppedEarly = (model: TreatmentModelEvidence): boolean =>
   model.kind === 'logistic' && !model.converged
 
-export const propensityWeightingEvidenceSchema = z.object({
-  kind: z.literal('propensityWeighting'),
-  target: z.enum(['ate', 'att']),
-  observations: z.number().int().positive(),
-  treatmentModel: treatmentModelEvidenceSchema,
-  treatedRows: z.number().int().positive(),
-  controlRows: z.number().int().positive(),
-  estimate: z.number().finite(),
-  treatedMean: z.number().finite(),
-  controlMean: z.number().finite(),
-  treatedWeightSum: z.number().finite().positive(),
-  controlWeightSum: z.number().finite().positive(),
-  /** P(treated | design) in row order, which is what the distribution panels draw. */
-  propensity: z.array(z.number().finite()),
-  /** Which arm each row is in, paired with the scores. */
-  treated: z.array(z.boolean()),
-  /** The weight each row carries, for the weighted panel. */
-  weights: z.array(z.number().finite()),
-  outcome: z.array(z.number().finite()),
-  interval: propensityIntervalSchema.nullable(),
-}).strict()
+export const propensityWeightingEvidenceSchema = z
+  .object({
+    kind: z.literal('propensityWeighting'),
+    target: z.enum(['ate', 'att']),
+    observations: z.number().int().positive(),
+    treatmentModel: treatmentModelEvidenceSchema,
+    treatedRows: z.number().int().positive(),
+    controlRows: z.number().int().positive(),
+    estimate: z.number().finite(),
+    treatedMean: z.number().finite(),
+    controlMean: z.number().finite(),
+    treatedWeightSum: z.number().finite().positive(),
+    controlWeightSum: z.number().finite().positive(),
+    /** P(treated | design) in row order, which is what the distribution panels draw. */
+    propensity: z.array(z.number().finite()),
+    /** Which arm each row is in, paired with the scores. */
+    treated: z.array(z.boolean()),
+    /** The weight each row carries, for the weighted panel. */
+    weights: z.array(z.number().finite()),
+    outcome: z.array(z.number().finite()),
+    interval: propensityIntervalSchema.nullable(),
+  })
+  .strict()
 
-export const gridSliceEvidenceSchema = z.object({
-  kind: z.literal('propensityGridSlice'),
-  scores: z.array(z.object({
-    learningRate: z.number().finite().nonnegative(),
-    maxDepth: z.number().int().positive(),
-    nEstimators: z.number().int().positive(),
-    meanScore: z.number().finite(),
-  }).strict()).min(1),
-}).strict()
+export const gridSliceEvidenceSchema = z
+  .object({
+    kind: z.literal('propensityGridSlice'),
+    scores: z
+      .array(
+        z
+          .object({
+            learningRate: z.number().finite().nonnegative(),
+            maxDepth: z.number().int().positive(),
+            nEstimators: z.number().int().positive(),
+            meanScore: z.number().finite(),
+          })
+          .strict(),
+      )
+      .min(1),
+  })
+  .strict()
 
 export type GridSliceEvidence = z.infer<typeof gridSliceEvidenceSchema>
 
-export const propensityMatchingEvidenceSchema = z.object({
-  kind: z.literal('propensityMatching'),
-  target: z.enum(['ate', 'att']),
-  observations: z.number().int().positive(),
-  treatmentModel: treatmentModelEvidenceSchema,
-  treatedRows: z.number().int().positive(),
-  controlRows: z.number().int().positive(),
-  estimate: z.number().finite(),
-  propensity: z.array(z.number().finite()),
-  treated: z.array(z.boolean()),
-  /** The opposite-arm outcome paired with each row. */
-  matches: z.array(z.number().finite()),
-}).strict()
+export const propensityMatchingEvidenceSchema = z
+  .object({
+    kind: z.literal('propensityMatching'),
+    target: z.enum(['ate', 'att']),
+    observations: z.number().int().positive(),
+    treatmentModel: treatmentModelEvidenceSchema,
+    treatedRows: z.number().int().positive(),
+    controlRows: z.number().int().positive(),
+    estimate: z.number().finite(),
+    propensity: z.array(z.number().finite()),
+    treated: z.array(z.boolean()),
+    /** The opposite-arm outcome paired with each row. */
+    matches: z.array(z.number().finite()),
+  })
+  .strict()
 
-export const doublyRobustEvidenceSchema = z.object({
-  kind: z.literal('doublyRobust'),
-  target: z.enum(['ate', 'att']),
-  observations: z.number().int().positive(),
-  /** The treatment model's parameter count: the constant plus one per design column. */
-  parameters: z.number().int().positive(),
-  estimate: z.number().finite(),
-  treatedTerm: z.number().finite(),
-  controlTerm: z.number().finite(),
-  propensity: z.array(z.number().finite()),
-  treated: z.array(z.boolean()),
-  converged: z.boolean(),
-  interval: propensityIntervalSchema.nullable(),
-}).strict()
+export const doublyRobustEvidenceSchema = z
+  .object({
+    kind: z.literal('doublyRobust'),
+    target: z.enum(['ate', 'att']),
+    observations: z.number().int().positive(),
+    /** The treatment model's parameter count: the constant plus one per design column. */
+    parameters: z.number().int().positive(),
+    estimate: z.number().finite(),
+    treatedTerm: z.number().finite(),
+    controlTerm: z.number().finite(),
+    propensity: z.array(z.number().finite()),
+    treated: z.array(z.boolean()),
+    converged: z.boolean(),
+    interval: propensityIntervalSchema.nullable(),
+  })
+  .strict()
 
-export const continuousGpsEvidenceSchema = z.object({
-  kind: z.literal('continuousGps'),
-  observations: z.number().int().positive(),
-  estimate: z.number().finite(),
-  intercept: z.number().finite(),
-  standardError: z.number().finite().nonnegative(),
-  weightSum: z.number().finite().positive(),
-  /** The weight each row carries, in row order; null for a run saved before weights were recorded. */
-  weights: z.array(z.number().finite().positive()).nullable(),
-  /** The conditional density at each observed treatment, in row order. */
-  density: z.array(z.number().finite()),
-  residualScale: z.number().finite().positive(),
-  treatmentParams: z.array(z.number().finite()),
-  interval: propensityIntervalSchema.nullable(),
-}).strict()
+export const continuousGpsEvidenceSchema = z
+  .object({
+    kind: z.literal('continuousGps'),
+    observations: z.number().int().positive(),
+    estimate: z.number().finite(),
+    intercept: z.number().finite(),
+    standardError: z.number().finite().nonnegative(),
+    weightSum: z.number().finite().positive(),
+    /** The weight each row carries, in row order; null for a run saved before weights were recorded. */
+    weights: z.array(z.number().finite().positive()).nullable(),
+    /** The conditional density at each observed treatment, in row order. */
+    density: z.array(z.number().finite()),
+    residualScale: z.number().finite().positive(),
+    treatmentParams: z.array(z.number().finite()),
+    interval: propensityIntervalSchema.nullable(),
+  })
+  .strict()
 
 export type PropensityWeightingEvidence = z.infer<typeof propensityWeightingEvidenceSchema>
 export type PropensityMatchingEvidence = z.infer<typeof propensityMatchingEvidenceSchema>
@@ -876,7 +1294,10 @@ export type ContinuousGpsEvidence = z.infer<typeof continuousGpsEvidenceSchema>
 export type PropensityInterval = z.infer<typeof propensityIntervalSchema>
 export type ArmaReading = Extract<BackdoorLinearEvidence['errorModel'], { kind: 'arma' }>
 
-export interface EffectiveSampleSize { readonly treated: number; readonly control: number }
+export interface EffectiveSampleSize {
+  readonly treated: number
+  readonly control: number
+}
 
 export const effectiveSampleSize = (
   weights: readonly number[],
@@ -887,8 +1308,13 @@ export const effectiveSampleSize = (
   let controlSum = 0
   let controlSquares = 0
   for (const [row, weight] of weights.entries()) {
-    if (treated[row] === true) { treatedSum += weight; treatedSquares += weight * weight }
-    else { controlSum += weight; controlSquares += weight * weight }
+    if (treated[row] === true) {
+      treatedSum += weight
+      treatedSquares += weight * weight
+    } else {
+      controlSum += weight
+      controlSquares += weight * weight
+    }
   }
   return {
     treated: treatedSquares === 0 ? 0 : (treatedSum * treatedSum) / treatedSquares,
@@ -907,104 +1333,134 @@ export interface WeightSpread {
 export const weightSpread = (weights: readonly number[], count: number): WeightSpread => {
   let sum = 0
   let squares = 0
-  for (const weight of weights) { sum += weight; squares += weight * weight }
+  for (const weight of weights) {
+    sum += weight
+    squares += weight * weight
+  }
   const descending = [...weights].sort((left, right) => right - left)
   const largest = descending.slice(0, count)
   return {
     effectiveSampleSize: squares === 0 ? 0 : (sum * sum) / squares,
     largestWeight: descending[0] ?? 0,
-    largestShare: { count: largest.length, share: sum === 0 ? 0 : largest.reduce((total, weight) => total + weight, 0) / sum },
+    largestShare: {
+      count: largest.length,
+      share: sum === 0 ? 0 : largest.reduce((total, weight) => total + weight, 0) / sum,
+    },
   }
 }
 
 /** The ARMA reading a run was configured for, and only then. */
-export const armaReading = (run: { readonly configuration: BackdoorLinearConfiguration; readonly evidence: BackdoorLinearEvidence }): ArmaReading | null =>
-  run.configuration.errors.kind === 'arma' && run.evidence.errorModel.kind === 'arma' ? run.evidence.errorModel : null
+export const armaReading = (run: {
+  readonly configuration: BackdoorLinearConfiguration
+  readonly evidence: BackdoorLinearEvidence
+}): ArmaReading | null =>
+  run.configuration.errors.kind === 'arma' && run.evidence.errorModel.kind === 'arma'
+    ? run.evidence.errorModel
+    : null
 
 /** DoWhy's generic bootstrap, shared by the front-door and instrumental-variable estimators. */
 const bootstrapUncertaintySchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('none') }).strict(),
-  z.object({
-    kind: z.literal('bootstrap'),
-    simulations: z.number().int().positive(),
-    sampleSizeFraction: z.number().finite().positive(),
-    confidenceLevel: z.number().gt(0).lt(1),
-    seed: z.number().int().nonnegative(),
-    interval: z.tuple([z.number().finite(), z.number().finite()]),
-  }).strict(),
+  z
+    .object({
+      kind: z.literal('bootstrap'),
+      simulations: z.number().int().positive(),
+      sampleSizeFraction: z.number().finite().positive(),
+      confidenceLevel: z.number().gt(0).lt(1),
+      seed: z.number().int().nonnegative(),
+      interval: z.tuple([z.number().finite(), z.number().finite()]),
+    })
+    .strict(),
 ])
 
-export const frontdoorTwoStageEvidenceSchema = z.object({
-  kind: z.literal('frontdoorTwoStage'),
-  observations: z.number().int().positive(),
-  treatment: z.number().int().nonnegative(),
-  mediator: z.number().int().nonnegative(),
-  outcome: z.number().int().nonnegative(),
-  firstStageAdjustment: z.array(z.number().int().nonnegative()),
-  secondStageAdjustment: z.array(z.number().int().nonnegative()),
-  controlValue: z.number().finite(),
-  treatmentValue: z.number().finite(),
-  firstStageParams: z.array(z.number().finite()).min(2),
-  secondStageParams: z.array(z.number().finite()).min(2),
-  firstStageEffect: z.number().finite(),
-  secondStageEffect: z.number().finite(),
-  estimate: z.number().finite(),
-  uncertainty: bootstrapUncertaintySchema,
-}).strict()
+export const frontdoorTwoStageEvidenceSchema = z
+  .object({
+    kind: z.literal('frontdoorTwoStage'),
+    observations: z.number().int().positive(),
+    treatment: z.number().int().nonnegative(),
+    mediator: z.number().int().nonnegative(),
+    outcome: z.number().int().nonnegative(),
+    firstStageAdjustment: z.array(z.number().int().nonnegative()),
+    secondStageAdjustment: z.array(z.number().int().nonnegative()),
+    controlValue: z.number().finite(),
+    treatmentValue: z.number().finite(),
+    firstStageParams: z.array(z.number().finite()).min(2),
+    secondStageParams: z.array(z.number().finite()).min(2),
+    firstStageEffect: z.number().finite(),
+    secondStageEffect: z.number().finite(),
+    estimate: z.number().finite(),
+    uncertainty: bootstrapUncertaintySchema,
+  })
+  .strict()
 
 export type FrontdoorTwoStageEvidence = z.infer<typeof frontdoorTwoStageEvidenceSchema>
 
-export const INSTRUMENTAL_VARIABLE_ROUTES = ['waldRatio', 'covarianceRatio', 'twoStageLeastSquares'] as const
+export const INSTRUMENTAL_VARIABLE_ROUTES = [
+  'waldRatio',
+  'covarianceRatio',
+  'twoStageLeastSquares',
+] as const
 export type InstrumentalVariableRoute = (typeof INSTRUMENTAL_VARIABLE_ROUTES)[number]
 
-export const instrumentalVariableEvidenceSchema = z.object({
-  kind: z.literal('instrumentalVariable'),
-  observations: z.number().int().positive(),
-  treatment: z.number().int().nonnegative(),
-  outcome: z.number().int().nonnegative(),
-  instruments: z.array(z.number().int().nonnegative()).min(1),
-  route: z.enum(INSTRUMENTAL_VARIABLE_ROUTES),
-  estimate: z.number().finite(),
-  params: z.array(z.number().finite()).min(1),
-  standardError: z.number().finite().nonnegative().nullable(),
-  uncertainty: bootstrapUncertaintySchema,
-}).strict()
+export const instrumentalVariableEvidenceSchema = z
+  .object({
+    kind: z.literal('instrumentalVariable'),
+    observations: z.number().int().positive(),
+    treatment: z.number().int().nonnegative(),
+    outcome: z.number().int().nonnegative(),
+    instruments: z.array(z.number().int().nonnegative()).min(1),
+    route: z.enum(INSTRUMENTAL_VARIABLE_ROUTES),
+    estimate: z.number().finite(),
+    params: z.array(z.number().finite()).min(1),
+    standardError: z.number().finite().nonnegative().nullable(),
+    uncertainty: bootstrapUncertaintySchema,
+  })
+  .strict()
 
 export type InstrumentalVariableEvidence = z.infer<typeof instrumentalVariableEvidenceSchema>
 
 export function describeInstrumentalVariableRoute(route: InstrumentalVariableRoute): string {
   switch (route) {
-    case 'waldRatio': return 'Wald ratio'
-    case 'covarianceRatio': return 'Covariance ratio'
-    case 'twoStageLeastSquares': return 'Two-stage least squares'
-    default: return assertNever(route)
+    case 'waldRatio':
+      return 'Wald ratio'
+    case 'covarianceRatio':
+      return 'Covariance ratio'
+    case 'twoStageLeastSquares':
+      return 'Two-stage least squares'
+    default:
+      return assertNever(route)
   }
 }
 
 /** Rust serialises NaN as null; the count families leave each other's statistics null. */
 const nullableNumber = z.number().finite().nullable()
 
-export const countGlmEvidenceSchema = z.object({
-  kind: z.literal('countGlm'),
-  observations: z.number().int().positive(),
-  parameters: z.number().int().min(2),
-  treatment: z.number().int().nonnegative(),
-  outcome: z.number().int().nonnegative(),
-  adjustment: z.array(z.number().int().nonnegative()),
-  family: z.enum(['poisson', 'negativeBinomial']),
-  coefficient: z.number().finite(),
-  standardError: z.number().finite().nonnegative(),
-  pValue: z.number().min(0).max(1),
-  incidenceRateRatio: z.number().finite().positive(),
-  incidenceRateRatioInterval: z.tuple([z.number().finite().positive(), z.number().finite().positive()]),
-  level: z.number().gt(0.5).lt(1),
-  deviance: nullableNumber,
-  logLikelihood: nullableNumber,
-  alpha: nullableNumber,
-  degreesOfFreedom: z.number().int().nonnegative(),
-  converged: z.boolean(),
-  iterations: z.number().int().nonnegative(),
-}).strict()
+export const countGlmEvidenceSchema = z
+  .object({
+    kind: z.literal('countGlm'),
+    observations: z.number().int().positive(),
+    parameters: z.number().int().min(2),
+    treatment: z.number().int().nonnegative(),
+    outcome: z.number().int().nonnegative(),
+    adjustment: z.array(z.number().int().nonnegative()),
+    family: z.enum(['poisson', 'negativeBinomial']),
+    coefficient: z.number().finite(),
+    standardError: z.number().finite().nonnegative(),
+    pValue: z.number().min(0).max(1),
+    incidenceRateRatio: z.number().finite().positive(),
+    incidenceRateRatioInterval: z.tuple([
+      z.number().finite().positive(),
+      z.number().finite().positive(),
+    ]),
+    level: z.number().gt(0.5).lt(1),
+    deviance: nullableNumber,
+    logLikelihood: nullableNumber,
+    alpha: nullableNumber,
+    degreesOfFreedom: z.number().int().nonnegative(),
+    converged: z.boolean(),
+    iterations: z.number().int().nonnegative(),
+  })
+  .strict()
 
 export type CountGlmEvidence = z.infer<typeof countGlmEvidenceSchema>
 
@@ -1014,195 +1470,288 @@ export const ingarchInterventionScheduleSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('decaying'), delta: z.number().min(0).max(1) }).strict(),
 ])
 
-export const negativeBinomialIngarchEvidenceSchema = z.object({
-  kind: z.literal('negativeBinomialIngarch'),
-  observations: z.number().int().positive(),
-  outcome: z.number().int().nonnegative(),
-  link: z.enum(['identity', 'log']),
-  regressors: z.array(z.number().int().nonnegative()).min(1),
-  pastObservationLags: z.array(z.number().int().positive()).min(1),
-  pastMeanLags: z.array(z.number().int().positive()).min(1),
-  externalRegressors: z.array(z.boolean()),
-  horizon: z.number().int().positive(),
-  interventionRegressor: z.number().int().nonnegative(),
-  controlValue: z.number().finite(),
-  treatmentValue: z.number().finite(),
-  schedule: ingarchInterventionScheduleSchema,
-  parameters: z.array(z.number().finite()).min(4),
-  fittedMeans: z.array(z.number().finite().positive()).min(1),
-  residuals: z.array(z.number().finite()).min(1),
-  logLikelihood: z.number().finite(),
-  size: z.number().finite().positive(),
-  dispersion: z.number().finite().positive(),
-  score: z.array(z.number().finite()).min(4),
-  iterations: z.number().int().positive(),
-  functionEvaluations: z.number().int().positive(),
-  gradientEvaluations: z.number().int().positive(),
-  baselineMean: z.array(z.number().finite().positive()).min(1),
-  interventionMean: z.array(z.number().finite().positive()).min(1),
-  effectPath: z.array(z.number().finite()).min(1),
-  averageEffect: z.number().finite(),
-  cumulativeEffect: z.number().finite(),
-}).strict().superRefine((value, context) => {
-  if (value.regressors.length !== value.externalRegressors.length) context.addIssue({ code: 'custom', message: 'INGARCH regressors and external flags differ in length.' })
-  if (value.fittedMeans.length !== value.observations || value.residuals.length !== value.observations) context.addIssue({ code: 'custom', message: 'INGARCH fitted arrays do not match the observation count.' })
-  if (value.baselineMean.length !== value.horizon || value.interventionMean.length !== value.horizon || value.effectPath.length !== value.horizon) context.addIssue({ code: 'custom', message: 'INGARCH forecast arrays do not match the horizon.' })
-})
+export const negativeBinomialIngarchEvidenceSchema = z
+  .object({
+    kind: z.literal('negativeBinomialIngarch'),
+    observations: z.number().int().positive(),
+    outcome: z.number().int().nonnegative(),
+    link: z.enum(['identity', 'log']),
+    regressors: z.array(z.number().int().nonnegative()).min(1),
+    pastObservationLags: z.array(z.number().int().positive()).min(1),
+    pastMeanLags: z.array(z.number().int().positive()).min(1),
+    externalRegressors: z.array(z.boolean()),
+    horizon: z.number().int().positive(),
+    interventionRegressor: z.number().int().nonnegative(),
+    controlValue: z.number().finite(),
+    treatmentValue: z.number().finite(),
+    schedule: ingarchInterventionScheduleSchema,
+    parameters: z.array(z.number().finite()).min(4),
+    fittedMeans: z.array(z.number().finite().positive()).min(1),
+    residuals: z.array(z.number().finite()).min(1),
+    logLikelihood: z.number().finite(),
+    size: z.number().finite().positive(),
+    dispersion: z.number().finite().positive(),
+    score: z.array(z.number().finite()).min(4),
+    iterations: z.number().int().positive(),
+    functionEvaluations: z.number().int().positive(),
+    gradientEvaluations: z.number().int().positive(),
+    baselineMean: z.array(z.number().finite().positive()).min(1),
+    interventionMean: z.array(z.number().finite().positive()).min(1),
+    effectPath: z.array(z.number().finite()).min(1),
+    averageEffect: z.number().finite(),
+    cumulativeEffect: z.number().finite(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.regressors.length !== value.externalRegressors.length)
+      context.addIssue({
+        code: 'custom',
+        message: 'INGARCH regressors and external flags differ in length.',
+      })
+    if (
+      value.fittedMeans.length !== value.observations ||
+      value.residuals.length !== value.observations
+    )
+      context.addIssue({
+        code: 'custom',
+        message: 'INGARCH fitted arrays do not match the observation count.',
+      })
+    if (
+      value.baselineMean.length !== value.horizon ||
+      value.interventionMean.length !== value.horizon ||
+      value.effectPath.length !== value.horizon
+    )
+      context.addIssue({
+        code: 'custom',
+        message: 'INGARCH forecast arrays do not match the horizon.',
+      })
+  })
 
 export type NegativeBinomialIngarchEvidence = z.infer<typeof negativeBinomialIngarchEvidenceSchema>
 
 /** One group of the effect modifier with DoubleML's group average treatment effect for it. */
-export const dmlGroupEffectSchema = z.object({
-  lower: z.number().finite().nullable(),
-  upper: z.number().finite().nullable(),
-  observations: z.number().int().positive(),
-  effect: z.number().finite(),
-  standardError: z.number().finite().nonnegative(),
-  interval: z.tuple([z.number().finite(), z.number().finite()]),
-  fewObservations: z.boolean(),
-}).strict()
+export const dmlGroupEffectSchema = z
+  .object({
+    lower: z.number().finite().nullable(),
+    upper: z.number().finite().nullable(),
+    observations: z.number().int().positive(),
+    effect: z.number().finite(),
+    standardError: z.number().finite().nonnegative(),
+    interval: z.tuple([z.number().finite(), z.number().finite()]),
+    fewObservations: z.boolean(),
+  })
+  .strict()
 
 export const dmlGroupEvidenceSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('none') }).strict(),
-  z.object({
-    kind: z.literal('grouped'),
-    modifier: z.number().int().nonnegative(),
-    grouping: z.discriminatedUnion('kind', [
-      z.object({ kind: z.literal('levels') }).strict(),
-      z.object({ kind: z.literal('quantiles'), bins: z.number().int().min(2).max(10) }).strict(),
-    ]),
-    level: z.number().gt(0.5).lt(1),
-    groups: z.array(dmlGroupEffectSchema).min(1),
-  }).strict(),
+  z
+    .object({
+      kind: z.literal('grouped'),
+      modifier: z.number().int().nonnegative(),
+      grouping: z.discriminatedUnion('kind', [
+        z.object({ kind: z.literal('levels') }).strict(),
+        z.object({ kind: z.literal('quantiles'), bins: z.number().int().min(2).max(10) }).strict(),
+      ]),
+      level: z.number().gt(0.5).lt(1),
+      groups: z.array(dmlGroupEffectSchema).min(1),
+    })
+    .strict(),
 ])
 
-export const doubleMlEvidenceSchema = z.object({
-  kind: z.literal('doubleMl'),
-  observations: z.number().int().positive(),
-  model: z.enum(['plr', 'irm']),
-  att: z.boolean(),
-  treatBinary: z.boolean(),
-  seed: z.number().int().nonnegative(),
-  estimate: z.number().finite(),
-  standardError: z.number().finite().nonnegative(),
-  interval: z.tuple([z.number().finite(), z.number().finite()]),
-  level: z.number().gt(0.5).lt(1),
-  groups: dmlGroupEvidenceSchema,
-}).strict()
+export const doubleMlEvidenceSchema = z
+  .object({
+    kind: z.literal('doubleMl'),
+    observations: z.number().int().positive(),
+    model: z.enum(['plr', 'irm']),
+    att: z.boolean(),
+    treatBinary: z.boolean(),
+    seed: z.number().int().nonnegative(),
+    estimate: z.number().finite(),
+    standardError: z.number().finite().nonnegative(),
+    interval: z.tuple([z.number().finite(), z.number().finite()]),
+    level: z.number().gt(0.5).lt(1),
+    groups: dmlGroupEvidenceSchema,
+  })
+  .strict()
 
 export type DoubleMlEvidence = z.infer<typeof doubleMlEvidenceSchema>
 
-export const tLearnerEvidenceSchema = z.object({
-  kind: z.literal('tLearner'),
-  observations: z.number().int().positive(),
-  controlRows: z.number().int().positive(),
-  treatedRows: z.number().int().positive(),
-  seed: z.number().int().nonnegative(),
-  trees: z.number().int().positive(),
-  minLeaf: z.number().int().positive(),
-  /** One effect per prepared row, in row order. */
-  effects: z.array(z.number().finite()).min(1),
-  /** The mean of the row effects, EconML's `ate`. */
-  average: z.number().finite(),
-  uncertainty: tLearnerUncertaintyEvidenceSchema.default({ kind: 'none' }),
-}).strict().superRefine((value, context) => {
-  if (value.controlRows + value.treatedRows !== value.observations || value.effects.length !== value.observations) {
-    context.addIssue({ code: 'custom', message: 'Treatment groups and row effects must match the observation count.' })
-  }
-  const uncertainty = value.uncertainty
-  if (uncertainty.kind === 'bootstrap' && (uncertainty.intervals.length !== value.observations || uncertainty.standardErrors.length !== value.observations)) {
-    context.addIssue({ code: 'custom', message: 'Each row effect must have one interval and standard error.' })
-  }
-})
+export const tLearnerEvidenceSchema = z
+  .object({
+    kind: z.literal('tLearner'),
+    observations: z.number().int().positive(),
+    controlRows: z.number().int().positive(),
+    treatedRows: z.number().int().positive(),
+    seed: z.number().int().nonnegative(),
+    trees: z.number().int().positive(),
+    minLeaf: z.number().int().positive(),
+    /** One effect per prepared row, in row order. */
+    effects: z.array(z.number().finite()).min(1),
+    /** The mean of the row effects, EconML's `ate`. */
+    average: z.number().finite(),
+    uncertainty: tLearnerUncertaintyEvidenceSchema.default({ kind: 'none' }),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (
+      value.controlRows + value.treatedRows !== value.observations ||
+      value.effects.length !== value.observations
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Treatment groups and row effects must match the observation count.',
+      })
+    }
+    const uncertainty = value.uncertainty
+    if (
+      uncertainty.kind === 'bootstrap' &&
+      (uncertainty.intervals.length !== value.observations ||
+        uncertainty.standardErrors.length !== value.observations)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Each row effect must have one interval and standard error.',
+      })
+    }
+  })
 
 export type TLearnerEvidence = z.infer<typeof tLearnerEvidenceSchema>
 
-const armChoiceSchema = z.object({
-  learningRate: z.number().finite().nonnegative(),
-  maxDepth: z.number().int().positive(),
-  nEstimators: z.number().int().positive(),
-  /** Mean held-out ROC AUC of the chosen candidate over the search folds. */
-  validationAuc: z.number().finite().min(0).max(1),
-}).strict()
+const armChoiceSchema = z
+  .object({
+    learningRate: z.number().finite().nonnegative(),
+    maxDepth: z.number().int().positive(),
+    nEstimators: z.number().int().positive(),
+    /** Mean held-out ROC AUC of the chosen candidate over the search folds. */
+    validationAuc: z.number().finite().min(0).max(1),
+  })
+  .strict()
 
 /** How the kernel picks each arm's candidate: its own search, or one already run on a worker pool. */
 export const armSelectionSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('search') }).strict(),
-  z.object({ kind: z.literal('chosen'), treated: armChoiceSchema, control: armChoiceSchema }).strict(),
+  z
+    .object({ kind: z.literal('chosen'), treated: armChoiceSchema, control: armChoiceSchema })
+    .strict(),
 ])
 
 export type ArmSelection = z.infer<typeof armSelectionSchema>
 export type ArmChoice = z.infer<typeof armChoiceSchema>
 
-export const crossFittedTLearnerEvidenceSchema = z.object({
-  kind: z.literal('crossFittedTLearner'),
-  observations: z.number().int().positive(),
-  controlRows: z.number().int().positive(),
-  treatedRows: z.number().int().positive(),
-  seed: z.number().int().nonnegative(),
-  splits: z.number().int().min(2),
-  candidates: z.number().int().positive(),
-  /** Each arm's candidate, chosen on all of that arm's rows. */
-  selected: z.object({ treated: armChoiceSchema, control: armChoiceSchema }).strict(),
-  /** One effect per prepared row, in row order. */
-  effects: z.array(z.number().finite()).min(1),
-  /** The mean of the effects in the order the halves are concatenated, as numpy takes it. */
-  average: z.number().finite(),
-}).strict().superRefine((value, context) => {
-  if (value.controlRows + value.treatedRows !== value.observations || value.effects.length !== value.observations) {
-    context.addIssue({ code: 'custom', message: 'Treatment groups and row effects must match the observation count.' })
-  }
-})
+export const crossFittedTLearnerEvidenceSchema = z
+  .object({
+    kind: z.literal('crossFittedTLearner'),
+    observations: z.number().int().positive(),
+    controlRows: z.number().int().positive(),
+    treatedRows: z.number().int().positive(),
+    seed: z.number().int().nonnegative(),
+    splits: z.number().int().min(2),
+    candidates: z.number().int().positive(),
+    /** Each arm's candidate, chosen on all of that arm's rows. */
+    selected: z.object({ treated: armChoiceSchema, control: armChoiceSchema }).strict(),
+    /** One effect per prepared row, in row order. */
+    effects: z.array(z.number().finite()).min(1),
+    /** The mean of the effects in the order the halves are concatenated, as numpy takes it. */
+    average: z.number().finite(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (
+      value.controlRows + value.treatedRows !== value.observations ||
+      value.effects.length !== value.observations
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Treatment groups and row effects must match the observation count.',
+      })
+    }
+  })
 
 export type CrossFittedTLearnerEvidence = z.infer<typeof crossFittedTLearnerEvidenceSchema>
 
-const boostedGridChoiceSchema = z.object({
-  ...boostedGridAxisSchemas,
-  splits: z.number().int().min(2).max(20),
-  seed: z.number().int().min(0).max(0xffffffff),
-}).strict()
+const boostedGridChoiceSchema = z
+  .object({
+    ...boostedGridAxisSchemas,
+    splits: z.number().int().min(2).max(20),
+    seed: z.number().int().min(0).max(0xffffffff),
+  })
+  .strict()
 
-export const tLearnerConfigurationSchema = z.object({
-  kind: z.literal('t-learner'),
-  model: z.discriminatedUnion('kind', [
-    z.object({ kind: z.literal('forest'), seed: z.number().int().min(0).max(0xffffffff), uncertainty: tLearnerUncertaintySchema }).strict(),
-    z.object({ kind: z.literal('boosted-cross-fitted'), grid: boostedGridChoiceSchema }).strict(),
-  ]),
-}).strict()
+export const tLearnerConfigurationSchema = z
+  .object({
+    kind: z.literal('t-learner'),
+    model: z.discriminatedUnion('kind', [
+      z
+        .object({
+          kind: z.literal('forest'),
+          seed: z.number().int().min(0).max(0xffffffff),
+          uncertainty: tLearnerUncertaintySchema,
+        })
+        .strict(),
+      z.object({ kind: z.literal('boosted-cross-fitted'), grid: boostedGridChoiceSchema }).strict(),
+    ]),
+  })
+  .strict()
 
 /** Whether a saved T-learner's evidence is what its configuration would produce. */
-export function tLearnerRunMatches(configuration: TLearnerConfiguration, evidence: TLearnerEvidence | CrossFittedTLearnerEvidence): boolean {
+export function tLearnerRunMatches(
+  configuration: TLearnerConfiguration,
+  evidence: TLearnerEvidence | CrossFittedTLearnerEvidence,
+): boolean {
   const model = configuration.model
   switch (model.kind) {
     case 'forest':
-      return evidence.kind === 'tLearner' && evidence.seed === model.seed && matchesTLearnerUncertainty(model.uncertainty, evidence.uncertainty)
+      return (
+        evidence.kind === 'tLearner' &&
+        evidence.seed === model.seed &&
+        matchesTLearnerUncertainty(model.uncertainty, evidence.uncertainty)
+      )
     case 'boosted-cross-fitted':
-      return evidence.kind === 'crossFittedTLearner' && evidence.seed === model.grid.seed && evidence.splits === model.grid.splits
-        && evidence.candidates === boostedCandidateCount(model.grid)
-        && [evidence.selected.treated, evidence.selected.control].every((choice) => model.grid.learningRate.includes(choice.learningRate)
-          && model.grid.maxDepth.includes(choice.maxDepth) && model.grid.nEstimators.includes(choice.nEstimators))
-    default: return assertNever(model)
+      return (
+        evidence.kind === 'crossFittedTLearner' &&
+        evidence.seed === model.grid.seed &&
+        evidence.splits === model.grid.splits &&
+        evidence.candidates === boostedCandidateCount(model.grid) &&
+        [evidence.selected.treated, evidence.selected.control].every(
+          (choice) =>
+            model.grid.learningRate.includes(choice.learningRate) &&
+            model.grid.maxDepth.includes(choice.maxDepth) &&
+            model.grid.nEstimators.includes(choice.nEstimators),
+        )
+      )
+    default:
+      return assertNever(model)
   }
 }
 
-export const ardlEvidenceSchema = z.object({
-  kind: z.literal('ardlPss'),
-  longRun: ardlLongRunSchema.optional(),
-  observations: z.number().int().positive(),
-  trend: z.enum(['c', 'ct']),
-  case: z.number().int().min(2).max(5),
-  arLag: z.number().int().positive(),
-  dlLag: z.number().int().positive(),
-  grid: z.array(z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative().nullable(), z.number(), z.number(), z.number()])),
-  longRunEffect: z.number().finite(),
-  pValue: z.number().min(0).max(1),
-  interval: z.tuple([z.number().finite(), z.number().finite()]),
-  level: z.number().gt(0.5).lt(1),
-  boundsStatistic: z.number().finite(),
-  boundsCritical: z.array(z.tuple([z.number().finite(), z.number().finite()])).length(4),
-  boundsPLower: z.number().min(0).max(1),
-  boundsPUpper: z.number().min(0).max(1),
-}).strict()
+export const ardlEvidenceSchema = z
+  .object({
+    kind: z.literal('ardlPss'),
+    longRun: ardlLongRunSchema.optional(),
+    observations: z.number().int().positive(),
+    trend: z.enum(['c', 'ct']),
+    case: z.number().int().min(2).max(5),
+    arLag: z.number().int().positive(),
+    dlLag: z.number().int().positive(),
+    grid: z.array(
+      z.tuple([
+        z.number().int().nonnegative(),
+        z.number().int().nonnegative().nullable(),
+        z.number(),
+        z.number(),
+        z.number(),
+      ]),
+    ),
+    longRunEffect: z.number().finite(),
+    pValue: z.number().min(0).max(1),
+    interval: z.tuple([z.number().finite(), z.number().finite()]),
+    level: z.number().gt(0.5).lt(1),
+    boundsStatistic: z.number().finite(),
+    boundsCritical: z.array(z.tuple([z.number().finite(), z.number().finite()])).length(4),
+    boundsPLower: z.number().min(0).max(1),
+    boundsPUpper: z.number().min(0).max(1),
+  })
+  .strict()
 
 export type ArdlEvidence = z.infer<typeof ardlEvidenceSchema>
 
@@ -1216,305 +1765,504 @@ export const boundsReading = (evidence: ArdlEvidence): BoundsReading => {
   return 'inconclusive'
 }
 
-export const vecmEvidenceSchema = z.object({
-  kind: z.literal('vecm'),
-  forecast: vecmForecastSchema.optional(),
-  longRun: vecmLongRunSchema.optional(),
-  observations: z.number().int().positive(),
-  deterministic: z.enum(['n', 'co', 'ci', 'coli']),
-  kArDiff: z.number().int().positive(),
-  rank: z.number().int().nonnegative(),
-  significance: z.number().int().min(0).max(2),
-  longRunEffect: z.number().finite().nullable(),
-  alpha: z.array(z.array(z.number())),
-  beta: z.array(z.array(z.number())),
-  gamma: z.array(z.array(z.number())),
-  pvaluesAlpha: z.array(z.array(z.number())),
-  chow: z.tuple([z.number(), z.number()]).nullable(),
-}).strict()
+export const vecmEvidenceSchema = z
+  .object({
+    kind: z.literal('vecm'),
+    forecast: vecmForecastSchema.optional(),
+    longRun: vecmLongRunSchema.optional(),
+    observations: z.number().int().positive(),
+    deterministic: z.enum(['n', 'co', 'ci', 'coli']),
+    kArDiff: z.number().int().positive(),
+    rank: z.number().int().nonnegative(),
+    significance: z.number().int().min(0).max(2),
+    longRunEffect: z.number().finite().nullable(),
+    alpha: z.array(z.array(z.number())),
+    beta: z.array(z.array(z.number())),
+    gamma: z.array(z.array(z.number())),
+    pvaluesAlpha: z.array(z.array(z.number())),
+    chow: z.tuple([z.number(), z.number()]).nullable(),
+  })
+  .strict()
 
 export type VecmEvidence = z.infer<typeof vecmEvidenceSchema>
 
-export const syntheticControlEvidenceSchema = z.object({
-  kind: z.literal('syntheticControl'),
-  observations: z.number().int().positive(),
-  nPre: z.number().int().min(2),
-  nPost: z.number().int().positive(),
-  weights: z.array(z.number().min(-1e-9).max(1 + 1e-9)).min(1),
-  loss: z.number().finite().nonnegative(),
-  iterations: z.number().int().nonnegative(),
-  preGap: z.array(z.number().finite()),
-  postGap: z.array(z.number().finite()).min(1),
-  att: z.number().finite(),
-  treated: z.array(z.number().finite()),
-  synthetic: z.array(z.number().finite()),
-  crossFit: z.discriminatedUnion('kind', [
-    z.object({
-      kind: z.literal('available'),
-      att: z.number().finite(),
-      standardError: z.number().finite().nonnegative(),
-      tStatistic: z.number().finite(),
-      degreesOfFreedom: z.number().int().positive(),
-      pValue: z.number().min(0).max(1),
-      confidenceInterval: z.tuple([z.number().finite(), z.number().finite()]),
-      blockSize: z.number().int().min(2),
-      folds: z.array(z.object({
-        heldOut: z.array(z.number().int().nonnegative()).min(2),
-        weights: z.array(z.number().finite()).min(1),
-        bias: z.number().finite(),
-        att: z.number().finite(),
-      }).strict()).min(2),
-    }).strict(),
-    z.object({ kind: z.literal('unavailable'), reason: z.string().min(1) }).strict(),
-  ]),
-  donorPlacebo: z.discriminatedUnion('kind', [
-    z.object({
-      kind: z.literal('available'),
-      treatedPreMspe: z.number().finite().nonnegative(),
-      treatedPostMspe: z.number().finite().nonnegative(),
-      treatedMspeRatio: z.number().finite().nonnegative().nullable(),
-      placebos: z.array(z.object({
-        donor: z.number().int().nonnegative(),
-        preMspe: z.number().finite().nonnegative(),
-        postMspe: z.number().finite().nonnegative(),
-        mspeRatio: z.number().finite().nonnegative().nullable(),
-      }).strict()).min(2),
-      pValue: z.number().min(0).max(1),
-      nValidPlacebos: z.number().int().positive(),
-    }).strict(),
-    z.object({ kind: z.literal('unavailable'), reason: z.string().min(1) }).strict(),
-  ]),
-  conformalBand: z.discriminatedUnion('kind', [
-    z.object({ kind: z.literal('available'), alpha: z.number().gt(0).lt(1), intervals: z.array(z.tuple([z.number().finite(), z.number().finite()])).min(1), halfWidth: z.number().finite().nonnegative(), preMspe: z.number().finite().nonnegative(), postMspe: z.number().finite().nonnegative(), mspeRatio: z.number().finite().nonnegative().nullable() }).strict(),
-    z.object({ kind: z.literal('unavailable'), reason: z.string().min(1) }).strict(),
-  ]),
-  gaussianBand: z.discriminatedUnion('kind', [
-    z.object({ kind: z.literal('available'), alpha: z.number().gt(0).lt(1), intervals: z.array(z.tuple([z.number().finite(), z.number().finite()])).min(1), halfWidth: z.number().finite().nonnegative(), preMspe: z.number().finite().nonnegative(), postMspe: z.number().finite().nonnegative(), mspeRatio: z.number().finite().nonnegative().nullable() }).strict(),
-    z.object({ kind: z.literal('unavailable'), reason: z.string().min(1) }).strict(),
-  ]),
-}).strict().superRefine((evidence, context) => {
-  if (evidence.nPre + evidence.nPost !== evidence.observations) context.addIssue({ code: 'custom', message: 'Synthetic-control pre/post counts do not match the observations.' })
-  if (evidence.preGap.length !== evidence.nPre) context.addIssue({ code: 'custom', message: 'Synthetic-control pre-period gaps do not match nPre.' })
-  if (evidence.postGap.length !== evidence.nPost) context.addIssue({ code: 'custom', message: 'Synthetic-control post-period gaps do not match nPost.' })
-  if (evidence.treated.length !== evidence.observations || evidence.synthetic.length !== evidence.observations) context.addIssue({ code: 'custom', message: 'Synthetic-control paths do not match the observation count.' })
-  if (evidence.crossFit.kind === 'available') {
-    for (const fold of evidence.crossFit.folds) {
-      if (fold.weights.length !== evidence.weights.length) context.addIssue({ code: 'custom', message: 'A cross-fit fold does not contain one weight per donor.' })
+export const syntheticControlEvidenceSchema = z
+  .object({
+    kind: z.literal('syntheticControl'),
+    observations: z.number().int().positive(),
+    nPre: z.number().int().min(2),
+    nPost: z.number().int().positive(),
+    weights: z
+      .array(
+        z
+          .number()
+          .min(-1e-9)
+          .max(1 + 1e-9),
+      )
+      .min(1),
+    loss: z.number().finite().nonnegative(),
+    iterations: z.number().int().nonnegative(),
+    preGap: z.array(z.number().finite()),
+    postGap: z.array(z.number().finite()).min(1),
+    att: z.number().finite(),
+    treated: z.array(z.number().finite()),
+    synthetic: z.array(z.number().finite()),
+    crossFit: z.discriminatedUnion('kind', [
+      z
+        .object({
+          kind: z.literal('available'),
+          att: z.number().finite(),
+          standardError: z.number().finite().nonnegative(),
+          tStatistic: z.number().finite(),
+          degreesOfFreedom: z.number().int().positive(),
+          pValue: z.number().min(0).max(1),
+          confidenceInterval: z.tuple([z.number().finite(), z.number().finite()]),
+          blockSize: z.number().int().min(2),
+          folds: z
+            .array(
+              z
+                .object({
+                  heldOut: z.array(z.number().int().nonnegative()).min(2),
+                  weights: z.array(z.number().finite()).min(1),
+                  bias: z.number().finite(),
+                  att: z.number().finite(),
+                })
+                .strict(),
+            )
+            .min(2),
+        })
+        .strict(),
+      z.object({ kind: z.literal('unavailable'), reason: z.string().min(1) }).strict(),
+    ]),
+    donorPlacebo: z.discriminatedUnion('kind', [
+      z
+        .object({
+          kind: z.literal('available'),
+          treatedPreMspe: z.number().finite().nonnegative(),
+          treatedPostMspe: z.number().finite().nonnegative(),
+          treatedMspeRatio: z.number().finite().nonnegative().nullable(),
+          placebos: z
+            .array(
+              z
+                .object({
+                  donor: z.number().int().nonnegative(),
+                  preMspe: z.number().finite().nonnegative(),
+                  postMspe: z.number().finite().nonnegative(),
+                  mspeRatio: z.number().finite().nonnegative().nullable(),
+                })
+                .strict(),
+            )
+            .min(2),
+          pValue: z.number().min(0).max(1),
+          nValidPlacebos: z.number().int().positive(),
+        })
+        .strict(),
+      z.object({ kind: z.literal('unavailable'), reason: z.string().min(1) }).strict(),
+    ]),
+    conformalBand: z.discriminatedUnion('kind', [
+      z
+        .object({
+          kind: z.literal('available'),
+          alpha: z.number().gt(0).lt(1),
+          intervals: z.array(z.tuple([z.number().finite(), z.number().finite()])).min(1),
+          halfWidth: z.number().finite().nonnegative(),
+          preMspe: z.number().finite().nonnegative(),
+          postMspe: z.number().finite().nonnegative(),
+          mspeRatio: z.number().finite().nonnegative().nullable(),
+        })
+        .strict(),
+      z.object({ kind: z.literal('unavailable'), reason: z.string().min(1) }).strict(),
+    ]),
+    gaussianBand: z.discriminatedUnion('kind', [
+      z
+        .object({
+          kind: z.literal('available'),
+          alpha: z.number().gt(0).lt(1),
+          intervals: z.array(z.tuple([z.number().finite(), z.number().finite()])).min(1),
+          halfWidth: z.number().finite().nonnegative(),
+          preMspe: z.number().finite().nonnegative(),
+          postMspe: z.number().finite().nonnegative(),
+          mspeRatio: z.number().finite().nonnegative().nullable(),
+        })
+        .strict(),
+      z.object({ kind: z.literal('unavailable'), reason: z.string().min(1) }).strict(),
+    ]),
+  })
+  .strict()
+  .superRefine((evidence, context) => {
+    if (evidence.nPre + evidence.nPost !== evidence.observations)
+      context.addIssue({
+        code: 'custom',
+        message: 'Synthetic-control pre/post counts do not match the observations.',
+      })
+    if (evidence.preGap.length !== evidence.nPre)
+      context.addIssue({
+        code: 'custom',
+        message: 'Synthetic-control pre-period gaps do not match nPre.',
+      })
+    if (evidence.postGap.length !== evidence.nPost)
+      context.addIssue({
+        code: 'custom',
+        message: 'Synthetic-control post-period gaps do not match nPost.',
+      })
+    if (
+      evidence.treated.length !== evidence.observations ||
+      evidence.synthetic.length !== evidence.observations
+    )
+      context.addIssue({
+        code: 'custom',
+        message: 'Synthetic-control paths do not match the observation count.',
+      })
+    if (evidence.crossFit.kind === 'available') {
+      for (const fold of evidence.crossFit.folds) {
+        if (fold.weights.length !== evidence.weights.length)
+          context.addIssue({
+            code: 'custom',
+            message: 'A cross-fit fold does not contain one weight per donor.',
+          })
+      }
     }
-  }
-  if (evidence.donorPlacebo.kind === 'available') {
-    if (evidence.donorPlacebo.placebos.length !== evidence.weights.length) context.addIssue({ code: 'custom', message: 'Donor-placebo evidence does not contain one result per donor.' })
-    const donors = evidence.donorPlacebo.placebos.map((placebo) => placebo.donor)
-    if (new Set(donors).size !== donors.length || donors.some((donor) => donor >= evidence.weights.length)) context.addIssue({ code: 'custom', message: 'Donor-placebo indices are not a distinct in-range donor set.' })
-  }
-  for (const band of [evidence.conformalBand, evidence.gaussianBand]) {
-    if (band.kind === 'available' && band.intervals.length !== evidence.observations) context.addIssue({ code: 'custom', message: 'A synthetic-control prediction band does not match the observation count.' })
-  }
-})
+    if (evidence.donorPlacebo.kind === 'available') {
+      if (evidence.donorPlacebo.placebos.length !== evidence.weights.length)
+        context.addIssue({
+          code: 'custom',
+          message: 'Donor-placebo evidence does not contain one result per donor.',
+        })
+      const donors = evidence.donorPlacebo.placebos.map((placebo) => placebo.donor)
+      if (
+        new Set(donors).size !== donors.length ||
+        donors.some((donor) => donor >= evidence.weights.length)
+      )
+        context.addIssue({
+          code: 'custom',
+          message: 'Donor-placebo indices are not a distinct in-range donor set.',
+        })
+    }
+    for (const band of [evidence.conformalBand, evidence.gaussianBand]) {
+      if (band.kind === 'available' && band.intervals.length !== evidence.observations)
+        context.addIssue({
+          code: 'custom',
+          message: 'A synthetic-control prediction band does not match the observation count.',
+        })
+    }
+  })
 
 export type SyntheticControlEvidence = z.infer<typeof syntheticControlEvidenceSchema>
 
-const panelMethodEvidenceSchema = z.object({
-  estimate: z.number().finite(),
-  lambda: z.array(z.number().finite()),
-  omega: z.array(z.number().finite()).min(1),
-  effectCurve: z.array(z.number().finite()).min(1),
-  lambdaIterations: z.number().int().nonnegative(),
-  omegaIterations: z.number().int().nonnegative(),
-  lambdaObjective: z.array(z.number().finite().nonnegative()),
-  omegaObjective: z.array(z.number().finite().nonnegative()),
-  noiseLevel: z.number().finite().nonnegative(),
-}).strict()
+const panelMethodEvidenceSchema = z
+  .object({
+    estimate: z.number().finite(),
+    lambda: z.array(z.number().finite()),
+    omega: z.array(z.number().finite()).min(1),
+    effectCurve: z.array(z.number().finite()).min(1),
+    lambdaIterations: z.number().int().nonnegative(),
+    omegaIterations: z.number().int().nonnegative(),
+    lambdaObjective: z.array(z.number().finite().nonnegative()),
+    omegaObjective: z.array(z.number().finite().nonnegative()),
+    noiseLevel: z.number().finite().nonnegative(),
+  })
+  .strict()
 
 const panelPlaceboEvidenceSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('available'), replications: z.number().int().min(2), seed: z.number().int().nonnegative(), standardError: z.number().finite().nonnegative(), estimates: z.array(z.number().finite()).min(2) }).strict(),
+  z
+    .object({
+      kind: z.literal('available'),
+      replications: z.number().int().min(2),
+      seed: z.number().int().nonnegative(),
+      standardError: z.number().finite().nonnegative(),
+      estimates: z.array(z.number().finite()).min(2),
+    })
+    .strict(),
   z.object({ kind: z.literal('unavailable'), reason: z.string().min(1) }).strict(),
 ])
 
 const panelInTimeEvidenceSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('available'), estimate: z.number().finite(), effectCurve: z.array(z.number().finite()).min(1) }).strict(),
+  z
+    .object({
+      kind: z.literal('available'),
+      estimate: z.number().finite(),
+      effectCurve: z.array(z.number().finite()).min(1),
+    })
+    .strict(),
   z.object({ kind: z.literal('unavailable'), reason: z.string().min(1) }).strict(),
 ])
 
-const syntheticPanelEvidenceSchema = z.object({
-  kind: z.literal('panelIntervention'),
-  observations: z.number().int().positive(),
-  units: z.array(z.string().min(1)).min(2),
-  times: z.array(z.number().int().nonnegative()).min(2),
-  controlUnits: z.number().int().positive(),
-  treatedUnits: z.number().int().positive(),
-  nPre: z.number().int().positive(),
-  nPost: z.number().int().positive(),
-  did: panelMethodEvidenceSchema,
-  syntheticControl: panelMethodEvidenceSchema,
-  syntheticDid: panelMethodEvidenceSchema,
-  syntheticControlPlacebo: panelPlaceboEvidenceSchema,
-  syntheticDidPlacebo: panelPlaceboEvidenceSchema,
-  syntheticControlInTime: panelInTimeEvidenceSchema,
-  syntheticDidInTime: panelInTimeEvidenceSchema,
-}).strict().superRefine((evidence, context) => {
-  if (evidence.controlUnits + evidence.treatedUnits !== evidence.units.length) context.addIssue({ code: 'custom', message: 'Panel unit counts do not match the unit labels.' })
-  if (evidence.nPre + evidence.nPost !== evidence.times.length) context.addIssue({ code: 'custom', message: 'Panel period counts do not match the time codes.' })
-  for (const [name, estimate] of [['DID', evidence.did], ['synthetic control', evidence.syntheticControl], ['synthetic DID', evidence.syntheticDid]] as const) {
-    if (estimate.omega.length !== evidence.controlUnits) context.addIssue({ code: 'custom', message: `${name} control weights do not match the controls.` })
-    if (estimate.lambda.length !== evidence.nPre) context.addIssue({ code: 'custom', message: `${name} time weights do not match the pre-periods.` })
-    if (estimate.effectCurve.length !== evidence.nPost) context.addIssue({ code: 'custom', message: `${name} effect curve does not match the post-periods.` })
-  }
-  for (const [name, inference] of [['synthetic control', evidence.syntheticControlPlacebo], ['synthetic DID', evidence.syntheticDidPlacebo]] as const) {
-    if (inference.kind === 'available' && inference.estimates.length !== inference.replications) context.addIssue({ code: 'custom', message: `${name} placebo estimates do not match the replication count.` })
-  }
-})
+const syntheticPanelEvidenceSchema = z
+  .object({
+    kind: z.literal('panelIntervention'),
+    observations: z.number().int().positive(),
+    units: z.array(z.string().min(1)).min(2),
+    times: z.array(z.number().int().nonnegative()).min(2),
+    controlUnits: z.number().int().positive(),
+    treatedUnits: z.number().int().positive(),
+    nPre: z.number().int().positive(),
+    nPost: z.number().int().positive(),
+    did: panelMethodEvidenceSchema,
+    syntheticControl: panelMethodEvidenceSchema,
+    syntheticDid: panelMethodEvidenceSchema,
+    syntheticControlPlacebo: panelPlaceboEvidenceSchema,
+    syntheticDidPlacebo: panelPlaceboEvidenceSchema,
+    syntheticControlInTime: panelInTimeEvidenceSchema,
+    syntheticDidInTime: panelInTimeEvidenceSchema,
+  })
+  .strict()
+  .superRefine((evidence, context) => {
+    if (evidence.controlUnits + evidence.treatedUnits !== evidence.units.length)
+      context.addIssue({
+        code: 'custom',
+        message: 'Panel unit counts do not match the unit labels.',
+      })
+    if (evidence.nPre + evidence.nPost !== evidence.times.length)
+      context.addIssue({
+        code: 'custom',
+        message: 'Panel period counts do not match the time codes.',
+      })
+    for (const [name, estimate] of [
+      ['DID', evidence.did],
+      ['synthetic control', evidence.syntheticControl],
+      ['synthetic DID', evidence.syntheticDid],
+    ] as const) {
+      if (estimate.omega.length !== evidence.controlUnits)
+        context.addIssue({
+          code: 'custom',
+          message: `${name} control weights do not match the controls.`,
+        })
+      if (estimate.lambda.length !== evidence.nPre)
+        context.addIssue({
+          code: 'custom',
+          message: `${name} time weights do not match the pre-periods.`,
+        })
+      if (estimate.effectCurve.length !== evidence.nPost)
+        context.addIssue({
+          code: 'custom',
+          message: `${name} effect curve does not match the post-periods.`,
+        })
+    }
+    for (const [name, inference] of [
+      ['synthetic control', evidence.syntheticControlPlacebo],
+      ['synthetic DID', evidence.syntheticDidPlacebo],
+    ] as const) {
+      if (inference.kind === 'available' && inference.estimates.length !== inference.replications)
+        context.addIssue({
+          code: 'custom',
+          message: `${name} placebo estimates do not match the replication count.`,
+        })
+    }
+  })
 
-const conventionalPanelEvidenceSchema = z.object({
-  kind: z.literal('panelDid'),
-  observations: z.number().int().positive(),
-  units: z.array(z.string().min(1)).min(2),
-  times: z.array(z.number().int().nonnegative()).min(2),
-  controlUnits: z.number().int().positive(),
-  treatedUnits: z.number().int().positive(),
-  nPre: z.number().int().positive(),
-  nPost: z.number().int().positive(),
-  did: panelMethodEvidenceSchema,
-}).strict().superRefine((e, ctx) => {
-  if (e.controlUnits + e.treatedUnits !== e.units.length || e.nPre + e.nPost !== e.times.length || e.observations !== e.units.length * e.times.length) ctx.addIssue({ code: 'custom', message: 'DiD panel dimensions do not match.' })
-  if (e.did.omega.length !== e.controlUnits || e.did.lambda.length !== e.nPre || e.did.effectCurve.length !== e.nPost) ctx.addIssue({ code: 'custom', message: 'DiD weights or period effects do not match the panel.' })
-})
+const conventionalPanelEvidenceSchema = z
+  .object({
+    kind: z.literal('panelDid'),
+    observations: z.number().int().positive(),
+    units: z.array(z.string().min(1)).min(2),
+    times: z.array(z.number().int().nonnegative()).min(2),
+    controlUnits: z.number().int().positive(),
+    treatedUnits: z.number().int().positive(),
+    nPre: z.number().int().positive(),
+    nPost: z.number().int().positive(),
+    did: panelMethodEvidenceSchema,
+  })
+  .strict()
+  .superRefine((e, ctx) => {
+    if (
+      e.controlUnits + e.treatedUnits !== e.units.length ||
+      e.nPre + e.nPost !== e.times.length ||
+      e.observations !== e.units.length * e.times.length
+    )
+      ctx.addIssue({ code: 'custom', message: 'DiD panel dimensions do not match.' })
+    if (
+      e.did.omega.length !== e.controlUnits ||
+      e.did.lambda.length !== e.nPre ||
+      e.did.effectCurve.length !== e.nPost
+    )
+      ctx.addIssue({
+        code: 'custom',
+        message: 'DiD weights or period effects do not match the panel.',
+      })
+  })
 
-export const panelInterventionEvidenceSchema = z.union([syntheticPanelEvidenceSchema, conventionalPanelEvidenceSchema, adjustedDidEvidenceSchema, staggeredEvidenceSchema, sunAbrahamEvidenceSchema])
+export const panelInterventionEvidenceSchema = z.union([
+  syntheticPanelEvidenceSchema,
+  conventionalPanelEvidenceSchema,
+  adjustedDidEvidenceSchema,
+  staggeredEvidenceSchema,
+  sunAbrahamEvidenceSchema,
+])
 export type PanelInterventionEvidence = z.infer<typeof panelInterventionEvidenceSchema>
 
-export const negbinNutsEvidenceSchema = z.object({
-  kind: z.literal('negbinNuts'),
-  observations: z.number().int().positive(),
-  warmup: z.number().int().positive(),
-  samples: z.number().int().positive(),
-  seed: z.number().int().nonnegative(),
-  irrMedian: z.number().finite().positive(),
-  irrLower: z.number().finite().positive(),
-  irrUpper: z.number().finite().positive(),
-  betaTreatmentMean: z.number().finite(),
-  betaTreatmentSd: z.number().finite().nonnegative(),
-  dispersionMean: z.number().finite().positive(),
-  divergences: z.number().int().nonnegative(),
-  acceptanceRate: z.number().min(0).max(1),
-  meanAcceptProbability: z.number().min(0).max(1),
-  stepSize: z.number().finite().positive(),
-}).strict()
+export const negbinNutsEvidenceSchema = z
+  .object({
+    kind: z.literal('negbinNuts'),
+    observations: z.number().int().positive(),
+    warmup: z.number().int().positive(),
+    samples: z.number().int().positive(),
+    seed: z.number().int().nonnegative(),
+    irrMedian: z.number().finite().positive(),
+    irrLower: z.number().finite().positive(),
+    irrUpper: z.number().finite().positive(),
+    betaTreatmentMean: z.number().finite(),
+    betaTreatmentSd: z.number().finite().nonnegative(),
+    dispersionMean: z.number().finite().positive(),
+    divergences: z.number().int().nonnegative(),
+    acceptanceRate: z.number().min(0).max(1),
+    meanAcceptProbability: z.number().min(0).max(1),
+    stepSize: z.number().finite().positive(),
+  })
+  .strict()
 
 export type NegbinNutsEvidence = z.infer<typeof negbinNutsEvidenceSchema>
 
-export const bayesianGaussianEvidenceSchema = z.object({
-  kind: z.literal('bayesianGaussian'),
-  observations: z.number().int().positive(),
-  warmup: z.number().int().positive(),
-  samples: z.number().int().positive(),
-  chains: z.number().int().positive(),
-  seed: z.number().int().nonnegative(),
-  effectMean: z.number().finite(),
-  effectSd: z.number().finite().nonnegative(),
-  effectMedian: z.number().finite(),
-  hdiLower: z.number().finite(),
-  hdiUpper: z.number().finite(),
-  probabilityPositive: z.number().min(0).max(1),
-  sigmaMean: z.number().finite().positive(),
-  divergences: z.number().int().nonnegative(),
-  acceptanceRate: z.number().min(0).max(1),
-  meanAcceptProbability: z.number().min(0).max(1),
-  stepSize: z.number().finite().positive(),
-  histogramStart: z.number().finite(),
-  histogramBinWidth: z.number().finite().positive(),
-  histogramCounts: z.array(z.number().int().nonnegative()).min(1),
-  curves: z.array(z.object({
-    standardised: z.boolean(),
-    grid: z.array(z.number().finite()).min(2),
-    controlLower: z.array(z.number().finite()),
-    controlMedian: z.array(z.number().finite()),
-    controlUpper: z.array(z.number().finite()),
-    treatedLower: z.array(z.number().finite()),
-    treatedMedian: z.array(z.number().finite()),
-    treatedUpper: z.array(z.number().finite()),
-  }).strict()),
-}).strict()
+export const bayesianGaussianEvidenceSchema = z
+  .object({
+    kind: z.literal('bayesianGaussian'),
+    observations: z.number().int().positive(),
+    warmup: z.number().int().positive(),
+    samples: z.number().int().positive(),
+    chains: z.number().int().positive(),
+    seed: z.number().int().nonnegative(),
+    effectMean: z.number().finite(),
+    effectSd: z.number().finite().nonnegative(),
+    effectMedian: z.number().finite(),
+    hdiLower: z.number().finite(),
+    hdiUpper: z.number().finite(),
+    probabilityPositive: z.number().min(0).max(1),
+    sigmaMean: z.number().finite().positive(),
+    divergences: z.number().int().nonnegative(),
+    acceptanceRate: z.number().min(0).max(1),
+    meanAcceptProbability: z.number().min(0).max(1),
+    stepSize: z.number().finite().positive(),
+    histogramStart: z.number().finite(),
+    histogramBinWidth: z.number().finite().positive(),
+    histogramCounts: z.array(z.number().int().nonnegative()).min(1),
+    curves: z.array(
+      z
+        .object({
+          standardised: z.boolean(),
+          grid: z.array(z.number().finite()).min(2),
+          controlLower: z.array(z.number().finite()),
+          controlMedian: z.array(z.number().finite()),
+          controlUpper: z.array(z.number().finite()),
+          treatedLower: z.array(z.number().finite()),
+          treatedMedian: z.array(z.number().finite()),
+          treatedUpper: z.array(z.number().finite()),
+        })
+        .strict(),
+    ),
+  })
+  .strict()
 
 export type BayesianGaussianEvidence = z.infer<typeof bayesianGaussianEvidenceSchema>
 export type BayesianGaussianCurve = BayesianGaussianEvidence['curves'][number]
 
 export const discreteStateStrategySchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('observedStates'), states: z.number().int().min(2) }).strict(),
-  z.object({
-    kind: z.literal('quantiles'),
-    requested: z.number().int().min(2),
-    populated: z.number().int().min(2),
-  }).strict(),
+  z
+    .object({
+      kind: z.literal('quantiles'),
+      requested: z.number().int().min(2),
+      populated: z.number().int().min(2),
+    })
+    .strict(),
 ])
 
-export const discreteStatePreparationSchema = z.object({
-  node: z.number().int().nonnegative(),
-  name: z.string().trim().min(1),
-  strategy: discreteStateStrategySchema,
-}).strict()
+export const discreteStatePreparationSchema = z
+  .object({
+    node: z.number().int().nonnegative(),
+    name: z.string().trim().min(1),
+    strategy: discreteStateStrategySchema,
+  })
+  .strict()
 
 export type DiscreteStatePreparation = z.infer<typeof discreteStatePreparationSchema>
 
 export const describeDiscreteStatePreparations = (
   preparations: readonly DiscreteStatePreparation[],
-): string => preparations.map((preparation) => {
-  switch (preparation.strategy.kind) {
-    case 'observedStates':
-      return `${preparation.name}: ${preparation.strategy.states} observed states`
-    case 'quantiles':
-      return `${preparation.name}: ${preparation.strategy.populated} quantile states (budget ${preparation.strategy.requested})`
-    default:
-      return assertNever(preparation.strategy)
-  }
-}).join('; ')
+): string =>
+  preparations
+    .map((preparation) => {
+      switch (preparation.strategy.kind) {
+        case 'observedStates':
+          return `${preparation.name}: ${preparation.strategy.states} observed states`
+        case 'quantiles':
+          return `${preparation.name}: ${preparation.strategy.populated} quantile states (budget ${preparation.strategy.requested})`
+        default:
+          return assertNever(preparation.strategy)
+      }
+    })
+    .join('; ')
 
-export const discreteBnEvidenceSchema = z.object({
-  kind: z.literal('discreteBnQuery'),
-  observations: z.number().int().positive(),
-  bins: z.number().int().min(2),
-  equivalentSampleSize: z.number().positive(),
-  stateCounts: z.array(z.number().int().positive()),
-  statePreparations: z.array(discreteStatePreparationSchema).min(2),
-  treatmentStates: z.tuple([z.string(), z.string()]),
-  expectations: z.tuple([z.number().finite(), z.number().finite()]),
-  effect: z.number().finite(),
-  distributionLow: z.array(z.tuple([z.string(), z.number().min(0).max(1 + 1e-9)])),
-  distributionHigh: z.array(z.tuple([z.string(), z.number().min(0).max(1 + 1e-9)])),
-  minimalAdjustmentSet: z.array(z.string()).nullable(),
-  parentsAdjusted: z.array(z.string()),
-}).strict()
+export const discreteBnEvidenceSchema = z
+  .object({
+    kind: z.literal('discreteBnQuery'),
+    observations: z.number().int().positive(),
+    bins: z.number().int().min(2),
+    equivalentSampleSize: z.number().positive(),
+    stateCounts: z.array(z.number().int().positive()),
+    statePreparations: z.array(discreteStatePreparationSchema).min(2),
+    treatmentStates: z.tuple([z.string(), z.string()]),
+    expectations: z.tuple([z.number().finite(), z.number().finite()]),
+    effect: z.number().finite(),
+    distributionLow: z.array(
+      z.tuple([
+        z.string(),
+        z
+          .number()
+          .min(0)
+          .max(1 + 1e-9),
+      ]),
+    ),
+    distributionHigh: z.array(
+      z.tuple([
+        z.string(),
+        z
+          .number()
+          .min(0)
+          .max(1 + 1e-9),
+      ]),
+    ),
+    minimalAdjustmentSet: z.array(z.string()).nullable(),
+    parentsAdjusted: z.array(z.string()),
+  })
+  .strict()
 
 export type DiscreteBnEvidence = z.infer<typeof discreteBnEvidenceSchema>
 
-export const binaryEttEvidenceSchema = z.object({
-  kind: z.literal('binaryEtt'),
-  observations: z.number().int().positive(),
-  treatment: z.number().int().nonnegative(),
-  outcome: z.number().int().nonnegative(),
-  treatedPotentialOutcomeMean: z.number().min(0).max(1),
-  untreatedPotentialOutcomeMean: z.number().min(0).max(1),
-  effectOnTreated: z.number().min(-1).max(1),
-  treatedExpression: z.string().min(1),
-  untreatedExpression: z.string().min(1),
-}).strict()
+export const binaryEttEvidenceSchema = z
+  .object({
+    kind: z.literal('binaryEtt'),
+    observations: z.number().int().positive(),
+    treatment: z.number().int().nonnegative(),
+    outcome: z.number().int().nonnegative(),
+    treatedPotentialOutcomeMean: z.number().min(0).max(1),
+    untreatedPotentialOutcomeMean: z.number().min(0).max(1),
+    effectOnTreated: z.number().min(-1).max(1),
+    treatedExpression: z.string().min(1),
+    untreatedExpression: z.string().min(1),
+  })
+  .strict()
 
 export type BinaryEttEvidence = z.infer<typeof binaryEttEvidenceSchema>
-export const parseBinaryEttEvidence = (value: unknown): Result<BinaryEttEvidence, EstimationEvidenceProblem> => parseWith(binaryEttEvidenceSchema, value)
+export const parseBinaryEttEvidence = (
+  value: unknown,
+): Result<BinaryEttEvidence, EstimationEvidenceProblem> => parseWith(binaryEttEvidenceSchema, value)
 
 const nodeSchema = causalEffectsNodeSchema
 
-const wrightCoefficientEvidenceSchema = z.object({
-  parent: nodeSchema,
-  child: nodeSchema,
-  coefficient: z.number().finite(),
-}).strict()
+const wrightCoefficientEvidenceSchema = z
+  .object({
+    parent: nodeSchema,
+    child: nodeSchema,
+    coefficient: z.number().finite(),
+  })
+  .strict()
 
-const wrightPathEvidenceSchema = z.object({
-  nodes: z.array(nodeSchema).min(2),
-  coefficient: z.number().finite(),
-  contrast: z.number().finite(),
-}).strict()
+const wrightPathEvidenceSchema = z
+  .object({
+    nodes: z.array(nodeSchema).min(2),
+    coefficient: z.number().finite(),
+    contrast: z.number().finite(),
+  })
+  .strict()
 
 export const causalEffectsAdjustmentProblemSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('queryTreatment'), node: nodeSchema }).strict(),
@@ -1527,56 +2275,79 @@ export type CausalEffectsAdjustmentProblem = z.infer<typeof causalEffectsAdjustm
 
 const causalEffectsFitEvidenceSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('unfitted'), requested: totalEffectEstimatorSchema }).strict(),
-  z.object({
-    kind: z.literal('invalidAdjustment'),
-    requested: totalEffectEstimatorSchema,
-    problems: z.array(causalEffectsAdjustmentProblemSchema).min(1),
-  }).strict(),
-  z.object({ kind: z.literal('adjustedLinear'), selection: causalEffectsAdjustmentSchema, adjustmentSet: z.array(nodeSchema) }).strict(),
-  z.object({ kind: z.literal('adjustedKnn'), k: z.number().int().positive(), selection: causalEffectsAdjustmentSchema, adjustmentSet: z.array(nodeSchema) }).strict(),
-  z.object({
-    kind: z.literal('wrightParents'),
-    coefficients: z.array(wrightCoefficientEvidenceSchema).min(1),
-    paths: z.array(wrightPathEvidenceSchema).min(1),
-    directEffect: z.number().finite(),
-    indirectEffect: z.number().finite(),
-  }).strict(),
+  z
+    .object({
+      kind: z.literal('invalidAdjustment'),
+      requested: totalEffectEstimatorSchema,
+      problems: z.array(causalEffectsAdjustmentProblemSchema).min(1),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('adjustedLinear'),
+      selection: causalEffectsAdjustmentSchema,
+      adjustmentSet: z.array(nodeSchema),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('adjustedKnn'),
+      k: z.number().int().positive(),
+      selection: causalEffectsAdjustmentSchema,
+      adjustmentSet: z.array(nodeSchema),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('wrightParents'),
+      coefficients: z.array(wrightCoefficientEvidenceSchema).min(1),
+      paths: z.array(wrightPathEvidenceSchema).min(1),
+      directEffect: z.number().finite(),
+      indirectEffect: z.number().finite(),
+    })
+    .strict(),
 ])
 export type CausalEffectsFitEvidence = z.infer<typeof causalEffectsFitEvidenceSchema>
 
 const causalEffectsUncertaintyEvidenceSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('none') }).strict(),
-  z.object({
-    kind: z.literal('bootstrap'),
-    samples: z.number().int().positive(),
-    blockLength: causalEffectsBlockLengthSchema,
-    resolvedBlockLength: z.number().int().positive(),
-    confidenceLevel: z.number().gt(0).lt(1),
-    seed: z.number().int().nonnegative(),
-    predictionIntervals: z.tuple([
-      z.tuple([z.number().finite(), z.number().finite()]),
-      z.tuple([z.number().finite(), z.number().finite()]),
-    ]),
-    effectInterval: z.tuple([z.number().finite(), z.number().finite()]),
-    effectDraws: z.array(z.number().finite()).min(1),
-  }).strict(),
+  z
+    .object({
+      kind: z.literal('bootstrap'),
+      samples: z.number().int().positive(),
+      blockLength: causalEffectsBlockLengthSchema,
+      resolvedBlockLength: z.number().int().positive(),
+      confidenceLevel: z.number().gt(0).lt(1),
+      seed: z.number().int().nonnegative(),
+      predictionIntervals: z.tuple([
+        z.tuple([z.number().finite(), z.number().finite()]),
+        z.tuple([z.number().finite(), z.number().finite()]),
+      ]),
+      effectInterval: z.tuple([z.number().finite(), z.number().finite()]),
+      effectDraws: z.array(z.number().finite()).min(1),
+    })
+    .strict(),
 ])
-export type CausalEffectsUncertaintyEvidence = z.infer<typeof causalEffectsUncertaintyEvidenceSchema>
+export type CausalEffectsUncertaintyEvidence = z.infer<
+  typeof causalEffectsUncertaintyEvidenceSchema
+>
 
-export const causalEffectsEvidenceSchema = z.object({
-  kind: z.literal('causalEffectsTotal'),
-  observations: z.number().int().positive(),
-  tauMax: z.number().int().nonnegative(),
-  noCausalPath: z.boolean(),
-  identifiable: z.boolean(),
-  mediators: z.array(nodeSchema),
-  fit: causalEffectsFitEvidenceSchema,
-  interventions: z.tuple([z.number().finite(), z.number().finite()]),
-  predictions: z.array(z.number().finite()),
-  totalEffect: nullableNumber,
-  fittedObservations: z.number().int().nonnegative(),
-  uncertainty: causalEffectsUncertaintyEvidenceSchema,
-}).strict()
+export const causalEffectsEvidenceSchema = z
+  .object({
+    kind: z.literal('causalEffectsTotal'),
+    observations: z.number().int().positive(),
+    tauMax: z.number().int().nonnegative(),
+    noCausalPath: z.boolean(),
+    identifiable: z.boolean(),
+    mediators: z.array(nodeSchema),
+    fit: causalEffectsFitEvidenceSchema,
+    interventions: z.tuple([z.number().finite(), z.number().finite()]),
+    predictions: z.array(z.number().finite()),
+    totalEffect: nullableNumber,
+    fittedObservations: z.number().int().nonnegative(),
+    uncertainty: causalEffectsUncertaintyEvidenceSchema,
+  })
+  .strict()
 
 export type CausalEffectsEvidence = z.infer<typeof causalEffectsEvidenceSchema>
 
@@ -1589,32 +2360,65 @@ function causalEffectsUncertaintyMatches(
       return returned.kind === 'none'
     case 'bootstrap':
       if (returned.kind !== 'bootstrap') return false
-      return requested.samples === returned.samples
-        && requested.confidenceLevel === returned.confidenceLevel
-        && requested.seed === returned.seed
-        && (requested.blockLength.kind === 'cubeRoot'
+      return (
+        requested.samples === returned.samples &&
+        requested.confidenceLevel === returned.confidenceLevel &&
+        requested.seed === returned.seed &&
+        (requested.blockLength.kind === 'cubeRoot'
           ? returned.blockLength.kind === 'cubeRoot'
-          : returned.blockLength.kind === 'fixed' && requested.blockLength.length === returned.blockLength.length)
+          : returned.blockLength.kind === 'fixed' &&
+            requested.blockLength.length === returned.blockLength.length)
+      )
     default:
       return assertNever(requested)
   }
 }
 
-function adjustmentSelectionMatches(left: CausalEffectsAdjustment, right: CausalEffectsAdjustment): boolean {
+function adjustmentSelectionMatches(
+  left: CausalEffectsAdjustment,
+  right: CausalEffectsAdjustment,
+): boolean {
   if (left.kind !== right.kind) return false
   if (left.kind !== 'explicit' || right.kind !== 'explicit') return true
-  return left.nodes.length === right.nodes.length
-    && left.nodes.every((node, index) => node[0] === right.nodes[index]?.[0] && node[1] === right.nodes[index]?.[1])
+  return (
+    left.nodes.length === right.nodes.length &&
+    left.nodes.every(
+      (node, index) => node[0] === right.nodes[index]?.[0] && node[1] === right.nodes[index]?.[1],
+    )
+  )
 }
 
-function causalEffectsFitMatches(requested: TotalEffectEstimator, returned: CausalEffectsFitEvidence): boolean {
+function causalEffectsFitMatches(
+  requested: TotalEffectEstimator,
+  returned: CausalEffectsFitEvidence,
+): boolean {
   switch (requested.kind) {
-    case 'linear': return (returned.kind === 'adjustedLinear' && adjustmentSelectionMatches(requested.adjustment, returned.selection))
-      || ((returned.kind === 'unfitted' || returned.kind === 'invalidAdjustment') && returned.requested.kind === 'linear' && adjustmentSelectionMatches(requested.adjustment, returned.requested.adjustment))
-    case 'knn': return (returned.kind === 'adjustedKnn' && returned.k === requested.k && adjustmentSelectionMatches(requested.adjustment, returned.selection))
-      || ((returned.kind === 'unfitted' || returned.kind === 'invalidAdjustment') && returned.requested.kind === 'knn' && returned.requested.k === requested.k && adjustmentSelectionMatches(requested.adjustment, returned.requested.adjustment))
-    case 'wrightParents': return returned.kind === 'wrightParents' || ((returned.kind === 'unfitted' || returned.kind === 'invalidAdjustment') && returned.requested.kind === 'wrightParents')
-    default: return assertNever(requested)
+    case 'linear':
+      return (
+        (returned.kind === 'adjustedLinear' &&
+          adjustmentSelectionMatches(requested.adjustment, returned.selection)) ||
+        ((returned.kind === 'unfitted' || returned.kind === 'invalidAdjustment') &&
+          returned.requested.kind === 'linear' &&
+          adjustmentSelectionMatches(requested.adjustment, returned.requested.adjustment))
+      )
+    case 'knn':
+      return (
+        (returned.kind === 'adjustedKnn' &&
+          returned.k === requested.k &&
+          adjustmentSelectionMatches(requested.adjustment, returned.selection)) ||
+        ((returned.kind === 'unfitted' || returned.kind === 'invalidAdjustment') &&
+          returned.requested.kind === 'knn' &&
+          returned.requested.k === requested.k &&
+          adjustmentSelectionMatches(requested.adjustment, returned.requested.adjustment))
+      )
+    case 'wrightParents':
+      return (
+        returned.kind === 'wrightParents' ||
+        ((returned.kind === 'unfitted' || returned.kind === 'invalidAdjustment') &&
+          returned.requested.kind === 'wrightParents')
+      )
+    default:
+      return assertNever(requested)
   }
 }
 
@@ -1626,258 +2430,511 @@ const preInterventionStepsSchema = {
   counterfactual: z.array(z.number().finite()),
 }
 const notReportedPathSchema = z.object({ kind: z.literal('notReported') }).strict()
-const fittedPreInterventionPathSchema = z.object({
-  kind: z.literal('fitted'), ...preInterventionStepsSchema,
-  se: z.array(z.number().finite().nonnegative()),
-}).strict()
-const sampledPreInterventionPathSchema = z.object({
-  kind: z.literal('sampled'), ...preInterventionStepsSchema,
-  lower: z.array(z.number().finite()), upper: z.array(z.number().finite()),
-}).strict()
+const fittedPreInterventionPathSchema = z
+  .object({
+    kind: z.literal('fitted'),
+    ...preInterventionStepsSchema,
+    se: z.array(z.number().finite().nonnegative()),
+  })
+  .strict()
+const sampledPreInterventionPathSchema = z
+  .object({
+    kind: z.literal('sampled'),
+    ...preInterventionStepsSchema,
+    lower: z.array(z.number().finite()),
+    upper: z.array(z.number().finite()),
+  })
+  .strict()
 export const preInterventionPathSchema = z.discriminatedUnion('kind', [
-  notReportedPathSchema, fittedPreInterventionPathSchema, sampledPreInterventionPathSchema,
+  notReportedPathSchema,
+  fittedPreInterventionPathSchema,
+  sampledPreInterventionPathSchema,
 ])
 export type PreInterventionPath = z.infer<typeof preInterventionPathSchema>
 
-const maximumLikelihoodImpactEvidenceSchema = z.object({
-  kind: z.literal('causalImpact'),
-  preInterventionPath: z.discriminatedUnion('kind', [notReportedPathSchema, fittedPreInterventionPathSchema]),
-  observations: z.number().int().positive(),
-  nPre: z.number().int().positive(),
-  nPost: z.number().int().positive(),
-  postEnd: z.number().int().positive(),
-  outcome: z.number().int().nonnegative(),
-  controls: z.array(z.number().int().nonnegative()),
-  counterfactual: z.array(z.number().finite()),
-  counterfactualSe: z.array(z.number().finite().nonnegative()),
-  pointwise: z.array(z.number().finite()),
-  cumulative: z.number().finite(),
-  average: z.number().finite(),
-  params: z.array(z.number().finite()),
-  logLikelihood: z.number().finite(),
-}).strict()
+const maximumLikelihoodImpactEvidenceSchema = z
+  .object({
+    kind: z.literal('causalImpact'),
+    preInterventionPath: z.discriminatedUnion('kind', [
+      notReportedPathSchema,
+      fittedPreInterventionPathSchema,
+    ]),
+    observations: z.number().int().positive(),
+    nPre: z.number().int().positive(),
+    nPost: z.number().int().positive(),
+    postEnd: z.number().int().positive(),
+    outcome: z.number().int().nonnegative(),
+    controls: z.array(z.number().int().nonnegative()),
+    counterfactual: z.array(z.number().finite()),
+    counterfactualSe: z.array(z.number().finite().nonnegative()),
+    pointwise: z.array(z.number().finite()),
+    cumulative: z.number().finite(),
+    average: z.number().finite(),
+    params: z.array(z.number().finite()),
+    logLikelihood: z.number().finite(),
+  })
+  .strict()
 
-const posteriorQuantitySchema = z.object({
-  mean: z.number().finite(), lower: z.number().finite(), upper: z.number().finite(),
-  sd: z.number().finite().nonnegative(),
-}).strict().refine((value) => value.lower <= value.upper, 'Posterior bounds must be ordered.')
-const impactSummarySchema = z.object({
-  actual: z.number().finite(), predicted: posteriorQuantitySchema,
-  absolute: posteriorQuantitySchema, relative: posteriorQuantitySchema,
-  tailProbability: z.number().positive().max(1),
-}).strict()
-export const bayesianImpactEvidenceSchema = z.object({
-  kind: z.literal('bayesianCausalImpact'),
-  // Older saved runs did not record inclusion indicators. Absence is not zero inclusion.
-  controlInclusion: z.array(z.object({ column:z.number().int().nonnegative(), probability:z.number().finite().min(0).max(1) }).strict()).optional(),
-  observations: z.number().int().positive(), nPre: z.number().int().min(8), nPost: z.number().int().positive(),
-  postEnd: z.number().int().positive(),
-  outcome: z.number().int().nonnegative(), controls: z.array(z.number().int().nonnegative()),
-  draws: z.number().int().min(2), warmup: z.number().int().nonnegative(), seed: z.number().int().min(0).max(0xffffffff),
-  priorLevelSd: z.number().finite().positive(), level: z.literal(0.95),
-  preInterventionPath: z.discriminatedUnion('kind', [notReportedPathSchema, sampledPreInterventionPathSchema]),
-  counterfactual: z.array(z.number().finite()), counterfactualSe: z.array(z.number().finite().nonnegative()),
-  counterfactualLower: z.array(z.number().finite()), counterfactualUpper: z.array(z.number().finite()),
-  pointwise: z.array(z.number().finite()), pointwiseLower: z.array(z.number().finite()), pointwiseUpper: z.array(z.number().finite()),
-  cumulativeLower: z.array(z.number().finite()), cumulativeUpper: z.array(z.number().finite()),
-  cumulative: z.number().finite(), average: z.number().finite(),
-  averageSummary: impactSummarySchema, cumulativeSummary: impactSummarySchema,
-}).strict()
-export const structuralImpactEvidenceSchema = bayesianImpactEvidenceSchema.omit({ kind:true, priorLevelSd:true }).extend({
-  kind: z.literal('structuralCausalImpact'), model: structuralModelSchema,
-  contributions: z.array(structuralContributionSchema).min(1),
-}).strict()
-export const causalImpactEvidenceSchema = z.discriminatedUnion('kind', [maximumLikelihoodImpactEvidenceSchema, bayesianImpactEvidenceSchema, structuralImpactEvidenceSchema])
+const posteriorQuantitySchema = z
+  .object({
+    mean: z.number().finite(),
+    lower: z.number().finite(),
+    upper: z.number().finite(),
+    sd: z.number().finite().nonnegative(),
+  })
+  .strict()
+  .refine((value) => value.lower <= value.upper, 'Posterior bounds must be ordered.')
+const impactSummarySchema = z
+  .object({
+    actual: z.number().finite(),
+    predicted: posteriorQuantitySchema,
+    absolute: posteriorQuantitySchema,
+    relative: posteriorQuantitySchema,
+    tailProbability: z.number().positive().max(1),
+  })
+  .strict()
+export const bayesianImpactEvidenceSchema = z
+  .object({
+    kind: z.literal('bayesianCausalImpact'),
+    // Older saved runs did not record inclusion indicators. Absence is not zero inclusion.
+    controlInclusion: z
+      .array(
+        z
+          .object({
+            column: z.number().int().nonnegative(),
+            probability: z.number().finite().min(0).max(1),
+          })
+          .strict(),
+      )
+      .optional(),
+    observations: z.number().int().positive(),
+    nPre: z.number().int().min(8),
+    nPost: z.number().int().positive(),
+    postEnd: z.number().int().positive(),
+    outcome: z.number().int().nonnegative(),
+    controls: z.array(z.number().int().nonnegative()),
+    draws: z.number().int().min(2),
+    warmup: z.number().int().nonnegative(),
+    seed: z.number().int().min(0).max(0xffffffff),
+    priorLevelSd: z.number().finite().positive(),
+    level: z.literal(0.95),
+    preInterventionPath: z.discriminatedUnion('kind', [
+      notReportedPathSchema,
+      sampledPreInterventionPathSchema,
+    ]),
+    counterfactual: z.array(z.number().finite()),
+    counterfactualSe: z.array(z.number().finite().nonnegative()),
+    counterfactualLower: z.array(z.number().finite()),
+    counterfactualUpper: z.array(z.number().finite()),
+    pointwise: z.array(z.number().finite()),
+    pointwiseLower: z.array(z.number().finite()),
+    pointwiseUpper: z.array(z.number().finite()),
+    cumulativeLower: z.array(z.number().finite()),
+    cumulativeUpper: z.array(z.number().finite()),
+    cumulative: z.number().finite(),
+    average: z.number().finite(),
+    averageSummary: impactSummarySchema,
+    cumulativeSummary: impactSummarySchema,
+  })
+  .strict()
+export const structuralImpactEvidenceSchema = bayesianImpactEvidenceSchema
+  .omit({ kind: true, priorLevelSd: true })
+  .extend({
+    kind: z.literal('structuralCausalImpact'),
+    model: structuralModelSchema,
+    contributions: z.array(structuralContributionSchema).min(1),
+  })
+  .strict()
+export const causalImpactEvidenceSchema = z.discriminatedUnion('kind', [
+  maximumLikelihoodImpactEvidenceSchema,
+  bayesianImpactEvidenceSchema,
+  structuralImpactEvidenceSchema,
+])
 export type CausalImpactEvidence = z.infer<typeof causalImpactEvidenceSchema>
 
-export function impactInferenceMatches(configuration: { readonly inference?: BayesianImpactSettings }, evidence: CausalImpactEvidence): boolean {
+export function impactInferenceMatches(
+  configuration: { readonly inference?: BayesianImpactSettings },
+  evidence: CausalImpactEvidence,
+): boolean {
   if (configuration.inference === undefined) return evidence.kind === 'causalImpact'
   const settings = configuration.inference
-  if (settings.kind === 'structural') return evidence.kind === 'structuralCausalImpact'
-    && settings.draws === evidence.draws && settings.warmup === evidence.warmup && settings.seed === evidence.seed
-    && sameStructuralModel(settings.model, evidence.model)
-  return evidence.kind === 'bayesianCausalImpact' && settings.draws === evidence.draws
-    && settings.warmup === evidence.warmup && settings.seed === evidence.seed
-    && settings.priorLevelSd === evidence.priorLevelSd
+  if (settings.kind === 'structural')
+    return (
+      evidence.kind === 'structuralCausalImpact' &&
+      settings.draws === evidence.draws &&
+      settings.warmup === evidence.warmup &&
+      settings.seed === evidence.seed &&
+      sameStructuralModel(settings.model, evidence.model)
+    )
+  return (
+    evidence.kind === 'bayesianCausalImpact' &&
+    settings.draws === evidence.draws &&
+    settings.warmup === evidence.warmup &&
+    settings.seed === evidence.seed &&
+    settings.priorLevelSd === evidence.priorLevelSd
+  )
 }
 
-export type EstimationEvidenceProblem = { readonly kind: 'invalid-estimation-evidence'; readonly detail: string }
+export type EstimationEvidenceProblem = {
+  readonly kind: 'invalid-estimation-evidence'
+  readonly detail: string
+}
 
-const parseWith = <Schema extends z.ZodTypeAny>(schema: Schema, value: unknown): Result<z.infer<Schema>, EstimationEvidenceProblem> => {
+const parseWith = <Schema extends z.ZodTypeAny>(
+  schema: Schema,
+  value: unknown,
+): Result<z.infer<Schema>, EstimationEvidenceProblem> => {
   const parsed = schema.safeParse(value)
-  return parsed.success ? ok(parsed.data) : err({ kind: 'invalid-estimation-evidence', detail: z.prettifyError(parsed.error) })
+  return parsed.success
+    ? ok(parsed.data)
+    : err({ kind: 'invalid-estimation-evidence', detail: z.prettifyError(parsed.error) })
 }
 
 /** A bootstrap interval with its bounds the wrong way round is a defect, not a wide interval. */
 const orderedInterval = (interval: PropensityInterval | null): boolean =>
   interval === null || interval.lower <= interval.upper
 
-export function parsePropensityWeightingEvidence(value: unknown): Result<PropensityWeightingEvidence, EstimationEvidenceProblem> {
+export function parsePropensityWeightingEvidence(
+  value: unknown,
+): Result<PropensityWeightingEvidence, EstimationEvidenceProblem> {
   const parsed = parseWith(propensityWeightingEvidenceSchema, value)
   if (!parsed.ok) return parsed
   if (parsed.value.propensity.length !== parsed.value.observations) {
-    return err({ kind: 'invalid-estimation-evidence', detail: 'The fitted scores do not cover every row.' })
+    return err({
+      kind: 'invalid-estimation-evidence',
+      detail: 'The fitted scores do not cover every row.',
+    })
   }
   if (!orderedInterval(parsed.value.interval)) {
-    return err({ kind: 'invalid-estimation-evidence', detail: 'An interval has its bounds reversed.' })
+    return err({
+      kind: 'invalid-estimation-evidence',
+      detail: 'An interval has its bounds reversed.',
+    })
   }
   return parsed
 }
 
-export function parsePropensityMatchingEvidence(value: unknown): Result<PropensityMatchingEvidence, EstimationEvidenceProblem> {
+export function parsePropensityMatchingEvidence(
+  value: unknown,
+): Result<PropensityMatchingEvidence, EstimationEvidenceProblem> {
   const parsed = parseWith(propensityMatchingEvidenceSchema, value)
   if (!parsed.ok) return parsed
-  if (parsed.value.propensity.length !== parsed.value.observations
-    || parsed.value.matches.length !== parsed.value.observations) {
-    return err({ kind: 'invalid-estimation-evidence', detail: 'The matched rows do not cover every row.' })
+  if (
+    parsed.value.propensity.length !== parsed.value.observations ||
+    parsed.value.matches.length !== parsed.value.observations
+  ) {
+    return err({
+      kind: 'invalid-estimation-evidence',
+      detail: 'The matched rows do not cover every row.',
+    })
   }
   return parsed
 }
 
-export function parseDoublyRobustEvidence(value: unknown): Result<DoublyRobustEvidence, EstimationEvidenceProblem> {
+export function parseDoublyRobustEvidence(
+  value: unknown,
+): Result<DoublyRobustEvidence, EstimationEvidenceProblem> {
   const parsed = parseWith(doublyRobustEvidenceSchema, value)
   if (!parsed.ok) return parsed
   if (parsed.value.propensity.length !== parsed.value.observations) {
-    return err({ kind: 'invalid-estimation-evidence', detail: 'The fitted scores do not cover every row.' })
+    return err({
+      kind: 'invalid-estimation-evidence',
+      detail: 'The fitted scores do not cover every row.',
+    })
   }
   if (!orderedInterval(parsed.value.interval)) {
-    return err({ kind: 'invalid-estimation-evidence', detail: 'An interval has its bounds reversed.' })
+    return err({
+      kind: 'invalid-estimation-evidence',
+      detail: 'An interval has its bounds reversed.',
+    })
   }
   return parsed
 }
 
-export function parseContinuousGpsEvidence(value: unknown): Result<ContinuousGpsEvidence, EstimationEvidenceProblem> {
+export function parseContinuousGpsEvidence(
+  value: unknown,
+): Result<ContinuousGpsEvidence, EstimationEvidenceProblem> {
   const parsed = parseWith(continuousGpsEvidenceSchema, value)
   if (!parsed.ok) return parsed
   if (parsed.value.density.length !== parsed.value.observations) {
-    return err({ kind: 'invalid-estimation-evidence', detail: 'The fitted densities do not cover every row.' })
+    return err({
+      kind: 'invalid-estimation-evidence',
+      detail: 'The fitted densities do not cover every row.',
+    })
   }
   if (parsed.value.weights?.length !== parsed.value.observations) {
-    return err({ kind: 'invalid-estimation-evidence', detail: 'The weights do not cover every row.' })
+    return err({
+      kind: 'invalid-estimation-evidence',
+      detail: 'The weights do not cover every row.',
+    })
   }
   if (!orderedInterval(parsed.value.interval)) {
-    return err({ kind: 'invalid-estimation-evidence', detail: 'An interval has its bounds reversed.' })
+    return err({
+      kind: 'invalid-estimation-evidence',
+      detail: 'An interval has its bounds reversed.',
+    })
   }
   return parsed
 }
 
-export function parseBackdoorLinearEvidence(value: unknown): Result<BackdoorLinearEvidence, EstimationEvidenceProblem> {
+export function parseBackdoorLinearEvidence(
+  value: unknown,
+): Result<BackdoorLinearEvidence, EstimationEvidenceProblem> {
   const parsed = parseWith(backdoorLinearEvidenceSchema, value)
   if (!parsed.ok) return parsed
-  if (parsed.value.interval[0] > parsed.value.interval[1] || parsed.value.hacInterval[0] > parsed.value.hacInterval[1]) {
-    return err({ kind: 'invalid-estimation-evidence', detail: 'An interval has its bounds reversed.' })
+  if (
+    parsed.value.interval[0] > parsed.value.interval[1] ||
+    parsed.value.hacInterval[0] > parsed.value.hacInterval[1]
+  ) {
+    return err({
+      kind: 'invalid-estimation-evidence',
+      detail: 'An interval has its bounds reversed.',
+    })
   }
   return parsed
 }
 
-export function parseFrontdoorTwoStageEvidence(value: unknown): Result<FrontdoorTwoStageEvidence, EstimationEvidenceProblem> {
+export function parseFrontdoorTwoStageEvidence(
+  value: unknown,
+): Result<FrontdoorTwoStageEvidence, EstimationEvidenceProblem> {
   const parsed = parseWith(frontdoorTwoStageEvidenceSchema, value)
   if (!parsed.ok) return parsed
-  if (parsed.value.uncertainty.kind === 'bootstrap' && parsed.value.uncertainty.interval[0] > parsed.value.uncertainty.interval[1]) {
-    return err({ kind: 'invalid-estimation-evidence', detail: 'The front-door confidence interval has its bounds reversed.' })
+  if (
+    parsed.value.uncertainty.kind === 'bootstrap' &&
+    parsed.value.uncertainty.interval[0] > parsed.value.uncertainty.interval[1]
+  ) {
+    return err({
+      kind: 'invalid-estimation-evidence',
+      detail: 'The front-door confidence interval has its bounds reversed.',
+    })
   }
   return parsed
 }
 
-export function parseInstrumentalVariableEvidence(value: unknown): Result<InstrumentalVariableEvidence, EstimationEvidenceProblem> {
+export function parseInstrumentalVariableEvidence(
+  value: unknown,
+): Result<InstrumentalVariableEvidence, EstimationEvidenceProblem> {
   const parsed = parseWith(instrumentalVariableEvidenceSchema, value)
   if (!parsed.ok) return parsed
-  if (parsed.value.uncertainty.kind === 'bootstrap' && parsed.value.uncertainty.interval[0] > parsed.value.uncertainty.interval[1]) {
-    return err({ kind: 'invalid-estimation-evidence', detail: 'The instrumental-variable confidence interval has its bounds reversed.' })
+  if (
+    parsed.value.uncertainty.kind === 'bootstrap' &&
+    parsed.value.uncertainty.interval[0] > parsed.value.uncertainty.interval[1]
+  ) {
+    return err({
+      kind: 'invalid-estimation-evidence',
+      detail: 'The instrumental-variable confidence interval has its bounds reversed.',
+    })
   }
-  if (new Set([parsed.value.treatment, parsed.value.outcome, ...parsed.value.instruments]).size !== 2 + parsed.value.instruments.length) {
-    return err({ kind: 'invalid-estimation-evidence', detail: 'The instrumental-variable columns are not distinct.' })
+  if (
+    new Set([parsed.value.treatment, parsed.value.outcome, ...parsed.value.instruments]).size !==
+    2 + parsed.value.instruments.length
+  ) {
+    return err({
+      kind: 'invalid-estimation-evidence',
+      detail: 'The instrumental-variable columns are not distinct.',
+    })
   }
   return parsed
 }
 
-export const parseCountGlmEvidence = (value: unknown): Result<CountGlmEvidence, EstimationEvidenceProblem> => parseWith(countGlmEvidenceSchema, value)
-export const parseNegativeBinomialIngarchEvidence = (value: unknown): Result<NegativeBinomialIngarchEvidence, EstimationEvidenceProblem> => parseWith(negativeBinomialIngarchEvidenceSchema, value)
+export const parseCountGlmEvidence = (
+  value: unknown,
+): Result<CountGlmEvidence, EstimationEvidenceProblem> => parseWith(countGlmEvidenceSchema, value)
+export const parseNegativeBinomialIngarchEvidence = (
+  value: unknown,
+): Result<NegativeBinomialIngarchEvidence, EstimationEvidenceProblem> =>
+  parseWith(negativeBinomialIngarchEvidenceSchema, value)
 
-export function parseCausalEffectsEvidence(value: unknown): Result<CausalEffectsEvidence, EstimationEvidenceProblem> {
+export function parseCausalEffectsEvidence(
+  value: unknown,
+): Result<CausalEffectsEvidence, EstimationEvidenceProblem> {
   const parsed = parseWith(causalEffectsEvidenceSchema, value)
   if (!parsed.ok) return parsed
-  if (parsed.value.identifiable && (parsed.value.predictions.length !== 2 || parsed.value.totalEffect === null)) {
-    return err({ kind: 'invalid-estimation-evidence', detail: 'An identifiable effect must carry two predictions and a total effect.' })
+  if (
+    parsed.value.identifiable &&
+    (parsed.value.predictions.length !== 2 || parsed.value.totalEffect === null)
+  ) {
+    return err({
+      kind: 'invalid-estimation-evidence',
+      detail: 'An identifiable effect must carry two predictions and a total effect.',
+    })
   }
-  const fitted = parsed.value.fit.kind === 'adjustedLinear'
-    || parsed.value.fit.kind === 'adjustedKnn'
-    || parsed.value.fit.kind === 'wrightParents'
+  const fitted =
+    parsed.value.fit.kind === 'adjustedLinear' ||
+    parsed.value.fit.kind === 'adjustedKnn' ||
+    parsed.value.fit.kind === 'wrightParents'
   if (parsed.value.identifiable !== fitted) {
-    return err({ kind: 'invalid-estimation-evidence', detail: 'The CausalEffects fit state does not agree with its identification state.' })
+    return err({
+      kind: 'invalid-estimation-evidence',
+      detail: 'The CausalEffects fit state does not agree with its identification state.',
+    })
   }
   if (!parsed.value.identifiable && parsed.value.uncertainty.kind === 'bootstrap') {
-    return err({ kind: 'invalid-estimation-evidence', detail: 'An unidentified effect cannot carry bootstrap uncertainty.' })
+    return err({
+      kind: 'invalid-estimation-evidence',
+      detail: 'An unidentified effect cannot carry bootstrap uncertainty.',
+    })
   }
   if (parsed.value.uncertainty.kind === 'bootstrap') {
     const uncertainty = parsed.value.uncertainty
     if (uncertainty.effectDraws.length !== uncertainty.samples) {
-      return err({ kind: 'invalid-estimation-evidence', detail: 'The CausalEffects bootstrap draw count does not match its sample count.' })
+      return err({
+        kind: 'invalid-estimation-evidence',
+        detail: 'The CausalEffects bootstrap draw count does not match its sample count.',
+      })
     }
-    if (uncertainty.effectInterval[0] > uncertainty.effectInterval[1] || uncertainty.predictionIntervals.some(([lower, upper]) => lower > upper)) {
-      return err({ kind: 'invalid-estimation-evidence', detail: 'A CausalEffects bootstrap interval has its bounds reversed.' })
+    if (
+      uncertainty.effectInterval[0] > uncertainty.effectInterval[1] ||
+      uncertainty.predictionIntervals.some(([lower, upper]) => lower > upper)
+    ) {
+      return err({
+        kind: 'invalid-estimation-evidence',
+        detail: 'A CausalEffects bootstrap interval has its bounds reversed.',
+      })
     }
   }
   if (parsed.value.fit.kind === 'wrightParents' && parsed.value.totalEffect !== null) {
     const scale = 1 + Math.abs(parsed.value.totalEffect)
     const decomposed = parsed.value.fit.directEffect + parsed.value.fit.indirectEffect
     const paths = parsed.value.fit.paths.reduce((sum, path) => sum + path.contrast, 0)
-    if (Math.abs(parsed.value.totalEffect - decomposed) > 1e-9 * scale || Math.abs(parsed.value.totalEffect - paths) > 1e-9 * scale) {
-      return err({ kind: 'invalid-estimation-evidence', detail: 'The Wright path contributions do not sum to the reported total effect.' })
+    if (
+      Math.abs(parsed.value.totalEffect - decomposed) > 1e-9 * scale ||
+      Math.abs(parsed.value.totalEffect - paths) > 1e-9 * scale
+    ) {
+      return err({
+        kind: 'invalid-estimation-evidence',
+        detail: 'The Wright path contributions do not sum to the reported total effect.',
+      })
     }
   }
   return parsed
 }
 
-export function parseCausalImpactEvidence(value: unknown): Result<CausalImpactEvidence, EstimationEvidenceProblem> {
+export function parseCausalImpactEvidence(
+  value: unknown,
+): Result<CausalImpactEvidence, EstimationEvidenceProblem> {
   const parsed = parseWith(causalImpactEvidenceSchema, value)
   if (!parsed.ok) return parsed
   const { nPost, postEnd, counterfactual, counterfactualSe, pointwise } = parsed.value
   if (parsed.value.nPre + nPost !== postEnd || postEnd > parsed.value.observations) {
-    return err({ kind: 'invalid-estimation-evidence', detail: 'The evaluated window does not run from the intervention row to its end inside the observations.' })
+    return err({
+      kind: 'invalid-estimation-evidence',
+      detail:
+        'The evaluated window does not run from the intervention row to its end inside the observations.',
+    })
   }
   if (parsed.value.kind !== 'causalImpact') {
     const evidence = parsed.value
     const inclusion = evidence.controlInclusion
-    if (inclusion !== undefined && (inclusion.length !== evidence.controls.length
-      || new Set(inclusion.map(item => item.column)).size !== inclusion.length
-      || inclusion.some(item => !evidence.controls.includes(item.column)))) {
-      return err({ kind:'invalid-estimation-evidence', detail:'Control inclusion probabilities must match the fitted control columns.' })
+    if (
+      inclusion !== undefined &&
+      (inclusion.length !== evidence.controls.length ||
+        new Set(inclusion.map((item) => item.column)).size !== inclusion.length ||
+        inclusion.some((item) => !evidence.controls.includes(item.column)))
+    ) {
+      return err({
+        kind: 'invalid-estimation-evidence',
+        detail: 'Control inclusion probabilities must match the fitted control columns.',
+      })
     }
-    const bands = [[evidence.counterfactualLower,evidence.counterfactualUpper],
-      [evidence.pointwiseLower,evidence.pointwiseUpper], [evidence.cumulativeLower,evidence.cumulativeUpper]]
-    if (bands.some(([lower,upper]) => lower.length !== nPost || upper.length !== nPost || lower.some((value,index) => value > upper[index]))) {
-      return err({ kind: 'invalid-estimation-evidence', detail: 'The posterior bands must cover the post-intervention window with ordered bounds.' })
+    const bands = [
+      [evidence.counterfactualLower, evidence.counterfactualUpper],
+      [evidence.pointwiseLower, evidence.pointwiseUpper],
+      [evidence.cumulativeLower, evidence.cumulativeUpper],
+    ]
+    if (
+      bands.some(
+        ([lower, upper]) =>
+          lower.length !== nPost ||
+          upper.length !== nPost ||
+          lower.some((value, index) => value > upper[index]),
+      )
+    ) {
+      return err({
+        kind: 'invalid-estimation-evidence',
+        detail: 'The posterior bands must cover the post-intervention window with ordered bounds.',
+      })
     }
   }
   if (parsed.value.kind === 'structuralCausalImpact') {
     const evidence = parsed.value
-    const keys = evidence.contributions.map(c => c.component.kind === 'predictor' ? `predictor:${c.component.column}` : c.component.kind)
-    const expected = ['trend', ...(evidence.model.seasonality.kind === 'none' ? [] : ['seasonal']), ...evidence.controls.map(c => `predictor:${c}`)]
-    if (keys.length !== expected.length || new Set(keys).size !== keys.length || expected.some(k => !keys.includes(k))
-      || evidence.contributions.some(c => c.mean.length !== postEnd || c.lower.length !== postEnd || c.upper.length !== postEnd || c.lower.some((v,i) => v > c.upper[i]))) {
-      return err({ kind:'invalid-estimation-evidence', detail:'The component paths do not match the model, predictors or evaluated window.' })
+    const keys = evidence.contributions.map((c) =>
+      c.component.kind === 'predictor' ? `predictor:${c.component.column}` : c.component.kind,
+    )
+    const expected = [
+      'trend',
+      ...(evidence.model.seasonality.kind === 'none' ? [] : ['seasonal']),
+      ...evidence.controls.map((c) => `predictor:${c}`),
+    ]
+    if (
+      keys.length !== expected.length ||
+      new Set(keys).size !== keys.length ||
+      expected.some((k) => !keys.includes(k)) ||
+      evidence.contributions.some(
+        (c) =>
+          c.mean.length !== postEnd ||
+          c.lower.length !== postEnd ||
+          c.upper.length !== postEnd ||
+          c.lower.some((v, i) => v > c.upper[i]),
+      )
+    ) {
+      return err({
+        kind: 'invalid-estimation-evidence',
+        detail: 'The component paths do not match the model, predictors or evaluated window.',
+      })
     }
     const path = evidence.preInterventionPath
-    if (path.kind !== 'sampled' || path.steps.length !== evidence.nPre || path.steps.some((v,i) => v !== i)) {
-      return err({ kind:'invalid-estimation-evidence', detail:'The composed model needs a complete sampled training path.' })
+    if (
+      path.kind !== 'sampled' ||
+      path.steps.length !== evidence.nPre ||
+      path.steps.some((v, i) => v !== i)
+    ) {
+      return err({
+        kind: 'invalid-estimation-evidence',
+        detail: 'The composed model needs a complete sampled training path.',
+      })
     }
-    const prediction = [...path.counterfactual,...evidence.counterfactual]
-    if (prediction.some((value,t) => Math.abs(value-evidence.contributions.reduce((s,c) => s+c.mean[t],0)) > 1e-8*(1+Math.abs(value)))) {
-      return err({ kind:'invalid-estimation-evidence', detail:'The component means do not reconstruct the latent prediction.' })
+    const prediction = [...path.counterfactual, ...evidence.counterfactual]
+    if (
+      prediction.some(
+        (value, t) =>
+          Math.abs(value - evidence.contributions.reduce((s, c) => s + c.mean[t], 0)) >
+          1e-8 * (1 + Math.abs(value)),
+      )
+    ) {
+      return err({
+        kind: 'invalid-estimation-evidence',
+        detail: 'The component means do not reconstruct the latent prediction.',
+      })
     }
   }
-  if (counterfactual.length !== nPost || counterfactualSe.length !== nPost || pointwise.length !== nPost) {
-    return err({ kind: 'invalid-estimation-evidence', detail: 'The counterfactual path does not cover the post-intervention window.' })
+  if (
+    counterfactual.length !== nPost ||
+    counterfactualSe.length !== nPost ||
+    pointwise.length !== nPost
+  ) {
+    return err({
+      kind: 'invalid-estimation-evidence',
+      detail: 'The counterfactual path does not cover the post-intervention window.',
+    })
   }
   const before = parsed.value.preInterventionPath
   if (before.kind !== 'notReported') {
     const bands = before.kind === 'fitted' ? [before.se] : [before.lower, before.upper]
     const rows = before.steps.length
-    if (rows === 0 || rows > parsed.value.nPre
-      || [before.observed, before.counterfactual, ...bands].some((series) => series.length !== rows)
-      || before.steps.some((step, index) => step >= parsed.value.nPre || (index > 0 && step <= before.steps[index - 1]))) {
-      return err({ kind: 'invalid-estimation-evidence', detail: 'The pre-intervention path must cover rows of the fitted window in order.' })
+    if (
+      rows === 0 ||
+      rows > parsed.value.nPre ||
+      [before.observed, before.counterfactual, ...bands].some((series) => series.length !== rows) ||
+      before.steps.some(
+        (step, index) =>
+          step >= parsed.value.nPre || (index > 0 && step <= before.steps[index - 1]),
+      )
+    ) {
+      return err({
+        kind: 'invalid-estimation-evidence',
+        detail: 'The pre-intervention path must cover rows of the fitted window in order.',
+      })
     }
   }
   return parsed
@@ -1909,9 +2966,18 @@ export interface TimeEffectPoint {
 export type EffectEstimate =
   | { readonly kind: 'additive'; readonly value: number; readonly unit: string }
   | { readonly kind: 'expectedCountRatio'; readonly value: number }
-  | { readonly kind: 'path'; readonly values: NonEmptyArray<TimeEffectPoint>; readonly aggregate: { readonly cumulative: number; readonly average: number } }
+  | {
+      readonly kind: 'path'
+      readonly values: NonEmptyArray<TimeEffectPoint>
+      readonly aggregate: { readonly cumulative: number; readonly average: number }
+    }
   /** One additive effect per group of an effect modifier, with the whole-population average beside them. */
-  | { readonly kind: 'byGroup'; readonly modifier: string; readonly overall: number; readonly groups: NonEmptyArray<GroupEffectEstimate> }
+  | {
+      readonly kind: 'byGroup'
+      readonly modifier: string
+      readonly overall: number
+      readonly groups: NonEmptyArray<GroupEffectEstimate>
+    }
   /** One additive effect per prepared row, in row order, with their mean as the whole-population average. */
   | { readonly kind: 'perRow'; readonly overall: number; readonly effects: NonEmptyArray<number> }
 
@@ -1919,11 +2985,15 @@ export type EffectEstimate =
 export const headlineValue = (effect: EffectEstimate): number => {
   switch (effect.kind) {
     case 'additive':
-    case 'expectedCountRatio': return effect.value
-    case 'path': return effect.aggregate.cumulative
+    case 'expectedCountRatio':
+      return effect.value
+    case 'path':
+      return effect.aggregate.cumulative
     case 'byGroup':
-    case 'perRow': return effect.overall
-    default: return assertNever(effect)
+    case 'perRow':
+      return effect.overall
+    default:
+      return assertNever(effect)
   }
 }
 
@@ -1950,7 +3020,10 @@ const orderQuantile = (sorted: readonly number[], probability: number): number =
   return sorted[lower] * (1 - weight) + sorted[upper] * weight
 }
 
-export function summariseRowEffects(effects: NonEmptyArray<number>, binCount = 20): RowEffectSummary {
+export function summariseRowEffects(
+  effects: NonEmptyArray<number>,
+  binCount = 20,
+): RowEffectSummary {
   const sorted = [...effects].sort((a, b) => a - b)
   const minimum = sorted[0]
   const maximum = sorted[sorted.length - 1]
@@ -1975,8 +3048,19 @@ export function summariseRowEffects(effects: NonEmptyArray<number>, binCount = 2
 }
 
 export type EstimateInterval =
-  | { readonly kind: 'confidence'; readonly level: number; readonly lower: number; readonly upper: number }
-  | { readonly kind: 'credible'; readonly level: number; readonly summary: 'HDI' | 'ETI'; readonly lower: number; readonly upper: number }
+  | {
+      readonly kind: 'confidence'
+      readonly level: number
+      readonly lower: number
+      readonly upper: number
+    }
+  | {
+      readonly kind: 'credible'
+      readonly level: number
+      readonly summary: 'HDI' | 'ETI'
+      readonly lower: number
+      readonly upper: number
+    }
   | { readonly kind: 'none'; readonly reason: string }
 
 /** The typed interval label for the number formatter: confidence stays a CI, credible carries its summary. */
@@ -1992,7 +3076,11 @@ export interface CausalEstimate {
   readonly interval: EstimateInterval
   readonly standardError: number | null
   readonly adjustment: AppliedAdjustment
-  readonly sample: { readonly observations: number; readonly parameters: number | null; readonly degreesOfFreedom: number | null }
+  readonly sample: {
+    readonly observations: number
+    readonly parameters: number | null
+    readonly degreesOfFreedom: number | null
+  }
 }
 
 export interface TimeIndexedStudyVariable {
@@ -2006,9 +3094,15 @@ export type AppliedAdjustment =
   | { readonly kind: 'none' }
   | { readonly kind: 'contemporaneous'; readonly variables: NonEmptyArray<StudyVariable> }
   | { readonly kind: 'time-indexed'; readonly variables: NonEmptyArray<TimeIndexedStudyVariable> }
-  | { readonly kind: 'structural-parent-model'; readonly coefficients: number; readonly paths: number }
+  | {
+      readonly kind: 'structural-parent-model'
+      readonly coefficients: number
+      readonly paths: number
+    }
 
-const appliedContemporaneousAdjustment = (variables: readonly StudyVariable[]): AppliedAdjustment =>
+const appliedContemporaneousAdjustment = (
+  variables: readonly StudyVariable[],
+): AppliedAdjustment =>
   isNonEmpty(variables) ? { kind: 'contemporaneous', variables } : { kind: 'none' }
 
 const appliedTimeIndexedAdjustment = (
@@ -2025,23 +3119,37 @@ const appliedTimeIndexedAdjustment = (
 }
 
 /** Contemporaneous columns are reusable by row-wise estimators; temporal rows are not raw columns. */
-export const contemporaneousAdjustmentVariables = (adjustment: AppliedAdjustment): readonly StudyVariable[] | null => {
+export const contemporaneousAdjustmentVariables = (
+  adjustment: AppliedAdjustment,
+): readonly StudyVariable[] | null => {
   switch (adjustment.kind) {
-    case 'none': return []
-    case 'contemporaneous': return adjustment.variables
-    case 'time-indexed': return null
-    case 'structural-parent-model': return null
-    default: return assertNever(adjustment)
+    case 'none':
+      return []
+    case 'contemporaneous':
+      return adjustment.variables
+    case 'time-indexed':
+      return null
+    case 'structural-parent-model':
+      return null
+    default:
+      return assertNever(adjustment)
   }
 }
 
 export const adjustmentLabels = (adjustment: AppliedAdjustment): readonly string[] => {
   switch (adjustment.kind) {
-    case 'none': return []
-    case 'contemporaneous': return adjustment.variables.map((variable) => variable.name)
-    case 'time-indexed': return adjustment.variables.map(({ variable, lag }) => `${variable.name} (${lag === 0 ? 't' : `t−${Math.abs(lag)}`})`)
-    case 'structural-parent-model': return []
-    default: return assertNever(adjustment)
+    case 'none':
+      return []
+    case 'contemporaneous':
+      return adjustment.variables.map((variable) => variable.name)
+    case 'time-indexed':
+      return adjustment.variables.map(
+        ({ variable, lag }) => `${variable.name} (${lag === 0 ? 't' : `t−${Math.abs(lag)}`})`,
+      )
+    case 'structural-parent-model':
+      return []
+    default:
+      return assertNever(adjustment)
   }
 }
 
@@ -2062,33 +3170,164 @@ interface RunIdentity {
 }
 
 export type EstimationRunArtifact =
-  | RunIdentity & {readonly kind:'ridge-augmented-synthetic-run';readonly method:typeof SYNTHETIC_CONTROL_METHOD_ID;readonly configuration:RidgeConfiguration;readonly evidence:RidgeAugmentedEvidence;readonly sourcePeriods:readonly {readonly code:number;readonly label:string}[]}
-  | Omit<RunIdentity, 'columns'> & { readonly kind: 'predictor-synthetic-control-run'; readonly method: typeof SYNTHETIC_CONTROL_METHOD_ID; readonly configuration: PredictorSyntheticConfiguration; readonly evidence: PredictorSyntheticEvidence; readonly catalog: PredictorSyntheticCatalog; readonly columns: NonEmptyArray<Pick<StudyVariable, 'column' | 'name'>> }
-  | RunIdentity & { readonly kind: 'causal-forest-run'; readonly method: typeof CAUSAL_FOREST_METHOD_ID; readonly configuration: CausalForestConfiguration; readonly evidence: CausalForestEvidence }
-  | RunIdentity & { readonly kind: 'sharp-rd-run'; readonly method: typeof SHARP_RD_METHOD_ID; readonly configuration: SharpRdConfiguration; readonly evidence: SharpRdEvidence }
-  | RunIdentity & { readonly kind: 'backdoor-linear-run'; readonly method: typeof BACKDOOR_LINEAR_REGRESSION_METHOD_ID; readonly configuration: BackdoorLinearConfiguration; readonly evidence: BackdoorLinearEvidence }
-  | RunIdentity & { readonly kind: 'propensity-weighting-run'; readonly method: typeof PROPENSITY_WEIGHTING_METHOD_ID; readonly configuration: PropensityWeightingConfiguration; readonly evidence: PropensityWeightingEvidence }
-  | RunIdentity & { readonly kind: 'propensity-matching-run'; readonly method: typeof PROPENSITY_MATCHING_METHOD_ID; readonly configuration: PropensityMatchingConfiguration; readonly evidence: PropensityMatchingEvidence }
-  | RunIdentity & { readonly kind: 'doubly-robust-run'; readonly method: typeof DOUBLY_ROBUST_METHOD_ID; readonly configuration: DoublyRobustConfiguration; readonly evidence: DoublyRobustEvidence }
-  | RunIdentity & { readonly kind: 'continuous-gps-run'; readonly method: typeof CONTINUOUS_GPS_METHOD_ID; readonly configuration: ContinuousGpsConfiguration; readonly evidence: ContinuousGpsEvidence }
-  | RunIdentity & { readonly kind: 'frontdoor-two-stage-run'; readonly method: typeof FRONTDOOR_TWO_STAGE_METHOD_ID; readonly configuration: FrontdoorTwoStageConfiguration; readonly evidence: FrontdoorTwoStageEvidence }
-  | RunIdentity & { readonly kind: 'instrumental-variable-run'; readonly method: typeof INSTRUMENTAL_VARIABLE_METHOD_ID; readonly configuration: InstrumentalVariableConfiguration; readonly evidence: InstrumentalVariableEvidence }
-  | RunIdentity & { readonly kind: 'count-glm-run'; readonly method: typeof POISSON_GLM_METHOD_ID | typeof NEGATIVE_BINOMIAL_METHOD_ID; readonly configuration: CountGlmConfiguration; readonly evidence: CountGlmEvidence }
-  | RunIdentity & { readonly kind: 'negative-binomial-ingarch-run'; readonly method: typeof NEGATIVE_BINOMIAL_INGARCH_METHOD_ID; readonly configuration: NegativeBinomialIngarchConfiguration; readonly evidence: NegativeBinomialIngarchEvidence }
-  | RunIdentity & { readonly kind: 'double-ml-run'; readonly method: typeof DML_PLR_METHOD_ID | typeof DML_IRM_METHOD_ID; readonly configuration: DoubleMlConfiguration; readonly evidence: DoubleMlEvidence }
-  | RunIdentity & { readonly kind: 't-learner-run'; readonly method: typeof T_LEARNER_METHOD_ID; readonly configuration: TLearnerConfiguration; readonly evidence: TLearnerEvidence | CrossFittedTLearnerEvidence }
-  | RunIdentity & { readonly kind: 'ardl-run'; readonly method: typeof ARDL_PSS_METHOD_ID; readonly configuration: ArdlConfiguration; readonly evidence: ArdlEvidence }
-  | RunIdentity & { readonly kind: 'vecm-run'; readonly method: typeof VECM_METHOD_ID; readonly configuration: VecmConfiguration; readonly evidence: VecmEvidence }
-  | RunIdentity & { readonly kind: 'synthetic-control-run'; readonly method: typeof SYNTHETIC_CONTROL_METHOD_ID; readonly configuration: OutcomeHistorySyntheticConfiguration; readonly evidence: SyntheticControlEvidence }
-  | RunIdentity & { readonly kind: 'panel-intervention-run'; readonly method: typeof PANEL_INTERVENTION_METHOD_ID; readonly configuration: PanelInterventionConfiguration; readonly evidence: PanelInterventionEvidence; readonly timeLabels: NonEmptyArray<string>; readonly sourcePeriods: readonly {readonly code:number;readonly label:string}[] }
-  | RunIdentity & { readonly kind: 'negbin-nuts-run'; readonly method: typeof NEGBIN_NUTS_METHOD_ID; readonly configuration: NegbinNutsConfiguration; readonly evidence: NegbinNutsEvidence }
-  | RunIdentity & { readonly kind: 'bayesian-gaussian-run'; readonly method: typeof BAYESIAN_GAUSSIAN_METHOD_ID; readonly configuration: BayesianGaussianConfiguration; readonly evidence: BayesianGaussianEvidence }
-  | RunIdentity & { readonly kind: 'discrete-bn-run'; readonly method: typeof DISCRETE_BN_METHOD_ID; readonly configuration: DiscreteBnConfiguration; readonly evidence: DiscreteBnEvidence }
-  | RunIdentity & { readonly kind: 'binary-ett-run'; readonly method: typeof BINARY_ETT_METHOD_ID; readonly configuration: BinaryEttConfiguration; readonly evidence: BinaryEttEvidence }
-  | RunIdentity & { readonly kind: 'causal-effects-run'; readonly method: typeof CAUSAL_EFFECTS_TOTAL_METHOD_ID; readonly configuration: CausalEffectsConfiguration; readonly evidence: CausalEffectsEvidence }
-  | RunIdentity & { readonly kind: 'causal-impact-run'; readonly method: typeof CAUSAL_IMPACT_METHOD_ID; readonly configuration: CausalImpactConfiguration; readonly evidence: CausalImpactEvidence }
+  | (RunIdentity & {
+      readonly kind: 'ridge-augmented-synthetic-run'
+      readonly method: typeof SYNTHETIC_CONTROL_METHOD_ID
+      readonly configuration: RidgeConfiguration
+      readonly evidence: RidgeAugmentedEvidence
+      readonly sourcePeriods: readonly { readonly code: number; readonly label: string }[]
+    })
+  | (Omit<RunIdentity, 'columns'> & {
+      readonly kind: 'predictor-synthetic-control-run'
+      readonly method: typeof SYNTHETIC_CONTROL_METHOD_ID
+      readonly configuration: PredictorSyntheticConfiguration
+      readonly evidence: PredictorSyntheticEvidence
+      readonly catalog: PredictorSyntheticCatalog
+      readonly columns: NonEmptyArray<Pick<StudyVariable, 'column' | 'name'>>
+    })
+  | (RunIdentity & {
+      readonly kind: 'causal-forest-run'
+      readonly method: typeof CAUSAL_FOREST_METHOD_ID
+      readonly configuration: CausalForestConfiguration
+      readonly evidence: CausalForestEvidence
+    })
+  | (RunIdentity & {
+      readonly kind: 'sharp-rd-run'
+      readonly method: typeof SHARP_RD_METHOD_ID
+      readonly configuration: SharpRdConfiguration
+      readonly evidence: SharpRdEvidence
+    })
+  | (RunIdentity & {
+      readonly kind: 'backdoor-linear-run'
+      readonly method: typeof BACKDOOR_LINEAR_REGRESSION_METHOD_ID
+      readonly configuration: BackdoorLinearConfiguration
+      readonly evidence: BackdoorLinearEvidence
+    })
+  | (RunIdentity & {
+      readonly kind: 'propensity-weighting-run'
+      readonly method: typeof PROPENSITY_WEIGHTING_METHOD_ID
+      readonly configuration: PropensityWeightingConfiguration
+      readonly evidence: PropensityWeightingEvidence
+    })
+  | (RunIdentity & {
+      readonly kind: 'propensity-matching-run'
+      readonly method: typeof PROPENSITY_MATCHING_METHOD_ID
+      readonly configuration: PropensityMatchingConfiguration
+      readonly evidence: PropensityMatchingEvidence
+    })
+  | (RunIdentity & {
+      readonly kind: 'doubly-robust-run'
+      readonly method: typeof DOUBLY_ROBUST_METHOD_ID
+      readonly configuration: DoublyRobustConfiguration
+      readonly evidence: DoublyRobustEvidence
+    })
+  | (RunIdentity & {
+      readonly kind: 'continuous-gps-run'
+      readonly method: typeof CONTINUOUS_GPS_METHOD_ID
+      readonly configuration: ContinuousGpsConfiguration
+      readonly evidence: ContinuousGpsEvidence
+    })
+  | (RunIdentity & {
+      readonly kind: 'frontdoor-two-stage-run'
+      readonly method: typeof FRONTDOOR_TWO_STAGE_METHOD_ID
+      readonly configuration: FrontdoorTwoStageConfiguration
+      readonly evidence: FrontdoorTwoStageEvidence
+    })
+  | (RunIdentity & {
+      readonly kind: 'instrumental-variable-run'
+      readonly method: typeof INSTRUMENTAL_VARIABLE_METHOD_ID
+      readonly configuration: InstrumentalVariableConfiguration
+      readonly evidence: InstrumentalVariableEvidence
+    })
+  | (RunIdentity & {
+      readonly kind: 'count-glm-run'
+      readonly method: typeof POISSON_GLM_METHOD_ID | typeof NEGATIVE_BINOMIAL_METHOD_ID
+      readonly configuration: CountGlmConfiguration
+      readonly evidence: CountGlmEvidence
+    })
+  | (RunIdentity & {
+      readonly kind: 'negative-binomial-ingarch-run'
+      readonly method: typeof NEGATIVE_BINOMIAL_INGARCH_METHOD_ID
+      readonly configuration: NegativeBinomialIngarchConfiguration
+      readonly evidence: NegativeBinomialIngarchEvidence
+    })
+  | (RunIdentity & {
+      readonly kind: 'double-ml-run'
+      readonly method: typeof DML_PLR_METHOD_ID | typeof DML_IRM_METHOD_ID
+      readonly configuration: DoubleMlConfiguration
+      readonly evidence: DoubleMlEvidence
+    })
+  | (RunIdentity & {
+      readonly kind: 't-learner-run'
+      readonly method: typeof T_LEARNER_METHOD_ID
+      readonly configuration: TLearnerConfiguration
+      readonly evidence: TLearnerEvidence | CrossFittedTLearnerEvidence
+    })
+  | (RunIdentity & {
+      readonly kind: 'ardl-run'
+      readonly method: typeof ARDL_PSS_METHOD_ID
+      readonly configuration: ArdlConfiguration
+      readonly evidence: ArdlEvidence
+    })
+  | (RunIdentity & {
+      readonly kind: 'vecm-run'
+      readonly method: typeof VECM_METHOD_ID
+      readonly configuration: VecmConfiguration
+      readonly evidence: VecmEvidence
+    })
+  | (RunIdentity & {
+      readonly kind: 'synthetic-control-run'
+      readonly method: typeof SYNTHETIC_CONTROL_METHOD_ID
+      readonly configuration: OutcomeHistorySyntheticConfiguration
+      readonly evidence: SyntheticControlEvidence
+    })
+  | (RunIdentity & {
+      readonly kind: 'panel-intervention-run'
+      readonly method: typeof PANEL_INTERVENTION_METHOD_ID
+      readonly configuration: PanelInterventionConfiguration
+      readonly evidence: PanelInterventionEvidence
+      readonly timeLabels: NonEmptyArray<string>
+      readonly sourcePeriods: readonly { readonly code: number; readonly label: string }[]
+    })
+  | (RunIdentity & {
+      readonly kind: 'negbin-nuts-run'
+      readonly method: typeof NEGBIN_NUTS_METHOD_ID
+      readonly configuration: NegbinNutsConfiguration
+      readonly evidence: NegbinNutsEvidence
+    })
+  | (RunIdentity & {
+      readonly kind: 'bayesian-gaussian-run'
+      readonly method: typeof BAYESIAN_GAUSSIAN_METHOD_ID
+      readonly configuration: BayesianGaussianConfiguration
+      readonly evidence: BayesianGaussianEvidence
+    })
+  | (RunIdentity & {
+      readonly kind: 'discrete-bn-run'
+      readonly method: typeof DISCRETE_BN_METHOD_ID
+      readonly configuration: DiscreteBnConfiguration
+      readonly evidence: DiscreteBnEvidence
+    })
+  | (RunIdentity & {
+      readonly kind: 'binary-ett-run'
+      readonly method: typeof BINARY_ETT_METHOD_ID
+      readonly configuration: BinaryEttConfiguration
+      readonly evidence: BinaryEttEvidence
+    })
+  | (RunIdentity & {
+      readonly kind: 'causal-effects-run'
+      readonly method: typeof CAUSAL_EFFECTS_TOTAL_METHOD_ID
+      readonly configuration: CausalEffectsConfiguration
+      readonly evidence: CausalEffectsEvidence
+    })
+  | (RunIdentity & {
+      readonly kind: 'causal-impact-run'
+      readonly method: typeof CAUSAL_IMPACT_METHOD_ID
+      readonly configuration: CausalImpactConfiguration
+      readonly evidence: CausalImpactEvidence
+    })
 
-export const newEstimationRunId = (): EstimationRunId => brand<string, 'EstimationRunId'>(crypto.randomUUID())
+export const newEstimationRunId = (): EstimationRunId =>
+  brand<string, 'EstimationRunId'>(crypto.randomUUID())
 
 type Satisfied = Extract<CaveatEvaluation, { readonly kind: 'satisfied' }>
 type Unresolved = Extract<CaveatEvaluation, { readonly kind: 'unresolved' }>
@@ -2111,31 +3350,59 @@ export interface EligibilityContext {
   /** The study whose variables the stationarity rules look up; null when the identification has no study loaded. */
   readonly study: StudySpecification | null
   /** Structural treatment-layout evidence loaded before a panel estimator can run. */
-  readonly sunAbrahamComparison?: { readonly ok: true; readonly value: null } | { readonly ok: false; readonly error: string }
+  readonly sunAbrahamComparison?:
+    { readonly ok: true; readonly value: null } | { readonly ok: false; readonly error: string }
   readonly panelPreflight: PanelInterventionPreflight
 }
 
 /** The treatment, the outcome and the adjustment set with their stationarity assessments on a time series. */
-const levelReadings = (context: EligibilityContext): readonly { readonly name: string; readonly assessment: StationarityAssessment | null }[] => {
+const levelReadings = (
+  context: EligibilityContext,
+): readonly { readonly name: string; readonly assessment: StationarityAssessment | null }[] => {
   if (context.study === null || context.identification.kind !== 'identified') return []
-  const variables = [context.study.treatment, context.study.outcome, ...context.identification.adjustment.variables]
-  return variables.map((variable) => ({ name: variable.name, assessment: context.stationarity?.variables.find((candidate) => candidate.column === variable.column)?.assessment ?? null }))
+  const variables = [
+    context.study.treatment,
+    context.study.outcome,
+    ...context.identification.adjustment.variables,
+  ]
+  return variables.map((variable) => ({
+    name: variable.name,
+    assessment:
+      context.stationarity?.variables.find((candidate) => candidate.column === variable.column)
+        ?.assessment ?? null,
+  }))
 }
 
 /** What a regression fitted in levels risks on an I(1) series. */
-const REGRESSION_IN_LEVELS = { integrated: 'a regression on those values can show a spurious relation. Create a differenced prepared version or use a suitable cointegration method.' } as const
+const REGRESSION_IN_LEVELS = {
+  integrated:
+    'a regression on those values can show a spurious relation. Create a differenced prepared version or use a suitable cointegration method.',
+} as const
 
 /** Level-model verdicts for the treatment, the outcome and the adjustment set on a time series. */
 const levelVerdicts = (context: EligibilityContext): readonly LevelModelVerdict[] =>
   levelReadings(context).map((reading) => levelModelVerdict(reading.name, reading.assessment))
 
 /** Cointegration procedures must receive the study variables in levels, not a prepared transform. */
-const transformedStudyVariables = (context: EligibilityContext): readonly { readonly name: string; readonly transform: string }[] => {
+const transformedStudyVariables = (
+  context: EligibilityContext,
+): readonly { readonly name: string; readonly transform: string }[] => {
   if (context.prepared.kind !== 'prepared-time-series' || context.study === null) return []
-  const variables = [context.study.treatment, context.study.outcome, ...(context.identification.kind === 'identified' ? context.identification.adjustment.variables : [])]
+  const variables = [
+    context.study.treatment,
+    context.study.outcome,
+    ...(context.identification.kind === 'identified'
+      ? context.identification.adjustment.variables
+      : []),
+  ]
   return variables.flatMap((variable) => {
-    const transform = seriesTransformFor(context.prepared.kind === 'prepared-time-series' ? context.prepared.seriesTransforms : [], variable.column)
-    return transform.kind === 'levels' ? [] : [{ name: variable.name, transform: describeSeriesTransform(transform) }]
+    const transform = seriesTransformFor(
+      context.prepared.kind === 'prepared-time-series' ? context.prepared.seriesTransforms : [],
+      variable.column,
+    )
+    return transform.kind === 'levels'
+      ? []
+      : [{ name: variable.name, transform: describeSeriesTransform(transform) }]
   })
 }
 
@@ -2148,20 +3415,43 @@ const applyOrderRule = (
   leave: (id: string, missingEvidence: string) => void,
   violate: (id: string, evidence: string) => void,
 ): void => {
-  if (context.study === null) { leave(id, 'No study is loaded, so the variables cannot be looked up.'); return }
-  if (context.stationarity === null) { leave(id, 'Run stationarity tests for this prepared dataset version in Data studio.'); return }
-  const variables = [context.study.treatment, context.study.outcome, ...(context.identification.kind === 'identified' ? context.identification.adjustment.variables : [])]
-  const readings = variables.map((variable) => ({ name: variable.name, assessment: context.stationarity?.variables.find((candidate) => candidate.column === variable.column)?.assessment ?? null }))
+  if (context.study === null) {
+    leave(id, 'No study is loaded, so the variables cannot be looked up.')
+    return
+  }
+  if (context.stationarity === null) {
+    leave(id, 'Run stationarity tests for this prepared dataset version in Data studio.')
+    return
+  }
+  const variables = [
+    context.study.treatment,
+    context.study.outcome,
+    ...(context.identification.kind === 'identified'
+      ? context.identification.adjustment.variables
+      : []),
+  ]
+  const readings = variables.map((variable) => ({
+    name: variable.name,
+    assessment:
+      context.stationarity?.variables.find((candidate) => candidate.column === variable.column)
+        ?.assessment ?? null,
+  }))
   const refused: string[] = []
   const open: string[] = []
   const accepted: string[] = []
   for (const reading of readings) {
-    if (reading.assessment === null) { open.push(`Run stationarity tests for ${reading.name} on this prepared dataset version.`); continue }
+    if (reading.assessment === null) {
+      open.push(`Run stationarity tests for ${reading.name} on this prepared dataset version.`)
+      continue
+    }
     switch (reading.assessment.kind) {
       case 'levelStationary':
       case 'trendStationary':
       case 'breakStationary':
-        if (mode === 'i1-only') refused.push(`${reading.name} is stationary in levels and does not belong in a cointegrated system.`)
+        if (mode === 'i1-only')
+          refused.push(
+            `${reading.name} is stationary in levels and does not belong in a cointegrated system.`,
+          )
         else accepted.push(`${reading.name} is I(0).`)
         break
       case 'differenceStationary':
@@ -2171,14 +3461,22 @@ const applyOrderRule = (
         refused.push(`${reading.name} is I(2) or unresolved.`)
         break
       case 'inconclusive':
-        refused.push(`${reading.name}'s order is unresolved: ${reading.assessment.conflicts.map(describeStationarityConflict).join(' ')}`)
+        refused.push(
+          `${reading.name}'s order is unresolved: ${reading.assessment.conflicts.map(describeStationarityConflict).join(' ')}`,
+        )
         break
       default:
         assertNever(reading.assessment)
     }
   }
-  if (refused.length > 0) { violate(id, refused.join(' ')); return }
-  if (open.length > 0) { leave(id, open.join(' ')); return }
+  if (refused.length > 0) {
+    violate(id, refused.join(' '))
+    return
+  }
+  if (open.length > 0) {
+    leave(id, open.join(' '))
+    return
+  }
   satisfy(id, accepted.join(' '))
 }
 
@@ -2189,29 +3487,59 @@ const applyLevelRule = (
   leave: (id: string, missingEvidence: string, groups?: NonEmptyArray<EvidenceGroup>) => void,
   violate: (id: string, evidence: string) => void,
 ): void => {
-  if (context.prepared.kind === 'prepared-panel') { leave(id, 'Rows are a panel; trends are assessed within units, which this rule does not cover.'); return }
-  if (context.prepared.kind !== 'prepared-time-series') { satisfy(id, 'Independent observations carry no stochastic trend.'); return }
-  if (context.stationarity === null) { leave(id, 'Run stationarity tests for this prepared dataset version in Data studio.'); return }
+  if (context.prepared.kind === 'prepared-panel') {
+    leave(id, 'Rows are a panel; trends are assessed within units, which this rule does not cover.')
+    return
+  }
+  if (context.prepared.kind !== 'prepared-time-series') {
+    satisfy(id, 'Independent observations carry no stochastic trend.')
+    return
+  }
+  if (context.stationarity === null) {
+    leave(id, 'Run stationarity tests for this prepared dataset version in Data studio.')
+    return
+  }
   // I(2) or an unsettled order refuses (DESIGN.md, integration table); I(1) warns, since the verdict is itself a test.
   const { refused, cautions } = levelEvidence(levelReadings(context), REGRESSION_IN_LEVELS)
-  if (refused.length > 0) { violate(id, summaries(refused)); return }
-  if (cautions.length > 0) { leave(id, summaries(cautions), nonEmptyGroups(cautions)); return }
-  satisfy(id, levelVerdicts(context).map((verdict) => verdict.reason).join(' ') || 'No study variables to check.')
+  if (refused.length > 0) {
+    violate(id, summaries(refused))
+    return
+  }
+  if (cautions.length > 0) {
+    leave(id, summaries(cautions), nonEmptyGroups(cautions))
+    return
+  }
+  satisfy(
+    id,
+    levelVerdicts(context)
+      .map((verdict) => verdict.reason)
+      .join(' ') || 'No study variables to check.',
+  )
 }
 
 const findCaveat = (method: MethodDefinition, id: string): MethodDefinition['caveats'][number] =>
-  method.caveats.find((caveat) => caveat.id === id) ?? (() => {
+  method.caveats.find((caveat) => caveat.id === id) ??
+  (() => {
     throw new Error(`Method catalogue invariant failed: ${method.name} has no condition “${id}”.`)
   })()
 
-const isNonEmpty = <Value>(values: readonly Value[]): values is NonEmptyArray<Value> => values.length > 0
+const isNonEmpty = <Value>(values: readonly Value[]): values is NonEmptyArray<Value> =>
+  values.length > 0
 
 const TARGET_COMPATIBILITY_CAVEAT: MethodCaveat = {
   id: brand<string, 'MethodCaveatId'>('estimand-target-compatibility'),
   category: 'interpretation',
-  requirement: 'The estimator must report the target population recorded in the study specification.',
-  consequenceIfUnmet: 'An ATE and an ATT answer different causal questions and cannot be substituted for one another.',
-  sources: [{ kind: 'paper', title: 'Hernán and Robins, Causal Inference: What If', locator: 'https://www.hsph.harvard.edu/miguel-hernan/causal-inference-book/' }],
+  requirement:
+    'The estimator must report the target population recorded in the study specification.',
+  consequenceIfUnmet:
+    'An ATE and an ATT answer different causal questions and cannot be substituted for one another.',
+  sources: [
+    {
+      kind: 'paper',
+      title: 'Hernán and Robins, Causal Inference: What If',
+      locator: 'https://www.hsph.harvard.edu/miguel-hernan/causal-inference-book/',
+    },
+  ],
 }
 
 /** Whether an estimator reports the study's target, decided once per target. */
@@ -2222,58 +3550,135 @@ type TargetVerdict =
 const reported = (evidence: string): TargetVerdict => ({ kind: 'reported', evidence })
 const notReported = (evidence: string): TargetVerdict => ({ kind: 'not-reported', evidence })
 
-function targetCompatibility(estimand: Estimand, configuration: EstimatorConfiguration): TargetVerdict {
-  if (configuration.kind === 'synthetic-control' && configuration.specification === 'ridge-augmented') return estimand.kind==='average-treatment-effect-on-treated'&&estimand.scale==='additive'
-    ? reported('Ridge augmentation estimates the post-treatment gap for the selected treated unit.')
-    : notReported('Ridge-augmented synthetic control requires an additive ATT study for the treated unit.')
-  if (configuration.kind === 'synthetic-control' && configuration.specification === 'predictors') return estimand.kind === 'average-treatment-effect-on-treated'
-    ? reported('This comparison estimates the effect for the selected treated unit over the selected post-intervention periods.')
-    : notReported('Predictor-based synthetic control targets the treated unit. Record an ATT study before running this comparison.')
-  if (configuration.kind === 'causal-forest') return causalForestTarget(estimand) === null
-    ? notReported('Causal forest does not report a cutoff-local effect or the configured grouped-effect target. Choose an average or a conditional effect at each row’s covariate values.')
-    : reported('The forest reports the treatment target and population recorded in Study design.')
-  if (estimand.kind === 'average-treatment-effect-on-controls' || estimand.kind === 'overlap-weighted-average-treatment-effect' || estimand.kind === 'average-partial-effect' || estimand.kind === 'variance-weighted-average-partial-effect' || estimand.kind === 'conditional-partial-effect-per-row') return notReported('This estimator does not report the recorded target. Choose causal forest for this target.')
-  if (configuration.kind === 'panel-intervention') return estimand.kind === 'average-treatment-effect-on-treated'
-    ? reported('The panel comparison targets the average effect on the treated group.')
-    : notReported('Panel DiD targets the treated group. Record an ATT study before running; existing saved runs retain their original labels.')
-  if (configuration.kind === 'sharp-rd') return estimand.kind === 'local-cutoff-effect'
-    ? reported('The study and estimator both target the local effect at the recorded cutoff.')
-    : notReported('Sharp RD estimates the average treatment effect at the cutoff. For a time-based design, this is the event time. In Study design, choose “At an assignment cutoff (sharp RD)”. Then set the running variable and cutoff.')
+function targetCompatibility(
+  estimand: Estimand,
+  configuration: EstimatorConfiguration,
+): TargetVerdict {
+  if (
+    configuration.kind === 'synthetic-control' &&
+    configuration.specification === 'ridge-augmented'
+  )
+    return estimand.kind === 'average-treatment-effect-on-treated' && estimand.scale === 'additive'
+      ? reported(
+          'Ridge augmentation estimates the post-treatment gap for the selected treated unit.',
+        )
+      : notReported(
+          'Ridge-augmented synthetic control requires an additive ATT study for the treated unit.',
+        )
+  if (configuration.kind === 'synthetic-control' && configuration.specification === 'predictors')
+    return estimand.kind === 'average-treatment-effect-on-treated'
+      ? reported(
+          'This comparison estimates the effect for the selected treated unit over the selected post-intervention periods.',
+        )
+      : notReported(
+          'Predictor-based synthetic control targets the treated unit. Record an ATT study before running this comparison.',
+        )
+  if (configuration.kind === 'causal-forest')
+    return causalForestTarget(estimand) === null
+      ? notReported(
+          'Causal forest does not report a cutoff-local effect or the configured grouped-effect target. Choose an average or a conditional effect at each row’s covariate values.',
+        )
+      : reported('The forest reports the treatment target and population recorded in Study design.')
+  if (
+    estimand.kind === 'average-treatment-effect-on-controls' ||
+    estimand.kind === 'overlap-weighted-average-treatment-effect' ||
+    estimand.kind === 'average-partial-effect' ||
+    estimand.kind === 'variance-weighted-average-partial-effect' ||
+    estimand.kind === 'conditional-partial-effect-per-row'
+  )
+    return notReported(
+      'This estimator does not report the recorded target. Choose causal forest for this target.',
+    )
+  if (configuration.kind === 'panel-intervention')
+    return estimand.kind === 'average-treatment-effect-on-treated'
+      ? reported('The panel comparison targets the average effect on the treated group.')
+      : notReported(
+          'Panel DiD targets the treated group. Record an ATT study before running; existing saved runs retain their original labels.',
+        )
+  if (configuration.kind === 'sharp-rd')
+    return estimand.kind === 'local-cutoff-effect'
+      ? reported('The study and estimator both target the local effect at the recorded cutoff.')
+      : notReported(
+          'Sharp RD estimates the average treatment effect at the cutoff. For a time-based design, this is the event time. In Study design, choose “At an assignment cutoff (sharp RD)”. Then set the running variable and cutoff.',
+        )
   // The T-learner estimates one effect per row; their mean over every row is the average effect.
   if (configuration.kind === 't-learner') {
     switch (estimand.kind) {
-      case 'conditional-average-treatment-effect-per-row': return reported('Estimator and study both target the effect for each row.')
-      case 'average-treatment-effect': return reported('The study targets ATE, which the T-learner reports as the mean of its row effects over every row.')
-      case 'average-treatment-effect-on-treated': return notReported('The study targets ATT. The T-learner reports the mean over every row, not over the treated rows.')
-      case 'conditional-average-treatment-effect': return notReported(`This study targets the effect within groups of ${estimand.modifier.name}. Only the double machine learning estimators report group effects.`)
-      case 'local-cutoff-effect': return notReported('This cutoff-local target requires the sharp RD estimator.')
-      default: return assertNever(estimand)
+      case 'conditional-average-treatment-effect-per-row':
+        return reported('Estimator and study both target the effect for each row.')
+      case 'average-treatment-effect':
+        return reported(
+          'The study targets ATE, which the T-learner reports as the mean of its row effects over every row.',
+        )
+      case 'average-treatment-effect-on-treated':
+        return notReported(
+          'The study targets ATT. The T-learner reports the mean over every row, not over the treated rows.',
+        )
+      case 'conditional-average-treatment-effect':
+        return notReported(
+          `This study targets the effect within groups of ${estimand.modifier.name}. Only the double machine learning estimators report group effects.`,
+        )
+      case 'local-cutoff-effect':
+        return notReported('This cutoff-local target requires the sharp RD estimator.')
+      default:
+        return assertNever(estimand)
     }
   }
   switch (estimand.kind) {
-    case 'local-cutoff-effect': return notReported('This cutoff-local target requires the sharp RD estimator.')
+    case 'local-cutoff-effect':
+      return notReported('This cutoff-local target requires the sharp RD estimator.')
     case 'average-treatment-effect':
-      if (configuration.kind === 'binary-ett-idc-star') return notReported('The binary IDC* evaluator reports ETT/ATT, but this study records ATE.')
-      if (configuration.kind === 'dml-irm' && configuration.att) return notReported('The DML configuration reports ATT, but the study records ATE.')
+      if (configuration.kind === 'binary-ett-idc-star')
+        return notReported('The binary IDC* evaluator reports ETT/ATT, but this study records ATE.')
+      if (configuration.kind === 'dml-irm' && configuration.att)
+        return notReported('The DML configuration reports ATT, but the study records ATE.')
       return reported('Estimator and study both target ATE.')
     case 'average-treatment-effect-on-treated':
-      if (configuration.kind === 'backdoor-linear-regression') return reported('The additive regression assumes one treatment contrast for every row. Under this common-effect model, the coefficient also represents ATT.')
-      if (configuration.kind === 'propensity-weighting' || configuration.kind === 'propensity-matching' || configuration.kind === 'doubly-robust') return reported('The propensity estimator averages the treatment contrast over treated rows.')
-      if (configuration.kind === 'binary-ett-idc-star') return reported('Estimator and study both target ATT.')
-      if (configuration.kind === 'dml-irm') return configuration.att ? reported('Estimator and study both target ATT.') : notReported('The DML configuration reports ATE, but the study records ATT.')
-      return notReported('This specification does not report ATT. Choose an estimator that averages the treatment contrast over treated rows.')
+      if (configuration.kind === 'backdoor-linear-regression')
+        return reported(
+          'The additive regression assumes one treatment contrast for every row. Under this common-effect model, the coefficient also represents ATT.',
+        )
+      if (
+        configuration.kind === 'propensity-weighting' ||
+        configuration.kind === 'propensity-matching' ||
+        configuration.kind === 'doubly-robust'
+      )
+        return reported(
+          'The propensity estimator averages the treatment contrast over treated rows.',
+        )
+      if (configuration.kind === 'binary-ett-idc-star')
+        return reported('Estimator and study both target ATT.')
+      if (configuration.kind === 'dml-irm')
+        return configuration.att
+          ? reported('Estimator and study both target ATT.')
+          : notReported('The DML configuration reports ATE, but the study records ATT.')
+      return notReported(
+        'This specification does not report ATT. Choose an estimator that averages the treatment contrast over treated rows.',
+      )
     case 'conditional-average-treatment-effect':
-      if (configuration.kind === 'dml-plr' || (configuration.kind === 'dml-irm' && !configuration.att)) {
+      if (
+        configuration.kind === 'dml-plr' ||
+        (configuration.kind === 'dml-irm' && !configuration.att)
+      ) {
         return reported('')
       }
-      return notReported(`This study targets the effect within groups of ${estimand.modifier.name}. Only the double machine learning estimators report group effects.`)
+      return notReported(
+        `This study targets the effect within groups of ${estimand.modifier.name}. Only the double machine learning estimators report group effects.`,
+      )
     case 'conditional-average-treatment-effect-per-row':
-      return notReported('This study targets the effect for each row. Only the T-learner reports per-row effects.')
-    default: return assertNever(estimand)
+      return notReported(
+        'This study targets the effect for each row. Only the T-learner reports per-row effects.',
+      )
+    default:
+      return assertNever(estimand)
   }
 }
 
-const verdict = (satisfied: Satisfied[], unresolved: Unresolved[], violations: Violated[]): MethodEligibility => {
+const verdict = (
+  satisfied: Satisfied[],
+  unresolved: Unresolved[],
+  violations: Violated[],
+): MethodEligibility => {
   if (isNonEmpty(violations)) return { kind: 'refused', satisfied, unresolved, violations }
   if (isNonEmpty(unresolved)) return { kind: 'caution', satisfied, unresolved }
   return { kind: 'eligible', satisfied }
@@ -2281,135 +3686,381 @@ const verdict = (satisfied: Satisfied[], unresolved: Unresolved[], violations: V
 
 /** Rules over the identification, the sampling structure, the data shape, and the chosen configuration. */
 /** What the double machine learning nuisance learners see: the identified set, plus the effect modifier of a conditional target. */
-export function dmlNuisanceInputs(adjustment: readonly StudyVariable[], estimand: Estimand | null): readonly StudyVariable[] {
-  const modifier = estimand?.kind === 'conditional-average-treatment-effect' ? estimand.modifier : null
-  return modifier === null || adjustment.some((variable) => variable.column === modifier.column) ? adjustment : [...adjustment, modifier]
+export function dmlNuisanceInputs(
+  adjustment: readonly StudyVariable[],
+  estimand: Estimand | null,
+): readonly StudyVariable[] {
+  const modifier =
+    estimand?.kind === 'conditional-average-treatment-effect' ? estimand.modifier : null
+  return modifier === null || adjustment.some((variable) => variable.column === modifier.column)
+    ? adjustment
+    : [...adjustment, modifier]
 }
 
 /** What the T-learner's outcome forests see, and what each row's effect is conditioned on: the identified set, then the per-row target's modifiers not already in it. */
 /** A T-learner run's effect for each prepared row, in row order, or null when they do not cover every row. */
-export const tLearnerRowEffects = (evidence: TLearnerEvidence | CrossFittedTLearnerEvidence): NonEmptyArray<number> | null =>
-  isNonEmpty(evidence.effects) && evidence.effects.length === evidence.observations ? evidence.effects : null
+export const tLearnerRowEffects = (
+  evidence: TLearnerEvidence | CrossFittedTLearnerEvidence,
+): NonEmptyArray<number> | null =>
+  isNonEmpty(evidence.effects) && evidence.effects.length === evidence.observations
+    ? evidence.effects
+    : null
 
 /**
  * What a T-learner run reports for the study's target: every row's effect for a per-row study, and
  * their mean over every row for an average-effect study. Other targets are not reported.
  */
-export const tLearnerEffect = (estimand: Estimand, average: number, effects: NonEmptyArray<number>): EffectEstimate | null => {
+export const tLearnerEffect = (
+  estimand: Estimand,
+  average: number,
+  effects: NonEmptyArray<number>,
+): EffectEstimate | null => {
   switch (estimand.kind) {
-    case 'conditional-average-treatment-effect-per-row': return { kind: 'perRow', overall: average, effects }
-    case 'average-treatment-effect': return { kind: 'additive', value: average, unit: '' }
+    case 'conditional-average-treatment-effect-per-row':
+      return { kind: 'perRow', overall: average, effects }
+    case 'average-treatment-effect':
+      return { kind: 'additive', value: average, unit: '' }
     case 'average-treatment-effect-on-treated':
     case 'conditional-average-treatment-effect':
-    case 'local-cutoff-effect': return null
+    case 'local-cutoff-effect':
+      return null
     case 'average-treatment-effect-on-controls':
     case 'overlap-weighted-average-treatment-effect':
     case 'average-partial-effect':
     case 'variance-weighted-average-partial-effect':
-    case 'conditional-partial-effect-per-row': return null
-    default: return assertNever(estimand)
+    case 'conditional-partial-effect-per-row':
+      return null
+    default:
+      return assertNever(estimand)
   }
 }
 
-export function tLearnerInputs(adjustment: readonly StudyVariable[], estimand: Estimand | null): readonly StudyVariable[] {
-  const modifiers = estimand?.kind === 'conditional-average-treatment-effect-per-row' ? estimand.modifiers : []
-  return [...adjustment, ...modifiers.filter((modifier) => !adjustment.some((variable) => variable.column === modifier.column))]
+export function tLearnerInputs(
+  adjustment: readonly StudyVariable[],
+  estimand: Estimand | null,
+): readonly StudyVariable[] {
+  const modifiers =
+    estimand?.kind === 'conditional-average-treatment-effect-per-row' ? estimand.modifiers : []
+  return [
+    ...adjustment,
+    ...modifiers.filter(
+      (modifier) => !adjustment.some((variable) => variable.column === modifier.column),
+    ),
+  ]
 }
 
-export function evaluateEstimatorEligibility(method: MethodDefinition, context: EligibilityContext): MethodEligibility {
+export function evaluateEstimatorEligibility(
+  method: MethodDefinition,
+  context: EligibilityContext,
+): MethodEligibility {
   const { identification, prepared, configuration } = context
   const timeSeries = prepared.kind === 'prepared-time-series'
   const panel = context.prepared.kind === 'prepared-panel'
   const satisfied: Satisfied[] = []
   const unresolved: Unresolved[] = []
   const violations: Violated[] = []
-  const satisfy = (id: string, evidence: string) => satisfied.push({ kind: 'satisfied', caveat: findCaveat(method, id), evidence })
-  const leave = (id: string, missingEvidence: string, groups?: NonEmptyArray<EvidenceGroup>) => unresolved.push({ kind: 'unresolved', caveat: findCaveat(method, id), missingEvidence, ...(groups === undefined ? {} : { groups }) })
-  const violate = (id: string, evidence: string) => violations.push({ kind: 'violated', caveat: findCaveat(method, id), evidence })
-  const adjustment = identification.kind === 'identified'
-    ? identification.adjustment.variables.length === 0 ? 'nothing' : identification.adjustment.variables.map((variable) => variable.name).join(', ')
-    : null
+  const satisfy = (id: string, evidence: string) =>
+    satisfied.push({ kind: 'satisfied', caveat: findCaveat(method, id), evidence })
+  const leave = (id: string, missingEvidence: string, groups?: NonEmptyArray<EvidenceGroup>) =>
+    unresolved.push({
+      kind: 'unresolved',
+      caveat: findCaveat(method, id),
+      missingEvidence,
+      ...(groups === undefined ? {} : { groups }),
+    })
+  const violate = (id: string, evidence: string) =>
+    violations.push({ kind: 'violated', caveat: findCaveat(method, id), evidence })
+  const adjustment =
+    identification.kind === 'identified'
+      ? identification.adjustment.variables.length === 0
+        ? 'nothing'
+        : identification.adjustment.variables.map((variable) => variable.name).join(', ')
+      : null
 
   if (context.study !== null) {
     const verdict = targetCompatibility(context.study.estimand, configuration)
     switch (verdict.kind) {
-      case 'reported': satisfied.push({ kind: 'satisfied', caveat: TARGET_COMPATIBILITY_CAVEAT, evidence: verdict.evidence }); break
-      case 'not-reported': violations.push({ kind: 'violated', caveat: TARGET_COMPATIBILITY_CAVEAT, evidence: verdict.evidence }); break
-      default: assertNever(verdict)
+      case 'reported':
+        satisfied.push({
+          kind: 'satisfied',
+          caveat: TARGET_COMPATIBILITY_CAVEAT,
+          evidence: verdict.evidence,
+        })
+        break
+      case 'not-reported':
+        violations.push({
+          kind: 'violated',
+          caveat: TARGET_COMPATIBILITY_CAVEAT,
+          evidence: verdict.evidence,
+        })
+        break
+      default:
+        assertNever(verdict)
     }
   }
 
   switch (configuration.kind) {
     case 'sharp-rd': {
-      if (identification.kind !== 'cutoff-design' || context.study?.estimand.kind !== 'local-cutoff-effect') violate('rd-design', 'Record a cutoff-local study and its running variable before fitting sharp RD.')
-      else leave('rd-design', 'Justify continuity of potential outcomes, no precise manipulation and no other change at the cutoff. The fit checks sharp assignment, not these causal assumptions.')
-      if (prepared.kind !== 'prepared-cross-section') violate('rd-sample', 'This RD implementation requires independent observations; it does not provide clustered or time-series uncertainty.')
-      else leave('rd-sample', 'The fit checks support on both sides and selects the mserd bandwidth. Inspect observations near the cutoff.')
+      if (
+        identification.kind !== 'cutoff-design' ||
+        context.study?.estimand.kind !== 'local-cutoff-effect'
+      )
+        violate(
+          'rd-design',
+          'Record a cutoff-local study and its running variable before fitting sharp RD.',
+        )
+      else
+        leave(
+          'rd-design',
+          'Justify continuity of potential outcomes, no precise manipulation and no other change at the cutoff. The fit checks sharp assignment, not these causal assumptions.',
+        )
+      if (prepared.kind !== 'prepared-cross-section')
+        violate(
+          'rd-sample',
+          'This RD implementation requires independent observations; it does not provide clustered or time-series uncertainty.',
+        )
+      else
+        leave(
+          'rd-sample',
+          'The fit checks support on both sides and selects the mserd bandwidth. Inspect observations near the cutoff.',
+        )
       break
     }
     case 'causal-forest': {
-      const inputs = identification.kind === 'identified' ? causalForestInputs(identification.adjustment.variables, context.study?.estimand ?? null) : []
-      if (identification.kind !== 'identified' || inputs.length === 0) violate('forest-adjustment', 'Identify a measured adjustment set and at least one pretreatment covariate. An empty set can be supplemented with recorded effect modifiers.')
-      else satisfy('forest-adjustment', `The forest uses ${inputs.map(variable => variable.name).join(', ')}.`)
-      if (prepared.kind !== 'prepared-cross-section') violate('forest-sampling', 'Prepare the evaluation observations as a cross-section and select a cluster identifier for dependent rows. This method does not model temporal treatment histories.')
-      else if (configuration.analysis !== undefined && configuration.analysis.sampling.kind !== 'independent') leave('forest-sampling', 'The forest samples clusters and accounts for clustering in inference. Justify independence between clusters; clustering does not resolve confounding.')
-      else leave('forest-sampling', 'Confirm that observations are independent, or select their cluster identifier.')
+      const inputs =
+        identification.kind === 'identified'
+          ? causalForestInputs(identification.adjustment.variables, context.study?.estimand ?? null)
+          : []
+      if (identification.kind !== 'identified' || inputs.length === 0)
+        violate(
+          'forest-adjustment',
+          'Identify a measured adjustment set and at least one pretreatment covariate. An empty set can be supplemented with recorded effect modifiers.',
+        )
+      else
+        satisfy(
+          'forest-adjustment',
+          `The forest uses ${inputs.map((variable) => variable.name).join(', ')}.`,
+        )
+      if (prepared.kind !== 'prepared-cross-section')
+        violate(
+          'forest-sampling',
+          'Prepare the evaluation observations as a cross-section and select a cluster identifier for dependent rows. This method does not model temporal treatment histories.',
+        )
+      else if (
+        configuration.analysis !== undefined &&
+        configuration.analysis.sampling.kind !== 'independent'
+      )
+        leave(
+          'forest-sampling',
+          'The forest samples clusters and accounts for clustering in inference. Justify independence between clusters; clustering does not resolve confounding.',
+        )
+      else
+        leave(
+          'forest-sampling',
+          'Confirm that observations are independent, or select their cluster identifier.',
+        )
       const target = context.study === null ? null : causalForestTarget(context.study.estimand)
-      if (configuration.analysis?.averageMethod === 'tmle' && !(target?.kind === 'binary-average' && target.population !== 'overlap')) violate('forest-tmle-target', 'TMLE requires a binary ATE, ATT or ATC target.')
-      if (configuration.analysis?.projection.kind === 'linear' && configuration.analysis.projection.overlap && target?.kind !== 'binary-average' && target?.kind !== 'binary-conditional') violate('forest-projection-target', 'Overlap-weighted projection requires a binary treatment.')
-      if (configuration.analysis?.moderation !== undefined && target?.kind !== 'binary-average' && target?.kind !== 'binary-conditional') violate('forest-moderation-target', 'Cluster-score moderation requires a binary treatment.')
-      if (configuration.analysis?.ranking.kind === 'external') leave('forest-ranking-independence', 'The priority scores must be constructed independently of this evaluation sample. A recorded rationale does not verify this assumption.')
+      if (
+        configuration.analysis?.averageMethod === 'tmle' &&
+        !(target?.kind === 'binary-average' && target.population !== 'overlap')
+      )
+        violate('forest-tmle-target', 'TMLE requires a binary ATE, ATT or ATC target.')
+      if (
+        configuration.analysis?.projection.kind === 'linear' &&
+        configuration.analysis.projection.overlap &&
+        target?.kind !== 'binary-average' &&
+        target?.kind !== 'binary-conditional'
+      )
+        violate(
+          'forest-projection-target',
+          'Overlap-weighted projection requires a binary treatment.',
+        )
+      if (
+        configuration.analysis?.moderation !== undefined &&
+        target?.kind !== 'binary-average' &&
+        target?.kind !== 'binary-conditional'
+      )
+        violate('forest-moderation-target', 'Cluster-score moderation requires a binary treatment.')
+      if (configuration.analysis?.ranking.kind === 'external')
+        leave(
+          'forest-ranking-independence',
+          'The priority scores must be constructed independently of this evaluation sample. A recorded rationale does not verify this assumption.',
+        )
       if (target?.kind === 'binary-average' || target?.kind === 'binary-conditional') {
-        if (context.treatmentIsBinary === false) violate('forest-target', 'The treatment is not coded 0 and 1. For a continuous treatment, record a partial-effect target in Study design.')
-        else if (context.treatmentIsBinary === null) leave('forest-target', 'The fit checks that treatment is 0 or 1 and that both groups are present.')
-        else satisfy('forest-target', 'Treatment values are 0 and 1; the fit also checks that both groups are present.')
-      } else leave('forest-target', 'Assess whether unconfoundedness and the exogenous random-coefficient treatment model support a causal slope interpretation. The graph alone does not establish this functional form.')
-      leave('forest-overlap', 'Inspect treatment variation across the adjustment variables. Conditional treatment probabilities or variances must support the chosen target.')
+        if (context.treatmentIsBinary === false)
+          violate(
+            'forest-target',
+            'The treatment is not coded 0 and 1. For a continuous treatment, record a partial-effect target in Study design.',
+          )
+        else if (context.treatmentIsBinary === null)
+          leave(
+            'forest-target',
+            'The fit checks that treatment is 0 or 1 and that both groups are present.',
+          )
+        else
+          satisfy(
+            'forest-target',
+            'Treatment values are 0 and 1; the fit also checks that both groups are present.',
+          )
+      } else
+        leave(
+          'forest-target',
+          'Assess whether unconfoundedness and the exogenous random-coefficient treatment model support a causal slope interpretation. The graph alone does not establish this functional form.',
+        )
+      leave(
+        'forest-overlap',
+        'Inspect treatment variation across the adjustment variables. Conditional treatment probabilities or variances must support the chosen target.',
+      )
       const validated = causalForestConfigurationSchema.safeParse(configuration)
-      if (!validated.success) violate('forest-settings', validated.error.issues.map(issue => issue.message).join(' '))
-      else satisfy('forest-settings', `${configuration.trees} trees; seed ${configuration.seed}; ${configuration.confidenceLevel * 100}% confidence level. Selected tuning settings are saved when tuning is requested.`)
-      leave('forest-reading', 'Read pointwise intervals and the calibration test alongside conditional predictions. Predictions alone do not establish heterogeneity.')
+      if (!validated.success)
+        violate('forest-settings', validated.error.issues.map((issue) => issue.message).join(' '))
+      else
+        satisfy(
+          'forest-settings',
+          `${configuration.trees} trees; seed ${configuration.seed}; ${configuration.confidenceLevel * 100}% confidence level. Selected tuning settings are saved when tuning is requested.`,
+        )
+      leave(
+        'forest-reading',
+        'Read pointwise intervals and the calibration test alongside conditional predictions. Predictions alone do not establish heterogeneity.',
+      )
       break
     }
     case 'backdoor-linear-regression': {
-      if (adjustment === null) violate('linear-identified-adjustment', 'No measured back-door adjustment set was found, so this adjusted regression cannot run.')
-      else satisfy('linear-identified-adjustment', `Identified by back-door adjustment for ${adjustment}.`)
+      if (adjustment === null)
+        violate(
+          'linear-identified-adjustment',
+          'No measured back-door adjustment set was found, so this adjusted regression cannot run.',
+        )
+      else
+        satisfy(
+          'linear-identified-adjustment',
+          `Identified by back-door adjustment for ${adjustment}.`,
+        )
       if (configuration.fixedEffects.kind !== 'none') {
-        satisfy('linear-fixed-effects', configuration.fixedEffects.kind === 'time'
-          ? `Period effects account for additive differences shared by rows with the same ${configuration.fixedEffects.name}. Unit-specific differences are not absorbed.`
-          : configuration.fixedEffects.kind === 'unit'
-          ? `Unit effects account for additive differences that stay constant within each ${configuration.fixedEffects.name}. Time-varying confounding is not automatically removed.`
-          : `Unit and period effects account for additive differences between ${configuration.fixedEffects.name} groups and changes shared within each ${configuration.fixedEffects.timeName}. Unit-specific time-varying confounding is not automatically removed.`)
-        if (configuration.errors.kind === 'hac' || configuration.errors.kind === 'arma') violate('linear-serial-dependence', 'Fixed effects use the within-unit deviations of each row. Choose the classical, robust (HC1) or clustered interval.')
-      } else if (panel) leave('linear-fixed-effects', 'Rows repeat within units. Choose fixed effects by the unit column so that causes fixed within a unit drop out.')
-      else leave('linear-fixed-effects', 'Without fixed effects, a causal interpretation relies on the recorded adjustment assumptions.')
-      if (configuration.errors.kind === 'cluster') satisfy('linear-serial-dependence', `Errors may correlate within each value of ${configuration.errors.name}; the interval treats the clusters as independent.`)
-      else if (panel) leave('linear-serial-dependence', 'Rows repeat within units. Choose the clustered interval with the unit column so that errors may correlate within a unit.')
-      else if (timeSeries && configuration.errors.kind !== 'hac' && configuration.errors.kind !== 'arma') violate('linear-serial-dependence', 'The rows are a time series and this interval assumes errors that are not serially correlated. Choose the HAC interval or an ARMA error process.')
-      else if (configuration.errors.kind === 'arma') satisfy('linear-serial-dependence', `An ARMA(${configuration.errors.p}, ${configuration.errors.q}) error process is fitted with the coefficients by maximum likelihood; the interval comes from that fit.`)
-      else if (configuration.errors.kind === 'hc1') satisfy('linear-serial-dependence', 'The prepared dataset contains independent rows. The interval permits error variance to differ between rows.')
-      else satisfy('linear-serial-dependence', timeSeries ? 'Heteroskedasticity and autocorrelation consistent (HAC) Newey–West interval selected for time-series rows.' : 'The prepared dataset holds independent rows, so the classical interval applies.')
+        satisfy(
+          'linear-fixed-effects',
+          configuration.fixedEffects.kind === 'time'
+            ? `Period effects account for additive differences shared by rows with the same ${configuration.fixedEffects.name}. Unit-specific differences are not absorbed.`
+            : configuration.fixedEffects.kind === 'unit'
+              ? `Unit effects account for additive differences that stay constant within each ${configuration.fixedEffects.name}. Time-varying confounding is not automatically removed.`
+              : `Unit and period effects account for additive differences between ${configuration.fixedEffects.name} groups and changes shared within each ${configuration.fixedEffects.timeName}. Unit-specific time-varying confounding is not automatically removed.`,
+        )
+        if (configuration.errors.kind === 'hac' || configuration.errors.kind === 'arma')
+          violate(
+            'linear-serial-dependence',
+            'Fixed effects use the within-unit deviations of each row. Choose the classical, robust (HC1) or clustered interval.',
+          )
+      } else if (panel)
+        leave(
+          'linear-fixed-effects',
+          'Rows repeat within units. Choose fixed effects by the unit column so that causes fixed within a unit drop out.',
+        )
+      else
+        leave(
+          'linear-fixed-effects',
+          'Without fixed effects, a causal interpretation relies on the recorded adjustment assumptions.',
+        )
+      if (configuration.errors.kind === 'cluster')
+        satisfy(
+          'linear-serial-dependence',
+          `Errors may correlate within each value of ${configuration.errors.name}; the interval treats the clusters as independent.`,
+        )
+      else if (panel)
+        leave(
+          'linear-serial-dependence',
+          'Rows repeat within units. Choose the clustered interval with the unit column so that errors may correlate within a unit.',
+        )
+      else if (
+        timeSeries &&
+        configuration.errors.kind !== 'hac' &&
+        configuration.errors.kind !== 'arma'
+      )
+        violate(
+          'linear-serial-dependence',
+          'The rows are a time series and this interval assumes errors that are not serially correlated. Choose the HAC interval or an ARMA error process.',
+        )
+      else if (configuration.errors.kind === 'arma')
+        satisfy(
+          'linear-serial-dependence',
+          `An ARMA(${configuration.errors.p}, ${configuration.errors.q}) error process is fitted with the coefficients by maximum likelihood; the interval comes from that fit.`,
+        )
+      else if (configuration.errors.kind === 'hc1')
+        satisfy(
+          'linear-serial-dependence',
+          'The prepared dataset contains independent rows. The interval permits error variance to differ between rows.',
+        )
+      else
+        satisfy(
+          'linear-serial-dependence',
+          timeSeries
+            ? 'Heteroskedasticity and autocorrelation consistent (HAC) Newey–West interval selected for time-series rows.'
+            : 'The prepared dataset holds independent rows, so the classical interval applies.',
+        )
       satisfy('linear-hac-bandwidth', 'The run records the bandwidth from the default rule.')
-      leave('linear-functional-form', context.study?.estimand.kind === 'average-treatment-effect-on-treated' ? 'ATT uses the common treatment coefficient. This assumes an additive outcome model with no treatment interactions and the same treatment contrast for every row; inspect residual diagnostics and plausible effect modification.' : 'Check linearity with the residual diagnostics in the sensitivity section.')
-      leave('linear-overlap', 'Inspect treatment overlap against the adjustment variables in Data studio.')
-      if (timeSeries) leave('linear-not-time-graph', 'Lagged effects are not estimated by this method.')
+      leave(
+        'linear-functional-form',
+        context.study?.estimand.kind === 'average-treatment-effect-on-treated'
+          ? 'ATT uses the common treatment coefficient. This assumes an additive outcome model with no treatment interactions and the same treatment contrast for every row; inspect residual diagnostics and plausible effect modification.'
+          : 'Check linearity with the residual diagnostics in the sensitivity section.',
+      )
+      leave(
+        'linear-overlap',
+        'Inspect treatment overlap against the adjustment variables in Data studio.',
+      )
+      if (timeSeries)
+        leave('linear-not-time-graph', 'Lagged effects are not estimated by this method.')
       else satisfy('linear-not-time-graph', 'Independent observations carry no lag structure.')
       applyLevelRule('linear-level-stationarity', context, satisfy, leave, violate)
       break
     }
     case 'frontdoor-two-stage': {
-      if (identification.kind !== 'graphically-identified' || identification.frontdoor.kind !== 'identified') {
-        violate('frontdoor-identified-mediator', 'The identification record does not contain a front-door set for this treatment and outcome.')
-        violate('frontdoor-single-mediator', 'No front-door mediator is available to the estimator.')
+      if (
+        identification.kind !== 'graphically-identified' ||
+        identification.frontdoor.kind !== 'identified'
+      ) {
+        violate(
+          'frontdoor-identified-mediator',
+          'The identification record does not contain a front-door set for this treatment and outcome.',
+        )
+        violate(
+          'frontdoor-single-mediator',
+          'No front-door mediator is available to the estimator.',
+        )
       } else {
-        satisfy('frontdoor-identified-mediator', `The graph identifies ${identification.frontdoor.mediators.map((mediator) => mediator.name).join(', ')} as the front-door set.`)
-        if (identification.frontdoor.mediators.length === 1) satisfy('frontdoor-single-mediator', `${identification.frontdoor.mediators[0].name} is the single identified mediator.`)
-        else violate('frontdoor-single-mediator', `The identified front-door set contains ${identification.frontdoor.mediators.length} mediators; this estimator supports one.`)
+        satisfy(
+          'frontdoor-identified-mediator',
+          `The graph identifies ${identification.frontdoor.mediators.map((mediator) => mediator.name).join(', ')} as the front-door set.`,
+        )
+        if (identification.frontdoor.mediators.length === 1)
+          satisfy(
+            'frontdoor-single-mediator',
+            `${identification.frontdoor.mediators[0].name} is the single identified mediator.`,
+          )
+        else
+          violate(
+            'frontdoor-single-mediator',
+            `The identified front-door set contains ${identification.frontdoor.mediators.length} mediators; this estimator supports one.`,
+          )
       }
-      leave('frontdoor-linear-stages', 'Assess whether treatment–mediator and mediator–outcome relations are adequately represented by additive linear regressions over the chosen contrast.')
-      if (timeSeries) violate('frontdoor-bootstrap-rows', 'The prepared rows are a time series, but this estimator uses an ordinary row bootstrap and does not preserve temporal dependence.')
-      else if (panel) violate('frontdoor-bootstrap-rows', 'The prepared rows repeat units, but this estimator uses an ordinary row bootstrap and does not preserve within-unit dependence.')
-      else leave('frontdoor-bootstrap-rows', `The run uses ${configuration.simulations} seeded row resamples; confirm that observations are independently sampled.`)
+      leave(
+        'frontdoor-linear-stages',
+        'Assess whether treatment–mediator and mediator–outcome relations are adequately represented by additive linear regressions over the chosen contrast.',
+      )
+      if (timeSeries)
+        violate(
+          'frontdoor-bootstrap-rows',
+          'The prepared rows are a time series, but this estimator uses an ordinary row bootstrap and does not preserve temporal dependence.',
+        )
+      else if (panel)
+        violate(
+          'frontdoor-bootstrap-rows',
+          'The prepared rows repeat units, but this estimator uses an ordinary row bootstrap and does not preserve within-unit dependence.',
+        )
+      else
+        leave(
+          'frontdoor-bootstrap-rows',
+          `The run uses ${configuration.simulations} seeded row resamples; confirm that observations are independently sampled.`,
+        )
       break
     }
     case 'instrumental-variable': {
@@ -2417,410 +4068,1229 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
       const treatmentName = context.study?.treatment.name ?? 'the treatment'
       const outcomeName = context.study?.outcome.name ?? 'the outcome'
       if (instruments === null) {
-        violate('iv-identified-instrument', `The identification record names no observed instrument for ${treatmentName} and ${outcomeName}. If the instrumental variables are latent, an instrumental variable estimand cannot be targeted.`)
+        violate(
+          'iv-identified-instrument',
+          `The identification record names no observed instrument for ${treatmentName} and ${outcomeName}. If the instrumental variables are latent, an instrumental variable estimand cannot be targeted.`,
+        )
       } else {
         const names = instruments.map((variable) => variable.name).join(', ')
-        satisfy('iv-identified-instrument', `${names} ${instruments.length === 1 ? 'meets' : 'meet'} as-if-random (any back-door paths between the instrument and ${outcomeName} can be blocked) and exclusion (the instrument is a cause of ${outcomeName} only indirectly through ${treatmentName}) in the recorded graph.`)
+        satisfy(
+          'iv-identified-instrument',
+          `${names} ${instruments.length === 1 ? 'meets' : 'meet'} as-if-random (any back-door paths between the instrument and ${outcomeName} can be blocked) and exclusion (the instrument is a cause of ${outcomeName} only indirectly through ${treatmentName}) in the recorded graph.`,
+        )
       }
-      leave('iv-linearity', `Assess whether ${outcomeName} and ${treatmentName} are linear in the instrument: the estimate is the ratio of the coefficients of the linear models ${outcomeName} ~ instrument and ${treatmentName} ~ instrument, fitted without covariates.`)
-      leave('iv-effect-homogeneity', `Assess whether each unit’s ${treatmentName} is affected in the same way by the common causes of ${treatmentName} and ${outcomeName}, and each unit’s ${outcomeName} likewise; the estimator reports one effect for every unit.`)
-      leave('iv-instrument-strength', `Check that the instrument is strong, meaning it has a strong causal effect on ${treatmentName}; weak instruments can lead to high variance estimates of the ATE. The run reports no first-stage F statistic.`)
-      if (timeSeries) violate('iv-bootstrap-rows', 'The prepared rows are a time series, but this estimator uses an ordinary row bootstrap and does not preserve temporal dependence.')
-      else if (panel) violate('iv-bootstrap-rows', 'The prepared rows repeat units, but this estimator uses an ordinary row bootstrap and does not preserve within-unit dependence.')
-      else leave('iv-bootstrap-rows', `The run uses ${configuration.simulations} seeded row resamples; confirm that observations are independently sampled.`)
+      leave(
+        'iv-linearity',
+        `Assess whether ${outcomeName} and ${treatmentName} are linear in the instrument: the estimate is the ratio of the coefficients of the linear models ${outcomeName} ~ instrument and ${treatmentName} ~ instrument, fitted without covariates.`,
+      )
+      leave(
+        'iv-effect-homogeneity',
+        `Assess whether each unit’s ${treatmentName} is affected in the same way by the common causes of ${treatmentName} and ${outcomeName}, and each unit’s ${outcomeName} likewise; the estimator reports one effect for every unit.`,
+      )
+      leave(
+        'iv-instrument-strength',
+        `Check that the instrument is strong, meaning it has a strong causal effect on ${treatmentName}; weak instruments can lead to high variance estimates of the ATE. The run reports no first-stage F statistic.`,
+      )
+      if (timeSeries)
+        violate(
+          'iv-bootstrap-rows',
+          'The prepared rows are a time series, but this estimator uses an ordinary row bootstrap and does not preserve temporal dependence.',
+        )
+      else if (panel)
+        violate(
+          'iv-bootstrap-rows',
+          'The prepared rows repeat units, but this estimator uses an ordinary row bootstrap and does not preserve within-unit dependence.',
+        )
+      else
+        leave(
+          'iv-bootstrap-rows',
+          `The run uses ${configuration.simulations} seeded row resamples; confirm that observations are independently sampled.`,
+        )
       break
     }
     case 'panel-intervention': {
       if (configuration.primary === 'sunAbraham') {
-        if (prepared.kind !== 'prepared-panel') violate('panel-balanced-layout','Prepare a long panel with unit and period keys.')
-        else satisfy('panel-balanced-layout','Unit and period keys are recorded. Sun–Abraham can use an unbalanced panel.')
-        if (!sunAbrahamConfigurationSchema.safeParse(configuration).success) violate('panel-pre-fit','Choose a reference event period and confidence level.')
-        else if (context.sunAbrahamComparison === undefined) leave('panel-pre-fit','Reading adoption cohorts and reference support.')
-        else if (!context.sunAbrahamComparison.ok) violate('panel-pre-fit',context.sunAbrahamComparison.error)
-        else satisfy('panel-pre-fit','Absorbing adoption and the selected reference cohorts are supported by the prepared panel. The fit checks which interactions are estimable.')
-        leave('panel-parallel-trends','Interpretation requires parallel untreated trends for the adoption cohorts and their comparison units.')
-        leave('panel-no-anticipation','Assume no treatment effect before adoption.')
-        leave('panel-no-spillovers','Treatment of one unit must not affect another unit’s outcome.')
-        leave('panel-no-interval','Pointwise intervals use unit-clustered covariance. Units must be independent clusters.')
+        if (prepared.kind !== 'prepared-panel')
+          violate('panel-balanced-layout', 'Prepare a long panel with unit and period keys.')
+        else
+          satisfy(
+            'panel-balanced-layout',
+            'Unit and period keys are recorded. Sun–Abraham can use an unbalanced panel.',
+          )
+        if (!sunAbrahamConfigurationSchema.safeParse(configuration).success)
+          violate('panel-pre-fit', 'Choose a reference event period and confidence level.')
+        else if (context.sunAbrahamComparison === undefined)
+          leave('panel-pre-fit', 'Reading adoption cohorts and reference support.')
+        else if (!context.sunAbrahamComparison.ok)
+          violate('panel-pre-fit', context.sunAbrahamComparison.error)
+        else
+          satisfy(
+            'panel-pre-fit',
+            'Absorbing adoption and the selected reference cohorts are supported by the prepared panel. The fit checks which interactions are estimable.',
+          )
+        leave(
+          'panel-parallel-trends',
+          'Interpretation requires parallel untreated trends for the adoption cohorts and their comparison units.',
+        )
+        leave('panel-no-anticipation', 'Assume no treatment effect before adoption.')
+        leave(
+          'panel-no-spillovers',
+          'Treatment of one unit must not affect another unit’s outcome.',
+        )
+        leave(
+          'panel-no-interval',
+          'Pointwise intervals use unit-clustered covariance. Units must be independent clusters.',
+        )
         break
       }
       if (configuration.primary === 'staggered') {
-        if (prepared.kind !== 'prepared-panel' || !prepared.panel.balanced) violate('panel-balanced-layout', 'Staggered DiD requires a balanced long panel with unit and time keys.')
-        else satisfy('panel-balanced-layout', 'A balanced panel is prepared. Each unit’s first treatment period is derived from its binary treatment indicator; treatment must remain on afterwards.')
-        if (configuration.clustering?.kind==='column' && configuration.specification.inference.kind==='analytical') violate('panel-pre-fit', 'Additional clustering requires pointwise or simultaneous bootstrap inference.')
-        else if (!staggeredConfigurationSchema.safeParse(configuration).success) violate('panel-pre-fit', 'Review the event window and inference settings.')
-        else satisfy('panel-pre-fit', 'Group-time ATT compares adoption cohorts with the selected comparison group. Numeric covariates use the comparison baseline.')
-        leave('panel-parallel-trends', 'Identification requires parallel untreated trends, conditional on the selected covariates when adjustment is used, and treatment overlap.')
-        leave('panel-no-anticipation', configuration.specification.anticipation === 0 ? 'Assume no treatment effect before adoption.' : 'Assume no treatment effect before the specified anticipation window.')
-        leave('panel-no-spillovers', 'Treatment of one unit must not affect another unit’s outcome.')
-        leave('panel-no-interval', `${configuration.clustering?.kind==='column'?'Inference treats the groups in the selected cluster column as independent. Each unit must remain in one group.':'Inference treats panel units as independent clusters.'} Simultaneous bands cover the effects within each reported family; overall ATT intervals are pointwise.`)
+        if (prepared.kind !== 'prepared-panel' || !prepared.panel.balanced)
+          violate(
+            'panel-balanced-layout',
+            'Staggered DiD requires a balanced long panel with unit and time keys.',
+          )
+        else
+          satisfy(
+            'panel-balanced-layout',
+            'A balanced panel is prepared. Each unit’s first treatment period is derived from its binary treatment indicator; treatment must remain on afterwards.',
+          )
+        if (
+          configuration.clustering?.kind === 'column' &&
+          configuration.specification.inference.kind === 'analytical'
+        )
+          violate(
+            'panel-pre-fit',
+            'Additional clustering requires pointwise or simultaneous bootstrap inference.',
+          )
+        else if (!staggeredConfigurationSchema.safeParse(configuration).success)
+          violate('panel-pre-fit', 'Review the event window and inference settings.')
+        else
+          satisfy(
+            'panel-pre-fit',
+            'Group-time ATT compares adoption cohorts with the selected comparison group. Numeric covariates use the comparison baseline.',
+          )
+        leave(
+          'panel-parallel-trends',
+          'Identification requires parallel untreated trends, conditional on the selected covariates when adjustment is used, and treatment overlap.',
+        )
+        leave(
+          'panel-no-anticipation',
+          configuration.specification.anticipation === 0
+            ? 'Assume no treatment effect before adoption.'
+            : 'Assume no treatment effect before the specified anticipation window.',
+        )
+        leave(
+          'panel-no-spillovers',
+          'Treatment of one unit must not affect another unit’s outcome.',
+        )
+        leave(
+          'panel-no-interval',
+          `${configuration.clustering?.kind === 'column' ? 'Inference treats the groups in the selected cluster column as independent. Each unit must remain in one group.' : 'Inference treats panel units as independent clusters.'} Simultaneous bands cover the effects within each reported family; overall ATT intervals are pointwise.`,
+        )
         break
       }
       if (prepared.kind !== 'prepared-panel') {
-        violate('panel-balanced-layout', 'This estimator requires a long panel prepared with explicit unit and time keys.')
+        violate(
+          'panel-balanced-layout',
+          'This estimator requires a long panel prepared with explicit unit and time keys.',
+        )
       } else if (!prepared.panel.balanced) {
         violate('panel-balanced-layout', 'The prepared unit–time grid is not balanced.')
-      } else switch (context.panelPreflight.kind) {
-        case 'not-applicable':
-        case 'pending':
-          leave('panel-balanced-layout', 'The treatment layout is being checked against the prepared panel before this estimator can run.')
-          break
-        case 'refused':
-          violate('panel-balanced-layout', describePanelInterventionPreflight(context.panelPreflight))
-          break
-        case 'ready': {
-          const layout = context.panelPreflight.layout
-          satisfy('panel-balanced-layout', `${layout.controls.length} control and ${layout.treated.length} treated units across ${layout.prePeriods} pre- and ${layout.postPeriods} post-periods; treatment adopts simultaneously at ${layout.adoption.label} and remains on.`)
-          break
+      } else
+        switch (context.panelPreflight.kind) {
+          case 'not-applicable':
+          case 'pending':
+            leave(
+              'panel-balanced-layout',
+              'The treatment layout is being checked against the prepared panel before this estimator can run.',
+            )
+            break
+          case 'refused':
+            violate(
+              'panel-balanced-layout',
+              describePanelInterventionPreflight(context.panelPreflight),
+            )
+            break
+          case 'ready': {
+            const layout = context.panelPreflight.layout
+            satisfy(
+              'panel-balanced-layout',
+              `${layout.controls.length} control and ${layout.treated.length} treated units across ${layout.prePeriods} pre- and ${layout.postPeriods} post-periods; treatment adopts simultaneously at ${layout.adoption.label} and remains on.`,
+            )
+            break
+          }
+          default:
+            assertNever(context.panelPreflight)
         }
-        default: assertNever(context.panelPreflight)
-      }
-      leave('panel-parallel-trends', 'Parallel untreated trends cannot be established from the panel shape. Inspect pre-treatment paths when multiple pre-periods are available and justify the comparison substantively.')
-      leave('panel-no-anticipation', 'Confirm that outcomes were not affected before the treatment indicator first turns on.')
-      if (context.study?.designAssumptions.noInterference.rationale === null || context.study === null) {
-        leave('panel-no-spillovers', 'The study has no recorded rationale for no interference between units.')
+      leave(
+        'panel-parallel-trends',
+        'Parallel untreated trends cannot be established from the panel shape. Inspect pre-treatment paths when multiple pre-periods are available and justify the comparison substantively.',
+      )
+      leave(
+        'panel-no-anticipation',
+        'Confirm that outcomes were not affected before the treatment indicator first turns on.',
+      )
+      if (
+        context.study?.designAssumptions.noInterference.rationale === null ||
+        context.study === null
+      ) {
+        leave(
+          'panel-no-spillovers',
+          'The study has no recorded rationale for no interference between units.',
+        )
       } else {
-        satisfy('panel-no-spillovers', `Recorded study rationale: ${context.study.designAssumptions.noInterference.rationale}`)
+        satisfy(
+          'panel-no-spillovers',
+          `Recorded study rationale: ${context.study.designAssumptions.noInterference.rationale}`,
+        )
       }
       if (configuration.primary === 'adjusted') {
-        if (!adjustedDidConfigurationSchema.safeParse(configuration).success) violate('panel-pre-fit', 'Review the DiD covariate selection and inference settings before running.')
-        const layout = context.panelPreflight.kind === 'ready' ? context.panelPreflight.layout : null
-        if (layout !== null && (layout.prePeriods !== 1 || layout.postPeriods !== 1)) violate('panel-pre-fit', `The selected two-period DiD specification requires exactly one pre-treatment and one post-treatment period. Your panel has ${layout.prePeriods} pre- and ${layout.postPeriods} post-treatment periods. The panel structure is valid, but this specification cannot use it unchanged.`)
-        else if (layout !== null) satisfy('panel-pre-fit', 'The selected two-period specification has one pre-treatment and one post-treatment period.')
+        if (!adjustedDidConfigurationSchema.safeParse(configuration).success)
+          violate(
+            'panel-pre-fit',
+            'Review the DiD covariate selection and inference settings before running.',
+          )
+        const layout =
+          context.panelPreflight.kind === 'ready' ? context.panelPreflight.layout : null
+        if (layout !== null && (layout.prePeriods !== 1 || layout.postPeriods !== 1))
+          violate(
+            'panel-pre-fit',
+            `The selected two-period DiD specification requires exactly one pre-treatment and one post-treatment period. Your panel has ${layout.prePeriods} pre- and ${layout.postPeriods} post-treatment periods. The panel structure is valid, but this specification cannot use it unchanged.`,
+          )
+        else if (layout !== null)
+          satisfy(
+            'panel-pre-fit',
+            'The selected two-period specification has one pre-treatment and one post-treatment period.',
+          )
         if (configuration.specification.kind === 'doublyRobust') {
-          if (configuration.covariates.length === 0) violate('panel-pre-fit', 'Select at least one baseline covariate for DR DiD.')
-          if (layout !== null && configuration.specification.folds > Math.min(layout.controls.length, layout.treated.length)) violate('panel-pre-fit', 'The fold count cannot exceed the smaller treatment group.')
-          leave('panel-parallel-trends', 'DR DiD requires conditional parallel trends and treatment overlap given baseline covariates. Clipping propensity estimates does not establish overlap.')
+          if (configuration.covariates.length === 0)
+            violate('panel-pre-fit', 'Select at least one baseline covariate for DR DiD.')
+          if (
+            layout !== null &&
+            configuration.specification.folds >
+              Math.min(layout.controls.length, layout.treated.length)
+          )
+            violate('panel-pre-fit', 'The fold count cannot exceed the smaller treatment group.')
+          leave(
+            'panel-parallel-trends',
+            'DR DiD requires conditional parallel trends and treatment overlap given baseline covariates. Clipping propensity estimates does not establish overlap.',
+          )
         }
       } else if (configuration.primary === 'did') {
-        satisfy('panel-pre-fit', 'Conventional DiD does not require synthetic weights or pre-period variation.')
-      } else if (context.panelPreflight.kind === 'ready' && context.panelPreflight.layout.controlPreDifferenceSd === null) {
-        violate('panel-pre-fit', 'Synthetic DiD needs non-constant control changes before adoption. Choose conventional DiD for this panel.')
-      } else if (context.panelPreflight.kind === 'ready' && context.panelPreflight.layout.controlPreDifferenceSd !== null) {
-        satisfy('panel-pre-fit', `${context.panelPreflight.layout.controls.length} controls and ${context.panelPreflight.layout.prePeriods} pre-periods provide non-constant control changes. Their standard deviation is ${context.panelPreflight.layout.controlPreDifferenceSd.toPrecision(4)}. The run reports all fitted weights.`)
+        satisfy(
+          'panel-pre-fit',
+          'Conventional DiD does not require synthetic weights or pre-period variation.',
+        )
+      } else if (
+        context.panelPreflight.kind === 'ready' &&
+        context.panelPreflight.layout.controlPreDifferenceSd === null
+      ) {
+        violate(
+          'panel-pre-fit',
+          'Synthetic DiD needs non-constant control changes before adoption. Choose conventional DiD for this panel.',
+        )
+      } else if (
+        context.panelPreflight.kind === 'ready' &&
+        context.panelPreflight.layout.controlPreDifferenceSd !== null
+      ) {
+        satisfy(
+          'panel-pre-fit',
+          `${context.panelPreflight.layout.controls.length} controls and ${context.panelPreflight.layout.prePeriods} pre-periods provide non-constant control changes. Their standard deviation is ${context.panelPreflight.layout.controlPreDifferenceSd.toPrecision(4)}. The run reports all fitted weights.`,
+        )
       } else {
-        leave('panel-pre-fit', 'The run checks control variation before treatment and reports the fitted unit and time weights.')
+        leave(
+          'panel-pre-fit',
+          'The run checks control variation before treatment and reports the fitted unit and time weights.',
+        )
       }
       if (configuration.primary === 'adjusted') {
-        leave('panel-no-interval', configuration.specification.kind === 'regression'
-          ? 'Classical Student-t intervals assume independent, homoskedastic errors. They are not unit-clustered intervals.'
-          : 'Cross-fitted score intervals assume independent units and adequate treatment overlap.')
+        leave(
+          'panel-no-interval',
+          configuration.specification.kind === 'regression'
+            ? 'Classical Student-t intervals assume independent, homoskedastic errors. They are not unit-clustered intervals.'
+            : 'Cross-fitted score intervals assume independent units and adequate treatment overlap.',
+        )
       } else if (configuration.primary === 'did') {
-        leave('panel-no-interval', 'This conventional DiD fit reports a point estimate without a confidence interval.')
-      } else if (context.panelPreflight.kind === 'ready' && context.panelPreflight.layout.controls.length > context.panelPreflight.layout.treated.length) {
+        leave(
+          'panel-no-interval',
+          'This conventional DiD fit reports a point estimate without a confidence interval.',
+        )
+      } else if (
+        context.panelPreflight.kind === 'ready' &&
+        context.panelPreflight.layout.controls.length > context.panelPreflight.layout.treated.length
+      ) {
         satisfy('panel-no-interval', '')
       } else {
-        leave('panel-no-interval', 'Placebo standard errors need more controls than treated units. The point estimates remain runnable and the result records whether inference was available.')
+        leave(
+          'panel-no-interval',
+          'Placebo standard errors need more controls than treated units. The point estimates remain runnable and the result records whether inference was available.',
+        )
       }
       break
     }
     case 'poisson-glm':
     case 'negative-binomial-p': {
       const prefix = configuration.kind === 'poisson-glm' ? 'poisson' : 'negbin'
-      if (adjustment === null) violate(`${prefix}-identified-adjustment`, 'No measured back-door adjustment set was found, so this count model has no identified set to condition on.')
-      else satisfy(`${prefix}-identified-adjustment`, `Identified by back-door adjustment for ${adjustment}.`)
-      if (context.outcomeIsCount === null) leave(`${prefix}-count-outcome`, 'The outcome column has not been read yet; it is checked when the run starts.')
-      else if (context.outcomeIsCount) satisfy(`${prefix}-count-outcome`, 'Every outcome value is a non-negative integer.')
-      else violate(`${prefix}-count-outcome`, 'The outcome holds negative or fractional values, so it is not a count.')
-      if (configuration.kind === 'poisson-glm') leave('poisson-dispersion', 'Compare with the negative binomial fit: an alpha well above zero means the Poisson variance assumption fails.')
-      else leave('negbin-convergence', 'Convergence is reported with the run; a fit at the alpha boundary is flagged.')
-      if (timeSeries) leave(`${prefix}-independence`, 'Rows are a time series; the standard errors assume independent counts.')
+      if (adjustment === null)
+        violate(
+          `${prefix}-identified-adjustment`,
+          'No measured back-door adjustment set was found, so this count model has no identified set to condition on.',
+        )
+      else
+        satisfy(
+          `${prefix}-identified-adjustment`,
+          `Identified by back-door adjustment for ${adjustment}.`,
+        )
+      if (context.outcomeIsCount === null)
+        leave(
+          `${prefix}-count-outcome`,
+          'The outcome column has not been read yet; it is checked when the run starts.',
+        )
+      else if (context.outcomeIsCount)
+        satisfy(`${prefix}-count-outcome`, 'Every outcome value is a non-negative integer.')
+      else
+        violate(
+          `${prefix}-count-outcome`,
+          'The outcome holds negative or fractional values, so it is not a count.',
+        )
+      if (configuration.kind === 'poisson-glm')
+        leave(
+          'poisson-dispersion',
+          'Compare with the negative binomial fit: an alpha well above zero means the Poisson variance assumption fails.',
+        )
+      else
+        leave(
+          'negbin-convergence',
+          'Convergence is reported with the run; a fit at the alpha boundary is flagged.',
+        )
+      if (timeSeries)
+        leave(
+          `${prefix}-independence`,
+          'Rows are a time series; the standard errors assume independent counts.',
+        )
       else satisfy(`${prefix}-independence`, 'The prepared dataset holds independent rows.')
       applyLevelRule(`${prefix}-level-stationarity`, context, satisfy, leave, violate)
       break
     }
     case 'negative-binomial-ingarch': {
-      if (adjustment === null) violate('ingarch-identified-regressors', 'No measured back-door adjustment set was found for the treatment trajectory.')
-      else satisfy('ingarch-identified-regressors', `The treatment and contemporaneous adjustment set are ${adjustment}. The requested future treatment path remains a modelling assumption.`)
-      if (!timeSeries) violate('ingarch-regular-count-series', 'The prepared dataset is not a regular time series.')
-      else if (context.outcomeIsCount === null) leave('ingarch-regular-count-series', 'The outcome is checked for non-negative integer values when the run starts.')
-      else if (context.outcomeIsCount) satisfy('ingarch-regular-count-series', 'The prepared rows are a regular time series and every outcome value is a non-negative integer.')
-      else violate('ingarch-regular-count-series', 'The outcome holds negative or fractional values.')
-      leave('ingarch-conditional-mean', `Review the selected ${configuration.link === 'identity' ? 'additive' : 'multiplicative'} conditional-mean form, count lags (${configuration.pastObservationLags.join(', ')}), mean lags (${configuration.pastMeanLags.join(', ')}), and contemporaneous regressors.${configuration.link === 'identity' ? ' The run requires their fitted and future values to be non-negative.' : ''}`)
-      leave('ingarch-stability', 'The run reports the fitted recursion and forecast path; inspect them for unstable or explosive behaviour.')
-      satisfy('ingarch-no-interval', 'This release labels both trajectories as conditional-mean point forecasts and reports no sampling interval.')
+      if (adjustment === null)
+        violate(
+          'ingarch-identified-regressors',
+          'No measured back-door adjustment set was found for the treatment trajectory.',
+        )
+      else
+        satisfy(
+          'ingarch-identified-regressors',
+          `The treatment and contemporaneous adjustment set are ${adjustment}. The requested future treatment path remains a modelling assumption.`,
+        )
+      if (!timeSeries)
+        violate(
+          'ingarch-regular-count-series',
+          'The prepared dataset is not a regular time series.',
+        )
+      else if (context.outcomeIsCount === null)
+        leave(
+          'ingarch-regular-count-series',
+          'The outcome is checked for non-negative integer values when the run starts.',
+        )
+      else if (context.outcomeIsCount)
+        satisfy(
+          'ingarch-regular-count-series',
+          'The prepared rows are a regular time series and every outcome value is a non-negative integer.',
+        )
+      else
+        violate('ingarch-regular-count-series', 'The outcome holds negative or fractional values.')
+      leave(
+        'ingarch-conditional-mean',
+        `Review the selected ${configuration.link === 'identity' ? 'additive' : 'multiplicative'} conditional-mean form, count lags (${configuration.pastObservationLags.join(', ')}), mean lags (${configuration.pastMeanLags.join(', ')}), and contemporaneous regressors.${configuration.link === 'identity' ? ' The run requires their fitted and future values to be non-negative.' : ''}`,
+      )
+      leave(
+        'ingarch-stability',
+        'The run reports the fitted recursion and forecast path; inspect them for unstable or explosive behaviour.',
+      )
+      satisfy(
+        'ingarch-no-interval',
+        'This release labels both trajectories as conditional-mean point forecasts and reports no sampling interval.',
+      )
       break
     }
     case 'dml-plr':
     case 'dml-irm': {
       const prefix = configuration.kind
-      const nuisance = identification.kind === 'identified' ? dmlNuisanceInputs(identification.adjustment.variables, context.study?.estimand ?? null) : []
-      if (identification.kind !== 'identified') violate(`${prefix}-identified-adjustment`, 'No measured back-door adjustment set was found, so there is no identified set for the nuisance learners.')
-      else if (nuisance.length === 0) violate(`${prefix}-identified-adjustment`, 'The identified adjustment set is empty, so double machine learning has no covariates to partial out. Use the adjusted linear regression, or target the effect within groups of a modifier.')
-      else satisfy(`${prefix}-identified-adjustment`, `Nuisance learners see ${nuisance.map((variable) => variable.name).join(', ')}.`)
-      if (panel) violate(`${prefix}-independent-rows`, 'The rows are a panel, so shuffled folds would split a unit across folds, and cross-fitting that keeps each unit together is not available.')
-      else if (timeSeries) violate(`${prefix}-independent-rows`, 'The rows are a time series and the folds are shuffled; cross-fitting with time blocks or rolling windows is not available.')
-      else satisfy(`${prefix}-independent-rows`, 'The prepared dataset holds independent rows, so shuffled folds are valid.')
+      const nuisance =
+        identification.kind === 'identified'
+          ? dmlNuisanceInputs(identification.adjustment.variables, context.study?.estimand ?? null)
+          : []
+      if (identification.kind !== 'identified')
+        violate(
+          `${prefix}-identified-adjustment`,
+          'No measured back-door adjustment set was found, so there is no identified set for the nuisance learners.',
+        )
+      else if (nuisance.length === 0)
+        violate(
+          `${prefix}-identified-adjustment`,
+          'The identified adjustment set is empty, so double machine learning has no covariates to partial out. Use the adjusted linear regression, or target the effect within groups of a modifier.',
+        )
+      else
+        satisfy(
+          `${prefix}-identified-adjustment`,
+          `Nuisance learners see ${nuisance.map((variable) => variable.name).join(', ')}.`,
+        )
+      if (panel)
+        violate(
+          `${prefix}-independent-rows`,
+          'The rows are a panel, so shuffled folds would split a unit across folds, and cross-fitting that keeps each unit together is not available.',
+        )
+      else if (timeSeries)
+        violate(
+          `${prefix}-independent-rows`,
+          'The rows are a time series and the folds are shuffled; cross-fitting with time blocks or rolling windows is not available.',
+        )
+      else
+        satisfy(
+          `${prefix}-independent-rows`,
+          'The prepared dataset holds independent rows, so shuffled folds are valid.',
+        )
       if (configuration.kind === 'dml-irm') {
-        if (context.treatmentIsBinary === null) leave('dml-irm-binary-treatment', 'The treatment column has not been read yet; it is checked when the run starts.')
-        else if (context.treatmentIsBinary) satisfy('dml-irm-binary-treatment', 'Every treatment value is 0 or 1.')
-        else violate('dml-irm-binary-treatment', 'The treatment holds values other than 0 and 1; use the partially linear model.')
+        if (context.treatmentIsBinary === null)
+          leave(
+            'dml-irm-binary-treatment',
+            'The treatment column has not been read yet; it is checked when the run starts.',
+          )
+        else if (context.treatmentIsBinary)
+          satisfy('dml-irm-binary-treatment', 'Every treatment value is 0 or 1.')
+        else
+          violate(
+            'dml-irm-binary-treatment',
+            'The treatment holds values other than 0 and 1; use the partially linear model.',
+          )
       } else {
-        leave('dml-plr-partial-linearity', 'Partial linearity in the treatment is assumed; compare with the interactive model when the treatment is binary.')
+        leave(
+          'dml-plr-partial-linearity',
+          'Partial linearity in the treatment is assumed; compare with the interactive model when the treatment is binary.',
+        )
       }
-      leave(`${prefix}-overlap`, 'Inspect treatment overlap against the adjustment variables in Data studio.')
+      leave(
+        `${prefix}-overlap`,
+        'Inspect treatment overlap against the adjustment variables in Data studio.',
+      )
       if (context.study?.estimand.kind === 'conditional-average-treatment-effect') {
         const modifier = context.study.estimand.modifier.name
-        leave(`${prefix}-group-effects`, `Assess whether the effect of ${context.study.treatment.name} is linear within each group of ${modifier} (${describeGrouping(context.study.estimand.grouping)}), and whether identification and overlap hold inside every group.`)
+        leave(
+          `${prefix}-group-effects`,
+          `Assess whether the effect of ${context.study.treatment.name} is linear within each group of ${modifier} (${describeGrouping(context.study.estimand.grouping)}), and whether identification and overlap hold inside every group.`,
+        )
       } else {
-        satisfy(`${prefix}-group-effects`, 'The study targets one average, so no group effects are estimated.')
+        satisfy(
+          `${prefix}-group-effects`,
+          'The study targets one average, so no group effects are estimated.',
+        )
       }
-      satisfy(`${prefix}-learner-settings`, `The run records 5 folds, 200 trees, minimum leaf 5, learner seed 7, and fold seed ${configuration.seed}.`)
-      if (prepared.observations < 100) leave(`${prefix}-interval`, `${prepared.observations} rows is a small sample for random-forest nuisances; read the interval as approximate.`)
+      satisfy(
+        `${prefix}-learner-settings`,
+        `The run records 5 folds, 200 trees, minimum leaf 5, learner seed 7, and fold seed ${configuration.seed}.`,
+      )
+      if (prepared.observations < 100)
+        leave(
+          `${prefix}-interval`,
+          `${prepared.observations} rows is a small sample for random-forest nuisances; read the interval as approximate.`,
+        )
       else satisfy(`${prefix}-interval`, `${prepared.observations} rows for the sandwich interval.`)
       break
     }
     case 't-learner': {
-      const inputs = identification.kind === 'identified' ? tLearnerInputs(identification.adjustment.variables, context.study?.estimand ?? null) : []
-      if (identification.kind !== 'identified') violate('t-learner-identified-adjustment', 'No measured back-door adjustment set was found, so there is no identified set for the arm models.')
-      else if (inputs.length === 0) violate('t-learner-identified-adjustment', 'The identified adjustment set is empty and the study names no effect modifier, so each row’s effect has nothing to be conditioned on. Name the modifiers in Study design.')
-      else satisfy('t-learner-identified-adjustment', `Both arm models see ${inputs.map((variable) => variable.name).join(', ')}, and each row’s effect is conditioned on those values.`)
-      if (context.treatmentIsBinary === null) leave('t-learner-binary-treatment', 'The treatment column has not been read yet; it is checked when the run starts.')
-      else if (context.treatmentIsBinary) satisfy('t-learner-binary-treatment', 'Every treatment value is 0 or 1.')
-      else violate('t-learner-binary-treatment', 'One outcome model per arm cannot be fitted because the treatment holds values other than 0 and 1.')
-      if (panel) leave('t-learner-independent-rows', 'Rows repeat within units; the arm models treat them as independent draws.')
-      else if (timeSeries) leave('t-learner-independent-rows', 'The rows are a time series; the arm models treat them as independent draws.')
+      const inputs =
+        identification.kind === 'identified'
+          ? tLearnerInputs(identification.adjustment.variables, context.study?.estimand ?? null)
+          : []
+      if (identification.kind !== 'identified')
+        violate(
+          't-learner-identified-adjustment',
+          'No measured back-door adjustment set was found, so there is no identified set for the arm models.',
+        )
+      else if (inputs.length === 0)
+        violate(
+          't-learner-identified-adjustment',
+          'The identified adjustment set is empty and the study names no effect modifier, so each row’s effect has nothing to be conditioned on. Name the modifiers in Study design.',
+        )
+      else
+        satisfy(
+          't-learner-identified-adjustment',
+          `Both arm models see ${inputs.map((variable) => variable.name).join(', ')}, and each row’s effect is conditioned on those values.`,
+        )
+      if (context.treatmentIsBinary === null)
+        leave(
+          't-learner-binary-treatment',
+          'The treatment column has not been read yet; it is checked when the run starts.',
+        )
+      else if (context.treatmentIsBinary)
+        satisfy('t-learner-binary-treatment', 'Every treatment value is 0 or 1.')
+      else
+        violate(
+          't-learner-binary-treatment',
+          'One outcome model per arm cannot be fitted because the treatment holds values other than 0 and 1.',
+        )
+      if (panel)
+        leave(
+          't-learner-independent-rows',
+          'Rows repeat within units; the arm models treat them as independent draws.',
+        )
+      else if (timeSeries)
+        leave(
+          't-learner-independent-rows',
+          'The rows are a time series; the arm models treat them as independent draws.',
+        )
       else satisfy('t-learner-independent-rows', 'The prepared dataset holds independent rows.')
-      leave('t-learner-overlap', 'Inspect treatment overlap against the adjustment variables in Data studio; a row with no nearby rows in one arm carries an extrapolated effect.')
-      leave('t-learner-row-effect-reading', 'Each row’s effect is the average for rows with its covariate values; it is not that row’s own observed counterfactual.')
+      leave(
+        't-learner-overlap',
+        'Inspect treatment overlap against the adjustment variables in Data studio; a row with no nearby rows in one arm carries an extrapolated effect.',
+      )
+      leave(
+        't-learner-row-effect-reading',
+        'Each row’s effect is the average for rows with its covariate values; it is not that row’s own observed counterfactual.',
+      )
       const model = configuration.model
       switch (model.kind) {
         case 'forest':
-          satisfy('t-learner-learner-settings', `The run records 200 trees, minimum leaf 5, and learner seed ${model.seed} for both arms.`)
-          satisfy('t-learner-no-interval', model.uncertainty.kind === 'none'
-            ? 'Uncertainty was not requested. The run reports point estimates.'
-            : `Both forests are refitted on ${model.uncertainty.samples} resampled datasets. Row intervals are pointwise; the average uses a conservative standard-error bound. Resampling assumes independent observations.`)
+          satisfy(
+            't-learner-learner-settings',
+            `The run records 200 trees, minimum leaf 5, and learner seed ${model.seed} for both arms.`,
+          )
+          satisfy(
+            't-learner-no-interval',
+            model.uncertainty.kind === 'none'
+              ? 'Uncertainty was not requested. The run reports point estimates.'
+              : `Both forests are refitted on ${model.uncertainty.samples} resampled datasets. Row intervals are pointwise; the average uses a conservative standard-error bound. Resampling assumes independent observations.`,
+          )
           break
         case 'boosted-cross-fitted':
-          satisfy('t-learner-learner-settings', `Grid search compares ${boostedCandidateCount(model.grid)} boosted classifiers using ${model.grid.splits}-fold ROC AUC on all rows within each arm before the two-half split. Each half is predicted by models fitted on the other half, without repeating hyperparameter selection. The split and trees use seed ${model.grid.seed}.`)
-          leave('t-learner-no-interval', 'The cross-fitted boosted learner reports point estimates only; no interval is calculated.')
+          satisfy(
+            't-learner-learner-settings',
+            `Grid search compares ${boostedCandidateCount(model.grid)} boosted classifiers using ${model.grid.splits}-fold ROC AUC on all rows within each arm before the two-half split. Each half is predicted by models fitted on the other half, without repeating hyperparameter selection. The split and trees use seed ${model.grid.seed}.`,
+          )
+          leave(
+            't-learner-no-interval',
+            'The cross-fitted boosted learner reports point estimates only; no interval is calculated.',
+          )
           break
-        default: assertNever(model)
+        default:
+          assertNever(model)
       }
       break
     }
     case 'ardl-pss': {
-      if (!timeSeries) violate('ardl-time-series', 'An autoregressive distributed lag model needs an ordered time series. This prepared dataset holds independent rows.')
-      else if (prepared.observations < 6 * (configuration.maxLag + 1) + 10) violate('ardl-time-series', `${prepared.observations} rows is too few for a maximum lag of ${configuration.maxLag}.`)
-      else satisfy('ardl-time-series', `Prepared as a regular ${prepared.sampling.frequency} time series with ${prepared.observations} rows for a maximum lag of ${configuration.maxLag}.`)
-      if (adjustment === null) violate('ardl-single-regressor', 'No measured back-door adjustment set was found for this study.')
-      else if (identification.kind === 'identified' && identification.adjustment.variables.length > 0) violate('ardl-single-regressor', `The identified adjustment set (${adjustment}) is not empty.`)
-      else satisfy('ardl-single-regressor', 'No adjustment is needed, so the treatment is the single exogenous variable.')
+      if (!timeSeries)
+        violate(
+          'ardl-time-series',
+          'An autoregressive distributed lag model needs an ordered time series. This prepared dataset holds independent rows.',
+        )
+      else if (prepared.observations < 6 * (configuration.maxLag + 1) + 10)
+        violate(
+          'ardl-time-series',
+          `${prepared.observations} rows is too few for a maximum lag of ${configuration.maxLag}.`,
+        )
+      else
+        satisfy(
+          'ardl-time-series',
+          `Prepared as a regular ${prepared.sampling.frequency} time series with ${prepared.observations} rows for a maximum lag of ${configuration.maxLag}.`,
+        )
+      if (adjustment === null)
+        violate(
+          'ardl-single-regressor',
+          'No measured back-door adjustment set was found for this study.',
+        )
+      else if (
+        identification.kind === 'identified' &&
+        identification.adjustment.variables.length > 0
+      )
+        violate(
+          'ardl-single-regressor',
+          `The identified adjustment set (${adjustment}) is not empty.`,
+        )
+      else
+        satisfy(
+          'ardl-single-regressor',
+          'No adjustment is needed, so the treatment is the single exogenous variable.',
+        )
       {
         const transformed = transformedStudyVariables(context)
-        if (transformed.length > 0) violate('ardl-orders-assessed', `ARDL bounds inference and its long-run coefficient require level variables. This prepared version uses ${transformed.map((variable) => `${variable.transform} for ${variable.name}`).join(', ')}.`)
+        if (transformed.length > 0)
+          violate(
+            'ardl-orders-assessed',
+            `ARDL bounds inference and its long-run coefficient require level variables. This prepared version uses ${transformed.map((variable) => `${variable.transform} for ${variable.name}`).join(', ')}.`,
+          )
         else applyOrderRule('ardl-orders-assessed', context, 'i0-or-i1', satisfy, leave, violate)
       }
-      leave('ardl-bounds-reading', 'The bounds test is read with the run: only a statistic above the I(1) bound establishes a level relation.')
-      satisfy('ardl-deterministic-case', `The run records ${configuration.trend === 'ct' ? 'a constant and trend' : 'a constant'} with Pesaran–Shin–Smith case ${configuration.case}.`)
+      leave(
+        'ardl-bounds-reading',
+        'The bounds test is read with the run: only a statistic above the I(1) bound establishes a level relation.',
+      )
+      satisfy(
+        'ardl-deterministic-case',
+        `The run records ${configuration.trend === 'ct' ? 'a constant and trend' : 'a constant'} with Pesaran–Shin–Smith case ${configuration.case}.`,
+      )
       break
     }
     case 'vecm': {
-      if (!timeSeries) violate('vecm-sample', 'A vector error correction model needs an ordered time series. This prepared dataset holds independent rows.')
-      else if (prepared.observations < (configuration.maxLags + 2) * (2 + (identification.kind === 'identified' ? identification.adjustment.variables.length : 0)) * 3 + 10) violate('vecm-sample', `${prepared.observations} rows is too few for the variables at ${configuration.maxLags} lags.`)
-      else satisfy('vecm-sample', `Prepared as a regular ${prepared.sampling.frequency} time series; deterministic terms “${configuration.deterministic}” and up to ${configuration.maxLags} lags are recorded.`)
+      if (!timeSeries)
+        violate(
+          'vecm-sample',
+          'A vector error correction model needs an ordered time series. This prepared dataset holds independent rows.',
+        )
+      else if (
+        prepared.observations <
+        (configuration.maxLags + 2) *
+          (2 +
+            (identification.kind === 'identified'
+              ? identification.adjustment.variables.length
+              : 0)) *
+          3 +
+          10
+      )
+        violate(
+          'vecm-sample',
+          `${prepared.observations} rows is too few for the variables at ${configuration.maxLags} lags.`,
+        )
+      else
+        satisfy(
+          'vecm-sample',
+          `Prepared as a regular ${prepared.sampling.frequency} time series; deterministic terms “${configuration.deterministic}” and up to ${configuration.maxLags} lags are recorded.`,
+        )
       {
         const transformed = transformedStudyVariables(context)
-        if (transformed.length > 0) violate('vecm-all-i1', `VECM estimates cointegration among variables in levels. This prepared version uses ${transformed.map((variable) => `${variable.transform} for ${variable.name}`).join(', ')}.`)
+        if (transformed.length > 0)
+          violate(
+            'vecm-all-i1',
+            `VECM estimates cointegration among variables in levels. This prepared version uses ${transformed.map((variable) => `${variable.transform} for ${variable.name}`).join(', ')}.`,
+          )
         else applyOrderRule('vecm-all-i1', context, 'i1-only', satisfy, leave, violate)
       }
-      leave('vecm-rank', 'The Johansen trace test decides the rank when the run starts; rank zero reports no effect.')
+      leave(
+        'vecm-rank',
+        'The Johansen trace test decides the rank when the run starts; rank zero reports no effect.',
+      )
       leave('vecm-single-relation', 'A long-run effect is read only when the rank is one.')
       leave('vecm-no-interval', '')
       break
     }
     case 'synthetic-control': {
       if (configuration.specification === 'ridge-augmented') {
-        if(!panel)violate('synthetic-panel-layout','Prepare a long panel with unit and period keys.')
-        else if(configuration.treatedUnit===null||configuration.donorUnits.length<2||new Set(configuration.donorUnits).size!==configuration.donorUnits.length||configuration.donorUnits.includes(configuration.treatedUnit))violate('synthetic-panel-layout','Choose one treated unit and at least two distinct donors.')
-        else satisfy('synthetic-panel-layout','The selected treated unit and donors are checked on the same period grid before fitting.')
-        if(configuration.interventionPeriod===null||!ridgeConfigurationSchema.safeParse(configuration).success)violate('synthetic-pre-period','Choose an intervention period and valid regularization settings.')
-        else satisfy('synthetic-pre-period','The run checks pre-treatment support and held-out blocks before fitting.')
-        leave('synthetic-donors-untreated','Donors must remain untreated and must not be affected by the intervention or its spillovers.')
-        leave('synthetic-convex-hull','Inspect pre-treatment fit and augmented weights. Ridge augmentation can assign negative weights.')
-        leave('synthetic-no-interval',configuration.uncertainty.kind==='none'?'No uncertainty interval was requested.':'Jackknife intervals hold the initially selected lambda fixed during refits; these are not conformal intervals.')
+        if (!panel)
+          violate('synthetic-panel-layout', 'Prepare a long panel with unit and period keys.')
+        else if (
+          configuration.treatedUnit === null ||
+          configuration.donorUnits.length < 2 ||
+          new Set(configuration.donorUnits).size !== configuration.donorUnits.length ||
+          configuration.donorUnits.includes(configuration.treatedUnit)
+        )
+          violate(
+            'synthetic-panel-layout',
+            'Choose one treated unit and at least two distinct donors.',
+          )
+        else
+          satisfy(
+            'synthetic-panel-layout',
+            'The selected treated unit and donors are checked on the same period grid before fitting.',
+          )
+        if (
+          configuration.interventionPeriod === null ||
+          !ridgeConfigurationSchema.safeParse(configuration).success
+        )
+          violate(
+            'synthetic-pre-period',
+            'Choose an intervention period and valid regularization settings.',
+          )
+        else
+          satisfy(
+            'synthetic-pre-period',
+            'The run checks pre-treatment support and held-out blocks before fitting.',
+          )
+        leave(
+          'synthetic-donors-untreated',
+          'Donors must remain untreated and must not be affected by the intervention or its spillovers.',
+        )
+        leave(
+          'synthetic-convex-hull',
+          'Inspect pre-treatment fit and augmented weights. Ridge augmentation can assign negative weights.',
+        )
+        leave(
+          'synthetic-no-interval',
+          configuration.uncertainty.kind === 'none'
+            ? 'No uncertainty interval was requested.'
+            : 'Jackknife intervals hold the initially selected lambda fixed during refits; these are not conformal intervals.',
+        )
         break
       }
       if (configuration.specification === 'predictors') {
-        if (!panel) violate('synthetic-panel-layout', 'Prepare a long panel with unit and period keys.')
-        else if (configuration.treatedUnit === null || configuration.donorUnits.length < 2 || new Set(configuration.donorUnits).size !== configuration.donorUnits.length || configuration.donorUnits.includes(configuration.treatedUnit)) violate('synthetic-panel-layout', 'Choose one treated unit and at least two distinct donor units.')
-        else satisfy('synthetic-panel-layout', 'The selected treated unit is compared with donor units from the prepared panel.')
+        if (!panel)
+          violate('synthetic-panel-layout', 'Prepare a long panel with unit and period keys.')
+        else if (
+          configuration.treatedUnit === null ||
+          configuration.donorUnits.length < 2 ||
+          new Set(configuration.donorUnits).size !== configuration.donorUnits.length ||
+          configuration.donorUnits.includes(configuration.treatedUnit)
+        )
+          violate(
+            'synthetic-panel-layout',
+            'Choose one treated unit and at least two distinct donor units.',
+          )
+        else
+          satisfy(
+            'synthetic-panel-layout',
+            'The selected treated unit is compared with donor units from the prepared panel.',
+          )
         const predictorCount = configuration.predictors.length + configuration.special.length
-        if (predictorCount === 0 || configuration.predictors.some(id => !prepared.columns.includes(id)) || configuration.special.some(p => !prepared.columns.includes(p.column))) violate('synthetic-pre-period', 'Choose at least one prepared predictor.')
-        else if (configuration.interventionPeriod === null || configuration.fitPeriods.length < 2 || configuration.predictors.length > 0 && configuration.predictorPeriods.length === 0 || configuration.special.some(p => p.periods.length === 0) || [...configuration.fitPeriods, ...configuration.predictorPeriods, ...configuration.special.flatMap(p => p.periods)].some(p => p >= configuration.interventionPeriod!) || !configuration.plotPeriods.some(p => p >= configuration.interventionPeriod!)) violate('synthetic-pre-period', 'Choose pre-intervention predictor and fitting periods, and at least one post-intervention plot period.')
-        else if (configuration.selection.kind === 'supplied' && (configuration.selection.weights.length !== predictorCount || !configuration.selection.weights.some(w => w > 0))) violate('synthetic-pre-period', 'Supply a non-negative weight for every predictor, with at least one positive weight.')
-        else satisfy('synthetic-pre-period', `${configuration.fitPeriods.length} pre-intervention periods fit the donor weights; ${predictorCount} predictor summaries define the balance criterion.`)
-        leave('synthetic-donors-untreated', 'The treatment indicator is checked before fitting. Donors must not be affected by the intervention or its spillovers.')
-        leave('synthetic-convex-hull', 'Inspect predictor balance and pre-intervention outcome fit. Donor weights are non-negative and sum to one.')
-        leave('synthetic-no-interval', 'This predictor-based fit reports point estimates and optimization diagnostics, without an uncertainty interval.')
+        if (
+          predictorCount === 0 ||
+          configuration.predictors.some((id) => !prepared.columns.includes(id)) ||
+          configuration.special.some((p) => !prepared.columns.includes(p.column))
+        )
+          violate('synthetic-pre-period', 'Choose at least one prepared predictor.')
+        else if (
+          configuration.interventionPeriod === null ||
+          configuration.fitPeriods.length < 2 ||
+          (configuration.predictors.length > 0 && configuration.predictorPeriods.length === 0) ||
+          configuration.special.some((p) => p.periods.length === 0) ||
+          [
+            ...configuration.fitPeriods,
+            ...configuration.predictorPeriods,
+            ...configuration.special.flatMap((p) => p.periods),
+          ].some((p) => p >= configuration.interventionPeriod!) ||
+          !configuration.plotPeriods.some((p) => p >= configuration.interventionPeriod!)
+        )
+          violate(
+            'synthetic-pre-period',
+            'Choose pre-intervention predictor and fitting periods, and at least one post-intervention plot period.',
+          )
+        else if (
+          configuration.selection.kind === 'supplied' &&
+          (configuration.selection.weights.length !== predictorCount ||
+            !configuration.selection.weights.some((w) => w > 0))
+        )
+          violate(
+            'synthetic-pre-period',
+            'Supply a non-negative weight for every predictor, with at least one positive weight.',
+          )
+        else
+          satisfy(
+            'synthetic-pre-period',
+            `${configuration.fitPeriods.length} pre-intervention periods fit the donor weights; ${predictorCount} predictor summaries define the balance criterion.`,
+          )
+        leave(
+          'synthetic-donors-untreated',
+          'The treatment indicator is checked before fitting. Donors must not be affected by the intervention or its spillovers.',
+        )
+        leave(
+          'synthetic-convex-hull',
+          'Inspect predictor balance and pre-intervention outcome fit. Donor weights are non-negative and sum to one.',
+        )
+        leave(
+          'synthetic-no-interval',
+          'This predictor-based fit reports point estimates and optimization diagnostics, without an uncertainty interval.',
+        )
         break
       }
-      if (!timeSeries) violate('synthetic-panel-layout', 'Synthetic control needs rows ordered by period. This prepared dataset holds independent rows.')
-      else satisfy('synthetic-panel-layout', `Rows are a regular ${prepared.sampling.frequency} series; the outcome column is the treated unit and the chosen columns the donors.`)
-      if (configuration.donors.length === 0) violate('synthetic-panel-layout', 'Choose at least one donor column.')
+      if (!timeSeries)
+        violate(
+          'synthetic-panel-layout',
+          'Synthetic control needs rows ordered by period. This prepared dataset holds independent rows.',
+        )
+      else
+        satisfy(
+          'synthetic-panel-layout',
+          `Rows are a regular ${prepared.sampling.frequency} series; the outcome column is the treated unit and the chosen columns the donors.`,
+        )
+      if (configuration.donors.length === 0)
+        violate('synthetic-panel-layout', 'Choose at least one donor column.')
       if (configuration.start.kind === 'row') {
-        if (configuration.start.row - 1 < 2) violate('synthetic-pre-period', 'At least two pre-intervention rows are needed to fit the weights.')
-        else satisfy('synthetic-pre-period', `Intervention at row ${configuration.start.row}: ${configuration.start.row - 1} pre-intervention rows fit the weights; the pre-period loss is reported.`)
-      } else leave('synthetic-pre-period', 'The intervention row is read from the treatment column when the run starts: it must be zero before and non-zero after one point.')
+        if (configuration.start.row - 1 < 2)
+          violate(
+            'synthetic-pre-period',
+            'At least two pre-intervention rows are needed to fit the weights.',
+          )
+        else
+          satisfy(
+            'synthetic-pre-period',
+            `Intervention at row ${configuration.start.row}: ${configuration.start.row - 1} pre-intervention rows fit the weights; the pre-period loss is reported.`,
+          )
+      } else
+        leave(
+          'synthetic-pre-period',
+          'The intervention row is read from the treatment column when the run starts: it must be zero before and non-zero after one point.',
+        )
       {
-        const affected = affectedNodes(context.study).filter((node) => configuration.donors.includes(node.column))
-        if (context.study === null) leave('synthetic-donors-untreated', 'No study is loaded, so the donors cannot be checked against the DAG.')
-        else if (affected.length > 0) violate('synthetic-donors-untreated', `${affected.map((node) => node.name).join(', ')} ${affected.length === 1 ? 'is a descendant' : 'are descendants'} of ${context.study.treatment.name} in the DAG: a donor the intervention moves absorbs the effect.`)
-        else leave('synthetic-donors-untreated', 'No chosen donor is a DAG descendant of the treatment; whether columns outside the DAG were untouched is a judgement recorded with the run.')
+        const affected = affectedNodes(context.study).filter((node) =>
+          configuration.donors.includes(node.column),
+        )
+        if (context.study === null)
+          leave(
+            'synthetic-donors-untreated',
+            'No study is loaded, so the donors cannot be checked against the DAG.',
+          )
+        else if (affected.length > 0)
+          violate(
+            'synthetic-donors-untreated',
+            `${affected.map((node) => node.name).join(', ')} ${affected.length === 1 ? 'is a descendant' : 'are descendants'} of ${context.study.treatment.name} in the DAG: a donor the intervention moves absorbs the effect.`,
+          )
+        else
+          leave(
+            'synthetic-donors-untreated',
+            'No chosen donor is a DAG descendant of the treatment; whether columns outside the DAG were untouched is a judgement recorded with the run.',
+          )
       }
-      leave('synthetic-convex-hull', 'The pre-period loss is reported with the run; read a large loss as a treated series outside the donors’ reach.')
+      leave(
+        'synthetic-convex-hull',
+        'The pre-period loss is reported with the run; read a large loss as a treated series outside the donors’ reach.',
+      )
       if (configuration.donors.length >= 2) {
-        leave('synthetic-no-interval', `${configuration.donors.length} donors permit the placebo rank calculation. Cross-fitted inference uses ${configuration.crossFitFolds} folds and prediction bands use alpha ${configuration.alpha}. Each result records whether its sample-size requirement was met.`)
+        leave(
+          'synthetic-no-interval',
+          `${configuration.donors.length} donors permit the placebo rank calculation. Cross-fitted inference uses ${configuration.crossFitFolds} folds and prediction bands use alpha ${configuration.alpha}. Each result records whether its sample-size requirement was met.`,
+        )
       } else {
-        leave('synthetic-no-interval', 'The point estimate can use one donor, but donor-placebo inference needs at least two. Cross-fitted inference and prediction bands remain subject to their pre-period requirements.')
+        leave(
+          'synthetic-no-interval',
+          'The point estimate can use one donor, but donor-placebo inference needs at least two. Cross-fitted inference and prediction bands remain subject to their pre-period requirements.',
+        )
       }
       break
     }
     case 'negbin-nuts': {
-      if (adjustment === null) violate('nuts-model-shape', 'No measured back-door adjustment set was found, so this one-confounder model has no identified covariate.')
-      else if (identification.kind === 'identified' && identification.adjustment.variables.length !== 1) violate('nuts-model-shape', `The identified set holds ${identification.adjustment.variables.length}.`)
-      else satisfy('nuts-model-shape', `One confounder, ${adjustment}, enters the linear predictor beside the treatment.`)
-      if (context.outcomeIsCount === null) leave('nuts-count-outcome', 'The outcome column has not been read yet; it is checked when the run starts.')
-      else if (context.outcomeIsCount) satisfy('nuts-count-outcome', 'Every outcome value is a non-negative integer.')
-      else violate('nuts-count-outcome', 'The outcome holds negative or fractional values, so it is not a count.')
-      leave('nuts-convergence', `Divergences and the acceptance rate are reported with the run; warmup ${configuration.warmup}, draws ${configuration.samples}, seed ${configuration.seed}.`)
-      if (panel) leave('nuts-independence', 'Rows are a panel; the model assumes independent counts.')
-      else if (timeSeries) leave('nuts-independence', 'Rows are a time series; the model assumes independent counts.')
+      if (adjustment === null)
+        violate(
+          'nuts-model-shape',
+          'No measured back-door adjustment set was found, so this one-confounder model has no identified covariate.',
+        )
+      else if (
+        identification.kind === 'identified' &&
+        identification.adjustment.variables.length !== 1
+      )
+        violate(
+          'nuts-model-shape',
+          `The identified set holds ${identification.adjustment.variables.length}.`,
+        )
+      else
+        satisfy(
+          'nuts-model-shape',
+          `One confounder, ${adjustment}, enters the linear predictor beside the treatment.`,
+        )
+      if (context.outcomeIsCount === null)
+        leave(
+          'nuts-count-outcome',
+          'The outcome column has not been read yet; it is checked when the run starts.',
+        )
+      else if (context.outcomeIsCount)
+        satisfy('nuts-count-outcome', 'Every outcome value is a non-negative integer.')
+      else
+        violate(
+          'nuts-count-outcome',
+          'The outcome holds negative or fractional values, so it is not a count.',
+        )
+      leave(
+        'nuts-convergence',
+        `Divergences and the acceptance rate are reported with the run; warmup ${configuration.warmup}, draws ${configuration.samples}, seed ${configuration.seed}.`,
+      )
+      if (panel)
+        leave('nuts-independence', 'Rows are a panel; the model assumes independent counts.')
+      else if (timeSeries)
+        leave('nuts-independence', 'Rows are a time series; the model assumes independent counts.')
       else satisfy('nuts-independence', 'The prepared dataset holds independent rows.')
       break
     }
     case 'propensity-weighting':
     case 'propensity-matching':
     case 'doubly-robust': {
-      const prefix = configuration.kind === 'propensity-weighting' ? 'ipw'
-        : configuration.kind === 'propensity-matching' ? 'matching' : 'aipw'
-      if (adjustment === null) violate(`${prefix}-unconfoundedness`, 'No measured back-door adjustment set was found, so the score has nothing to condition on.')
-      else satisfy(`${prefix}-unconfoundedness`, `Identified by back-door adjustment for ${adjustment}.`)
-      if (context.treatmentIsBinary === null) leave(`${prefix}-positivity`, 'The treatment column has not been read yet; it is checked before the estimator runs.')
-      else if (!context.treatmentIsBinary) violate(`${prefix}-positivity`, 'This estimator requires treatment values of 0 or 1.')
-      else leave(`${prefix}-positivity`, 'Inspect overlap in the fitted propensity scores. Scores strictly between zero and one do not by themselves establish adequate support in both arms.')
+      const prefix =
+        configuration.kind === 'propensity-weighting'
+          ? 'ipw'
+          : configuration.kind === 'propensity-matching'
+            ? 'matching'
+            : 'aipw'
+      if (adjustment === null)
+        violate(
+          `${prefix}-unconfoundedness`,
+          'No measured back-door adjustment set was found, so the score has nothing to condition on.',
+        )
+      else
+        satisfy(
+          `${prefix}-unconfoundedness`,
+          `Identified by back-door adjustment for ${adjustment}.`,
+        )
+      if (context.treatmentIsBinary === null)
+        leave(
+          `${prefix}-positivity`,
+          'The treatment column has not been read yet; it is checked before the estimator runs.',
+        )
+      else if (!context.treatmentIsBinary)
+        violate(`${prefix}-positivity`, 'This estimator requires treatment values of 0 or 1.')
+      else
+        leave(
+          `${prefix}-positivity`,
+          'Inspect overlap in the fitted propensity scores. Scores strictly between zero and one do not by themselves establish adequate support in both arms.',
+        )
       if (configuration.kind === 'propensity-weighting') {
-        leave('ipw-extreme-weights', 'Inspect the weight distribution and effective sample size within each arm. Weight sums alone do not measure concentration.')
+        leave(
+          'ipw-extreme-weights',
+          'Inspect the weight distribution and effective sample size within each arm. Weight sums alone do not measure concentration.',
+        )
         const modelDescription = {
           newton: 'Logistic regression fitted with Newton-Raphson.',
           lbfgsb: `Logistic regression fitted with L-BFGS-B, with a maximum of ${configuration.maxIter} iterations.`,
-          boosted: 'Gradient-boosted trees with hyperparameters selected by cross-validation ROC AUC on the full sample before any two-half split.',
+          boosted:
+            'Gradient-boosted trees with hyperparameters selected by cross-validation ROC AUC on the full sample before any two-half split.',
         } satisfies Record<PropensityWeightingConfiguration['model'], string>
-        leave('ipw-treatment-model', `${modelDescription[configuration.model]} Declare categorical covariates before fitting.`)
+        leave(
+          'ipw-treatment-model',
+          `${modelDescription[configuration.model]} Declare categorical covariates before fitting.`,
+        )
       }
       if (configuration.kind === 'propensity-matching') {
-        leave('matching-single-neighbour', context.study?.estimand.kind === 'average-treatment-effect-on-treated' ? 'Each treated row is paired with one nearest control neighbour on the score.' : 'Every row is paired with one nearest neighbour on the score.')
-        leave('matching-average-not-treated', context.study?.estimand.kind === 'average-treatment-effect-on-treated' ? 'Matched differences are averaged over treated rows, so the target is ATT.' : 'Matched differences are averaged over every row, so the target is ATE.')
+        leave(
+          'matching-single-neighbour',
+          context.study?.estimand.kind === 'average-treatment-effect-on-treated'
+            ? 'Each treated row is paired with one nearest control neighbour on the score.'
+            : 'Every row is paired with one nearest neighbour on the score.',
+        )
+        leave(
+          'matching-average-not-treated',
+          context.study?.estimand.kind === 'average-treatment-effect-on-treated'
+            ? 'Matched differences are averaged over treated rows, so the target is ATT.'
+            : 'Matched differences are averaged over every row, so the target is ATE.',
+        )
       }
       if (configuration.kind === 'doubly-robust') {
-        leave('aipw-one-model-right', context.study?.estimand.kind === 'average-treatment-effect-on-treated' ? 'Consistency requires a correctly specified propensity model or control-outcome regression, together with no unmeasured confounding and adequate control support for treated rows.' : 'Consistency requires a correctly specified propensity model or correctly specified outcome regressions in both arms, together with the identification and regularity assumptions.')
-        leave('aipw-arm-regressions', context.study?.estimand.kind === 'average-treatment-effect-on-treated' ? 'The outcome regression is fitted to control rows and evaluated at the covariate values of treated rows.' : 'The outcome model is a linear regression fitted within each arm on the same design.')
+        leave(
+          'aipw-one-model-right',
+          context.study?.estimand.kind === 'average-treatment-effect-on-treated'
+            ? 'Consistency requires a correctly specified propensity model or control-outcome regression, together with no unmeasured confounding and adequate control support for treated rows.'
+            : 'Consistency requires a correctly specified propensity model or correctly specified outcome regressions in both arms, together with the identification and regularity assumptions.',
+        )
+        leave(
+          'aipw-arm-regressions',
+          context.study?.estimand.kind === 'average-treatment-effect-on-treated'
+            ? 'The outcome regression is fitted to control rows and evaluated at the covariate values of treated rows.'
+            : 'The outcome model is a linear regression fitted within each arm on the same design.',
+        )
       }
       break
     }
     case 'continuous-gps': {
-      if (adjustment === null) violate('gps-unconfoundedness', 'No measured back-door adjustment set was found, so the treatment model has nothing to condition on.')
+      if (adjustment === null)
+        violate(
+          'gps-unconfoundedness',
+          'No measured back-door adjustment set was found, so the treatment model has nothing to condition on.',
+        )
       else satisfy('gps-unconfoundedness', `Identified by back-door adjustment for ${adjustment}.`)
-      if (context.treatmentIsBinary === true) violate('gps-normal-treatment', 'The treatment contains only 0 and 1. This Gaussian density model is for continuous treatments; use a binary-treatment estimator.')
-      else leave('gps-normal-treatment', 'The treatment is taken as normal around its fitted value with constant variance.')
-      if (configuration.scale === 'stabilized') satisfy('gps-stabilize', 'Weights are stabilized by the marginal density of the treatment.')
-      else leave('gps-stabilize', 'Weights are inverse conditional treatment densities. Inspect their concentration; small densities can produce large weights.')
-      leave('gps-linear-response', 'The weighted regression assumes a linear dose-response relationship and estimates the outcome change per one-unit increase in treatment.')
+      if (context.treatmentIsBinary === true)
+        violate(
+          'gps-normal-treatment',
+          'The treatment contains only 0 and 1. This Gaussian density model is for continuous treatments; use a binary-treatment estimator.',
+        )
+      else
+        leave(
+          'gps-normal-treatment',
+          'The treatment is taken as normal around its fitted value with constant variance.',
+        )
+      if (configuration.scale === 'stabilized')
+        satisfy('gps-stabilize', 'Weights are stabilized by the marginal density of the treatment.')
+      else
+        leave(
+          'gps-stabilize',
+          'Weights are inverse conditional treatment densities. Inspect their concentration; small densities can produce large weights.',
+        )
+      leave(
+        'gps-linear-response',
+        'The weighted regression assumes a linear dose-response relationship and estimates the outcome change per one-unit increase in treatment.',
+      )
       break
     }
     case 'bayesian-gaussian': {
-      if (adjustment === null) violate('bayes-gaussian-identified-adjustment', 'No measured back-door adjustment set was found, so the regression has no identified set to condition on.')
-      else satisfy('bayes-gaussian-identified-adjustment', `Identified by back-door adjustment for ${adjustment}.`)
-      if (context.treatmentIsBinary === null) leave('bayes-gaussian-binary-treatment', 'The treatment column has not been read yet; it is checked before the estimator runs.')
-      else if (context.treatmentIsBinary) satisfy('bayes-gaussian-binary-treatment', 'Every treatment value is 0 or 1.')
-      else violate('bayes-gaussian-binary-treatment', 'The treatment holds values other than 0 and 1, so do(0) versus do(1) is not the recorded treatment contrast.')
-      leave('bayes-gaussian-prior-scale', 'Slope priors are Normal(0, 1) and the residual scale prior is half-normal(10). Non-binary adjustment columns are standardised, but the outcome keeps its units: on a scale where plausible effects lie far outside ±2, the prior pulls the estimate toward zero.')
-      leave('bayes-gaussian-convergence', `Divergences and the acceptance rate are reported with the run; warmup ${configuration.warmup} and ${configuration.samples} draws in each of 3 chains, seed ${configuration.seed}.`)
-      if (panel) leave('bayes-gaussian-independence', 'Rows are a panel; the model assumes independent rows.')
-      else if (timeSeries) leave('bayes-gaussian-independence', 'Rows are a time series; the model assumes independent rows.')
+      if (adjustment === null)
+        violate(
+          'bayes-gaussian-identified-adjustment',
+          'No measured back-door adjustment set was found, so the regression has no identified set to condition on.',
+        )
+      else
+        satisfy(
+          'bayes-gaussian-identified-adjustment',
+          `Identified by back-door adjustment for ${adjustment}.`,
+        )
+      if (context.treatmentIsBinary === null)
+        leave(
+          'bayes-gaussian-binary-treatment',
+          'The treatment column has not been read yet; it is checked before the estimator runs.',
+        )
+      else if (context.treatmentIsBinary)
+        satisfy('bayes-gaussian-binary-treatment', 'Every treatment value is 0 or 1.')
+      else
+        violate(
+          'bayes-gaussian-binary-treatment',
+          'The treatment holds values other than 0 and 1, so do(0) versus do(1) is not the recorded treatment contrast.',
+        )
+      leave(
+        'bayes-gaussian-prior-scale',
+        'Slope priors are Normal(0, 1) and the residual scale prior is half-normal(10). Non-binary adjustment columns are standardised, but the outcome keeps its units: on a scale where plausible effects lie far outside ±2, the prior pulls the estimate toward zero.',
+      )
+      leave(
+        'bayes-gaussian-convergence',
+        `Divergences and the acceptance rate are reported with the run; warmup ${configuration.warmup} and ${configuration.samples} draws in each of 3 chains, seed ${configuration.seed}.`,
+      )
+      if (panel)
+        leave(
+          'bayes-gaussian-independence',
+          'Rows are a panel; the model assumes independent rows.',
+        )
+      else if (timeSeries)
+        leave(
+          'bayes-gaussian-independence',
+          'Rows are a time series; the model assumes independent rows.',
+        )
       else satisfy('bayes-gaussian-independence', 'The prepared dataset holds independent rows.')
       break
     }
     case 'discrete-bn-query': {
-      if (context.study === null) leave('bn-observed-graph', 'No study is loaded, so the graph cannot be checked.')
+      if (context.study === null)
+        leave('bn-observed-graph', 'No study is loaded, so the graph cannot be checked.')
       else {
         const latent = context.study.graph.nodes.filter((node) => node.column === null)
-        if (latent.length > 0) violate('bn-observed-graph', `${latent.map((node) => node.name).join(', ')} ${latent.length === 1 ? 'is' : 'are'} unmeasured; the network needs every node in the data.`)
-        else satisfy('bn-observed-graph', `All ${context.study.graph.nodes.length} DAG nodes are measured; the query adjusts for the treatment’s parents.`)
+        if (latent.length > 0)
+          violate(
+            'bn-observed-graph',
+            `${latent.map((node) => node.name).join(', ')} ${latent.length === 1 ? 'is' : 'are'} unmeasured; the network needs every node in the data.`,
+          )
+        else
+          satisfy(
+            'bn-observed-graph',
+            `All ${context.study.graph.nodes.length} DAG nodes are measured; the query adjusts for the treatment’s parents.`,
+          )
       }
-      satisfy('bn-discretisation', `Each variable has a budget of ${configuration.bins} states. Observed low-cardinality states are preserved; higher-cardinality values are divided at quantiles. The run records the mean value represented by each state.`)
-      leave('bn-sample-per-cell', `${prepared.observations} total rows do not establish support in every parent configuration. Cell counts are not reported in this release; sparse cells receive BDeu pseudo-counts with equivalent sample size ${configuration.equivalentSampleSize}.`)
-      if (timeSeries) violate('bn-independent-rows', 'The prepared rows are a time series; this discrete network has no lag or serial-dependence model.')
-      else if (panel) violate('bn-independent-rows', 'The prepared rows repeat units through time; this discrete network has no unit or serial-dependence model.')
-      else leave('bn-independent-rows', 'Cross-sectional structure does not by itself establish independent sampling. Confirm that clustering or repeated observations are absent.')
+      satisfy(
+        'bn-discretisation',
+        `Each variable has a budget of ${configuration.bins} states. Observed low-cardinality states are preserved; higher-cardinality values are divided at quantiles. The run records the mean value represented by each state.`,
+      )
+      leave(
+        'bn-sample-per-cell',
+        `${prepared.observations} total rows do not establish support in every parent configuration. Cell counts are not reported in this release; sparse cells receive BDeu pseudo-counts with equivalent sample size ${configuration.equivalentSampleSize}.`,
+      )
+      if (timeSeries)
+        violate(
+          'bn-independent-rows',
+          'The prepared rows are a time series; this discrete network has no lag or serial-dependence model.',
+        )
+      else if (panel)
+        violate(
+          'bn-independent-rows',
+          'The prepared rows repeat units through time; this discrete network has no unit or serial-dependence model.',
+        )
+      else
+        leave(
+          'bn-independent-rows',
+          'Cross-sectional structure does not by itself establish independent sampling. Confirm that clustering or repeated observations are absent.',
+        )
       break
     }
     case 'binary-ett-idc-star': {
-      if (identification.kind === 'counterfactually-identified') satisfy('ett-identified-expression', 'IDC* identified both conditional potential-outcome distributions in this record.')
-      else violate('ett-identified-expression', 'This identification record does not contain the two IDC* expressions for binary ETT.')
-      if (context.observedGraphIsBinary === null) leave('ett-binary-table', 'The observed graph columns have not been read yet.')
-      else if (context.observedGraphIsBinary) satisfy('ett-binary-table', 'Every observed graph variable contains only 0 and 1.')
-      else violate('ett-binary-table', 'At least one observed graph variable contains a value other than 0 or 1; no discretisation is applied.')
-      leave('ett-positive-conditioning-mass', 'The run evaluates every conditional denominator and refuses zero observed mass.')
-      if (timeSeries) violate('ett-independent-rows', 'The prepared rows are a time series, so the empirical table would count serially dependent rows as independent.')
-      else if (panel) violate('ett-independent-rows', 'The prepared rows repeat units, so the empirical table would count dependent rows as independent.')
-      else leave('ett-independent-rows', 'Confirm that the cross-sectional rows are independently sampled.')
-      satisfy('ett-no-interval', 'The run is recorded as a point estimate with no sampling interval.')
+      if (identification.kind === 'counterfactually-identified')
+        satisfy(
+          'ett-identified-expression',
+          'IDC* identified both conditional potential-outcome distributions in this record.',
+        )
+      else
+        violate(
+          'ett-identified-expression',
+          'This identification record does not contain the two IDC* expressions for binary ETT.',
+        )
+      if (context.observedGraphIsBinary === null)
+        leave('ett-binary-table', 'The observed graph columns have not been read yet.')
+      else if (context.observedGraphIsBinary)
+        satisfy('ett-binary-table', 'Every observed graph variable contains only 0 and 1.')
+      else
+        violate(
+          'ett-binary-table',
+          'At least one observed graph variable contains a value other than 0 or 1; no discretisation is applied.',
+        )
+      leave(
+        'ett-positive-conditioning-mass',
+        'The run evaluates every conditional denominator and refuses zero observed mass.',
+      )
+      if (timeSeries)
+        violate(
+          'ett-independent-rows',
+          'The prepared rows are a time series, so the empirical table would count serially dependent rows as independent.',
+        )
+      else if (panel)
+        violate(
+          'ett-independent-rows',
+          'The prepared rows repeat units, so the empirical table would count dependent rows as independent.',
+        )
+      else
+        leave(
+          'ett-independent-rows',
+          'Confirm that the cross-sectional rows are independently sampled.',
+        )
+      satisfy(
+        'ett-no-interval',
+        'The run is recorded as a point estimate with no sampling interval.',
+      )
       break
     }
     case 'causal-effects-total': {
-      if (!timeSeries) violate('causal-effects-time-series', 'A time-series graph needs a regular time series. This prepared dataset holds independent rows.')
-      else satisfy('causal-effects-time-series', `Prepared as a regular ${prepared.sampling.frequency} time series.`)
-      if (context.document === null) violate('causal-effects-stationary-dag', 'No DAG document is bound to the study.')
-      else if (context.document.current.validation.structure.kind !== 'sound') violate('causal-effects-stationary-dag', 'The bound DAG revision is not structurally valid.')
-      else satisfy('causal-effects-stationary-dag', `Stationary DAG read from “${context.document.name}” with its lagged arrows kept.`)
-      if (context.stationarity === null) leave('causal-effects-stationarity', 'Run stationarity tests for this prepared dataset version in Data studio.')
+      if (!timeSeries)
+        violate(
+          'causal-effects-time-series',
+          'A time-series graph needs a regular time series. This prepared dataset holds independent rows.',
+        )
+      else
+        satisfy(
+          'causal-effects-time-series',
+          `Prepared as a regular ${prepared.sampling.frequency} time series.`,
+        )
+      if (context.document === null)
+        violate('causal-effects-stationary-dag', 'No DAG document is bound to the study.')
+      else if (context.document.current.validation.structure.kind !== 'sound')
+        violate(
+          'causal-effects-stationary-dag',
+          'The bound DAG revision is not structurally valid.',
+        )
+      else
+        satisfy(
+          'causal-effects-stationary-dag',
+          `Stationary DAG read from “${context.document.name}” with its lagged arrows kept.`,
+        )
+      if (context.stationarity === null)
+        leave(
+          'causal-effects-stationarity',
+          'Run stationarity tests for this prepared dataset version in Data studio.',
+        )
       else {
-        const readings = context.stationarity.variables.map((variable) => ({ name: context.document?.current.graph.nodes.find((node) => node.kind === 'observed' && node.column === variable.column)?.name ?? variable.column, assessment: variable.assessment }))
+        const readings = context.stationarity.variables.map((variable) => ({
+          name:
+            context.document?.current.graph.nodes.find(
+              (node) => node.kind === 'observed' && node.column === variable.column,
+            )?.name ?? variable.column,
+          assessment: variable.assessment,
+        }))
         const { refused, cautions } = levelEvidence(readings, REGRESSION_IN_LEVELS)
         const review = [...refused, ...cautions]
-        if (review.length > 0) leave('causal-effects-stationarity', `${summaries(review)} CausalEffects assumes a stationary temporal graph; continuing keeps the prepared values unchanged and records this conflict with the run.`, nonEmptyGroups(review))
-        else satisfy('causal-effects-stationarity', `All ${readings.length} prepared series are stationary in levels.`)
+        if (review.length > 0)
+          leave(
+            'causal-effects-stationarity',
+            `${summaries(review)} CausalEffects assumes a stationary temporal graph; continuing keeps the prepared values unchanged and records this conflict with the run.`,
+            nonEmptyGroups(review),
+          )
+        else
+          satisfy(
+            'causal-effects-stationarity',
+            `All ${readings.length} prepared series are stationary in levels.`,
+          )
       }
       if (configuration.estimator.kind === 'wrightParents') {
-        leave('causal-effects-identifiable', 'The run checks whether the graph contains directed treatment–outcome paths that Wright path tracing can evaluate.')
+        leave(
+          'causal-effects-identifiable',
+          'The run checks whether the graph contains directed treatment–outcome paths that Wright path tracing can evaluate.',
+        )
       } else if (configuration.estimator.adjustment.kind === 'explicit') {
-        leave('causal-effects-identifiable', 'The run checks the supplied time-indexed set against every open path between treatment and outcome that is not causal and refuses an invalid set.')
+        leave(
+          'causal-effects-identifiable',
+          'The run checks the supplied time-indexed set against every open path between treatment and outcome that is not causal and refuses an invalid set.',
+        )
       } else {
-        leave('causal-effects-identifiable', `Whether the ${configuration.estimator.adjustment.kind === 'optimal' ? 'complete O-set' : configuration.estimator.adjustment.kind === 'minimizedOptimal' ? 'minimized O-set' : 'collider-minimized O-set'} exists is decided by the run; a refusal is reported as not identifiable.`)
+        leave(
+          'causal-effects-identifiable',
+          `Whether the ${configuration.estimator.adjustment.kind === 'optimal' ? 'complete O-set' : configuration.estimator.adjustment.kind === 'minimizedOptimal' ? 'minimized O-set' : 'collider-minimized O-set'} exists is decided by the run; a refusal is reported as not identifiable.`,
+        )
       }
       switch (configuration.estimator.kind) {
         case 'linear':
-          satisfy('causal-effects-functional-form', 'Linear outcome regression with the selected time-indexed adjustment set.')
+          satisfy(
+            'causal-effects-functional-form',
+            'Linear outcome regression with the selected time-indexed adjustment set.',
+          )
           break
         case 'knn':
-          leave('causal-effects-functional-form', `k-nearest neighbours with k = ${configuration.estimator.k}; confirm that this local model is suitable for the response surface.`)
+          leave(
+            'causal-effects-functional-form',
+            `k-nearest neighbours with k = ${configuration.estimator.k}; confirm that this local model is suitable for the response surface.`,
+          )
           break
         case 'wrightParents':
-          leave('causal-effects-functional-form', 'Wright path tracing fits one linear parent regression per structural equation. Review the linearity and directed-graph assumptions before interpreting the path decomposition.')
+          leave(
+            'causal-effects-functional-form',
+            'Wright path tracing fits one linear parent regression per structural equation. Review the linearity and directed-graph assumptions before interpreting the path decomposition.',
+          )
           break
         default:
           assertNever(configuration.estimator)
       }
-      if (configuration.uncertainty.kind === 'none') leave('causal-effects-bootstrap', 'This run does not request a sampling interval.')
+      if (configuration.uncertainty.kind === 'none')
+        leave('causal-effects-bootstrap', 'This run does not request a sampling interval.')
       else satisfy('causal-effects-bootstrap', '')
       break
     }
     case 'causal-impact': {
-      if (!timeSeries) violate('impact-time-series', 'An intervention analysis needs an ordered time series. This prepared dataset holds independent rows.')
-      else satisfy('impact-time-series', `Prepared as a regular ${prepared.sampling.frequency} time series.`)
-      if (configuration.inference !== undefined && !bayesianImpactSettingsSchema.safeParse(configuration.inference).success) violate('impact-pre-period', 'Review the sampling settings and the selected model. Seasonal counts and durations must be positive; harmonic pairs must be below half the period.')
-      if (configuration.start.kind === 'row') satisfy('impact-intervention-time', `Intervention starts at row ${configuration.start.row}.`)
-      else leave('impact-intervention-time', 'The intervention start is read from the treatment column when the run starts: it must be zero before and non-zero after one point.')
-      leave('impact-pre-period', 'The pre-period length is checked at run time; at least 8 rows are required and more is better.')
-      if (configuration.controls.length === 0) leave('impact-controls', 'Choose control series, or accept a counterfactual based only on the selected state model.')
-      else satisfy('impact-controls', `${configuration.controls.length} control series enter the static regression.`)
+      if (!timeSeries)
+        violate(
+          'impact-time-series',
+          'An intervention analysis needs an ordered time series. This prepared dataset holds independent rows.',
+        )
+      else
+        satisfy(
+          'impact-time-series',
+          `Prepared as a regular ${prepared.sampling.frequency} time series.`,
+        )
+      if (
+        configuration.inference !== undefined &&
+        !bayesianImpactSettingsSchema.safeParse(configuration.inference).success
+      )
+        violate(
+          'impact-pre-period',
+          'Review the sampling settings and the selected model. Seasonal counts and durations must be positive; harmonic pairs must be below half the period.',
+        )
+      if (configuration.start.kind === 'row')
+        satisfy(
+          'impact-intervention-time',
+          `Intervention starts at row ${configuration.start.row}.`,
+        )
+      else
+        leave(
+          'impact-intervention-time',
+          'The intervention start is read from the treatment column when the run starts: it must be zero before and non-zero after one point.',
+        )
+      leave(
+        'impact-pre-period',
+        'The pre-period length is checked at run time; at least 8 rows are required and more is better.',
+      )
+      if (configuration.controls.length === 0)
+        leave(
+          'impact-controls',
+          'Choose control series, or accept a counterfactual based only on the selected state model.',
+        )
+      else
+        satisfy(
+          'impact-controls',
+          `${configuration.controls.length} control series enter the static regression.`,
+        )
       {
-        const affected = affectedNodes(context.study).filter((node) => configuration.controls.includes(node.column))
-        if (context.study === null) leave('impact-controls-unaffected', 'No study is loaded, so the controls cannot be checked against the DAG.')
-        else if (affected.length > 0) violate('impact-controls-unaffected', `${affected.map((node) => node.name).join(', ')} ${affected.length === 1 ? 'is a descendant' : 'are descendants'} of ${context.study.treatment.name} in the DAG: a control the intervention moves absorbs the effect. Untick ${affected.length === 1 ? 'it' : 'them'}.`)
-        else if (configuration.controls.length === 0) satisfy('impact-controls-unaffected', 'No controls are used.')
-        else leave('impact-controls-unaffected', 'No chosen control is a DAG descendant of the treatment; columns outside the DAG remain a judgement recorded with the run.')
+        const affected = affectedNodes(context.study).filter((node) =>
+          configuration.controls.includes(node.column),
+        )
+        if (context.study === null)
+          leave(
+            'impact-controls-unaffected',
+            'No study is loaded, so the controls cannot be checked against the DAG.',
+          )
+        else if (affected.length > 0)
+          violate(
+            'impact-controls-unaffected',
+            `${affected.map((node) => node.name).join(', ')} ${affected.length === 1 ? 'is a descendant' : 'are descendants'} of ${context.study.treatment.name} in the DAG: a control the intervention moves absorbs the effect. Untick ${affected.length === 1 ? 'it' : 'them'}.`,
+          )
+        else if (configuration.controls.length === 0)
+          satisfy('impact-controls-unaffected', 'No controls are used.')
+        else
+          leave(
+            'impact-controls-unaffected',
+            'No chosen control is a DAG descendant of the treatment; columns outside the DAG remain a judgement recorded with the run.',
+          )
       }
       break
     }
@@ -2833,35 +5303,60 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
 export const additive = { kind: 'additive', unit: '' } as const
 
 /** Columns of DAG nodes the treatment reaches, with their names; empty without a study. */
-function affectedNodes(study: StudySpecification | null): readonly { readonly column: ColumnId; readonly name: string }[] {
+function affectedNodes(
+  study: StudySpecification | null,
+): readonly { readonly column: ColumnId; readonly name: string }[] {
   if (study === null) return []
   const descendants = treatmentDescendants(study)
-  return study.graph.nodes.flatMap((node) => (node.column !== null && descendants.has(node.node) ? [{ column: node.column, name: node.name }] : []))
+  return study.graph.nodes.flatMap((node) =>
+    node.column !== null && descendants.has(node.node)
+      ? [{ column: node.column, name: node.name }]
+      : [],
+  )
 }
 
-const affectedColumns = (study: StudySpecification | null): ReadonlySet<ColumnId> => new Set(affectedNodes(study).map((node) => node.column))
+const affectedColumns = (study: StudySpecification | null): ReadonlySet<ColumnId> =>
+  new Set(affectedNodes(study).map((node) => node.column))
 
 /** A group's label from its bounds: the level itself, or the quantile band it spans. */
-export const groupLabel = (group: { readonly lower: number | null; readonly upper: number | null }, grouping: ModifierGrouping): string => {
+export const groupLabel = (
+  group: { readonly lower: number | null; readonly upper: number | null },
+  grouping: ModifierGrouping,
+): string => {
   const text = (value: number) => formatStatistic('raw', value).text
   switch (grouping.kind) {
-    case 'levels': return group.lower === null ? 'level' : text(group.lower)
+    case 'levels':
+      return group.lower === null ? 'level' : text(group.lower)
     case 'quantiles':
       if (group.lower === null && group.upper !== null) return `≤ ${text(group.upper)}`
       if (group.upper === null && group.lower !== null) return `> ${text(group.lower)}`
-      return group.lower === null || group.upper === null ? 'all' : `${text(group.lower)} to ${text(group.upper)}`
-    default: return assertNever(grouping)
+      return group.lower === null || group.upper === null
+        ? 'all'
+        : `${text(group.lower)} to ${text(group.upper)}`
+    default:
+      return assertNever(grouping)
   }
 }
 
 /** The DML effect in the shape the study asked for: the plain average, or one effect per modifier group. */
-const groupedEffectFrom = (study: StudySpecification, evidence: DoubleMlEvidence): CausalEstimate['effect'] | null => {
+const groupedEffectFrom = (
+  study: StudySpecification,
+  evidence: DoubleMlEvidence,
+): CausalEstimate['effect'] | null => {
   if (study.estimand.kind !== 'conditional-average-treatment-effect') {
-    return evidence.groups.kind === 'none' ? { kind: 'additive', value: evidence.estimate, unit: '' } : null
+    return evidence.groups.kind === 'none'
+      ? { kind: 'additive', value: evidence.estimate, unit: '' }
+      : null
   }
   if (evidence.groups.kind !== 'grouped') return null
   const grouping = study.estimand.grouping
-  if (evidence.groups.grouping.kind !== grouping.kind || (grouping.kind === 'quantiles' && evidence.groups.grouping.kind === 'quantiles' && evidence.groups.grouping.bins !== grouping.bins)) return null
+  if (
+    evidence.groups.grouping.kind !== grouping.kind ||
+    (grouping.kind === 'quantiles' &&
+      evidence.groups.grouping.kind === 'quantiles' &&
+      evidence.groups.grouping.bins !== grouping.bins)
+  )
+    return null
   const groups = evidence.groups.groups.map((group): GroupEffectEstimate => ({
     label: groupLabel(group, grouping),
     lower: group.lower,
@@ -2872,7 +5367,14 @@ const groupedEffectFrom = (study: StudySpecification, evidence: DoubleMlEvidence
     observations: group.observations,
     fewObservations: group.fewObservations,
   }))
-  return isNonEmpty(groups) ? { kind: 'byGroup', modifier: study.estimand.modifier.name, overall: evidence.estimate, groups } : null
+  return isNonEmpty(groups)
+    ? {
+        kind: 'byGroup',
+        modifier: study.estimand.modifier.name,
+        overall: evidence.estimate,
+        groups,
+      }
+    : null
 }
 
 /** The typed estimate from each façade's evidence; the interval follows the configuration. */
@@ -2880,81 +5382,276 @@ export function causalEstimateFrom(
   study: StudySpecification,
   identification: IdentificationArtifact,
   run:
-    | { readonly kind: 'causal-forest-run'; readonly configuration: CausalForestConfiguration; readonly evidence: CausalForestEvidence }
-    | { readonly kind: 'sharp-rd-run'; readonly configuration: SharpRdConfiguration; readonly evidence: SharpRdEvidence }
-    | { readonly kind: 'backdoor-linear-run'; readonly configuration: BackdoorLinearConfiguration; readonly evidence: BackdoorLinearEvidence }
-    | { readonly kind: 'propensity-weighting-run'; readonly configuration: PropensityWeightingConfiguration; readonly evidence: PropensityWeightingEvidence }
-    | { readonly kind: 'propensity-matching-run'; readonly configuration: PropensityMatchingConfiguration; readonly evidence: PropensityMatchingEvidence }
-    | { readonly kind: 'doubly-robust-run'; readonly configuration: DoublyRobustConfiguration; readonly evidence: DoublyRobustEvidence }
-    | { readonly kind: 'continuous-gps-run'; readonly configuration: ContinuousGpsConfiguration; readonly evidence: ContinuousGpsEvidence }
-    | { readonly kind: 'frontdoor-two-stage-run'; readonly configuration: FrontdoorTwoStageConfiguration; readonly evidence: FrontdoorTwoStageEvidence }
-    | { readonly kind: 'instrumental-variable-run'; readonly configuration: InstrumentalVariableConfiguration; readonly evidence: InstrumentalVariableEvidence }
-    | { readonly kind: 'count-glm-run'; readonly configuration: CountGlmConfiguration; readonly evidence: CountGlmEvidence }
-    | { readonly kind: 'negative-binomial-ingarch-run'; readonly configuration: NegativeBinomialIngarchConfiguration; readonly evidence: NegativeBinomialIngarchEvidence }
-    | { readonly kind: 'double-ml-run'; readonly configuration: DoubleMlConfiguration; readonly evidence: DoubleMlEvidence }
-    | { readonly kind: 't-learner-run'; readonly configuration: TLearnerConfiguration; readonly evidence: TLearnerEvidence | CrossFittedTLearnerEvidence }
-    | { readonly kind: 'ardl-run'; readonly configuration: ArdlConfiguration; readonly evidence: ArdlEvidence }
-    | { readonly kind: 'vecm-run'; readonly configuration: VecmConfiguration; readonly evidence: VecmEvidence }
-    | {readonly kind:'ridge-augmented-synthetic-run';readonly configuration:RidgeConfiguration;readonly evidence:RidgeAugmentedEvidence}
-    | { readonly kind: 'predictor-synthetic-control-run'; readonly configuration: PredictorSyntheticConfiguration; readonly evidence: PredictorSyntheticEvidence; readonly catalog: PredictorSyntheticCatalog; readonly columns: NonEmptyArray<Pick<StudyVariable, 'column' | 'name'>> }
-    | { readonly kind: 'synthetic-control-run'; readonly configuration: OutcomeHistorySyntheticConfiguration; readonly evidence: SyntheticControlEvidence }
-    | { readonly kind: 'panel-intervention-run'; readonly configuration: PanelInterventionConfiguration; readonly evidence: PanelInterventionEvidence }
-    | { readonly kind: 'negbin-nuts-run'; readonly configuration: NegbinNutsConfiguration; readonly evidence: NegbinNutsEvidence }
-    | { readonly kind: 'bayesian-gaussian-run'; readonly configuration: BayesianGaussianConfiguration; readonly evidence: BayesianGaussianEvidence }
-    | { readonly kind: 'discrete-bn-run'; readonly configuration: DiscreteBnConfiguration; readonly evidence: DiscreteBnEvidence }
-    | { readonly kind: 'binary-ett-run'; readonly configuration: BinaryEttConfiguration; readonly evidence: BinaryEttEvidence }
-    | { readonly kind: 'causal-effects-run'; readonly configuration: CausalEffectsConfiguration; readonly evidence: CausalEffectsEvidence; readonly graphVariables: readonly (StudyVariable | null)[] }
-    | { readonly kind: 'causal-impact-run'; readonly configuration: CausalImpactConfiguration; readonly evidence: CausalImpactEvidence },
+    | {
+        readonly kind: 'causal-forest-run'
+        readonly configuration: CausalForestConfiguration
+        readonly evidence: CausalForestEvidence
+      }
+    | {
+        readonly kind: 'sharp-rd-run'
+        readonly configuration: SharpRdConfiguration
+        readonly evidence: SharpRdEvidence
+      }
+    | {
+        readonly kind: 'backdoor-linear-run'
+        readonly configuration: BackdoorLinearConfiguration
+        readonly evidence: BackdoorLinearEvidence
+      }
+    | {
+        readonly kind: 'propensity-weighting-run'
+        readonly configuration: PropensityWeightingConfiguration
+        readonly evidence: PropensityWeightingEvidence
+      }
+    | {
+        readonly kind: 'propensity-matching-run'
+        readonly configuration: PropensityMatchingConfiguration
+        readonly evidence: PropensityMatchingEvidence
+      }
+    | {
+        readonly kind: 'doubly-robust-run'
+        readonly configuration: DoublyRobustConfiguration
+        readonly evidence: DoublyRobustEvidence
+      }
+    | {
+        readonly kind: 'continuous-gps-run'
+        readonly configuration: ContinuousGpsConfiguration
+        readonly evidence: ContinuousGpsEvidence
+      }
+    | {
+        readonly kind: 'frontdoor-two-stage-run'
+        readonly configuration: FrontdoorTwoStageConfiguration
+        readonly evidence: FrontdoorTwoStageEvidence
+      }
+    | {
+        readonly kind: 'instrumental-variable-run'
+        readonly configuration: InstrumentalVariableConfiguration
+        readonly evidence: InstrumentalVariableEvidence
+      }
+    | {
+        readonly kind: 'count-glm-run'
+        readonly configuration: CountGlmConfiguration
+        readonly evidence: CountGlmEvidence
+      }
+    | {
+        readonly kind: 'negative-binomial-ingarch-run'
+        readonly configuration: NegativeBinomialIngarchConfiguration
+        readonly evidence: NegativeBinomialIngarchEvidence
+      }
+    | {
+        readonly kind: 'double-ml-run'
+        readonly configuration: DoubleMlConfiguration
+        readonly evidence: DoubleMlEvidence
+      }
+    | {
+        readonly kind: 't-learner-run'
+        readonly configuration: TLearnerConfiguration
+        readonly evidence: TLearnerEvidence | CrossFittedTLearnerEvidence
+      }
+    | {
+        readonly kind: 'ardl-run'
+        readonly configuration: ArdlConfiguration
+        readonly evidence: ArdlEvidence
+      }
+    | {
+        readonly kind: 'vecm-run'
+        readonly configuration: VecmConfiguration
+        readonly evidence: VecmEvidence
+      }
+    | {
+        readonly kind: 'ridge-augmented-synthetic-run'
+        readonly configuration: RidgeConfiguration
+        readonly evidence: RidgeAugmentedEvidence
+      }
+    | {
+        readonly kind: 'predictor-synthetic-control-run'
+        readonly configuration: PredictorSyntheticConfiguration
+        readonly evidence: PredictorSyntheticEvidence
+        readonly catalog: PredictorSyntheticCatalog
+        readonly columns: NonEmptyArray<Pick<StudyVariable, 'column' | 'name'>>
+      }
+    | {
+        readonly kind: 'synthetic-control-run'
+        readonly configuration: OutcomeHistorySyntheticConfiguration
+        readonly evidence: SyntheticControlEvidence
+      }
+    | {
+        readonly kind: 'panel-intervention-run'
+        readonly configuration: PanelInterventionConfiguration
+        readonly evidence: PanelInterventionEvidence
+      }
+    | {
+        readonly kind: 'negbin-nuts-run'
+        readonly configuration: NegbinNutsConfiguration
+        readonly evidence: NegbinNutsEvidence
+      }
+    | {
+        readonly kind: 'bayesian-gaussian-run'
+        readonly configuration: BayesianGaussianConfiguration
+        readonly evidence: BayesianGaussianEvidence
+      }
+    | {
+        readonly kind: 'discrete-bn-run'
+        readonly configuration: DiscreteBnConfiguration
+        readonly evidence: DiscreteBnEvidence
+      }
+    | {
+        readonly kind: 'binary-ett-run'
+        readonly configuration: BinaryEttConfiguration
+        readonly evidence: BinaryEttEvidence
+      }
+    | {
+        readonly kind: 'causal-effects-run'
+        readonly configuration: CausalEffectsConfiguration
+        readonly evidence: CausalEffectsEvidence
+        readonly graphVariables: readonly (StudyVariable | null)[]
+      }
+    | {
+        readonly kind: 'causal-impact-run'
+        readonly configuration: CausalImpactConfiguration
+        readonly evidence: CausalImpactEvidence
+      },
 ): CausalEstimate | null {
   if (run.kind === 'ridge-augmented-synthetic-run') {
-    if(study.estimand.kind!=='average-treatment-effect-on-treated'||study.estimand.scale!=='additive'||!ridgeMatches(run.configuration,run.evidence))return null
-    const e=run.evidence,b=e.bounds,u=e.request.uncertainty
-    if(b.kind==='jackknife'&&u.kind==='none')return null
-    return {kind:'causal-estimate',estimand:study.estimand,effect:{kind:'additive',value:e.average,unit:''},
-      interval:b.kind==='jackknife'&&u.kind!=='none'?{kind:'confidence',level:u.confidence,lower:b.averageLower,upper:b.averageUpper}:{kind:'none',reason:'No jackknife interval was requested.'},
-      standardError:null,adjustment:{kind:'none'},sample:{observations:e.periods.length*(e.request.donors.length+1),parameters:e.donorWeights.length,degreesOfFreedom:null}}
+    if (
+      study.estimand.kind !== 'average-treatment-effect-on-treated' ||
+      study.estimand.scale !== 'additive' ||
+      !ridgeMatches(run.configuration, run.evidence)
+    )
+      return null
+    const e = run.evidence,
+      b = e.bounds,
+      u = e.request.uncertainty
+    if (b.kind === 'jackknife' && u.kind === 'none') return null
+    return {
+      kind: 'causal-estimate',
+      estimand: study.estimand,
+      effect: { kind: 'additive', value: e.average, unit: '' },
+      interval:
+        b.kind === 'jackknife' && u.kind !== 'none'
+          ? {
+              kind: 'confidence',
+              level: u.confidence,
+              lower: b.averageLower,
+              upper: b.averageUpper,
+            }
+          : { kind: 'none', reason: 'No jackknife interval was requested.' },
+      standardError: null,
+      adjustment: { kind: 'none' },
+      sample: {
+        observations: e.periods.length * (e.request.donors.length + 1),
+        parameters: e.donorWeights.length,
+        degreesOfFreedom: null,
+      },
+    }
   }
   if (run.kind === 'predictor-synthetic-control-run') {
-    if (study.estimand.kind !== 'average-treatment-effect-on-treated' || !predictorSyntheticRecordMatches(run.configuration, run.evidence, run.catalog, run.columns, study.outcome.column)) return null
+    if (
+      study.estimand.kind !== 'average-treatment-effect-on-treated' ||
+      !predictorSyntheticRecordMatches(
+        run.configuration,
+        run.evidence,
+        run.catalog,
+        run.columns,
+        study.outcome.column,
+      )
+    )
+      return null
     const points: TimeEffectPoint[] = []
     for (let i = 0; i < run.evidence.plotPeriods.length; i++) {
       const step = run.evidence.plotPeriods[i]!
       if (step < run.configuration.interventionPeriod!) continue
-      const counterfactual = run.evidence.synthetic[i], effect = run.evidence.gaps[i]
+      const counterfactual = run.evidence.synthetic[i],
+        effect = run.evidence.gaps[i]
       if (counterfactual == null || effect == null) return null
-      points.push({ step, actual: run.evidence.observed[i]!, counterfactual, lower: counterfactual, upper: counterfactual, effect })
+      points.push({
+        step,
+        actual: run.evidence.observed[i]!,
+        counterfactual,
+        lower: counterfactual,
+        upper: counterfactual,
+        effect,
+      })
     }
     if (!isNonEmpty(points)) return null
     const cumulative = points.reduce((sum, point) => sum + point.effect, 0)
-    return { kind: 'causal-estimate', estimand: study.estimand, effect: { kind: 'path', values: points, aggregate: { cumulative, average: cumulative / points.length } },
-      interval: { kind: 'none', reason: 'The predictor-based synthetic-control fit does not report an uncertainty interval.' }, standardError: null, adjustment: { kind: 'none' },
-      sample: { observations: run.evidence.plotPeriods.length, parameters: run.evidence.donorWeights.length, degreesOfFreedom: null } }
+    return {
+      kind: 'causal-estimate',
+      estimand: study.estimand,
+      effect: {
+        kind: 'path',
+        values: points,
+        aggregate: { cumulative, average: cumulative / points.length },
+      },
+      interval: {
+        kind: 'none',
+        reason:
+          'The predictor-based synthetic-control fit does not report an uncertainty interval.',
+      },
+      standardError: null,
+      adjustment: { kind: 'none' },
+      sample: {
+        observations: run.evidence.plotPeriods.length,
+        parameters: run.evidence.donorWeights.length,
+        degreesOfFreedom: null,
+      },
+    }
   }
   if (run.kind === 'sharp-rd-run') {
-    if (study.estimand.kind !== 'local-cutoff-effect' || identification.result.kind !== 'cutoff-design' || study.estimand.cutoff !== run.evidence.cutoff) return null
+    if (
+      study.estimand.kind !== 'local-cutoff-effect' ||
+      identification.result.kind !== 'cutoff-design' ||
+      study.estimand.cutoff !== run.evidence.cutoff
+    )
+      return null
     const { robust, observations } = run.evidence
-    return { kind: 'causal-estimate', estimand: study.estimand,
+    return {
+      kind: 'causal-estimate',
+      estimand: study.estimand,
       effect: { kind: 'additive', value: robust.value, unit: '' },
-      interval: { kind: 'confidence', level: 0.95, lower: robust.interval[0], upper: robust.interval[1] },
-      standardError: robust.standardError, adjustment: { kind: 'none' },
-      sample: { observations: observations[0] + observations[1], parameters: 4, degreesOfFreedom: null },
+      interval: {
+        kind: 'confidence',
+        level: 0.95,
+        lower: robust.interval[0],
+        upper: robust.interval[1],
+      },
+      standardError: robust.standardError,
+      adjustment: { kind: 'none' },
+      sample: {
+        observations: observations[0] + observations[1],
+        parameters: 4,
+        degreesOfFreedom: null,
+      },
     }
   }
   if (run.kind === 'frontdoor-two-stage-run') {
-    if (identification.result.kind !== 'graphically-identified' || identification.result.frontdoor.kind !== 'identified' || identification.result.frontdoor.mediators.length !== 1) return null
+    if (
+      identification.result.kind !== 'graphically-identified' ||
+      identification.result.frontdoor.kind !== 'identified' ||
+      identification.result.frontdoor.mediators.length !== 1
+    )
+      return null
     const interval = run.evidence.uncertainty
     return {
       kind: 'causal-estimate',
       estimand: study.estimand,
       effect: { kind: 'additive', value: run.evidence.estimate, unit: '' },
-      interval: interval.kind === 'bootstrap'
-        ? { kind: 'confidence', level: interval.confidenceLevel, lower: interval.interval[0], upper: interval.interval[1] }
-        : { kind: 'none', reason: 'This run did not request bootstrap uncertainty.' },
+      interval:
+        interval.kind === 'bootstrap'
+          ? {
+              kind: 'confidence',
+              level: interval.confidenceLevel,
+              lower: interval.interval[0],
+              upper: interval.interval[1],
+            }
+          : { kind: 'none', reason: 'This run did not request bootstrap uncertainty.' },
       standardError: null,
       adjustment: { kind: 'none' },
       sample: {
         observations: run.evidence.observations,
-        parameters: Math.max(run.evidence.firstStageParams.length, run.evidence.secondStageParams.length),
+        parameters: Math.max(
+          run.evidence.firstStageParams.length,
+          run.evidence.secondStageParams.length,
+        ),
         degreesOfFreedom: null,
       },
     }
@@ -2967,9 +5664,15 @@ export function causalEstimateFrom(
       kind: 'causal-estimate',
       estimand: study.estimand,
       effect: { kind: 'additive', value: run.evidence.estimate, unit: '' },
-      interval: interval.kind === 'bootstrap'
-        ? { kind: 'confidence', level: interval.confidenceLevel, lower: interval.interval[0], upper: interval.interval[1] }
-        : { kind: 'none', reason: 'This run did not request bootstrap uncertainty.' },
+      interval:
+        interval.kind === 'bootstrap'
+          ? {
+              kind: 'confidence',
+              level: interval.confidenceLevel,
+              lower: interval.interval[0],
+              upper: interval.interval[1],
+            }
+          : { kind: 'none', reason: 'This run did not request bootstrap uncertainty.' },
       standardError: run.evidence.standardError,
       adjustment: { kind: 'none' },
       sample: {
@@ -2981,16 +5684,21 @@ export function causalEstimateFrom(
   }
   if (run.kind === 'binary-ett-run') {
     if (
-      identification.result.kind !== 'counterfactually-identified'
-      || study.estimand.kind !== 'average-treatment-effect-on-treated'
-      || run.evidence.treatedExpression !== identification.result.treatedExpression
-      || run.evidence.untreatedExpression !== identification.result.untreatedExpression
-    ) return null
+      identification.result.kind !== 'counterfactually-identified' ||
+      study.estimand.kind !== 'average-treatment-effect-on-treated' ||
+      run.evidence.treatedExpression !== identification.result.treatedExpression ||
+      run.evidence.untreatedExpression !== identification.result.untreatedExpression
+    )
+      return null
     return {
       kind: 'causal-estimate',
       estimand: study.estimand,
       effect: { kind: 'additive', value: run.evidence.effectOnTreated, unit: '' },
-      interval: { kind: 'none', reason: 'This empirical IDC* evaluator reports a plug-in point estimate without a sampling interval.' },
+      interval: {
+        kind: 'none',
+        reason:
+          'This empirical IDC* evaluator reports a plug-in point estimate without a sampling interval.',
+      },
       standardError: null,
       adjustment: { kind: 'none' },
       sample: { observations: run.evidence.observations, parameters: 0, degreesOfFreedom: null },
@@ -3008,27 +5716,51 @@ export function causalEstimateFrom(
         kind: 'causal-estimate',
         estimand: study.estimand,
         effect: { kind: 'additive', value: reading.estimate, unit: '' },
-        interval: { kind: 'confidence', level: evidence.level, lower: reading.interval[0], upper: reading.interval[1] },
+        interval: {
+          kind: 'confidence',
+          level: evidence.level,
+          lower: reading.interval[0],
+          upper: reading.interval[1],
+        },
         standardError: reading.standardError,
         adjustment,
-        sample: { observations: evidence.observations, parameters: evidence.parameters, degreesOfFreedom: evidence.degreesOfFreedom },
+        sample: {
+          observations: evidence.observations,
+          parameters: evidence.parameters,
+          degreesOfFreedom: evidence.degreesOfFreedom,
+        },
       }
     }
     case 'propensity-weighting-run':
     case 'doubly-robust-run': {
       const { evidence } = run
-      if (evidence.target !== (study.estimand.kind === 'average-treatment-effect-on-treated' ? 'att' : 'ate')) return null
-      const parameters = evidence.kind === 'doublyRobust'
-        ? evidence.parameters
-        : treatmentModelParameters(evidence.treatmentModel)
+      if (
+        evidence.target !==
+        (study.estimand.kind === 'average-treatment-effect-on-treated' ? 'att' : 'ate')
+      )
+        return null
+      const parameters =
+        evidence.kind === 'doublyRobust'
+          ? evidence.parameters
+          : treatmentModelParameters(evidence.treatmentModel)
       return {
         kind: 'causal-estimate',
         estimand: study.estimand,
         effect: { kind: 'additive', value: evidence.estimate, unit: '' },
         // A weighted estimate has no closed-form interval here; the bootstrap supplies one or none.
-        interval: evidence.interval === null
-          ? { kind: 'none', reason: 'A weighted estimate has no closed-form confidence interval. Add bootstrap rounds for one.' }
-          : { kind: 'confidence', level: evidence.interval.level, lower: evidence.interval.lower, upper: evidence.interval.upper },
+        interval:
+          evidence.interval === null
+            ? {
+                kind: 'none',
+                reason:
+                  'A weighted estimate has no closed-form confidence interval. Add bootstrap rounds for one.',
+              }
+            : {
+                kind: 'confidence',
+                level: evidence.interval.level,
+                lower: evidence.interval.lower,
+                upper: evidence.interval.upper,
+              },
         standardError: null,
         adjustment,
         sample: { observations: evidence.observations, parameters, degreesOfFreedom: null },
@@ -3036,7 +5768,11 @@ export function causalEstimateFrom(
     }
     case 'propensity-matching-run': {
       const { evidence } = run
-      if (evidence.target !== (study.estimand.kind === 'average-treatment-effect-on-treated' ? 'att' : 'ate')) return null
+      if (
+        evidence.target !==
+        (study.estimand.kind === 'average-treatment-effect-on-treated' ? 'att' : 'ate')
+      )
+        return null
       return {
         kind: 'causal-estimate',
         estimand: study.estimand,
@@ -3044,7 +5780,11 @@ export function causalEstimateFrom(
         interval: { kind: 'none', reason: 'Matched pairs have no closed-form interval here.' },
         standardError: null,
         adjustment,
-        sample: { observations: evidence.observations, parameters: treatmentModelParameters(evidence.treatmentModel), degreesOfFreedom: null },
+        sample: {
+          observations: evidence.observations,
+          parameters: treatmentModelParameters(evidence.treatmentModel),
+          degreesOfFreedom: null,
+        },
       }
     }
     case 'continuous-gps-run': {
@@ -3053,12 +5793,26 @@ export function causalEstimateFrom(
         kind: 'causal-estimate',
         estimand: study.estimand,
         effect: { kind: 'additive', value: evidence.estimate, unit: '' },
-        interval: evidence.interval === null
-          ? { kind: 'none', reason: 'The standard error takes the weights as known. For a confidence interval that also allows for the weights being estimated, add bootstrap rounds.' }
-          : { kind: 'confidence', level: evidence.interval.level, lower: evidence.interval.lower, upper: evidence.interval.upper },
+        interval:
+          evidence.interval === null
+            ? {
+                kind: 'none',
+                reason:
+                  'The standard error takes the weights as known. For a confidence interval that also allows for the weights being estimated, add bootstrap rounds.',
+              }
+            : {
+                kind: 'confidence',
+                level: evidence.interval.level,
+                lower: evidence.interval.lower,
+                upper: evidence.interval.upper,
+              },
         standardError: evidence.standardError,
         adjustment,
-        sample: { observations: evidence.observations, parameters: 2, degreesOfFreedom: evidence.observations - 2 },
+        sample: {
+          observations: evidence.observations,
+          parameters: 2,
+          degreesOfFreedom: evidence.observations - 2,
+        },
       }
     }
     case 'count-glm-run': {
@@ -3067,10 +5821,19 @@ export function causalEstimateFrom(
         kind: 'causal-estimate',
         estimand: study.estimand,
         effect: { kind: 'expectedCountRatio', value: evidence.incidenceRateRatio },
-        interval: { kind: 'confidence', level: evidence.level, lower: evidence.incidenceRateRatioInterval[0], upper: evidence.incidenceRateRatioInterval[1] },
+        interval: {
+          kind: 'confidence',
+          level: evidence.level,
+          lower: evidence.incidenceRateRatioInterval[0],
+          upper: evidence.incidenceRateRatioInterval[1],
+        },
         standardError: evidence.standardError,
         adjustment,
-        sample: { observations: evidence.observations, parameters: evidence.parameters, degreesOfFreedom: evidence.degreesOfFreedom },
+        sample: {
+          observations: evidence.observations,
+          parameters: evidence.parameters,
+          degreesOfFreedom: evidence.degreesOfFreedom,
+        },
       }
     }
     case 'negative-binomial-ingarch-run': {
@@ -3087,11 +5850,23 @@ export function causalEstimateFrom(
       return {
         kind: 'causal-estimate',
         estimand: study.estimand,
-        effect: { kind: 'path', values: points, aggregate: { cumulative: evidence.cumulativeEffect, average: evidence.averageEffect } },
-        interval: { kind: 'none', reason: 'The INGARCH run reports conditional-mean scenario paths without a sampling interval.' },
+        effect: {
+          kind: 'path',
+          values: points,
+          aggregate: { cumulative: evidence.cumulativeEffect, average: evidence.averageEffect },
+        },
+        interval: {
+          kind: 'none',
+          reason:
+            'The INGARCH run reports conditional-mean scenario paths without a sampling interval.',
+        },
         standardError: null,
         adjustment,
-        sample: { observations: evidence.observations, parameters: evidence.parameters.length, degreesOfFreedom: null },
+        sample: {
+          observations: evidence.observations,
+          parameters: evidence.parameters.length,
+          degreesOfFreedom: null,
+        },
       }
     }
     case 'double-ml-run': {
@@ -3104,21 +5879,46 @@ export function causalEstimateFrom(
         kind: 'causal-estimate',
         estimand: study.estimand,
         effect,
-        interval: { kind: 'confidence', level: evidence.level, lower: evidence.interval[0], upper: evidence.interval[1] },
+        interval: {
+          kind: 'confidence',
+          level: evidence.level,
+          lower: evidence.interval[0],
+          upper: evidence.interval[1],
+        },
         standardError: evidence.standardError,
         adjustment,
-        sample: { observations: evidence.observations, parameters: 1 + adjustmentSet.length, degreesOfFreedom: null },
+        sample: {
+          observations: evidence.observations,
+          parameters: 1 + adjustmentSet.length,
+          degreesOfFreedom: null,
+        },
       }
     }
     case 'causal-forest-run': {
       const { evidence } = run
       const target = causalForestTarget(study.estimand)
-      if (target === null || !sameCausalForestTarget(target, evidence.target) || evidence.confidenceLevel !== run.configuration.confidenceLevel) return null
+      if (
+        target === null ||
+        !sameCausalForestTarget(target, evidence.target) ||
+        evidence.confidenceLevel !== run.configuration.confidenceLevel
+      )
+        return null
       const sample = { observations: evidence.observations, parameters: 0, degreesOfFreedom: null }
       if (target.kind === 'binary-average' || target.kind === 'continuous-average') {
         if (evidence.summary.kind !== 'estimated') return null
-        return { kind: 'causal-estimate', estimand: study.estimand, effect: { kind: 'additive', value: evidence.summary.estimate, unit: '' },
-          interval: { kind: 'confidence', level: evidence.confidenceLevel, ...evidence.summary.interval }, standardError: evidence.summary.standardError, adjustment, sample }
+        return {
+          kind: 'causal-estimate',
+          estimand: study.estimand,
+          effect: { kind: 'additive', value: evidence.summary.estimate, unit: '' },
+          interval: {
+            kind: 'confidence',
+            level: evidence.confidenceLevel,
+            ...evidence.summary.interval,
+          },
+          standardError: evidence.summary.standardError,
+          adjustment,
+          sample,
+        }
       }
       const effects: number[] = []
       for (const prediction of evidence.predictions) {
@@ -3126,10 +5926,23 @@ export function causalEstimateFrom(
         effects.push(prediction.estimate)
       }
       if (!isNonEmpty(effects)) return null
-      return { kind: 'causal-estimate', estimand: study.estimand,
-        effect: { kind: 'perRow', effects, overall: effects.reduce((total, effect) => total + effect, 0) / effects.length },
-        interval: { kind: 'none', reason: 'Pointwise intervals are reported with each conditional prediction, not as one interval for all rows.' },
-        standardError: null, adjustment, sample }
+      return {
+        kind: 'causal-estimate',
+        estimand: study.estimand,
+        effect: {
+          kind: 'perRow',
+          effects,
+          overall: effects.reduce((total, effect) => total + effect, 0) / effects.length,
+        },
+        interval: {
+          kind: 'none',
+          reason:
+            'Pointwise intervals are reported with each conditional prediction, not as one interval for all rows.',
+        },
+        standardError: null,
+        adjustment,
+        sample,
+      }
     }
     case 't-learner-run': {
       const { evidence } = run
@@ -3139,27 +5952,46 @@ export function causalEstimateFrom(
       if (effect === null) return null
       const sample = { observations: evidence.observations, parameters: 0, degreesOfFreedom: null }
       switch (evidence.kind) {
-        case 'tLearner': return {
-          kind: 'causal-estimate',
-          estimand: study.estimand,
-          effect,
-          interval: evidence.uncertainty.kind === 'none'
-            ? { kind: 'none', reason: 'Uncertainty was not requested. Choose bootstrap intervals to estimate it.' }
-            : { kind: 'confidence', level: evidence.uncertainty.level, lower: evidence.uncertainty.average.interval[0], upper: evidence.uncertainty.average.interval[1] },
-          standardError: evidence.uncertainty.kind === 'none' ? null : evidence.uncertainty.average.standardErrorBound,
-          adjustment,
-          sample,
-        }
-        case 'crossFittedTLearner': return {
-          kind: 'causal-estimate',
-          estimand: study.estimand,
-          effect,
-          interval: { kind: 'none', reason: 'The cross-fitted boosted learner reports point estimates only.' },
-          standardError: null,
-          adjustment,
-          sample,
-        }
-        default: return assertNever(evidence)
+        case 'tLearner':
+          return {
+            kind: 'causal-estimate',
+            estimand: study.estimand,
+            effect,
+            interval:
+              evidence.uncertainty.kind === 'none'
+                ? {
+                    kind: 'none',
+                    reason:
+                      'Uncertainty was not requested. Choose bootstrap intervals to estimate it.',
+                  }
+                : {
+                    kind: 'confidence',
+                    level: evidence.uncertainty.level,
+                    lower: evidence.uncertainty.average.interval[0],
+                    upper: evidence.uncertainty.average.interval[1],
+                  },
+            standardError:
+              evidence.uncertainty.kind === 'none'
+                ? null
+                : evidence.uncertainty.average.standardErrorBound,
+            adjustment,
+            sample,
+          }
+        case 'crossFittedTLearner':
+          return {
+            kind: 'causal-estimate',
+            estimand: study.estimand,
+            effect,
+            interval: {
+              kind: 'none',
+              reason: 'The cross-fitted boosted learner reports point estimates only.',
+            },
+            standardError: null,
+            adjustment,
+            sample,
+          }
+        default:
+          return assertNever(evidence)
       }
     }
     case 'ardl-run': {
@@ -3168,10 +6000,19 @@ export function causalEstimateFrom(
         kind: 'causal-estimate',
         estimand: study.estimand,
         effect: { kind: 'additive', value: evidence.longRunEffect, unit: '' },
-        interval: { kind: 'confidence', level: evidence.level, lower: evidence.interval[0], upper: evidence.interval[1] },
+        interval: {
+          kind: 'confidence',
+          level: evidence.level,
+          lower: evidence.interval[0],
+          upper: evidence.interval[1],
+        },
         standardError: null,
         adjustment,
-        sample: { observations: evidence.observations, parameters: evidence.arLag + evidence.dlLag + 2, degreesOfFreedom: null },
+        sample: {
+          observations: evidence.observations,
+          parameters: evidence.arLag + evidence.dlLag + 2,
+          degreesOfFreedom: null,
+        },
       }
     }
     case 'vecm-run': {
@@ -3181,76 +6022,196 @@ export function causalEstimateFrom(
         kind: 'causal-estimate',
         estimand: study.estimand,
         effect: { kind: 'additive', value: evidence.longRunEffect, unit: '' },
-        interval: { kind: 'none', reason: 'No standard error is reported for the long-run vector.' },
+        interval: {
+          kind: 'none',
+          reason: 'No standard error is reported for the long-run vector.',
+        },
         standardError: null,
         adjustment,
-        sample: { observations: evidence.observations, parameters: evidence.beta.length * evidence.rank, degreesOfFreedom: null },
+        sample: {
+          observations: evidence.observations,
+          parameters: evidence.beta.length * evidence.rank,
+          degreesOfFreedom: null,
+        },
       }
     }
     case 'synthetic-control-run': {
       const { evidence } = run
-      const predictionBand = evidence.conformalBand.kind === 'available'
-        ? evidence.conformalBand
-        : evidence.gaussianBand.kind === 'available' ? evidence.gaussianBand : null
+      const predictionBand =
+        evidence.conformalBand.kind === 'available'
+          ? evidence.conformalBand
+          : evidence.gaussianBand.kind === 'available'
+            ? evidence.gaussianBand
+            : null
       const points = evidence.postGap.map((effect, index): TimeEffectPoint => {
         const counterfactual = evidence.synthetic[evidence.nPre + index] ?? Number.NaN
         const interval = predictionBand?.intervals[evidence.nPre + index]
-        return { step: evidence.nPre + index + 1, actual: counterfactual + effect, counterfactual, lower: interval?.[0] ?? counterfactual, upper: interval?.[1] ?? counterfactual, effect }
+        return {
+          step: evidence.nPre + index + 1,
+          actual: counterfactual + effect,
+          counterfactual,
+          lower: interval?.[0] ?? counterfactual,
+          upper: interval?.[1] ?? counterfactual,
+          effect,
+        }
       })
       if (!isNonEmpty(points)) return null
       return {
         kind: 'causal-estimate',
         estimand: study.estimand,
-        effect: { kind: 'path', values: points, aggregate: { cumulative: evidence.postGap.reduce((sum, value) => sum + value, 0), average: evidence.att } },
-        interval: { kind: 'none', reason: 'Cross-fitted confidence inference, the donor-placebo rank test, and fixed-weight prediction bands are reported with this run; they answer different uncertainty questions and are not combined into one interval.' },
+        effect: {
+          kind: 'path',
+          values: points,
+          aggregate: {
+            cumulative: evidence.postGap.reduce((sum, value) => sum + value, 0),
+            average: evidence.att,
+          },
+        },
+        interval: {
+          kind: 'none',
+          reason:
+            'Cross-fitted confidence inference, the donor-placebo rank test, and fixed-weight prediction bands are reported with this run; they answer different uncertainty questions and are not combined into one interval.',
+        },
         standardError: null,
         adjustment,
-        sample: { observations: evidence.observations, parameters: evidence.weights.length, degreesOfFreedom: null },
+        sample: {
+          observations: evidence.observations,
+          parameters: evidence.weights.length,
+          degreesOfFreedom: null,
+        },
       }
     }
     case 'panel-intervention-run': {
       const { evidence } = run
       if (run.configuration.primary === 'sunAbraham') {
-        if (study.estimand.kind !== 'average-treatment-effect-on-treated' || evidence.kind !== 'sunAbraham' || !sameSunAbraham(run.configuration,evidence.request)) return null
-        const point=evidence.overall
-        return {kind:'causal-estimate',estimand:study.estimand,effect:{kind:'additive',value:point.estimate,unit:''},
-          interval:{kind:'confidence',level:evidence.request.confidence,lower:point.lower,upper:point.upper},standardError:point.standardError,
-          adjustment:{kind:'none'},sample:{observations:evidence.observations,parameters:evidence.cells.length,degreesOfFreedom:evidence.clusters-1}}
+        if (
+          study.estimand.kind !== 'average-treatment-effect-on-treated' ||
+          evidence.kind !== 'sunAbraham' ||
+          !sameSunAbraham(run.configuration, evidence.request)
+        )
+          return null
+        const point = evidence.overall
+        return {
+          kind: 'causal-estimate',
+          estimand: study.estimand,
+          effect: { kind: 'additive', value: point.estimate, unit: '' },
+          interval: {
+            kind: 'confidence',
+            level: evidence.request.confidence,
+            lower: point.lower,
+            upper: point.upper,
+          },
+          standardError: point.standardError,
+          adjustment: { kind: 'none' },
+          sample: {
+            observations: evidence.observations,
+            parameters: evidence.cells.length,
+            degreesOfFreedom: evidence.clusters - 1,
+          },
+        }
       }
       if (evidence.kind === 'sunAbraham') return null
       if (run.configuration.primary === 'staggered') {
-        if (study.estimand.kind !== 'average-treatment-effect-on-treated' || evidence.kind !== 'staggeredDid' || !sameStaggeredSpecification(run.configuration.specification,evidence.specification) || run.configuration.covariates.length !== evidence.covariates) return null
-        const point=evidence.overall.dynamic
-        if (point.kind==='reference') return null
-        return {kind:'causal-estimate',estimand:study.estimand,effect:{kind:'additive',value:point.estimate,unit:''},
-          interval:point.kind==='estimated'?{kind:'confidence',level:evidence.specification.confidence,lower:point.lower,upper:point.upper}:{kind:'none',reason:'The influence-function variance does not support an uncertainty interval.'},
-          standardError:point.kind==='estimated'?point.standardError:null,adjustment:{kind:'none'},sample:{observations:evidence.retainedObservations,parameters:evidence.covariates,degreesOfFreedom:null}}
+        if (
+          study.estimand.kind !== 'average-treatment-effect-on-treated' ||
+          evidence.kind !== 'staggeredDid' ||
+          !sameStaggeredSpecification(run.configuration.specification, evidence.specification) ||
+          run.configuration.covariates.length !== evidence.covariates
+        )
+          return null
+        const point = evidence.overall.dynamic
+        if (point.kind === 'reference') return null
+        return {
+          kind: 'causal-estimate',
+          estimand: study.estimand,
+          effect: { kind: 'additive', value: point.estimate, unit: '' },
+          interval:
+            point.kind === 'estimated'
+              ? {
+                  kind: 'confidence',
+                  level: evidence.specification.confidence,
+                  lower: point.lower,
+                  upper: point.upper,
+                }
+              : {
+                  kind: 'none',
+                  reason:
+                    'The influence-function variance does not support an uncertainty interval.',
+                },
+          standardError: point.kind === 'estimated' ? point.standardError : null,
+          adjustment: { kind: 'none' },
+          sample: {
+            observations: evidence.retainedObservations,
+            parameters: evidence.covariates,
+            degreesOfFreedom: null,
+          },
+        }
       }
       if (evidence.kind === 'staggeredDid') return null
       if (run.configuration.primary === 'adjusted') {
-        if (study.estimand.kind !== 'average-treatment-effect-on-treated' || evidence.kind !== 'panelAdjusted'
-          || !sameDidSpecification(run.configuration.specification, evidence.specification) || run.configuration.covariates.length !== evidence.covariates) return null
-        return { kind: 'causal-estimate', estimand: study.estimand, effect: { kind: 'additive', value: evidence.estimate, unit: '' },
-          interval: { kind: 'confidence', level: 0.95, lower: evidence.interval[0], upper: evidence.interval[1] }, standardError: evidence.standardError,
-          adjustment: { kind: 'none' }, sample: { observations: evidence.observations, parameters: evidence.inference.kind === 'independentErrors' ? 4+evidence.covariates : evidence.covariates, degreesOfFreedom: evidence.inference.kind === 'independentErrors' ? evidence.inference.degreesOfFreedom : null } }
+        if (
+          study.estimand.kind !== 'average-treatment-effect-on-treated' ||
+          evidence.kind !== 'panelAdjusted' ||
+          !sameDidSpecification(run.configuration.specification, evidence.specification) ||
+          run.configuration.covariates.length !== evidence.covariates
+        )
+          return null
+        return {
+          kind: 'causal-estimate',
+          estimand: study.estimand,
+          effect: { kind: 'additive', value: evidence.estimate, unit: '' },
+          interval: {
+            kind: 'confidence',
+            level: 0.95,
+            lower: evidence.interval[0],
+            upper: evidence.interval[1],
+          },
+          standardError: evidence.standardError,
+          adjustment: { kind: 'none' },
+          sample: {
+            observations: evidence.observations,
+            parameters:
+              evidence.inference.kind === 'independentErrors'
+                ? 4 + evidence.covariates
+                : evidence.covariates,
+            degreesOfFreedom:
+              evidence.inference.kind === 'independentErrors'
+                ? evidence.inference.degreesOfFreedom
+                : null,
+          },
+        }
       }
       if (evidence.kind === 'panelAdjusted') return null
       if ((run.configuration.primary === 'did') !== (evidence.kind === 'panelDid')) return null
-      if (evidence.kind === 'panelDid') return {
-        kind: 'causal-estimate', estimand: study.estimand,
-        effect: { kind: 'additive', value: evidence.did.estimate, unit: '' },
-        interval: { kind: 'none', reason: 'This conventional DiD result does not yet report an uncertainty interval.' },
-        standardError: null, adjustment: { kind: 'none' },
-        sample: { observations: evidence.observations, parameters: 4, degreesOfFreedom: null },
-      }
-      const placeboStandardError = evidence.syntheticDidPlacebo.kind === 'available' ? evidence.syntheticDidPlacebo.standardError : null
+      if (evidence.kind === 'panelDid')
+        return {
+          kind: 'causal-estimate',
+          estimand: study.estimand,
+          effect: { kind: 'additive', value: evidence.did.estimate, unit: '' },
+          interval: {
+            kind: 'none',
+            reason: 'This conventional DiD result does not yet report an uncertainty interval.',
+          },
+          standardError: null,
+          adjustment: { kind: 'none' },
+          sample: { observations: evidence.observations, parameters: 4, degreesOfFreedom: null },
+        }
+      const placeboStandardError =
+        evidence.syntheticDidPlacebo.kind === 'available'
+          ? evidence.syntheticDidPlacebo.standardError
+          : null
       return {
-        kind: 'causal-estimate', estimand: study.estimand,
+        kind: 'causal-estimate',
+        estimand: study.estimand,
         effect: { kind: 'additive', value: evidence.syntheticDid.estimate, unit: '' },
         interval: { kind: 'none', reason: 'No confidence interval is shown for this result.' },
         standardError: placeboStandardError,
         adjustment: { kind: 'none' },
-        sample: { observations: evidence.observations, parameters: evidence.syntheticDid.lambda.length + evidence.syntheticDid.omega.length, degreesOfFreedom: null },
+        sample: {
+          observations: evidence.observations,
+          parameters: evidence.syntheticDid.lambda.length + evidence.syntheticDid.omega.length,
+          degreesOfFreedom: null,
+        },
       }
     }
     case 'negbin-nuts-run': {
@@ -3259,7 +6220,13 @@ export function causalEstimateFrom(
         kind: 'causal-estimate',
         estimand: study.estimand,
         effect: { kind: 'expectedCountRatio', value: evidence.irrMedian },
-        interval: { kind: 'credible', level: 0.95, summary: 'ETI', lower: evidence.irrLower, upper: evidence.irrUpper },
+        interval: {
+          kind: 'credible',
+          level: 0.95,
+          summary: 'ETI',
+          lower: evidence.irrLower,
+          upper: evidence.irrUpper,
+        },
         standardError: null,
         adjustment,
         sample: { observations: evidence.observations, parameters: 4, degreesOfFreedom: null },
@@ -3271,10 +6238,20 @@ export function causalEstimateFrom(
         kind: 'causal-estimate',
         estimand: study.estimand,
         effect: { kind: 'additive', value: evidence.effectMean, unit: '' },
-        interval: { kind: 'credible', level: 0.94, summary: 'HDI', lower: evidence.hdiLower, upper: evidence.hdiUpper },
+        interval: {
+          kind: 'credible',
+          level: 0.94,
+          summary: 'HDI',
+          lower: evidence.hdiLower,
+          upper: evidence.hdiUpper,
+        },
         standardError: null,
         adjustment,
-        sample: { observations: evidence.observations, parameters: adjustmentSet.length + 3, degreesOfFreedom: null },
+        sample: {
+          observations: evidence.observations,
+          parameters: adjustmentSet.length + 3,
+          degreesOfFreedom: null,
+        },
       }
     }
     case 'discrete-bn-run': {
@@ -3283,32 +6260,50 @@ export function causalEstimateFrom(
         kind: 'causal-estimate',
         estimand: study.estimand,
         effect: { kind: 'additive', value: evidence.effect, unit: '' },
-        interval: { kind: 'none', reason: 'The do-query reports expectations from the fitted network; no posterior or sampling interval is available.' },
+        interval: {
+          kind: 'none',
+          reason:
+            'The do-query reports expectations from the fitted network; no posterior or sampling interval is available.',
+        },
         standardError: null,
         adjustment,
-        sample: { observations: evidence.observations, parameters: evidence.stateCounts.reduce((sum, count) => sum + count, 0), degreesOfFreedom: null },
+        sample: {
+          observations: evidence.observations,
+          parameters: evidence.stateCounts.reduce((sum, count) => sum + count, 0),
+          degreesOfFreedom: null,
+        },
       }
     }
     case 'causal-effects-run': {
       const { evidence } = run
       if (!evidence.identifiable || evidence.totalEffect === null) return null
-      if (!causalEffectsUncertaintyMatches(run.configuration.uncertainty, evidence.uncertainty)) return null
+      if (!causalEffectsUncertaintyMatches(run.configuration.uncertainty, evidence.uncertainty))
+        return null
       if (!causalEffectsFitMatches(run.configuration.estimator, evidence.fit)) return null
       let applied: AppliedAdjustment
       let parameters: number
       switch (evidence.fit.kind) {
-        case 'unfitted': return null
-        case 'invalidAdjustment': return null
+        case 'unfitted':
+          return null
+        case 'invalidAdjustment':
+          return null
         case 'adjustedLinear':
         case 'adjustedKnn': {
-          const temporal = appliedTimeIndexedAdjustment(run.graphVariables, evidence.fit.adjustmentSet)
+          const temporal = appliedTimeIndexedAdjustment(
+            run.graphVariables,
+            evidence.fit.adjustmentSet,
+          )
           if (temporal === null) return null
           applied = temporal
           parameters = evidence.fit.adjustmentSet.length + 1
           break
         }
         case 'wrightParents':
-          applied = { kind: 'structural-parent-model', coefficients: evidence.fit.coefficients.length, paths: evidence.fit.paths.length }
+          applied = {
+            kind: 'structural-parent-model',
+            coefficients: evidence.fit.coefficients.length,
+            paths: evidence.fit.paths.length,
+          }
           parameters = evidence.fit.coefficients.length
           break
         default:
@@ -3318,9 +6313,15 @@ export function causalEstimateFrom(
         kind: 'causal-estimate',
         estimand: study.estimand,
         effect: { kind: 'additive', value: evidence.totalEffect, unit: '' },
-        interval: evidence.uncertainty.kind === 'bootstrap'
-          ? { kind: 'confidence', level: evidence.uncertainty.confidenceLevel, lower: evidence.uncertainty.effectInterval[0], upper: evidence.uncertainty.effectInterval[1] }
-          : { kind: 'none', reason: 'This run did not request bootstrap uncertainty.' },
+        interval:
+          evidence.uncertainty.kind === 'bootstrap'
+            ? {
+                kind: 'confidence',
+                level: evidence.uncertainty.confidenceLevel,
+                lower: evidence.uncertainty.effectInterval[0],
+                upper: evidence.uncertainty.effectInterval[1],
+              }
+            : { kind: 'none', reason: 'This run did not request bootstrap uncertainty.' },
         standardError: null,
         adjustment: applied,
         sample: { observations: evidence.fittedObservations, parameters, degreesOfFreedom: null },
@@ -3334,21 +6335,53 @@ export function causalEstimateFrom(
         step: evidence.nPre + index + 1,
         actual: evidence.counterfactual[index] + effect,
         counterfactual: evidence.counterfactual[index],
-        lower: evidence.kind !== 'causalImpact' ? evidence.counterfactualLower[index] : evidence.counterfactual[index] - z * evidence.counterfactualSe[index],
-        upper: evidence.kind !== 'causalImpact' ? evidence.counterfactualUpper[index] : evidence.counterfactual[index] + z * evidence.counterfactualSe[index],
+        lower:
+          evidence.kind !== 'causalImpact'
+            ? evidence.counterfactualLower[index]
+            : evidence.counterfactual[index] - z * evidence.counterfactualSe[index],
+        upper:
+          evidence.kind !== 'causalImpact'
+            ? evidence.counterfactualUpper[index]
+            : evidence.counterfactual[index] + z * evidence.counterfactualSe[index],
         effect,
       }))
       if (!isNonEmpty(points)) return null
       return {
         kind: 'causal-estimate',
         estimand: study.estimand,
-        effect: { kind: 'path', values: points, aggregate: { cumulative: evidence.cumulative, average: evidence.average } },
-        interval: evidence.kind !== 'causalImpact'
-          ? { kind: 'credible', level: evidence.level, summary: 'ETI', lower: evidence.cumulativeSummary.absolute.lower, upper: evidence.cumulativeSummary.absolute.upper }
-          : { kind: 'none', reason: 'The shaded range is a pointwise forecast band for each no-intervention period. It is not a confidence interval for the average or cumulative difference.' },
+        effect: {
+          kind: 'path',
+          values: points,
+          aggregate: { cumulative: evidence.cumulative, average: evidence.average },
+        },
+        interval:
+          evidence.kind !== 'causalImpact'
+            ? {
+                kind: 'credible',
+                level: evidence.level,
+                summary: 'ETI',
+                lower: evidence.cumulativeSummary.absolute.lower,
+                upper: evidence.cumulativeSummary.absolute.upper,
+              }
+            : {
+                kind: 'none',
+                reason:
+                  'The shaded range is a pointwise forecast band for each no-intervention period. It is not a confidence interval for the average or cumulative difference.',
+              },
         standardError: null,
         adjustment: { kind: 'none' },
-        sample: { observations: evidence.observations, parameters: evidence.kind === 'causalImpact' ? evidence.params.length : evidence.kind === 'bayesianCausalImpact' ? evidence.controls.length + (evidence.controls.length > 0 ? 1 : 0) + 2 : evidence.controls.length + ({ level:2, linear:3, semilocal:5 }[evidence.model.trend]) + (evidence.model.seasonality.kind === 'none' ? 0 : 1), degreesOfFreedom: null },
+        sample: {
+          observations: evidence.observations,
+          parameters:
+            evidence.kind === 'causalImpact'
+              ? evidence.params.length
+              : evidence.kind === 'bayesianCausalImpact'
+                ? evidence.controls.length + (evidence.controls.length > 0 ? 1 : 0) + 2
+                : evidence.controls.length +
+                  { level: 2, linear: 3, semilocal: 5 }[evidence.model.trend] +
+                  (evidence.model.seasonality.kind === 'none' ? 0 : 1),
+          degreesOfFreedom: null,
+        },
       }
     }
     default:
@@ -3397,9 +6430,13 @@ const preInterventionEffects = (path: PreInterventionPath): readonly ImpactEffec
     return {
       step: step + 1,
       effect,
-      band: path.kind === 'fitted'
-        ? interval(effect - NORMAL_95 * path.se[index], effect + NORMAL_95 * path.se[index])
-        : interval(path.observed[index] - path.upper[index], path.observed[index] - path.lower[index]),
+      band:
+        path.kind === 'fitted'
+          ? interval(effect - NORMAL_95 * path.se[index], effect + NORMAL_95 * path.se[index])
+          : interval(
+              path.observed[index] - path.upper[index],
+              path.observed[index] - path.lower[index],
+            ),
     }
   })
 }
@@ -3409,9 +6446,13 @@ export function impactPointwisePath(evidence: CausalImpactEvidence): readonly Im
   const after = evidence.pointwise.map((effect, index): ImpactEffectPoint => ({
     step: evidence.nPre + index + 1,
     effect,
-    band: evidence.kind === 'causalImpact'
-      ? interval(effect - NORMAL_95 * evidence.counterfactualSe[index], effect + NORMAL_95 * evidence.counterfactualSe[index])
-      : interval(evidence.pointwiseLower[index], evidence.pointwiseUpper[index]),
+    band:
+      evidence.kind === 'causalImpact'
+        ? interval(
+            effect - NORMAL_95 * evidence.counterfactualSe[index],
+            effect + NORMAL_95 * evidence.counterfactualSe[index],
+          )
+        : interval(evidence.pointwiseLower[index], evidence.pointwiseUpper[index]),
   }))
   return [...preInterventionEffects(evidence.preInterventionPath), ...after]
 }
@@ -3427,136 +6468,285 @@ export function impactCumulativePath(evidence: CausalImpactEvidence): readonly I
     return {
       step: evidence.nPre + index + 1,
       effect: total,
-      band: evidence.kind === 'causalImpact'
-        ? { kind: 'none' }
-        : interval(evidence.cumulativeLower[index], evidence.cumulativeUpper[index]),
+      band:
+        evidence.kind === 'causalImpact'
+          ? { kind: 'none' }
+          : interval(evidence.cumulativeLower[index], evidence.cumulativeUpper[index]),
     }
   })
-  const before = preInterventionEffects(evidence.preInterventionPath)
-    .map((point): ImpactEffectPoint => ({ step: point.step, effect: 0, band: { kind: 'none' } }))
+  const before = preInterventionEffects(evidence.preInterventionPath).map(
+    (point): ImpactEffectPoint => ({ step: point.step, effect: 0, band: { kind: 'none' } }),
+  )
   return [...before, ...after]
 }
 
 export function describeCovariance(errors: LinearErrors): string {
   switch (errors.kind) {
-    case 'hac': return 'Newey–West HAC'
-    case 'classical': return 'Classical'
-    case 'hc1': return 'Robust (HC1)'
-    case 'cluster': return `Clustered by ${errors.name}`
-    case 'arma': return `ARMA(${errors.p}, ${errors.q}) errors`
-    default: return assertNever(errors)
+    case 'hac':
+      return 'Newey–West HAC'
+    case 'classical':
+      return 'Classical'
+    case 'hc1':
+      return 'Robust (HC1)'
+    case 'cluster':
+      return `Clustered by ${errors.name}`
+    case 'arma':
+      return `ARMA(${errors.p}, ${errors.q}) errors`
+    default:
+      return assertNever(errors)
   }
 }
 
 export function describeFixedEffects(fixedEffects: FixedEffects): string | null {
   switch (fixedEffects.kind) {
-    case 'none': return null
-    case 'unit': return `Fixed effects by ${fixedEffects.name}`
-    case 'time': return `Time fixed effects by ${fixedEffects.name}`
-    case 'unit-and-time': return `Fixed effects by ${fixedEffects.name} and ${fixedEffects.timeName}`
-    default: return assertNever(fixedEffects)
+    case 'none':
+      return null
+    case 'unit':
+      return `Fixed effects by ${fixedEffects.name}`
+    case 'time':
+      return `Time fixed effects by ${fixedEffects.name}`
+    case 'unit-and-time':
+      return `Fixed effects by ${fixedEffects.name} and ${fixedEffects.timeName}`
+    default:
+      return assertNever(fixedEffects)
   }
 }
 
 /** The coefficient, its standard error and interval under the configured error treatment; null when the evidence holds no ARMA fit for an ARMA configuration. */
-export function linearReading(run: { readonly configuration: BackdoorLinearConfiguration; readonly evidence: BackdoorLinearEvidence }): { readonly estimate: number; readonly standardError: number; readonly interval: readonly [number, number] } | null {
+export function linearReading(run: {
+  readonly configuration: BackdoorLinearConfiguration
+  readonly evidence: BackdoorLinearEvidence
+}): {
+  readonly estimate: number
+  readonly standardError: number
+  readonly interval: readonly [number, number]
+} | null {
   const { evidence } = run
   switch (run.configuration.errors.kind) {
-    case 'classical': return { estimate: evidence.estimate, standardError: evidence.standardError, interval: evidence.interval }
-    case 'hac': return { estimate: evidence.estimate, standardError: evidence.hacStandardError, interval: evidence.hacInterval }
+    case 'classical':
+      return {
+        estimate: evidence.estimate,
+        standardError: evidence.standardError,
+        interval: evidence.interval,
+      }
+    case 'hac':
+      return {
+        estimate: evidence.estimate,
+        standardError: evidence.hacStandardError,
+        interval: evidence.hacInterval,
+      }
     case 'hc1':
     case 'cluster': {
       const model = evidence.errorModel
-      return model.kind === run.configuration.errors.kind ? { estimate: evidence.estimate, standardError: model.standardError, interval: model.interval } : null
+      return model.kind === run.configuration.errors.kind
+        ? {
+            estimate: evidence.estimate,
+            standardError: model.standardError,
+            interval: model.interval,
+          }
+        : null
     }
     case 'arma': {
       const reading = armaReading(run)
-      return reading === null ? null : { estimate: reading.estimate, standardError: reading.standardError, interval: reading.interval }
+      return reading === null
+        ? null
+        : {
+            estimate: reading.estimate,
+            standardError: reading.standardError,
+            interval: reading.interval,
+          }
     }
-    default: return assertNever(run.configuration.errors)
+    default:
+      return assertNever(run.configuration.errors)
   }
 }
 
 /** The estimator the chapter opens with for a record: the one its strategy calls for, else the plain adjustment route for the row structure. */
-export function defaultEstimatorFor(identification: Identification | null, prepared: PreparedDatasetArtifact, study: StudySpecification | null): EstimatorId {
-  if (study !== null && ['average-treatment-effect-on-controls', 'overlap-weighted-average-treatment-effect', 'average-partial-effect', 'variance-weighted-average-partial-effect', 'conditional-partial-effect-per-row'].includes(study.estimand.kind)) return 'causal-forest'
+export function defaultEstimatorFor(
+  identification: Identification | null,
+  prepared: PreparedDatasetArtifact,
+  study: StudySpecification | null,
+): EstimatorId {
+  if (
+    study !== null &&
+    [
+      'average-treatment-effect-on-controls',
+      'overlap-weighted-average-treatment-effect',
+      'average-partial-effect',
+      'variance-weighted-average-partial-effect',
+      'conditional-partial-effect-per-row',
+    ].includes(study.estimand.kind)
+  )
+    return 'causal-forest'
   if (study?.estimand.kind === 'local-cutoff-effect') return 'sharp-rd'
   // A conditional target is reported only by the DML estimators; the partially linear one runs for any treatment.
   if (study?.estimand.kind === 'conditional-average-treatment-effect') return 'dml-plr'
   // The per-row target is reported only by the T-learner.
   if (study?.estimand.kind === 'conditional-average-treatment-effect-per-row') return 't-learner'
-  if (study?.estimand.kind === 'average-treatment-effect-on-treated' && (identification?.kind === 'identified' || identification?.kind === 'backdoor-not-identified' || identification === null)) return prepared.kind === 'prepared-panel' ? 'panel-intervention' : 'propensity-weighting'
-  const fallback: EstimatorId = prepared.kind === 'prepared-panel' ? 'panel-intervention' : 'backdoor-linear-regression'
+  if (
+    study?.estimand.kind === 'average-treatment-effect-on-treated' &&
+    (identification?.kind === 'identified' ||
+      identification?.kind === 'backdoor-not-identified' ||
+      identification === null)
+  )
+    return prepared.kind === 'prepared-panel' ? 'panel-intervention' : 'propensity-weighting'
+  const fallback: EstimatorId =
+    prepared.kind === 'prepared-panel' ? 'panel-intervention' : 'backdoor-linear-regression'
   if (identification === null) return fallback
   switch (identification.kind) {
-    case 'cutoff-design': return 'sharp-rd'
-    case 'instrument-identified': return 'instrumental-variable'
-    case 'graphically-identified': return identification.frontdoor.kind === 'identified' ? 'frontdoor-two-stage' : 'instrumental-variable'
-    case 'counterfactually-identified': return 'binary-ett-idc-star'
+    case 'cutoff-design':
+      return 'sharp-rd'
+    case 'instrument-identified':
+      return 'instrumental-variable'
+    case 'graphically-identified':
+      return identification.frontdoor.kind === 'identified'
+        ? 'frontdoor-two-stage'
+        : 'instrumental-variable'
+    case 'counterfactually-identified':
+      return 'binary-ett-idc-star'
     case 'identified':
     case 'backdoor-not-identified':
       return fallback
-    default: return assertNever(identification)
+    default:
+      return assertNever(identification)
   }
 }
 
 /** Target-aware presentation of the same estimator; the study owns the target. */
-export function propensityMethodForTarget(method: MethodDefinition, target: 'ate' | 'att'): MethodDefinition {
+export function propensityMethodForTarget(
+  method: MethodDefinition,
+  target: 'ate' | 'att',
+): MethodDefinition {
   if (target === 'ate') return method
-  const expressions: Readonly<Record<string, { readonly tex: string; readonly plain: string }>> = {"propensity-weighting":{"tex":"\\widehat{\\mathrm{ATT}}=\\frac{\\sum_i T_iY_i}{\\sum_i T_i}-\\frac{\\sum_i(1-T_i)\\frac{e(X_i)}{1-e(X_i)}Y_i}{\\sum_i(1-T_i)\\frac{e(X_i)}{1-e(X_i)}}","plain":"ATT = treated outcome mean minus the treatment-odds-weighted control outcome mean."},"propensity-matching":{"tex":"\\widehat{\\mathrm{ATT}}=\\frac{1}{N_1}\\sum_{i:T_i=1}\\left(Y_i-Y_{j_0(i)}\\right)","plain":"ATT = average among treated rows of observed outcome minus nearest matched control outcome."},"doubly-robust":{"tex":"\\widehat{\\mathrm{ATT}}=\\frac{1}{N_1}\\sum_i\\left[T_i\\{Y_i-\\hat\\mu_0(X_i)\\}-(1-T_i)\\frac{e(X_i)}{1-e(X_i)}\\{Y_i-\\hat\\mu_0(X_i)\\}\\right]","plain":"ATT = the treated residual sum minus the treatment-odds-weighted control residual sum, divided by the number of treated rows."}}
+  const expressions: Readonly<Record<string, { readonly tex: string; readonly plain: string }>> = {
+    'propensity-weighting': {
+      tex: '\\widehat{\\mathrm{ATT}}=\\frac{\\sum_i T_iY_i}{\\sum_i T_i}-\\frac{\\sum_i(1-T_i)\\frac{e(X_i)}{1-e(X_i)}Y_i}{\\sum_i(1-T_i)\\frac{e(X_i)}{1-e(X_i)}}',
+      plain: 'ATT = treated outcome mean minus the treatment-odds-weighted control outcome mean.',
+    },
+    'propensity-matching': {
+      tex: '\\widehat{\\mathrm{ATT}}=\\frac{1}{N_1}\\sum_{i:T_i=1}\\left(Y_i-Y_{j_0(i)}\\right)',
+      plain:
+        'ATT = average among treated rows of observed outcome minus nearest matched control outcome.',
+    },
+    'doubly-robust': {
+      tex: '\\widehat{\\mathrm{ATT}}=\\frac{1}{N_1}\\sum_i\\left[T_i\\{Y_i-\\hat\\mu_0(X_i)\\}-(1-T_i)\\frac{e(X_i)}{1-e(X_i)}\\{Y_i-\\hat\\mu_0(X_i)\\}\\right]',
+      plain:
+        'ATT = the treated residual sum minus the treatment-odds-weighted control residual sum, divided by the number of treated rows.',
+    },
+  }
   const expression = expressions[method.id]
   if (expression === undefined) return method
-  const describeCaveat = (caveat: MethodDefinition['caveats'][number]): MethodDefinition['caveats'][number] =>
-    caveat.id.endsWith('-positivity') ? { ...caveat, requirement: 'Control outcomes must be supported at the covariate values of treated rows. Extreme treatment probabilities can produce unstable weights or poor matches.' }
-    : caveat.id === 'aipw-one-model-right' ? { ...caveat, requirement: 'Either the propensity model or the control-outcome regression must be correctly specified. Double robustness does not replace no unmeasured confounding or control support for treated rows.' }
-    : caveat.id === 'matching-single-neighbour' ? { ...caveat, requirement: 'Each treated row is paired with one nearest control neighbour on the propensity score.' }
-    : caveat
+  const describeCaveat = (
+    caveat: MethodDefinition['caveats'][number],
+  ): MethodDefinition['caveats'][number] =>
+    caveat.id.endsWith('-positivity')
+      ? {
+          ...caveat,
+          requirement:
+            'Control outcomes must be supported at the covariate values of treated rows. Extreme treatment probabilities can produce unstable weights or poor matches.',
+        }
+      : caveat.id === 'aipw-one-model-right'
+        ? {
+            ...caveat,
+            requirement:
+              'Either the propensity model or the control-outcome regression must be correctly specified. Double robustness does not replace no unmeasured confounding or control support for treated rows.',
+          }
+        : caveat.id === 'matching-single-neighbour'
+          ? {
+              ...caveat,
+              requirement:
+                'Each treated row is paired with one nearest control neighbour on the propensity score.',
+            }
+          : caveat
   const [first, ...rest] = method.caveats
-  return { ...method, summaryTex: expression, caveats: [describeCaveat(first), ...rest.map(describeCaveat)] }
+  return {
+    ...method,
+    summaryTex: expression,
+    caveats: [describeCaveat(first), ...rest.map(describeCaveat)],
+  }
 }
 
 export function describeEstimator(estimator: EstimatorId): string {
   switch (estimator) {
-    case 'backdoor-linear-regression': return 'Adjusted linear regression'
-    case 'frontdoor-two-stage': return 'Linear front-door regression'
-    case 'instrumental-variable': return 'Instrumental variable'
-    case 'poisson-glm': return 'Poisson GLM'
-    case 'negative-binomial-p': return 'Negative binomial'
-    case 'negative-binomial-ingarch': return 'Negative-binomial INGARCH'
-    case 'dml-plr': return 'Double machine learning, partially linear'
-    case 'dml-irm': return 'Double machine learning, interactive'
-    case 't-learner': return 'T-learner'
-    case 'causal-forest': return 'Causal forest'
-    case 'ardl-pss': return 'ARDL long run'
-    case 'vecm': return 'VECM'
-    case 'synthetic-control': return 'Synthetic control'
-    case 'sharp-rd': return 'Sharp regression discontinuity'
-    case 'panel-intervention': return 'Panel difference-in-differences'
-    case 'negbin-nuts': return 'Bayesian negative binomial'
-    case 'bayesian-gaussian': return 'Bayesian Gaussian regression'
-    case 'discrete-bn-query': return 'Discrete BN do-query'
-    case 'binary-ett-idc-star': return 'Binary ETT by IDC*'
-    case 'causal-effects-total': return 'CausalEffects total effect'
-    case 'propensity-weighting': return 'Inverse propensity weighting'
-    case 'propensity-matching': return 'Propensity-score matching'
-    case 'doubly-robust': return 'Doubly robust estimation'
-    case 'continuous-gps': return 'Generalised propensity score'
-    case 'causal-impact': return 'Causal impact'
-    default: return assertNever(estimator)
+    case 'backdoor-linear-regression':
+      return 'Adjusted linear regression'
+    case 'frontdoor-two-stage':
+      return 'Linear front-door regression'
+    case 'instrumental-variable':
+      return 'Instrumental variable'
+    case 'poisson-glm':
+      return 'Poisson GLM'
+    case 'negative-binomial-p':
+      return 'Negative binomial'
+    case 'negative-binomial-ingarch':
+      return 'Negative-binomial INGARCH'
+    case 'dml-plr':
+      return 'Double machine learning, partially linear'
+    case 'dml-irm':
+      return 'Double machine learning, interactive'
+    case 't-learner':
+      return 'T-learner'
+    case 'causal-forest':
+      return 'Causal forest'
+    case 'ardl-pss':
+      return 'ARDL long run'
+    case 'vecm':
+      return 'VECM'
+    case 'synthetic-control':
+      return 'Synthetic control'
+    case 'sharp-rd':
+      return 'Sharp regression discontinuity'
+    case 'panel-intervention':
+      return 'Panel difference-in-differences'
+    case 'negbin-nuts':
+      return 'Bayesian negative binomial'
+    case 'bayesian-gaussian':
+      return 'Bayesian Gaussian regression'
+    case 'discrete-bn-query':
+      return 'Discrete BN do-query'
+    case 'binary-ett-idc-star':
+      return 'Binary ETT by IDC*'
+    case 'causal-effects-total':
+      return 'CausalEffects total effect'
+    case 'propensity-weighting':
+      return 'Inverse propensity weighting'
+    case 'propensity-matching':
+      return 'Propensity-score matching'
+    case 'doubly-robust':
+      return 'Doubly robust estimation'
+    case 'continuous-gps':
+      return 'Generalised propensity score'
+    case 'causal-impact':
+      return 'Causal impact'
+    default:
+      return assertNever(estimator)
   }
 }
 
 /** Tigramite marks for a DAG document: `graph[i][j][tau]` is the arrow from i at t−tau to j at t. */
-export function stationaryMarksOf(document: DagDocument): { readonly statLag: number; readonly marks: readonly (readonly (readonly string[])[])[]; readonly hidden: readonly number[] } {
+export function stationaryMarksOf(document: DagDocument): {
+  readonly statLag: number
+  readonly marks: readonly (readonly (readonly string[])[])[]
+  readonly hidden: readonly number[]
+} {
   return stationaryMarksFromGraph(document.current.graph)
 }
 
 /** Tigramite stationary marks for an immutable DAG revision rather than a document's current draft. */
-export function stationaryMarksFromGraph(graph: EditableDag): { readonly statLag: number; readonly marks: readonly (readonly (readonly string[])[])[]; readonly hidden: readonly number[] } {
+export function stationaryMarksFromGraph(graph: EditableDag): {
+  readonly statLag: number
+  readonly marks: readonly (readonly (readonly string[])[])[]
+  readonly hidden: readonly number[]
+} {
   const nodes = graph.nodes
   const index = new Map(nodes.map((node, position) => [node.id, position]))
-  const statLag = Math.max(0, ...graph.edges.map((edge) => (edge.timing.kind === 'lagged' ? edge.timing.lag : 0)))
-  const marks: string[][][] = nodes.map(() => nodes.map(() => Array.from({ length: statLag + 1 }, () => '')))
+  const statLag = Math.max(
+    0,
+    ...graph.edges.map((edge) => (edge.timing.kind === 'lagged' ? edge.timing.lag : 0)),
+  )
+  const marks: string[][][] = nodes.map(() =>
+    nodes.map(() => Array.from({ length: statLag + 1 }, () => '')),
+  )
   for (const edge of graph.edges) {
     const from = index.get(edge.cause)
     const to = index.get(edge.effect)
@@ -3565,14 +6755,33 @@ export function stationaryMarksFromGraph(graph: EditableDag): { readonly statLag
     marks[from][to][lag] = '-->'
     if (lag === 0 && marks[to][from][0] === '') marks[to][from][0] = '<--'
   }
-  return { statLag, marks, hidden: nodes.flatMap((node, position) => (node.kind === 'latent' ? [position] : [])) }
+  return {
+    statLag,
+    marks,
+    hidden: nodes.flatMap((node, position) => (node.kind === 'latent' ? [position] : [])),
+  }
 }
 
 /** The first row at which a step treatment turns on, or the reason it is not a step. */
-export function interventionStartFromTreatment(values: readonly number[]): Result<number, { readonly kind: 'not-a-step'; readonly detail: string }> {
+export function interventionStartFromTreatment(
+  values: readonly number[],
+): Result<number, { readonly kind: 'not-a-step'; readonly detail: string }> {
   const first = values.findIndex((value) => value !== 0)
-  if (first <= 0) return err({ kind: 'not-a-step', detail: first === 0 ? 'The treatment is already on at the first row.' : 'The treatment never turns on.' })
-  if (values.slice(first).some((value) => value === 0)) return err({ kind: 'not-a-step', detail: 'The treatment switches off again after it starts.' })
+  if (first <= 0)
+    return err({
+      kind: 'not-a-step',
+      detail:
+        first === 0
+          ? 'The treatment is already on at the first row.'
+          : 'The treatment never turns on.',
+    })
+  if (values.slice(first).some((value) => value === 0))
+    return err({ kind: 'not-a-step', detail: 'The treatment switches off again after it starts.' })
   return ok(first)
 }
-import { adjustedDidEvidenceSchema, adjustedDidConfigurationSchema, sameDidSpecification, type AdjustedDidSpecification } from './adjustedDid'
+import {
+  adjustedDidEvidenceSchema,
+  adjustedDidConfigurationSchema,
+  sameDidSpecification,
+  type AdjustedDidSpecification,
+} from './adjustedDid'

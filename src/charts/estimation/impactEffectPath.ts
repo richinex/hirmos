@@ -16,12 +16,15 @@ export interface ImpactEffectView {
 /** The difference between the outcome and its estimated no-intervention path, across the fitted
  * window and the evaluated one. Before the intervention it should sit near zero; the departure
  * after it is the effect being claimed. */
-export function impactEffectPathOption(view: ImpactEffectView, theme: ChartTheme): EChartsCoreOption {
+export function impactEffectPathOption(
+  view: ImpactEffectView,
+  theme: ChartTheme,
+): EChartsCoreOption {
   const first = view.points[0]?.step ?? view.evaluatedFrom
   const last = view.points.at(-1)?.step ?? view.evaluatedFrom
   const banded = view.points.some((point) => point.band.kind === 'interval')
   const bound = (point: ImpactEffectPoint, edge: 'lower' | 'upper') =>
-    (point.band.kind === 'interval' ? point.band[edge] : null)
+    point.band.kind === 'interval' ? point.band[edge] : null
   const description = `${view.label} by ${view.stepLabel}, ${view.stepLabel} ${first} to ${last}, against a zero line. The intervention begins at ${view.stepLabel} ${view.evaluatedFrom}.${banded ? ' The shaded range is a 95% interval.' : ' No interval is drawn for this route.'}`
   return {
     ...baseOption(theme, description),
@@ -34,9 +37,10 @@ export function impactEffectPathOption(view: ImpactEffectView, theme: ChartTheme
         if (head === null || typeof head !== 'object') return ''
         const point = view.points[Number(Reflect.get(head, 'dataIndex'))]
         if (point === undefined) return ''
-        const range = point.band.kind === 'interval'
-          ? ` [${formatStatistic('raw', point.band.lower).text}, ${formatStatistic('raw', point.band.upper).text}]`
-          : ''
+        const range =
+          point.band.kind === 'interval'
+            ? ` [${formatStatistic('raw', point.band.lower).text}, ${formatStatistic('raw', point.band.upper).text}]`
+            : ''
         const window = point.step < view.evaluatedFrom ? ' (fitted window)' : ''
         return `${view.stepLabel} ${point.step}${window}<br/>${view.label.toLowerCase()} <strong>${formatStatistic('raw', point.effect).text}</strong>${range}`
       },
@@ -94,8 +98,13 @@ export function impactEffectPathOption(view: ImpactEffectView, theme: ChartTheme
           silent: true,
           symbol: 'none',
           label: { show: false },
-          data: [{ yAxis: 0, lineStyle: { color: theme.muted, type: 'solid', width: 1 } },
-            { xAxis: view.evaluatedFrom, lineStyle: { color: theme.faint, type: 'dashed', width: 1 } }],
+          data: [
+            { yAxis: 0, lineStyle: { color: theme.muted, type: 'solid', width: 1 } },
+            {
+              xAxis: view.evaluatedFrom,
+              lineStyle: { color: theme.faint, type: 'dashed', width: 1 },
+            },
+          ],
         },
         markArea: {
           silent: true,

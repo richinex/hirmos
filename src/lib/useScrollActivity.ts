@@ -9,10 +9,13 @@ export function useScrollActivity() {
       if (!(element instanceof HTMLElement)) return
       clearTimeout(pending.get(element))
       element.dataset.scrolling = 'true'
-      pending.set(element, setTimeout(() => {
-        delete element.dataset.scrolling
-        pending.delete(element)
-      }, 700))
+      pending.set(
+        element,
+        setTimeout(() => {
+          delete element.dataset.scrolling
+          pending.delete(element)
+        }, 700),
+      )
     }
     document.addEventListener('scroll', scroll, { capture: true, passive: true })
     return () => {

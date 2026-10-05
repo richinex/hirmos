@@ -23,9 +23,16 @@ export function dagCardSize(names: readonly string[]): DagCardSize {
   const font = fontFor('body', 600)
   const inset = cardInset(fontPx(font))
   const widest = Math.max(0, ...names.map((name) => textWidth(name, font)))
-  const width = Math.min(CARD_MAX_WIDTH, Math.max(DEFAULT_CARD_SIZE.width, Math.ceil(widest) + inset))
+  const width = Math.min(
+    CARD_MAX_WIDTH,
+    Math.max(DEFAULT_CARD_SIZE.width, Math.ceil(widest) + inset),
+  )
   const content = width - inset
-  const nameLines = Math.min(MAX_NAME_LINES, Math.max(1, ...names.map((name) => lineCountAt(name, font, content))))
-  const height = DEFAULT_CARD_SIZE.height + (nameLines - 1) * Math.round(lineHeightFor('body', font))
+  const nameLines = Math.min(
+    MAX_NAME_LINES,
+    Math.max(1, ...names.map((name) => lineCountAt(name, font, content))),
+  )
+  const height =
+    DEFAULT_CARD_SIZE.height + (nameLines - 1) * Math.round(lineHeightFor('body', font))
   return { width, height, nameLines }
 }

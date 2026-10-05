@@ -8,7 +8,12 @@ import { cn } from '@/lib/utils'
  * (`smart-truncate`) turns the fade on. No script measures anything; the layout answers the question.
  * The fade takes its colour from `--smart-truncate-surface`, so a row sets it to its own background.
  */
-export function SmartTruncate({ text, className, textClassName, title }: {
+export function SmartTruncate({
+  text,
+  className,
+  textClassName,
+  title,
+}: {
   readonly text: string
   readonly className?: string
   readonly textClassName?: string

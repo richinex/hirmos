@@ -1,5 +1,12 @@
 import type { EChartsCoreOption } from 'echarts/core'
-import { axisLabelStyle, axisNameStyle, baseOption, escapeHtml, gridAuto, tooltip } from '@/charts/grammar'
+import {
+  axisLabelStyle,
+  axisNameStyle,
+  baseOption,
+  escapeHtml,
+  gridAuto,
+  tooltip,
+} from '@/charts/grammar'
 import type { ChartTheme } from '@/charts/theme'
 import { formatP, formatStatistic } from '@/lib/format/number'
 
@@ -13,7 +20,10 @@ export interface RatioEstimate {
 /** The height a forest plot needs to keep every row legible, for the host to reserve. */
 export const ratioForestHeight = (rows: number): number => Math.max(160, 26 * rows + 64)
 
-const ROUND_RATIOS = [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2, 1.25, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10, 15, 20]
+const ROUND_RATIOS = [
+  0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2, 1.25, 1.5, 2, 2.5, 3,
+  4, 5, 6, 8, 10, 15, 20,
+]
 
 /** Round ratios inside the axis range, thinned to at most seven with 1 always kept, so the labels read as ratios rather than as powers. */
 const ratioTicks = (low: number, high: number): number[] => {
@@ -46,12 +56,18 @@ export function ratioForestOption(
   const excluding = ordered.filter((row) => row.interval[0] > 1 || row.interval[1] < 1).length
   const ratio = (value: number): string => formatStatistic('raw', value).text
   return {
-    ...baseOption(theme, `${ratioName} of ${ordered.length} covariates with ${confidence}% intervals on a log scale; ${excluding} intervals exclude 1.`),
+    ...baseOption(
+      theme,
+      `${ratioName} of ${ordered.length} covariates with ${confidence}% intervals on a log scale; ${excluding} intervals exclude 1.`,
+    ),
     grid: gridAuto({ top: 12, bottom: 34 }),
     tooltip: {
       ...tooltip(theme),
       formatter: (raw: unknown) => {
-        const index = raw !== null && typeof raw === 'object' ? Number(Reflect.get(raw, 'dataIndex')) : Number.NaN
+        const index =
+          raw !== null && typeof raw === 'object'
+            ? Number(Reflect.get(raw, 'dataIndex'))
+            : Number.NaN
         const row = ordered[index]
         if (row === undefined) return ''
         return `${escapeHtml(row.label)}<br/>${ratioName} <strong>${ratio(row.ratio)}</strong><br/>${confidence}% interval ${ratio(row.interval[0])} to ${ratio(row.interval[1])}<br/>${formatP(row.pValue).text}`
@@ -67,7 +83,11 @@ export function ratioForestOption(
       nameTextStyle: axisNameStyle(theme),
       axisLine: { lineStyle: { color: theme.hair } },
       axisTick: { show: true, lineStyle: { color: theme.hair }, customValues: ticks },
-      axisLabel: { ...axisLabelStyle(theme), customValues: ticks, formatter: (value: number) => String(Number(Math.exp(value).toPrecision(3))) },
+      axisLabel: {
+        ...axisLabelStyle(theme),
+        customValues: ticks,
+        formatter: (value: number) => String(Number(Math.exp(value).toPrecision(3))),
+      },
       // The rules would follow the axis's own even steps in log space, not the round ratios the labels name.
       splitLine: { show: false },
     },
@@ -76,13 +96,22 @@ export function ratioForestOption(
       data: ordered.map((row) => row.label),
       axisLine: { show: false },
       axisTick: { show: false },
-      axisLabel: { color: theme.muted, fontFamily: theme.font, fontSize: theme.labelSize, width: 200, overflow: 'truncate' },
+      axisLabel: {
+        color: theme.muted,
+        fontFamily: theme.font,
+        fontSize: theme.labelSize,
+        width: 200,
+        overflow: 'truncate',
+      },
     },
     series: [
       ...ordered.map((row, index) => ({
         type: 'line' as const,
         name: `${row.label} interval`,
-        data: [[Math.log(row.interval[0]), index], [Math.log(row.interval[1]), index]],
+        data: [
+          [Math.log(row.interval[0]), index],
+          [Math.log(row.interval[1]), index],
+        ],
         lineStyle: { color: theme.muted, width: 1.6 },
         symbol: 'none',
         silent: true,
