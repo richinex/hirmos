@@ -52,13 +52,19 @@ import { SunAbrahamControls } from './SunAbrahamControls'
 import { useSunAbrahamPanel } from './useSunAbrahamPanel'
 import { SunAbrahamResult } from './SunAbrahamResult'
 import {
+  staggeredHeadlineDescriptions,
+  staggeredRunHeadline,
   defaultStaggeredSpecification,
   staggeredInput,
   recordedStaggeredAdjustment,
   staggeredAdjustmentDescriptions,
 } from '@/domain/staggeredDid'
 import { AdjustedDidControls } from './AdjustedDidControls'
-import { didCovariateRestrictions, describeDidCovariateRole } from '@/domain/adjustedDid'
+import {
+  didCovariateRestrictions,
+  describeDidCovariateRestrictions,
+  staggeredCovariateRestrictions,
+} from '@/domain/adjustedDid'
 import { AdjustedDidResult, AdjustedDidConvergenceWarning } from './AdjustedDidResult'
 import { describePanelDataProblem } from '@/domain/panel'
 import { TLearnerIntervals } from './TLearnerIntervals'
@@ -1447,8 +1453,10 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
             },
             {
               label: 'Overall ATT',
-              value: formatWords('Dynamic aggregation'),
-              context: 'Equal average of supported nonnegative event-time effects',
+              value: formatWords(
+                `${staggeredHeadlineDescriptions[staggeredRunHeadline(run)].label} average`,
+              ),
+              context: staggeredHeadlineDescriptions[staggeredRunHeadline(run)].description,
             },
           ]
         if (evidence.kind === 'panelAdjusted')
@@ -2687,6 +2695,8 @@ export function EstimationPanel({
   readonly onDeleteRun: (run: EstimationRunArtifact['id']) => void
   readonly onOpenStudy: () => void
 }) {
+  const columnName = (id: string): string =>
+    profile.columns.find((column) => column.id === id)?.name ?? id
   const identified = identifications.filter((identification) =>
     estimableIdentification(identification.result),
   )
@@ -4124,6 +4134,14 @@ export function EstimationPanel({
               dispatch({ type: 'run-failed', detail: describePanelDataProblem(materialized.error) })
               return
             }
+            const refused = staggeredCovariateRestrictions(materialized.value)
+            if (refused.length > 0) {
+              dispatch({
+                type: 'run-failed',
+                detail: describeDidCovariateRestrictions(refused, columnName),
+              })
+              return
+            }
             const input = staggeredInput(
               materialized.value,
               configuration.specification,
@@ -4214,12 +4232,7 @@ export function EstimationPanel({
             if (restrictions.length > 0) {
               dispatch({
                 type: 'run-failed',
-                detail: restrictions
-                  .map(
-                    (item) =>
-                      `${profile.columns.find((column) => column.id === item.column)?.name ?? item.column}: ${describeDidCovariateRole(item.role)}`,
-                  )
-                  .join(' '),
+                detail: describeDidCovariateRestrictions(restrictions, columnName),
               })
               return
             }
@@ -6673,11 +6686,8 @@ export function EstimationPanel({
                 <StaggeredDidControls
                   section="comparison"
                   configuration={configuration}
-                  candidates={controlCandidates.filter(
-                    (c) =>
-                      prepared.kind !== 'prepared-panel' ||
-                      (c.id !== prepared.panel.unitColumn && c.id !== prepared.panel.timeColumn),
-                  )}
+                  candidates={didCandidates}
+                  inspect={{ file: source.file, profile, binding: panelBinding }}
                   clusterCandidates={profile.columns.filter(
                     (c) =>
                       c.id !== study?.treatment.column &&
@@ -6690,15 +6700,11 @@ export function EstimationPanel({
               </SettingsStep>
             )}
             {configuration.primary === 'staggered' && (
-              <SettingsStep number={3} title="Report uncertainty">
+              <SettingsStep number={3} title="Report the result">
                 <StaggeredDidControls
                   section="reporting"
                   configuration={configuration}
-                  candidates={controlCandidates.filter(
-                    (c) =>
-                      prepared.kind !== 'prepared-panel' ||
-                      (c.id !== prepared.panel.unitColumn && c.id !== prepared.panel.timeColumn),
-                  )}
+                  candidates={didCandidates}
                   clusterCandidates={profile.columns.filter(
                     (c) =>
                       c.id !== study?.treatment.column &&

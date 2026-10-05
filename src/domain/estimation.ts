@@ -451,6 +451,7 @@ import {
   staggeredEvidenceSchema,
   staggeredConfigurationSchema,
   sameStaggeredSpecification,
+  recordedStaggeredHeadline,
   type StaggeredConfiguration,
 } from './staggeredDid'
 
@@ -6119,7 +6120,7 @@ export function causalEstimateFrom(
           run.configuration.covariates.length !== evidence.covariates
         )
           return null
-        const point = evidence.overall.dynamic
+        const point = evidence.overall[recordedStaggeredHeadline(run.configuration)]
         if (point.kind === 'reference') return null
         return {
           kind: 'causal-estimate',

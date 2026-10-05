@@ -87,6 +87,46 @@ export const defaultStaggeredSpecification: StaggeredSpecification = {
   confidence: 0.95,
   inference: { kind: 'bootstrapSimultaneous', iterations: 999, seed: 731 },
 }
+/** Which average of the group-time effects the run reports as its overall ATT: the `type` of did's aggte(). */
+export const staggeredHeadlineSchema = z.enum(['dynamic', 'group', 'calendar', 'simple'])
+export type StaggeredHeadline = z.infer<typeof staggeredHeadlineSchema>
+export const staggeredHeadlineDescriptions = {
+  dynamic: {
+    label: 'Event time',
+    description:
+      'Averages the effects at each length of exposure, from adoption on, with equal weight per event time. The did package reports this as aggte(type = "dynamic").',
+  },
+  group: {
+    label: 'Cohort',
+    description:
+      'Averages each cohort\'s effects over its post-adoption periods, then weights the cohorts by size. The did package reports this as aggte(type = "group").',
+  },
+  calendar: {
+    label: 'Calendar',
+    description:
+      'Averages the effects in each calendar period after the first adoption, with equal weight per period. The did package reports this as aggte(type = "calendar").',
+  },
+  simple: {
+    label: 'Simple',
+    description:
+      'Averages every post-adoption group-time effect, weighting each by its cohort\'s size. The did package reports this as aggte(type = "simple").',
+  },
+} as const satisfies Record<
+  StaggeredHeadline,
+  { readonly label: string; readonly description: string }
+>
+// Runs saved before the choice was offered reported the event-time average.
+export function recordedStaggeredHeadline(configuration: {
+  readonly headline?: StaggeredHeadline
+}): StaggeredHeadline {
+  return configuration.headline ?? 'dynamic'
+}
+/** The overall ATT a panel run reports; only staggered configurations carry a choice. */
+export function staggeredRunHeadline(run: { readonly configuration: object }): StaggeredHeadline {
+  return 'headline' in run.configuration
+    ? recordedStaggeredHeadline(run.configuration as { readonly headline?: StaggeredHeadline })
+    : 'dynamic'
+}
 const clusteringSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('unit') }).strict(),
   z.object({ kind: z.literal('column'), column: z.string().min(1) }).strict(),
@@ -99,6 +139,7 @@ const legacyConfigurationSchema = z
     primary: z.literal('staggered'),
     covariates: uniqueColumns,
     specification: staggeredSpecificationSchema,
+    headline: staggeredHeadlineSchema.optional(),
   })
   .strict()
 // Missing clustering is accepted only as the historical, unit-clustered format.
@@ -122,6 +163,7 @@ export interface StaggeredConfiguration {
   readonly covariates: readonly ColumnId[]
   readonly specification: StaggeredSpecification
   readonly clustering?: StaggeredClustering
+  readonly headline?: StaggeredHeadline
 }
 
 export const staggeredIntervalSchema = z.discriminatedUnion('kind', [
@@ -409,7 +451,7 @@ export function staggeredRecordMatches(raw: unknown, rawStudy: unknown): boolean
     .safeParse(rawStudy)
   if (!run.success || !study.success) return false
   const { configuration: c, evidence: e, columns, estimate } = run.data,
-    headline = e.overall.dynamic
+    headline = e.overall[recordedStaggeredHeadline(c)]
   const clustered = 'clustering' in c && c.clustering.kind === 'column'
   if (
     clustered

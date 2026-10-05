@@ -15,6 +15,7 @@ import {
 import type { StudySpecification } from './study'
 import type { SensitivityRunArtifact } from './sensitivity'
 import type { AdjustedDidSpecification } from './adjustedDid'
+import { staggeredRunHeadline, type StaggeredHeadline } from './staggeredDid'
 import { formatCount, formatEstimate, formatPercent, formatStatistic } from '../lib/format/number'
 
 /**
@@ -195,6 +196,18 @@ const armModel = (evidence: { readonly kind: 'tLearner' | 'crossFittedTLearner' 
     default:
       return assertNever(evidence.kind)
   }
+}
+
+/** The opening sentence for each overall ATT a staggered run can report. */
+const staggeredHeadlineSentence: Record<StaggeredHeadline, string> = {
+  dynamic:
+    'The headline is the equal-weight average of supported post-adoption event-time effects.',
+  group:
+    "The headline averages each cohort's post-adoption effects, then weights the cohorts by size.",
+  calendar:
+    'The headline is the equal-weight average of the effects in each calendar period after the first adoption.',
+  simple:
+    "The headline averages every post-adoption group-time effect, weighting each by its cohort's size.",
 }
 
 const staggeredBaseline = (anticipation: number): string => {
@@ -890,7 +903,7 @@ export function interpretEstimationResult(
           statements: [
             {
               kind: 'magnitude',
-              text: `The headline is the equal-weight average of supported post-adoption event-time effects. Each post-adoption effect compares the outcome in that period with ${staggeredBaseline(run.evidence.specification.anticipation)}, for the treated cohort against the comparison group. Group-time ATT, cohort averages and calendar averages are reported separately.`,
+              text: `${staggeredHeadlineSentence[staggeredRunHeadline(run)]} Each post-adoption effect compares the outcome in that period with ${staggeredBaseline(run.evidence.specification.anticipation)}, for the treated cohort against the comparison group. The other averages and the group-time ATT are reported separately.`,
             },
             estimate.interval.kind === 'none'
               ? noInterval(estimate.interval.reason)

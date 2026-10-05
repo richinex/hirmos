@@ -13,16 +13,22 @@ type Inspection =
   | {
       readonly kind: 'ready'
       readonly matrix: PanelLongMatrix
-      readonly layout: PanelInterventionLayout
+      /** Null when units adopt at different times: the two-period layout does not apply. */
+      readonly layout: PanelInterventionLayout | null
     }
 
 /** One keyed read for the candidate list. Selected covariates are checked again on the run's own matrix. */
 export function useDidCovariates(
-  file: File,
-  profile: DatasetProfile,
-  binding: PanelBinding | null,
+  panel: {
+    readonly file: File
+    readonly profile: DatasetProfile
+    readonly binding: PanelBinding | null
+  } | null,
   candidates: readonly { readonly id: ColumnId }[],
 ): Inspection {
+  const file = panel?.file ?? null,
+    profile = panel?.profile ?? null,
+    binding = panel?.binding ?? null
   const [record, setRecord] = useState<{
     readonly file: File
     readonly profile: DatasetProfile
@@ -31,7 +37,7 @@ export function useDidCovariates(
     readonly inspection: Inspection
   } | null>(null)
   useEffect(() => {
-    if (binding === null) return
+    if (file === null || profile === null || binding === null) return
     let cancelled = false
     void (async () => {
       const { materializePanelInWorker } = await import('@/data/client')
@@ -41,10 +47,9 @@ export function useDidCovariates(
       })
       if (cancelled) return
       const layout = result.ok ? assessPanelInterventionLayout(result.value) : null
-      const inspection: Inspection =
-        result.ok && layout?.ok
-          ? { kind: 'ready', matrix: result.value, layout: layout.value }
-          : { kind: 'unavailable' }
+      const inspection: Inspection = result.ok
+        ? { kind: 'ready', matrix: result.value, layout: layout?.ok ? layout.value : null }
+        : { kind: 'unavailable' }
       setRecord({ file, profile, binding, candidates, inspection })
     })()
     return () => {

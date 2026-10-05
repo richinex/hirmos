@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { SelectionActions } from '@/components/ui/SelectionActions'
 import { ParameterLabel } from '@/components/ui/ParameterLabel'
@@ -11,6 +12,7 @@ import {
   describeDidCovariateRole,
 } from '@/domain/adjustedDid'
 import { useDidCovariates } from './useDidCovariates'
+import { DidCovariateChecklist } from './DidCovariateChecklist'
 type Configuration = Extract<PanelInterventionConfiguration, { primary: 'adjusted' }>
 export function AdjustedDidControls({
   configuration,
@@ -28,14 +30,19 @@ export function AdjustedDidControls({
   readonly binding: PanelBinding | null
 }) {
   const spec = configuration.specification
-  const inspection = useDidCovariates(file, profile, binding, candidates)
-  const restrictions = new Map(
-    inspection.kind === 'ready'
-      ? didCovariateRestrictions(inspection.matrix, inspection.layout, spec).map((item) => [
-          item.column,
-          describeDidCovariateRole(item.role),
-        ])
-      : [],
+  const inspection = useDidCovariates({ file, profile, binding }, candidates)
+  // A scan of the whole panel: once per read and specification, not on every keystroke.
+  const restrictions = useMemo(
+    () =>
+      new Map(
+        inspection.kind === 'ready' && inspection.layout !== null
+          ? didCovariateRestrictions(inspection.matrix, inspection.layout, spec).map((item) => [
+              item.column,
+              describeDidCovariateRole(item.role),
+            ])
+          : [],
+      ),
+    [inspection, spec],
   )
   return (
     <div className={settingsStack}>
@@ -62,40 +69,20 @@ export function AdjustedDidControls({
             onClear={() => onChange({ ...configuration, covariates: [] })}
           />
         </div>
-        <div role="group" aria-label="DiD covariates" className="mt-1 flex flex-wrap gap-2">
-          {candidates.map((c) => (
-            <label key={c.id} className="flex items-center gap-1.5 text-body text-ink">
-              <input
-                type="checkbox"
-                aria-label={c.name}
-                disabled={restrictions.has(c.id) && !configuration.covariates.includes(c.id)}
-                checked={configuration.covariates.includes(c.id)}
-                onChange={(e) =>
-                  onChange({
-                    ...configuration,
-                    covariates: e.target.checked
-                      ? [...configuration.covariates, c.id]
-                      : configuration.covariates.filter((id) => id !== c.id),
-                  })
-                }
-              />
-              {c.name}
-              {restrictions.has(c.id) && (
-                <span className="text-muted">{restrictions.get(c.id)}</span>
-              )}
-            </label>
-          ))}
-        </div>
-        {inspection.kind === 'pending' && (
-          <p className="mb-0 mt-2 text-body text-muted" role="status">
-            Checking whether any covariates duplicate treatment or group membership…
-          </p>
-        )}
-        {inspection.kind === 'unavailable' && (
-          <p className="mb-0 mt-2 text-body text-muted">
-            The candidate list could not be checked. Selected covariates are checked before fitting.
-          </p>
-        )}
+        <DidCovariateChecklist
+          label="DiD covariates"
+          candidates={candidates}
+          selected={configuration.covariates}
+          restrictions={restrictions}
+          check={
+            inspection.kind === 'pending'
+              ? 'pending'
+              : inspection.kind === 'ready' && inspection.layout !== null
+                ? 'checked'
+                : 'unchecked'
+          }
+          onChange={(covariates) => onChange({ ...configuration, covariates: [...covariates] })}
+        />
       </div>
       {spec.kind === 'doublyRobust' && (
         <div className={fieldRow.two}>

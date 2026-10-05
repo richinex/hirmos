@@ -4,10 +4,41 @@ import type { PanelInterventionLayout, PanelLongMatrix } from './panel'
 import { assertNever } from './dop'
 
 export type DidCovariateRole =
-  'treatment-indicator' | 'group-indicator' | 'baseline-group-indicator'
+  'treatment-indicator' | 'group-indicator' | 'baseline-group-indicator' | 'cohort-indicator'
 export interface DidCovariateRestriction {
   readonly column: ColumnId
   readonly role: DidCovariateRole
+}
+
+/** The covariate's values for every row of the long matrix; covariates follow the outcome and treatment. */
+const covariateValues = (matrix: PanelLongMatrix, index: number): Float64Array =>
+  matrix.values.subarray((index + 2) * matrix.rowCount, (index + 3) * matrix.rowCount)
+
+const duplicatesTreatment = (matrix: PanelLongMatrix, values: Float64Array): boolean =>
+  values.every((value, row) => value === matrix.values[matrix.rowCount + row])
+
+/**
+ * True when the column takes one value on every row of one side and a different value on every row of
+ * the other: no overlap is left between the two. `side` returns undefined for units in neither, and
+ * `period`, when given, limits the test to that period's rows.
+ */
+function separates(
+  matrix: PanelLongMatrix,
+  values: Float64Array,
+  side: (unit: string) => boolean | undefined,
+  period?: number,
+): boolean {
+  const levels = new Map<boolean, number>()
+  for (let row = 0; row < matrix.rowCount; row++) {
+    if (period !== undefined && matrix.periodCodes[row] !== period) continue
+    const group = side(matrix.units[row]!)
+    if (group === undefined) continue
+    const value = values[row]
+    if (value === undefined || !Number.isFinite(value)) return false
+    if (levels.has(group) && levels.get(group) !== value) return false
+    levels.set(group, value)
+  }
+  return levels.size === 2 && levels.get(false) !== levels.get(true)
 }
 
 /** Exact identities, not correlation thresholds or column-name heuristics. */
@@ -17,32 +48,60 @@ export function didCovariateRestrictions(
   specification: AdjustedDidSpecification,
 ): readonly DidCovariateRestriction[] {
   const treated = new Set(layout.treated)
-  const baseline = layout.periods[0].code
-  const separatesGroups = (values: Float64Array, baselineOnly: boolean): boolean => {
-    const levels = new Map<boolean, number>()
-    for (let row = 0; row < matrix.rowCount; row++) {
-      if (baselineOnly && matrix.periodCodes[row] !== baseline) continue
-      const value = values[row]
-      if (value === undefined || !Number.isFinite(value)) return false
-      const group = treated.has(matrix.units[row]!)
-      if (levels.has(group) && levels.get(group) !== value) return false
-      levels.set(group, value)
-    }
-    return levels.size === 2 && levels.get(false) !== levels.get(true)
-  }
+  const side = (unit: string) => treated.has(unit)
   return (matrix.covariates ?? []).flatMap((column, index): DidCovariateRestriction[] => {
-    const values = matrix.values.subarray(
-      (index + 2) * matrix.rowCount,
-      (index + 3) * matrix.rowCount,
-    )
+    const values = covariateValues(matrix, index)
     if (values.length !== matrix.rowCount) return []
-    if (values.every((value, row) => value === matrix.values[matrix.rowCount + row]))
-      return [{ column, role: 'treatment-indicator' }]
-    if (separatesGroups(values, false)) return [{ column, role: 'group-indicator' }]
-    if (specification.kind === 'doublyRobust' && separatesGroups(values, true))
+    if (duplicatesTreatment(matrix, values)) return [{ column, role: 'treatment-indicator' }]
+    if (separates(matrix, values, side)) return [{ column, role: 'group-indicator' }]
+    if (
+      specification.kind === 'doublyRobust' &&
+      separates(matrix, values, side, layout.periods[0].code)
+    )
       return [{ column, role: 'baseline-group-indicator' }]
     return []
   })
+}
+
+/**
+ * Staggered adoption compares each cohort with the never-treated units, so a column that separates any
+ * cohort from them exactly, such as the first-treatment period itself, leaves that comparison no overlap.
+ */
+export function staggeredCovariateRestrictions(
+  matrix: PanelLongMatrix,
+): readonly DidCovariateRestriction[] {
+  const adoption = new Map<string, number | null>()
+  for (let row = 0; row < matrix.rowCount; row++) {
+    const unit = matrix.units[row]!
+    const treated = matrix.values[matrix.rowCount + row] === 1
+    const known = adoption.get(unit)
+    if (treated && (known === undefined || known === null || matrix.periodCodes[row]! < known))
+      adoption.set(unit, matrix.periodCodes[row]!)
+    else if (known === undefined) adoption.set(unit, null)
+  }
+  const cohorts = [...new Set([...adoption.values()].filter((g): g is number => g !== null))]
+  return (matrix.covariates ?? []).flatMap((column, index): DidCovariateRestriction[] => {
+    const values = covariateValues(matrix, index)
+    if (values.length !== matrix.rowCount) return []
+    if (duplicatesTreatment(matrix, values)) return [{ column, role: 'treatment-indicator' }]
+    const separatesCohort = cohorts.some((cohort) =>
+      separates(matrix, values, (unit) => {
+        const g = adoption.get(unit)
+        return g === cohort ? true : g === null ? false : undefined
+      }),
+    )
+    return separatesCohort ? [{ column, role: 'cohort-indicator' }] : []
+  })
+}
+
+/** The run's refusal: each restricted column by name, with its reason. */
+export function describeDidCovariateRestrictions(
+  restrictions: readonly DidCovariateRestriction[],
+  nameOf: (column: ColumnId) => string,
+): string {
+  return restrictions
+    .map((item) => `${nameOf(item.column)}: ${describeDidCovariateRole(item.role)}`)
+    .join(' ')
 }
 
 export function describeDidCovariateRole(role: DidCovariateRole): string {
@@ -53,6 +112,8 @@ export function describeDidCovariateRole(role: DidCovariateRole): string {
       return 'Identifies the treated and control groups exactly; it is not an adjustment covariate.'
     case 'baseline-group-indicator':
       return 'Baseline values identify the treated and control groups exactly, leaving no treatment overlap.'
+    case 'cohort-indicator':
+      return 'Identifies an adoption cohort exactly against the never-treated units; it is not an adjustment covariate.'
     default:
       return assertNever(role)
   }

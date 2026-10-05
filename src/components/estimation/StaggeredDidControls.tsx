@@ -1,13 +1,20 @@
+import { useMemo } from 'react'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { SelectionActions } from '@/components/ui/SelectionActions'
 import { ParameterLabel } from '@/components/ui/ParameterLabel'
 import { SettingsDisclosure } from '@/components/ui/SettingsDisclosure'
 import { Select } from '@/components/ui/Select'
 import { field, fieldLabel, fieldRow, settingsStack } from '@/components/ui/recipes'
-import type { ColumnId } from '@/domain/dataset'
+import type { ColumnId, DatasetProfile } from '@/domain/dataset'
+import type { PanelBinding } from '@/domain/estimationDraft'
+import { describeDidCovariateRole, staggeredCovariateRestrictions } from '@/domain/adjustedDid'
+import { useDidCovariates } from './useDidCovariates'
+import { DidCovariateChecklist } from './DidCovariateChecklist'
 import {
   recordedStaggeredAdjustment,
+  recordedStaggeredHeadline,
   staggeredAdjustmentDescriptions,
+  staggeredHeadlineDescriptions,
   type StaggeredConfiguration,
 } from '@/domain/staggeredDid'
 
@@ -17,15 +24,37 @@ export function StaggeredDidControls({
   candidates,
   clusterCandidates,
   onChange,
+  inspect,
 }: {
   readonly configuration: StaggeredConfiguration
   readonly candidates: readonly { readonly id: ColumnId; readonly name: string }[]
   readonly clusterCandidates: readonly { readonly id: ColumnId; readonly name: string }[]
   readonly onChange: (value: StaggeredConfiguration) => void
   readonly section: 'comparison' | 'reporting'
+  /** Given only where the covariate list is shown, so the panel is read once. */
+  readonly inspect?: {
+    readonly file: File
+    readonly profile: DatasetProfile
+    readonly binding: PanelBinding | null
+  }
 }) {
+  const inspection = useDidCovariates(inspect ?? null, candidates)
+  // A scan of the whole panel: once per read, not on every keystroke.
+  const restrictions = useMemo(
+    () =>
+      new Map(
+        inspection.kind === 'ready'
+          ? staggeredCovariateRestrictions(inspection.matrix).map((item) => [
+              item.column,
+              describeDidCovariateRole(item.role),
+            ])
+          : [],
+      ),
+    [inspection],
+  )
   const spec = configuration.specification
   const adjustment = recordedStaggeredAdjustment(spec)
+  const headline = recordedStaggeredHeadline(configuration)
   const update = (value: Partial<typeof spec>) =>
     onChange({ ...configuration, specification: { ...spec, ...value } })
   // Two settings steps, so the method step does not stand alone above a column of empty space.
@@ -95,34 +124,28 @@ export function StaggeredDidControls({
               selectLabel="Select all staggered DiD covariates"
               clearLabel="Clear staggered DiD covariates"
               onSelectAll={() =>
-                onChange({ ...configuration, covariates: candidates.map((c) => c.id) })
+                onChange({
+                  ...configuration,
+                  covariates: candidates.filter((c) => !restrictions.has(c.id)).map((c) => c.id),
+                })
               }
               onClear={() => onChange({ ...configuration, covariates: [] })}
             />
           </div>
-          <div
-            role="group"
-            aria-label="Staggered DiD covariates"
-            className="mt-1 flex flex-wrap gap-2"
-          >
-            {candidates.map((c) => (
-              <label key={c.id} className="flex items-center gap-1.5 text-body text-ink">
-                <input
-                  type="checkbox"
-                  checked={configuration.covariates.includes(c.id)}
-                  onChange={(e) =>
-                    onChange({
-                      ...configuration,
-                      covariates: e.target.checked
-                        ? [...configuration.covariates, c.id]
-                        : configuration.covariates.filter((id) => id !== c.id),
-                    })
-                  }
-                />
-                {c.name}
-              </label>
-            ))}
-          </div>
+          <DidCovariateChecklist
+            label="Staggered DiD covariates"
+            candidates={candidates}
+            selected={configuration.covariates}
+            restrictions={restrictions}
+            check={
+              inspection.kind === 'pending'
+                ? 'pending'
+                : inspection.kind === 'ready'
+                  ? 'checked'
+                  : 'unchecked'
+            }
+            onChange={(covariates) => onChange({ ...configuration, covariates: [...covariates] })}
+          />
         </div>
         <label className="block max-w-xs">
           <ParameterLabel
@@ -177,6 +200,23 @@ export function StaggeredDidControls({
           Select pointwise or simultaneous bootstrap to use the cluster column.
         </p>
       )}
+      <div>
+        <ParameterLabel
+          className={fieldLabel}
+          label="Overall ATT"
+          help={`${staggeredHeadlineDescriptions[headline].description} Every average is computed in the same run; this choice sets which one is the headline.`}
+        />
+        <SegmentedControl
+          className="mt-1"
+          ariaLabel="Staggered overall ATT"
+          value={headline}
+          onChange={(value) => onChange({ ...configuration, headline: value })}
+          options={(['dynamic', 'group', 'calendar', 'simple'] as const).map((value) => ({
+            value,
+            label: staggeredHeadlineDescriptions[value].label,
+          }))}
+        />
+      </div>
       <div>
         <ParameterLabel
           className={fieldLabel}
