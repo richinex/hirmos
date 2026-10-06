@@ -63,7 +63,10 @@ export function RunPicker<Id extends string>({
               className={iconControl('danger')}
               aria-label={run.deleteLabel}
               title={run.deleteLabel}
-              onClick={() => onDelete(run.id)}
+              onClick={() => {
+                close()
+                onDelete(run.id)
+              }}
             >
               <Icon name="delete" size={16} />
             </button>

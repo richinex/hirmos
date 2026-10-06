@@ -66,6 +66,12 @@ test('qualified DiD accepts an optional rationale and restores its assessment', 
   await expect(
     page.getByLabel('Read-only SWIG graph', { exact: true }).locator('.react-flow__node'),
   ).toHaveCount(8)
+  await expect(
+    page
+      .getByLabel('Read-only SWIG graph', { exact: true })
+      .locator('.react-flow__node')
+      .filter({ hasText: 'Y1 (D = 0) − Y0' }),
+  ).toHaveCount(1)
   for (const theme of ['light', 'dark']) {
     await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
     await page.screenshot({ path: info.outputPath('did-' + theme + '.png') })

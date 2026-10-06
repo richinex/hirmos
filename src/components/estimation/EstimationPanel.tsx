@@ -384,7 +384,7 @@ const describeErrorTreatment = (errors: LinearErrors, fixedEffects: FixedEffects
         ? `The interval uses a 95% confidence level. The robust (HC1) interval allows the error variance to differ between rows and scales each squared residual by the factor c, where n is the number of rows and G counts the ${effects}:`
         : 'The interval uses a 95% confidence level. The robust (HC1) interval allows the error variance to differ between rows and scales each squared residual by the factor c, where n is the number of rows:'
     case 'cluster':
-      return `The interval uses a 95% confidence level. The clustered interval allows errors to correlate within each value of ${errors.name} and treats the clusters as independent. A finite-sample correction accounts for the cluster count and fitted parameters. With two-way effects, both effect dimensions count towards that correction. With one-way effects, effects nested within clusters do not.`
+      return `The interval uses a 95% confidence level. The clustered interval allows errors to correlate within each value of ${errors.name} and treats the clusters as independent. A finite-sample correction accounts for the cluster count and fitted parameters.${effects === null ? '' : ' Fixed effects whose groups lie entirely within clusters are excluded from the parameter count used in this correction. Intervals and p-values use the number of clusters minus one degrees of freedom.'}`
     case 'hac':
       return 'The interval uses a 95% confidence level. Heteroskedasticity- and autocorrelation-consistent (HAC) covariance uses a Bartlett kernel and a bandwidth of L lags, where n is the number of rows:'
     case 'arma':

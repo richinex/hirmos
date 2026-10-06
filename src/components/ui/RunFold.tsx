@@ -1,4 +1,5 @@
 import { type ReactNode } from 'react'
+import { useClosePane } from '@/components/shell/WorkbenchLayout'
 import { Icon } from '@/components/Icon'
 import { caption, iconControl, num } from './recipes'
 
@@ -24,6 +25,7 @@ export function RunFold({
   readonly defaultOpen?: boolean
   readonly children: ReactNode
 }) {
+  const close = useClosePane()
   return (
     <li>
       <details className="group/fold" open={defaultOpen}>
@@ -48,6 +50,7 @@ export function RunFold({
               onClick={(event) => {
                 event.preventDefault()
                 event.stopPropagation()
+                close()
                 onDelete()
               }}
             >

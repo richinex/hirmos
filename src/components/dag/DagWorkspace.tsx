@@ -7,7 +7,7 @@ import { Orb } from '@/components/ui/Orb'
 import { Alert } from '@/components/ui/Alert'
 import { Select } from '@/components/ui/Select'
 import { useEffect, useMemo, useReducer, useState } from 'react'
-import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
+import { WorkbenchLayout, useClosePane } from '@/components/shell/WorkbenchLayout'
 import { InterventionPanel } from './InterventionPanel'
 import type { InterventionOverlay, InterventionQueryArtifact } from '@/domain/intervention'
 import type { SelectedSource } from '@/domain/workflow'
@@ -94,9 +94,12 @@ import { SwigWorkspace } from './SwigWorkspace'
 import type { SwigAnalysis } from '@/domain/swig'
 
 interface DagWorkspaceProps {
+  readonly onDeleteDocument: (id: DagDocumentId) => void
   readonly swigAnalyses: readonly SwigAnalysis[]
   readonly onSwigAnalysis: (record: SwigAnalysis) => void
   readonly onDeleteSwigAnalysis: (id: SwigAnalysis['id']) => void
+  /** Asks to delete a saved graph with its separation checks, through the shared deletion dialog. */
+  readonly onDeleteSwigGraph: (id: SwigAnalysis['id']) => void
   readonly source: SelectedSource
   readonly profile: DatasetProfile
   readonly prepared: PreparedDatasetArtifact
@@ -1069,9 +1072,11 @@ function GraphCheckPanel({
 }
 
 export function DagWorkspace({
+  onDeleteDocument,
   swigAnalyses,
   onSwigAnalysis,
   onDeleteSwigAnalysis,
+  onDeleteSwigGraph,
   profile,
   prepared,
   discoveryRuns,
@@ -1090,6 +1095,16 @@ export function DagWorkspace({
   onDeleteInterventionQuery,
 }: DagWorkspaceProps) {
   const [state, dispatch] = useReducer(stepDagWorkspace, documents, initialState)
+
+  // Deletion may remove the selected document while the workspace remains mounted.
+  if (state.kind === 'editing' && !documents.some((document) => document.id === state.document)) {
+    const next = documents[0]
+    dispatch(
+      next === undefined
+        ? { type: 'new-document-requested' }
+        : { type: 'document-selected', document: next.id, latestRun: latestRunId(discoveryRuns) },
+    )
+  }
 
   const createDocument = () => {
     if (state.kind !== 'creating') return
@@ -1530,53 +1545,44 @@ export function DagWorkspace({
           role="toolbar"
           aria-label="DAG actions"
         >
-          <div className="col-span-2 grid grid-cols-2 items-center gap-3 @3xl/panel:contents">
-            <div
-              className="flex w-full min-w-0 items-center gap-2 @3xl/panel:w-auto"
-              role="group"
-              aria-label="DAG revision controls"
-            >
-              <button
-                type="button"
-                disabled={document.history.length === 0}
-                className={button('quiet', 'min-w-0 flex-1 @3xl/panel:flex-none')}
-                onClick={() => moveRevision(document, 'undo')}
-                aria-label="Undo DAG revision"
-                title="Undo DAG revision"
-              >
-                <Icon name="undo" size={15} />
-              </button>
-              <span className="whitespace-nowrap text-label tabular-nums text-muted">
-                <span className="sr-only">
-                  Revision {document.history.length + 1} of{' '}
-                  {document.history.length + document.future.length + 1}
-                </span>
-                <span aria-hidden className="@sm/panel:hidden">
-                  {document.history.length + 1} /{' '}
-                  {document.history.length + document.future.length + 1}
-                </span>
-                <span aria-hidden className="hidden @sm/panel:inline">
-                  Revision {document.history.length + 1} of{' '}
-                  {document.history.length + document.future.length + 1}
-                </span>
-              </span>
-              <button
-                type="button"
-                disabled={document.future.length === 0}
-                className={button('quiet', 'min-w-0 flex-1 @3xl/panel:flex-none')}
-                onClick={() => moveRevision(document, 'redo')}
-                aria-label="Redo DAG revision"
-                title="Redo DAG revision"
-              >
-                <Icon name="redo" size={15} />
-              </button>
-            </div>
+          <div
+            className="col-span-2 flex w-full min-w-0 items-center gap-2 @3xl/panel:w-auto"
+            role="group"
+            aria-label="DAG revision controls"
+          >
             <button
               type="button"
-              className={button('quiet', 'min-w-0 w-full @3xl/panel:w-auto')}
-              onClick={() => dispatch({ type: 'new-document-requested' })}
+              disabled={document.history.length === 0}
+              className={button('quiet', 'min-w-0 flex-1 @3xl/panel:flex-none')}
+              onClick={() => moveRevision(document, 'undo')}
+              aria-label="Undo DAG revision"
+              title="Undo DAG revision"
             >
-              New DAG
+              <Icon name="undo" size={15} />
+            </button>
+            <span className="whitespace-nowrap text-label tabular-nums text-muted">
+              <span className="sr-only">
+                Revision {document.history.length + 1} of{' '}
+                {document.history.length + document.future.length + 1}
+              </span>
+              <span aria-hidden className="@sm/panel:hidden">
+                {document.history.length + 1} /{' '}
+                {document.history.length + document.future.length + 1}
+              </span>
+              <span aria-hidden className="hidden @sm/panel:inline">
+                Revision {document.history.length + 1} of{' '}
+                {document.history.length + document.future.length + 1}
+              </span>
+            </span>
+            <button
+              type="button"
+              disabled={document.future.length === 0}
+              className={button('quiet', 'min-w-0 flex-1 @3xl/panel:flex-none')}
+              onClick={() => moveRevision(document, 'redo')}
+              aria-label="Redo DAG revision"
+              title="Redo DAG revision"
+            >
+              <Icon name="redo" size={15} />
             </button>
           </div>
           <button
@@ -1912,7 +1918,6 @@ export function DagWorkspace({
         value={inspectorTab}
         onChange={setInspectorTab}
         options={[
-          { value: 'swig', label: 'SWIG' },
           {
             value: 'selection',
             label: (
@@ -1940,38 +1945,18 @@ export function DagWorkspace({
               </span>
             ),
           },
+          {
+            value: 'swig',
+            label: (
+              <span className="flex items-center gap-1.5">
+                <Icon name="call_split" size={14} />
+                SWIG
+              </span>
+            ),
+          },
         ]}
       />
-      <ValidationPanel
-        document={document}
-        flow={flow}
-        onUseForStudy={() => {
-          if (!boundHere) onStudyDraftChanged({ ...EMPTY_STUDY_DRAFT, dagDocument: document.id })
-          onUseForStudy()
-        }}
-        onUseForRootCause={
-          rootCause.ok
-            ? () =>
-                onUseForRootCause({
-                  dagDocument: rootCause.value.dagDocument,
-                  dagRevision: rootCause.value.dagRevision,
-                  preparedDataset: rootCause.value.preparedDataset,
-                })
-            : null
-        }
-        onSelectEdge={(edge) => {
-          setInspectorTab('selection')
-          selectEdge(document, edge)
-        }}
-      />
-      <GraphCheckPanel
-        source={source}
-        profile={profile}
-        prepared={prepared}
-        document={document}
-        checks={checks}
-        onCheck={onCheck}
-      />
+      {/* The selected arrow, or the form for a new one, comes before the graph-wide panels. */}
       {inspectorTab === 'selection' &&
         (selectedEdge !== null && selectedEdgeDraft !== null ? (
           <aside className="pt-4" aria-labelledby="selected-edge-title">
@@ -2069,6 +2054,36 @@ export function DagWorkspace({
         ) : (
           addEdgeForm
         ))}
+      <ValidationPanel
+        document={document}
+        flow={flow}
+        onUseForStudy={() => {
+          if (!boundHere) onStudyDraftChanged({ ...EMPTY_STUDY_DRAFT, dagDocument: document.id })
+          onUseForStudy()
+        }}
+        onUseForRootCause={
+          rootCause.ok
+            ? () =>
+                onUseForRootCause({
+                  dagDocument: rootCause.value.dagDocument,
+                  dagRevision: rootCause.value.dagRevision,
+                  preparedDataset: rootCause.value.preparedDataset,
+                })
+            : null
+        }
+        onSelectEdge={(edge) => {
+          setInspectorTab('selection')
+          selectEdge(document, edge)
+        }}
+      />
+      <GraphCheckPanel
+        source={source}
+        profile={profile}
+        prepared={prepared}
+        document={document}
+        checks={checks}
+        onCheck={onCheck}
+      />
       {inspectorTab === 'intervene' && (
         <InterventionPanel
           document={document}
@@ -2113,6 +2128,7 @@ export function DagWorkspace({
         records={swigAnalyses}
         onRecord={onSwigAnalysis}
         onDelete={onDeleteSwigAnalysis}
+        onDeleteGraph={onDeleteSwigGraph}
         onBack={() => setInspectorTab('selection')}
       />
     )
@@ -2132,17 +2148,22 @@ export function DagWorkspace({
             ? `Arrows (${document.current.graph.edges.length})`
             : `DAGs (${documents.length})`,
         controls: (
-          <SegmentedControl
-            variant="line"
-            size="sm"
-            ariaLabel="Bottom panel"
-            value={bottomView}
-            onChange={setBottomView}
-            options={[
-              { value: 'arrows', label: 'Arrows' },
-              { value: 'dags', label: 'DAGs' },
-            ]}
-          />
+          <div className="flex items-center gap-2">
+            {bottomView === 'dags' && (
+              <NewDagButton onCreate={() => dispatch({ type: 'new-document-requested' })} />
+            )}
+            <SegmentedControl
+              variant="line"
+              size="sm"
+              ariaLabel="Bottom panel"
+              value={bottomView}
+              onChange={setBottomView}
+              options={[
+                { value: 'arrows', label: 'Arrows' },
+                { value: 'dags', label: 'DAGs' },
+              ]}
+            />
+          </div>
         ),
         body:
           bottomView === 'arrows' ? (
@@ -2155,7 +2176,9 @@ export function DagWorkspace({
                 id: candidate.id,
                 title: candidate.name,
                 createdAt: candidate.current.createdAt,
+                deleteLabel: 'Delete DAG ' + candidate.name,
               }))}
+              onDelete={onDeleteDocument}
               selected={document.id}
               onSelect={(id) =>
                 dispatch({
@@ -2169,5 +2192,22 @@ export function DagWorkspace({
         defaultSize: 150,
       }}
     />
+  )
+}
+
+/** Starts a new DAG from the DAGs list; on a phone the list is a sheet, which closes so the new draft shows. */
+function NewDagButton({ onCreate }: { readonly onCreate: () => void }) {
+  const close = useClosePane()
+  return (
+    <button
+      type="button"
+      className={button('quiet', 'inline-flex items-center gap-1', 'sm')}
+      onClick={() => {
+        onCreate()
+        close()
+      }}
+    >
+      <Icon name="add" size={13} /> New DAG
+    </button>
   )
 }

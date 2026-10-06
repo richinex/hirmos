@@ -129,7 +129,7 @@ pub(crate) fn backdoor_linear(
         LinearErrorModel::Cluster { column } => {
             let (groups, clusters) = groups_of(column, "cluster")?;
             let fit = ols_cluster(&y, &design, &groups);
-            LinearErrorEvidence::Cluster { clusters, standard_error: fit.bse[1], interval: [fit.conf_int[1].0, fit.conf_int[1].1], p_value: fit.pvalues[1] }
+            LinearErrorEvidence::Cluster { clusters, standard_error: fit.bse[1], interval: [fit.conf_int[1].0, fit.conf_int[1].1], p_value: fit.pvalues[1], correction: None }
         }
         LinearErrorModel::Arma { p, q, max_iter } => {
             let order = arma_order("backdoor linear estimate", rows, p, q, max_iter)?;
@@ -211,10 +211,10 @@ fn backdoor_linear_within(
         0 => data[(row, treatment)],
         _ => data[(row, adjustment[column - 1])],
     });
-    let fit_with = |errors: WithinErrors| match &time {
-        None => ols_within(y, &design, &groups, errors),
-        Some((_, (periods, _))) => ols_two_way(y, &design, &groups, periods, errors),
-    };
+    let fit_with = |errors: WithinErrors| hirmos_causal_core::estimation::ols_within_convention(
+        y, &design, &groups, time.as_ref().map(|(_, (periods, _))| periods.as_slice()),
+        errors, hirmos_causal_core::estimation::WithinConvention::Fixest,
+    );
     let classical = fit_with(WithinErrors::Classical).map_err(|problem| problem.to_string())?;
     if classical.kept.first() != Some(&0) {
         return Err("backdoor linear estimate treatment does not vary within the units, so its fixed effects absorb it".to_owned());
@@ -233,7 +233,14 @@ fn backdoor_linear_within(
     };
     let error_model = match (error_model, requested) {
         (LinearErrorModel::Hc1, Some(fit)) => LinearErrorEvidence::Hc1 { standard_error: fit.bse[0], interval: [fit.conf_int[0].0, fit.conf_int[0].1], p_value: fit.pvalues[0] },
-        (LinearErrorModel::Cluster { .. }, Some(fit)) => LinearErrorEvidence::Cluster { clusters: cluster_labels.as_ref().ok_or("Cluster labels are missing.")?.iter().collect::<std::collections::BTreeSet<_>>().len(), standard_error: fit.bse[0], interval: [fit.conf_int[0].0, fit.conf_int[0].1], p_value: fit.pvalues[0] },
+        (LinearErrorModel::Cluster { .. }, Some(fit)) => LinearErrorEvidence::Cluster {
+            clusters: cluster_labels.as_ref().ok_or("Cluster labels are missing.")?.iter().collect::<std::collections::BTreeSet<_>>().len(),
+            standard_error: fit.bse[0], interval: [fit.conf_int[0].0, fit.conf_int[0].1], p_value: fit.pvalues[0],
+            correction: Some(FixedEffectsClusterCorrection::FixestNonNested {
+                parameters: fit.cluster_parameters.ok_or("Cluster correction is missing.")?,
+                degrees_of_freedom: fit.inference_df,
+            }),
+        },
         _ => LinearErrorEvidence::NeweyWest,
     };
     let hac = ols_hac(&classical.within_outcome, &classical.within_design, max_lags);

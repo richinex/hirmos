@@ -1,5 +1,6 @@
 import { surrogateRunMatchesProfile, type SurrogateRun, type SurrogateRunId } from './surrogateRun'
 import type { SwigAnalysis } from './swig'
+import { deleteArtifact, type DeletionTarget } from './artifactLifecycle'
 import { assertNever, brand, err, ok, type Brand, type NonEmptyArray, type Result } from './dop'
 import type { DatasetProfile, DatasetProfileProblem, SourcePersistence } from './dataset'
 import { fileReading, NO_DECLARATIONS, type FileReading } from './fileReading'
@@ -219,6 +220,7 @@ export type WorkflowEvent =
   | { readonly type: 'count-series-model-created'; readonly artifact: CountSeriesModelArtifact }
   | { readonly type: 'discovery-run-created'; readonly artifact: DiscoveryRunArtifact }
   | { readonly type: 'discovery-run-deletion-committed'; readonly deletion: DeletableDiscoveryRun }
+  | { readonly type: 'artifact-deletion-requested'; readonly target: DeletionTarget }
   | { readonly type: 'dag-document-created'; readonly document: DagDocument }
   | { readonly type: 'dag-document-revised'; readonly document: DagDocument }
   | { readonly type: 'dag-check-created'; readonly check: DagCheckArtifact }
@@ -710,6 +712,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
       ) {
         return { ...state, discoveryRuns: [...state.discoveryRuns, event.artifact] }
       }
+      if (event.type === 'artifact-deletion-requested') return deleteArtifact(state, event.target)
       if (event.type === 'discovery-run-deletion-committed') {
         return {
           ...state,
@@ -762,15 +765,32 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
         }
       }
       if (event.type === 'study-draft-changed') return { ...state, studyDraft: event.draft }
-      if (event.type === 'swig-analysis-created' && state.prepared?.id === event.analysis.preparedDataset && state.dagDocuments.some(document => document.id === event.analysis.dagDocument && document.current.id === event.analysis.dagRevision)) {
+      if (
+        event.type === 'swig-analysis-created' &&
+        state.prepared?.id === event.analysis.preparedDataset &&
+        state.dagDocuments.some(
+          (document) =>
+            document.id === event.analysis.dagDocument &&
+            document.current.id === event.analysis.dagRevision,
+        )
+      ) {
         return { ...state, swigAnalyses: [...state.swigAnalyses, event.analysis] }
       }
-      if (event.type === 'swig-analysis-deleted') return { ...state, swigAnalyses: state.swigAnalyses.filter(record => record.id !== event.id) }
+      if (event.type === 'swig-analysis-deleted')
+        return {
+          ...state,
+          swigAnalyses: state.swigAnalyses.filter((record) => record.id !== event.id),
+        }
       if (
         event.type === 'study-identified' &&
         state.prepared !== null &&
         event.study.preparedDataset === state.prepared.id &&
         event.identification.study === event.study.id &&
+        state.dagDocuments.some(
+          (document) =>
+            document.id === event.study.dagDocument &&
+            document.audit.some((revision) => revision.id === event.study.dagRevision),
+        ) &&
         !state.studies.some((study) => study.id === event.study.id)
       ) {
         return {
@@ -784,7 +804,9 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
         state.prepared !== null &&
         event.run.preparedDataset === state.prepared.id &&
         state.identifications.some(
-          (identification) => identification.id === event.run.identification,
+          (identification) =>
+            identification.id === event.run.identification &&
+            identification.study === event.run.study,
         )
       ) {
         return { ...state, estimationRuns: [...state.estimationRuns, event.run] }
@@ -806,7 +828,9 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
         state.prepared !== null &&
         event.run.preparedDataset === state.prepared.id &&
         state.identifications.some(
-          (identification) => identification.id === event.run.identification,
+          (identification) =>
+            identification.id === event.run.identification &&
+            identification.study === event.run.study,
         )
       ) {
         return { ...state, counterfactualRuns: [...state.counterfactualRuns, event.run] }

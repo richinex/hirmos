@@ -12,6 +12,7 @@ import {
   separationKey,
   separationNotation,
   groupSwigAnalyses,
+  swigGraphTitle,
   type SwigAnalysis,
   type SwigSpecification,
 } from '@/domain/swig'
@@ -31,7 +32,6 @@ import { ColumnChecklist } from '@/components/ui/ColumnChecklist'
 import { RunActions } from '@/components/ui/RunActions'
 import { JobNotice } from '@/components/ui/JobNotice'
 import { Alert } from '@/components/ui/Alert'
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { RunPicker } from '@/components/ui/RunPicker'
 import { Icon } from '@/components/Icon'
 import { button, field, fieldHint, fieldLabel, iconControl } from '@/components/ui/recipes'
@@ -47,24 +47,16 @@ type Construction =
   | { readonly kind: 'swig' }
   | { readonly kind: 'difference'; readonly earlier: Equation; readonly later: Equation }
 const emptyEquation = (): Equation => ({ outcome: '', terms: [] })
-const constructionLabel = (record: SwigAnalysis) => {
-  const conclusion = record.result.conclusion
-  if (conclusion.kind === 'did')
-    return `DiD adjustment, ${didVerdicts[conclusion.assessment.decision.kind]}`
-  return record.specification.construction.kind === 'swig' ? 'SWIG' : 'Δ-SWIG'
-}
-const didVerdicts = {
-  baselineIdentity: 'baseline period',
-  supportedSubjectToOverlap: 'supported subject to overlap',
-  notEstablished: 'not established',
-} as const
 const listClass = 'panel-scroll max-h-64 overflow-y-auto p-1'
 type Props = {
   readonly document: DagDocument
   readonly prepared: PreparedDatasetArtifact
   readonly records: readonly SwigAnalysis[]
   readonly onRecord: (record: SwigAnalysis) => void
+  /** Removes one record directly, as when a repeated query replaces it. */
   readonly onDelete: (id: SwigAnalysis['id']) => void
+  /** Asks to delete a saved graph and its checks through the shared deletion dialog. */
+  readonly onDeleteGraph: (id: SwigAnalysis['id']) => void
   readonly onBack: () => void
 }
 
@@ -170,7 +162,15 @@ function EquationEditor({
   )
 }
 
-export function SwigWorkspace({ document, prepared, records, onRecord, onDelete, onBack }: Props) {
+export function SwigWorkspace({
+  document,
+  prepared,
+  records,
+  onRecord,
+  onDelete,
+  onDeleteGraph,
+  onBack,
+}: Props) {
   const [projection, setProjection] = useState<SwigProjection>({ kind: 'explicit' })
   const [historyConfirmed, setHistoryConfirmed] = useState(false)
   const [purpose, setPurpose] = useState<'graph' | 'did'>('graph')
@@ -191,7 +191,6 @@ export function SwigWorkspace({ document, prepared, records, onRecord, onDelete,
   const [construction, setConstruction] = useState<Construction>({ kind: 'swig' })
   const [rationale, setRationale] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
-  const [pendingDelete, setPendingDelete] = useState<SwigAnalysis['id'] | null>(null)
   const [problem, setProblem] = useState<string | null>(null)
   const [left, setLeft] = useState(''),
     [right, setRight] = useState('')
@@ -870,19 +869,6 @@ export function SwigWorkspace({ document, prepared, records, onRecord, onDelete,
   )
   return (
     <>
-      <ConfirmDialog
-        open={pendingDelete !== null}
-        title="Delete this intervention graph?"
-        danger
-        confirmLabel="Delete analysis"
-        message="This removes the saved graph, its separation checks and their results. The source DAG remains unchanged."
-        onConfirm={() => {
-          const doomed = entries.find((item) => item.graph.id === pendingDelete)
-          if (doomed === undefined) return
-          for (const item of [doomed.graph, ...doomed.checks]) onDelete(item.id)
-        }}
-        onClose={() => setPendingDelete(null)}
-      />
       <WorkbenchLayout
         id="swig"
         stage={stage}
@@ -897,17 +883,16 @@ export function SwigWorkspace({ document, prepared, records, onRecord, onDelete,
               label="Saved intervention graphs"
               empty="Construct a graph to record it here."
               runs={entries.map(({ graph: item, checks: recorded }) => {
-                const count = distinctSeparationChecks(recorded).length
                 return {
                   id: item.id,
-                  title: `${constructionLabel(item)}${count === 0 ? '' : `, ${count} separation ${count === 1 ? 'check' : 'checks'}`}`,
+                  title: swigGraphTitle({ graph: item, checks: recorded }),
                   createdAt: item.createdAt,
                   deleteLabel: 'Delete this saved graph',
                 }
               })}
               selected={record?.id}
               onSelect={show}
-              onDelete={setPendingDelete}
+              onDelete={onDeleteGraph}
             />
           ),
         }}

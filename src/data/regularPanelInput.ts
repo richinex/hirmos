@@ -6,6 +6,7 @@ import {
   regularPanel,
   type RegularPanel,
   type PanelProblem,
+  type NumericPeriodSpacing,
 } from '@/domain/regularPanel'
 import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
 import type { SelectedSource } from '@/domain/workflow'
@@ -18,6 +19,7 @@ export async function prepareRegularPanel(
   prepared: Extract<PreparedDatasetArtifact, { kind: 'prepared-panel' }>,
   matrix: PreparedMatrix,
   current: () => boolean,
+  numericSpacing: NumericPeriodSpacing = 'consecutive',
 ): Promise<Result<RegularPanel, PanelProblem>> {
   const { unitColumn, timeColumn, frequency } = prepared.sampling
   const time = profile.columns.find((column) => column.id === timeColumn)
@@ -33,7 +35,7 @@ export async function prepareRegularPanel(
     return err({ kind: 'source-mismatch' })
   switch (clock.kind) {
     case 'ordinal':
-      return regularPanel(raw.value, matrix, clock)
+      return regularPanel(raw.value, matrix, clock, numericSpacing)
     case 'calendar': {
       for (const schedule of clock.schedules) {
         const checked = await previewTimeColumnInWorker(

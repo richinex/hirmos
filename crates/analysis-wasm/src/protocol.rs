@@ -1997,8 +1997,16 @@ pub(crate) enum ArmaCovarianceEvidence {
 pub(crate) enum LinearErrorEvidence {
     NeweyWest,
     Hc1 { standard_error: f64, interval: [f64; 2], p_value: f64 },
-    Cluster { clusters: usize, standard_error: f64, interval: [f64; 2], p_value: f64 },
+    Cluster { clusters: usize, standard_error: f64, interval: [f64; 2], p_value: f64,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        correction: Option<FixedEffectsClusterCorrection> },
     Arma { estimate: f64, standard_error: f64, interval: [f64; 2], p_value: f64, errors: ArmaErrorEvidence },
+}
+
+#[derive(Clone, serde::Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub(crate) enum FixedEffectsClusterCorrection {
+    FixestNonNested { parameters: usize, degrees_of_freedom: usize },
 }
 
 /// The fixed effects a regression absorbs: one per unit, or one per unit and one per period, from

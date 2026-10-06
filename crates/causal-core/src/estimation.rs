@@ -162,6 +162,8 @@ pub enum WithinErrors<'a> {
 pub enum WithinConvention {
     PanelOls,
     Lfe,
+    /// fixest 0.14.2: K.adj=TRUE, K.fixef="nonnested", G.adj=TRUE, t.df="min".
+    Fixest,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -210,6 +212,8 @@ pub struct WithinOls {
     pub df_resid: usize,
     /// Reference degrees of freedom for intervals and p-values; may differ from residual df.
     pub inference_df: usize,
+    /// Effective parameter count used in the one-way cluster correction.
+    pub cluster_parameters: Option<usize>,
     /// The fit of the outcome purged of unit effects on the kept columns purged of unit effects.
     pub rsquared_within: f64,
     /// The demeaned outcome and kept columns the fit used.
@@ -316,6 +320,11 @@ pub fn weighted_within_convention(y: &[f64], x: &DMatrix<f64>, units: &[u64], ti
     within_fit(y, x, units, times, errors, Some(weights), convention)
 }
 
+pub fn ols_within_convention(y: &[f64], x: &DMatrix<f64>, units: &[u64], times: Option<&[u64]>,
+    errors: WithinErrors<'_>, convention: WithinConvention) -> Result<WithinOls, WithinProblem> {
+    within_fit(y, x, units, times, errors, None, convention)
+}
+
 fn within_fit(y: &[f64], x: &DMatrix<f64>, units: &[u64], times: Option<&[u64]>, errors: WithinErrors<'_>, weights: Option<&[f64]>, convention: WithinConvention) -> Result<WithinOls, WithinProblem> {
     let n = x.nrows();
     if n == 0 || x.ncols() == 0 || y.len() != n || units.len() != n
@@ -395,6 +404,7 @@ fn within_fit(y: &[f64], x: &DMatrix<f64>, units: &[u64], times: Option<&[u64]>,
     let xtx_inv = fit.xtx_inverse();
     let resid: Vec<f64> = fit.resid.iter().copied().collect();
     let mut inference_df = df_resid;
+    let mut cluster_parameters = None;
     let cov = match errors {
         WithinErrors::Classical => &xtx_inv * (fit.ssr / df_resid as f64),
         WithinErrors::Hc1 => {
@@ -423,6 +433,23 @@ fn within_fit(y: &[f64], x: &DMatrix<f64>, units: &[u64], times: Option<&[u64]>,
                 }
             });
             let counted = match convention {
+                WithinConvention::Fixest => {
+                    let time_nested = times.is_some_and(|times| {
+                        let (ti, count) = group_index(times);
+                        let mut seen = vec![None; count];
+                        ti.iter().zip(&cluster_index).all(|(&t, &c)| match seen[t] {
+                            Some(previous) => previous == c,
+                            None => { seen[t] = Some(c); true }
+                        })
+                    });
+                    // Remove each nested FE's levels minus one; retain an intercept.
+                    // With two effects this also retains the nonnested dimension.
+                    let parameters = k + effects
+                        - if nested { unit_count - 1 } else { 0 }
+                        - if time_nested { periods.unwrap() - 1 } else { 0 };
+                    inference_df = cluster_count - 1;
+                    n - parameters
+                }
                 WithinConvention::PanelOls => if periods.is_some() || !nested { df_resid } else { n - k },
                 WithinConvention::Lfe => {
                     let time_nested = times.is_some_and(|times| {
@@ -441,6 +468,7 @@ fn within_fit(y: &[f64], x: &DMatrix<f64>, units: &[u64], times: Option<&[u64]>,
                 }
             };
             let g = cluster_count as f64;
+            cluster_parameters = Some(n - counted);
             let correction = g / (g - 1.0) * ((n as f64 - 1.0) / counted as f64);
             let s = sums.transpose() * &sums * correction;
             &xtx_inv * s * &xtx_inv
@@ -478,6 +506,7 @@ fn within_fit(y: &[f64], x: &DMatrix<f64>, units: &[u64], times: Option<&[u64]>,
         periods,
         df_resid,
         inference_df,
+        cluster_parameters,
         rsquared_within: 1.0 - within_ssr / within_tss,
         within_outcome: yd,
         within_design: design,

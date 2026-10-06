@@ -64,7 +64,14 @@ export async function preparePanelRegression(
     if (prepared.kind !== 'prepared-panel')
       return err('Prepare a panel with unit and period keys for this analysis.')
     if (model.onset === null) return err('Choose the absorbing treatment indicator.')
-    const regular = await prepareRegularPanel(source, profile, prepared, matrix, current)
+    const regular = await prepareRegularPanel(
+      source,
+      profile,
+      prepared,
+      matrix,
+      current,
+      model.kind === 'bacon' ? 'evenly-spaced' : 'consecutive',
+    )
     if (!current()) return err('The analysis was cancelled.')
     if (!regular.ok) return err(describePanelProblem(regular.error))
     const panel = regular.value

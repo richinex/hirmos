@@ -14,6 +14,8 @@ import {
   type FormEvent,
 } from 'react'
 import { JobsProvider } from '@/analysis/JobsProvider'
+import { ArtifactDeletionDialog } from '@/components/ui/ArtifactDeletionDialog'
+import type { DeletionTarget } from '@/domain/artifactLifecycle'
 import { WorkflowProvider, useWorkflow } from '@/components/WorkflowProvider'
 import { PreparationProvider } from '@/components/data/PreparationProvider'
 import { Icon } from '@/components/Icon'
@@ -219,6 +221,7 @@ function SourceSummary({ source }: { readonly source: SelectedSource }) {
 }
 
 function App() {
+  const [deletionTarget, setDeletionTarget] = useState<DeletionTarget | null>(null)
   const workflow = useWorkflow((state) => state.workflow)
   const dispatch = useWorkflow((state) => state.dispatch)
   const sourceEditor = useWorkflow((state) => state.sourceEditor)
@@ -1689,9 +1692,15 @@ function App() {
                     <ChapterBoundary key={activeChapter} chapter={activeName}>
                       <Suspense fallback={<ChapterSkeleton label="Loading DAG editor…" />}>
                         <DagWorkspace
+                          onDeleteDocument={(id) => setDeletionTarget({ kind: 'dag', id })}
                           swigAnalyses={workflow.swigAnalyses}
-                          onSwigAnalysis={analysis => dispatch({ type: 'swig-analysis-created', analysis })}
-                          onDeleteSwigAnalysis={id => dispatch({ type: 'swig-analysis-deleted', id })}
+                          onSwigAnalysis={(analysis) =>
+                            dispatch({ type: 'swig-analysis-created', analysis })
+                          }
+                          onDeleteSwigAnalysis={(id) =>
+                            dispatch({ type: 'swig-analysis-deleted', id })
+                          }
+                          onDeleteSwigGraph={(id) => setDeletionTarget({ kind: 'swig-graph', id })}
                           key={workflow.prepared.id}
                           source={workflow.source}
                           profile={workflow.profile}
@@ -1758,6 +1767,7 @@ function App() {
                     <ChapterBoundary key={activeChapter} chapter={activeName}>
                       <Suspense fallback={<ChapterSkeleton label="Loading study design…" />}>
                         <StudyDesignPanel
+                          onDeleteStudy={(id) => setDeletionTarget({ kind: 'study', id })}
                           onActivity={reportActivity.study}
                           key={workflow.prepared.id}
                           prepared={workflow.prepared}
@@ -1923,6 +1933,13 @@ function App() {
             </>
           }
         />
+        {deletionTarget !== null && (
+          <ArtifactDeletionDialog
+            target={deletionTarget}
+            onTarget={setDeletionTarget}
+            onClose={() => setDeletionTarget(null)}
+          />
+        )}
       </JobsProvider>
     </ChartExportProvider.Provider>
   )

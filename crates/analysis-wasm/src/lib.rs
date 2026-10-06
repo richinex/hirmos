@@ -83,7 +83,7 @@ use hirmos_causal_core::{
 use hirmos_causal_core::{
     backdoor_linear_ate, dagitty_adjustment_sets, durbin_watson, identify_conditional_outcomes,
     identify_frontdoor_set, identify_instrument_set, identify_outcomes, infer_kappa_t,
-    infer_kappa_y, latent_projection, ols_cluster, ols_hac, ols_hc1, ols_two_way, ols_within, refute_data_subset, refute_placebo,
+    infer_kappa_y, latent_projection, ols_cluster, ols_hac, ols_hc1, refute_data_subset, refute_placebo,
     refute_random_common_cause, shapiro, unobserved_common_cause_grid, AdjustmentSetAnalysis, Dag,
     IdentificationError, WithinErrors,
 };

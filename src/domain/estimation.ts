@@ -1090,6 +1090,11 @@ export const backdoorLinearEvidenceSchema = z
         .object({
           kind: z.literal('cluster'),
           clusters: z.number().int().min(2),
+          correction: z.object({
+            kind: z.literal('fixestNonNested'),
+            parameters: z.number().int().positive(),
+            degreesOfFreedom: z.number().int().positive(),
+          }).strict().optional(),
           standardError: z.number().finite().nonnegative(),
           interval: z.tuple([z.number().finite(), z.number().finite()]),
           pValue: z.number().min(0).max(1),

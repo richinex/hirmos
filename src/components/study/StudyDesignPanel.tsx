@@ -480,6 +480,7 @@ function IdentificationOutcome({
 }
 
 function IdentificationCard({
+  onDelete,
   study,
   identification,
   current,
@@ -489,6 +490,7 @@ function IdentificationCard({
   readonly study: StudySpecification
   readonly identification: IdentificationArtifact
   readonly current: boolean
+  readonly onDelete?: () => void
   readonly onContinue: () => void
   readonly onOpenDag: () => void
 }) {
@@ -523,6 +525,8 @@ function IdentificationCard({
       <RunFold
         title={title}
         figure={ledgerLabel(result)}
+        onDelete={onDelete}
+        deleteLabel={`Delete study: ${estimandSentence(study)}, ${formatTime(study.createdAt)}`}
         stamp={<RunMeta>{[study.dagName, formatTime(study.createdAt)]}</RunMeta>}
       >
         {body}
@@ -607,6 +611,7 @@ function AdjustmentSetChoicePanel({
 }
 
 export function StudyDesignPanel({
+  onDeleteStudy,
   prepared,
   documents,
   draft,
@@ -624,6 +629,7 @@ export function StudyDesignPanel({
   readonly draft: StudyDesignDraft
   readonly onDraftChanged: (draft: StudyDesignDraft) => void
   readonly studies: readonly StudySpecification[]
+  readonly onDeleteStudy: (id: StudySpecification['id']) => void
   readonly identifications: readonly IdentificationArtifact[]
   readonly onIdentified: (study: StudySpecification, identification: IdentificationArtifact) => void
   readonly onContinue: () => void
@@ -1281,21 +1287,22 @@ export function StudyDesignPanel({
         const identification =
           identifications.find((candidate) => candidate.study === study.id) ?? null
         return identification === null ? (
-          <li
+          <RunFold
             key={study.id}
-            className="flex flex-wrap items-baseline justify-between gap-2 px-3 py-1.5"
+            title={estimandSentence(study)}
+            stamp={<RunMeta>{['Pending', study.dagName, formatTime(study.createdAt)]}</RunMeta>}
+            onDelete={() => onDeleteStudy(study.id)}
+            deleteLabel={`Delete study: ${estimandSentence(study)}, ${formatTime(study.createdAt)}`}
           >
-            <span className="text-ink">{estimandSentence(study)}</span>
-            <span className={num('text-label text-faint')}>
-              <RunMeta>{['Pending', study.dagName, formatTime(study.createdAt)]}</RunMeta>
-            </span>
-          </li>
+            Identification has not been recorded for this study.
+          </RunFold>
         ) : (
           <IdentificationCard
             key={study.id}
             study={study}
             identification={identification}
             current={false}
+            onDelete={() => onDeleteStudy(study.id)}
             onContinue={onContinue}
             onOpenDag={onOpenDag}
           />

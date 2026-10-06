@@ -19,14 +19,14 @@ const cohortRegressionStudy = async (page: Page) => {
 /**
  * The adjusted regression with one fixed effect per unit: the control offers it, the run absorbs the
  * adjustment variables that do not vary within a unit and says which, and the figures match
- * linearmodels' PanelOLS with entity effects on the same rows (crates/causal-core/oracle/within_fixtures.py
- * holds the kernel's parity; these values come from the same estimator on docs/facure_and_alex/data/sasp_panel.csv).
+ * fixest 0.14.2 with its default nonnested correction on the same rows.
+ * oracle/mixtape-did/fixest-ui.R in the transpile project generates the references.
  */
 
 const REGRESSORS = 'age asq bmi hispanic black other asian schooling cohab married divorced separated age_cl unsafe llength reg asq_cl appearance_cl provider_second asian_cl black_cl hispanic_cl othrace_cl hot massage_cl'.split(' ')
 const CONSTANT_WITHIN_PROVIDER = 'age asq bmi hispanic black other asian schooling cohab married divorced separated'.split(' ')
 const GRAPH = `dag {\n  unsafe [exposure]\n  lnw [outcome]\n${REGRESSORS.filter((name) => name !== 'unsafe').flatMap((name) => [`  ${name} -> unsafe`, `  ${name} -> lnw`]).join('\n')}\n  unsafe -> lnw\n}`
-const REFERENCE = { estimate: 0.05103386003796254, clusteredSe: 0.02826916065733058, units: 257, degreesOfFreedom: 758 }
+const REFERENCE = { estimate: 0.05103386003796254, clusteredSe: 0.028283096650613505, units: 257, degreesOfFreedom: 758 }
 
 test('fixed effects by unit absorb the provider-level regressors and cluster the interval by the unit', async ({ page }, info) => {
   test.skip(info.project.name !== 'chromium', 'One layout is enough for the run path.')
@@ -108,8 +108,8 @@ test('fixed effects by unit absorb the provider-level regressors and cluster the
   expect(evidence.fixedEffects.absorbed.map((column: number) => last.columns[column].name).sort()).toEqual([...CONSTANT_WITHIN_PROVIDER].sort())
 })
 
-// linearmodels PanelOLS on tests/fixtures/cohort-march.csv: entity effects by team, clustered by entity with group_debias and debiased.
-const COHORT = { estimate: -0.5549111111111109, clusteredSe: 0.006251980920644163, units: 6, degreesOfFreedom: 137 }
+// fixest default clustered inference on tests/fixtures/cohort-march.csv.
+const COHORT = { estimate: -0.5549111111111109, clusteredSe: 0.0062739563167684758, units: 6, degreesOfFreedom: 137 }
 
 test('a panel-structured dataset offers its own unit key for fixed effects without a prepared column', async ({ page }, info) => {
   test.skip(info.project.name !== 'chromium', 'One layout is enough for the run path.')
@@ -141,8 +141,8 @@ test('a panel-structured dataset offers its own unit key for fixed effects witho
   expect(evidence.degreesOfFreedom).toBe(COHORT.degreesOfFreedom)
 })
 
-// linearmodels PanelOLS on the same file with entity and time effects; on a balanced panel with one adoption date this is the conventional difference in differences.
-const TWO_WAY = { estimate: -0.45448333333333263, clusteredSe: 0.02215517418644088, degreesOfFreedom: 114, periods: 24 }
+// fixest on the same file with unit and time effects and unit clustering.
+const TWO_WAY = { estimate: -0.45448333333333263, clusteredSe: 0.021684734732218484, degreesOfFreedom: 114, periods: 24 }
 
 test('time-only effects keep unit clustering independent and survive saved-run decoding', async ({ page }, info) => {
   const errors: string[] = []

@@ -230,21 +230,26 @@ export function swigNodeName(record: SwigAnalysis, index: number): string {
     if (value === undefined) throw new Error('Unknown source graph variable')
     return value
   }
+  const randomName = (original: number): string => {
+    const random = record.result.nodes.find(
+      (candidate) => candidate.kind === 'random' && candidate.original === original,
+    )
+    if (random === undefined || random.kind !== 'random')
+      throw new Error('Missing random outcome node')
+    const settings = random.interventions.map((original) => {
+      const intervention = record.specification.interventions.find(([id]) => id === original)
+      if (intervention === undefined) throw new Error('Missing recorded intervention')
+      return `${name(original)} = ${intervention[1]}`
+    })
+    return settings.length === 0 ? name(original) : `${name(original)} (${settings.join(', ')})`
+  }
   switch (node.kind) {
     case 'fixed':
       return `${name(node.original)} = ${node.value}`
-    case 'random': {
-      const settings = node.interventions.map((original) => {
-        const intervention = record.specification.interventions.find(([id]) => id === original)
-        if (intervention === undefined) throw new Error('Missing recorded intervention')
-        return `${name(original)} = ${intervention[1]}`
-      })
-      return settings.length === 0
-        ? name(node.original)
-        : `${name(node.original)} (${settings.join(', ')})`
-    }
+    case 'random':
+      return randomName(node.original)
     case 'difference':
-      return `${name(node.later)} − ${name(node.earlier)}`
+      return `${randomName(node.later)} − ${randomName(node.earlier)}`
   }
 }
 
@@ -368,4 +373,23 @@ export function distinctSeparationChecks(checks: readonly SwigAnalysis[]): SwigA
     seen.add(key)
     return true
   })
+}
+
+const didVerdicts = {
+  baselineIdentity: 'baseline period',
+  supportedSubjectToOverlap: 'supported subject to overlap',
+  notEstablished: 'not established',
+} as const
+
+/** The name a saved graph goes by wherever it is listed: its construction or verdict, and its checks. */
+export function swigGraphTitle(entry: SwigGraphEntry): string {
+  const conclusion = entry.graph.result.conclusion
+  const kind =
+    conclusion.kind === 'did'
+      ? `DiD adjustment, ${didVerdicts[conclusion.assessment.decision.kind]}`
+      : entry.graph.specification.construction.kind === 'swig'
+        ? 'SWIG'
+        : 'Δ-SWIG'
+  const count = distinctSeparationChecks(entry.checks).length
+  return count === 0 ? kind : `${kind}, ${count} separation ${count === 1 ? 'check' : 'checks'}`
 }

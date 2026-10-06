@@ -15,7 +15,9 @@ const TIME = new Intl.DateTimeFormat('en-GB', {
 
 const DAY = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 
-const normalisePeriod = (value: string): string => value.replace(/\s(am|pm)$/u, '$1').toLowerCase()
+/** Joins and lowercases the day period ("2:33 PM" becomes "2:33pm"); month names keep their capital. */
+const normalisePeriod = (value: string): string =>
+  value.replace(/\s?(am|pm)$/iu, (period) => period.trim().toLowerCase())
 
 /** A complete timestamp for records that may be read after the current session. */
 export const formatTimestamp = (value: string): string =>

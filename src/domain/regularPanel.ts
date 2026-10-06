@@ -7,6 +7,7 @@ import type { Frequency } from './preprocessing'
 import type { CountRegressionRequest } from './countRegression'
 
 type Schedule = CalendarRequest['schedule']
+export type NumericPeriodSpacing = 'consecutive' | 'evenly-spaced'
 export type PanelClock =
   | { readonly kind: 'ordinal' }
   | { readonly kind: 'calendar'; readonly schedule: Schedule; readonly report: CalendarReport }
@@ -18,6 +19,7 @@ export type PanelProblem =
   | { readonly kind: 'cancelled' }
   | { readonly kind: 'structure'; readonly problem: JointPanelMatrixProblem }
   | { readonly kind: 'ordinal-gap' }
+  | { readonly kind: 'ordinal-irregular' }
   | { readonly kind: 'calendar-unavailable' }
   | { readonly kind: 'calendar-gaps'; readonly missing: number }
   | { readonly kind: 'calendar-alignment' }
@@ -60,6 +62,7 @@ export function regularPanel(
   raw: PanelKeyMatrix,
   matrix: PreparedMatrix,
   clock: PanelClock,
+  numericSpacing: NumericPeriodSpacing = 'consecutive',
 ): Result<RegularPanel, PanelProblem> {
   const structure = orderJointPanelMatrix(matrix, raw)
   if (!structure.ok) return err({ kind: 'structure', problem: structure.error })
@@ -69,11 +72,16 @@ export function regularPanel(
         .array(z.coerce.number().int().safe())
         .min(1)
         .safeParse(raw.periods.map((period) => period.label))
+      if (!axis.success)
+        return err({ kind: numericSpacing === 'consecutive' ? 'ordinal-gap' : 'ordinal-irregular' })
+      const step =
+        numericSpacing === 'consecutive' || axis.data.length < 2 ? 1 : axis.data[1]! - axis.data[0]!
       if (
-        !axis.success ||
-        axis.data.some((value, index) => index > 0 && value - axis.data[index - 1]! !== 1)
+        !Number.isSafeInteger(step) ||
+        step <= 0 ||
+        axis.data.some((value, index) => index > 0 && value - axis.data[index - 1]! !== step)
       )
-        return err({ kind: 'ordinal-gap' })
+        return err({ kind: numericSpacing === 'consecutive' ? 'ordinal-gap' : 'ordinal-irregular' })
       break
     }
     case 'calendar':
@@ -143,6 +151,8 @@ export function describePanelProblem(problem: PanelProblem): string {
       return 'The analysis was cancelled.'
     case 'ordinal-gap':
       return 'Numeric panel periods must be consecutive integers. Missing periods cannot be compressed into adjacent lags.'
+    case 'ordinal-irregular':
+      return 'Numeric panel periods must be evenly spaced integers for this decomposition. Keep the original period labels and check for missing periods.'
     case 'calendar-unavailable':
       return 'Calendar regularity could not be checked for this panel.'
     case 'calendar-gaps':
