@@ -140,7 +140,6 @@ test('standalone time-series fits, shared results, persistence and deletion', as
   expect(parsed).toEqual({ valid: true, corrupt: false })
   await page.waitForTimeout(1000)
   await page.reload()
-  await page.getByRole('button', { name: `Open ${name}`, exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Choose the data file again' })).toBeVisible()
   await page.locator('input[type=file]').setInputFiles(source)
   await chapter(/Results/)

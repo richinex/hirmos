@@ -15,7 +15,7 @@ import type { RunActivity } from '@/domain/activity'
 import { useRunActivity } from '@/lib/useRunActivity'
 import { literatureOf, MethodCaveats, RequirementsFold } from '@/components/MethodCaveats'
 import { ParameterLabel } from '@/components/ui/ParameterLabel'
-import { LagGraphViews } from '@/components/discovery/LagGraphViews'
+import { StudyGraphCanvas } from '@/components/dag/StudyGraphCanvas'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { Alert } from '@/components/ui/Alert'
 import { RefusalTile } from '@/components/ui/figures'
@@ -24,6 +24,7 @@ import { Formula } from '@/components/ui/Formula'
 import {
   button,
   chapterIntro,
+  caption,
   chip,
   field,
   fieldHint,
@@ -41,12 +42,13 @@ import {
 import { SettingsStep } from '@/components/ui/SettingsStep'
 import { cn } from '@/lib/utils'
 import { RecordList, RecordRow } from '@/components/ui/RecordList'
+import { Icon } from '@/components/Icon'
+import { NAMED_IN_FULL, SHOWN_BEFORE_COUNT } from '@/lib/format/names'
 import { formatTime, formatTimestamp } from '@/lib/format/date'
 import { formatCount } from '@/lib/format/number'
 import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
 import type { DagDocument, DagDocumentId, DagNodeId } from '@/domain/dag'
 import { assertNever } from '@/domain/dop'
-import { lagGraphFromDag } from '@/domain/lagGraph'
 import {
   BACKDOOR_IDENTIFICATION_METHOD_ID,
   COUNTERFACTUAL_IDENTIFICATION_METHOD_ID,
@@ -55,7 +57,6 @@ import {
 } from '@/domain/methods'
 import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
 import { roleWord, roleDetail, type DagCausalRole } from '@/domain/dagFlow'
-import { IdentityRow } from '@/components/ui/IdentityRow'
 import {
   backdoorIdentificationCommand,
   describeIdentificationFailure,
@@ -179,6 +180,59 @@ const estimandHint = (kind: Estimand['kind']): string => {
     default:
       return assertNever(kind)
   }
+}
+
+function RoleChips({ names }: { readonly names: readonly string[] }) {
+  const chips = (shown: readonly string[]) =>
+    shown.map((name) => (
+      <span key={name} className={chip()}>
+        {name}
+      </span>
+    ))
+  if (names.length <= NAMED_IN_FULL)
+    return <span className="flex flex-wrap gap-1">{chips(names)}</span>
+  return (
+    <details className="group">
+      <summary className="flex cursor-pointer list-none flex-wrap items-center gap-1 [&::-webkit-details-marker]:hidden">
+        {chips(names.slice(0, SHOWN_BEFORE_COUNT))}
+        <span className="flex items-center gap-1 text-label text-muted hover:text-ink group-open:hidden">
+          <Icon name="expand_more" size={14} />
+          Show all {names.length} variables
+        </span>
+      </summary>
+      <span className="mt-1 flex flex-wrap gap-1">{chips(names.slice(SHOWN_BEFORE_COUNT))}</span>
+    </details>
+  )
+}
+
+const ROLE_ORDER: readonly DagCausalRole['kind'][] = [
+  'treatment',
+  'outcome',
+  'confounder',
+  'backdoor-variable',
+  'mediator',
+  'collider',
+  'post-treatment',
+  'outcome-predictor',
+  'pre-treatment',
+  'unmeasured',
+  'unrelated',
+]
+
+/** Variables gathered under each role and its description, so a description shared by several variables reads once. */
+const roleGroups = (
+  roles: readonly { readonly node: { readonly name: string }; readonly role: DagCausalRole }[],
+): readonly { readonly word: string; readonly detail: string | null; readonly names: string[] }[] => {
+  const groups = new Map<string, { word: string; detail: string | null; rank: number; names: string[] }>()
+  for (const { node, role } of roles) {
+    const word = roleWord(role)
+    const detail = roleDetail(role)
+    const key = `${word}\u0000${detail ?? ''}`
+    const group = groups.get(key) ?? { word, detail, rank: ROLE_ORDER.indexOf(role.kind), names: [] }
+    group.names.push(node.name)
+    groups.set(key, group)
+  }
+  return [...groups.values()].sort((a, b) => a.rank - b.rank)
 }
 
 /** Whether a variable may define the groups: anything measured that the treatment does not reach. */
@@ -672,10 +726,6 @@ export function StudyDesignPanel({
         return { node, role, allowed: modifierAllowed(role) }
       })
   }, [observedNodes, preview, state.draft.treatment, state.draft.outcome])
-  const evidenceGraph = useMemo(
-    () => (document === null ? null : lagGraphFromDag(document)),
-    [document],
-  )
   const latestIdentified =
     [...identifications]
       .reverse()
@@ -1216,14 +1266,11 @@ export function StudyDesignPanel({
         <h3 id="study-graph-title" className="mb-2 mt-0 text-body font-medium text-ink">
           {document === null ? 'No graph chosen' : document.name}
         </h3>
-        {evidenceGraph !== null && (
-          <LagGraphViews
-            graph={evidenceGraph}
-            label={`${document?.name ?? 'Graph'} summary`}
-            highlighted={[state.draft.treatment, state.draft.outcome].filter(
-              (node): node is DagNodeId => node !== null,
-            )}
-            compact
+        {document !== null && (
+          <StudyGraphCanvas
+            document={document}
+            treatment={state.draft.treatment}
+            outcome={state.draft.outcome}
           />
         )}
       </section>
@@ -1236,21 +1283,14 @@ export function StudyDesignPanel({
             Choose a graph, a treatment, and an outcome to see which variables may be adjusted for.
           </p>
         ) : (
-          <ul
-            className="m-0 list-none divide-y divide-line border-t border-line p-0 text-body"
-            aria-label="Variable roles"
-          >
-            {roles.map(({ node, role }) => (
-              <li key={node.node} className="flex flex-col py-1.5">
-                <IdentityRow name={<span className="text-ink">{node.name}</span>}>
-                  <span>{roleWord(role)}</span>
-                </IdentityRow>
-                {roleDetail(role) !== null && (
-                  <span className="mt-1 text-label text-faint">{roleDetail(role)}</span>
-                )}
-              </li>
+          <RecordList className="mt-2">
+            {roleGroups(roles).map((group) => (
+              <RecordRow key={group.word} term={group.word}>
+                <RoleChips names={group.names} />
+                {group.detail !== null && <p className={caption('mb-0 mt-1')}>{group.detail}</p>}
+              </RecordRow>
             ))}
-          </ul>
+          </RecordList>
         )}
       </section>
       <MethodCaveats

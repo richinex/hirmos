@@ -6,7 +6,7 @@ import { ParameterHelp } from '@/components/ui/ParameterLabel'
 import { Orb } from '@/components/ui/Orb'
 import { Alert } from '@/components/ui/Alert'
 import { Select } from '@/components/ui/Select'
-import { useEffect, useMemo, useReducer, useState } from 'react'
+import { Fragment, useEffect, useMemo, useReducer, useState } from 'react'
 import { WorkbenchLayout, useClosePane } from '@/components/shell/WorkbenchLayout'
 import { InterventionPanel } from './InterventionPanel'
 import type { InterventionOverlay, InterventionQueryArtifact } from '@/domain/intervention'
@@ -32,6 +32,8 @@ import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { RunPicker } from '@/components/ui/RunPicker'
 import {
   createDagDocument,
+  dagExploration,
+  selectDagExploration,
   describeDagCreateProblem,
   describeDagEditProblem,
   describeDagVariableEditProblem,
@@ -84,8 +86,9 @@ import { methodDefinition } from '@/domain/methods'
 import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
 import { formatTime } from '@/lib/format/date'
 import { DagCanvas } from './DagCanvas'
+import { useDagAdjustment } from './useDagAdjustment'
 import { EdgeLedgerTable } from './EdgeLedgerTable'
-import { analyseDagCausalFlow, type DagCausalFlow } from '@/domain/dagFlow'
+import { analyseDagCausalFlow, roleDetail, roleWord, type DagCausalFlow } from '@/domain/dagFlow'
 import { EMPTY_STUDY_DRAFT, type StudyDesignDraft } from '@/domain/study'
 import { EvidenceInspector } from './EvidenceInspector'
 
@@ -544,24 +547,41 @@ function PathList({
   readonly flow: DagCausalFlow
 }) {
   const name = (node: DagNodeId) => nameOfDagNode(document, node)
+  const forward = new Set(
+    document.current.graph.edges
+      .filter((edge) => edge.timing.kind === 'contemporaneous')
+      .map((edge) => `${edge.cause}>${edge.effect}`),
+  )
+  const latent = new Set(
+    document.current.graph.nodes.filter((node) => node.kind === 'latent').map((node) => node.id),
+  )
   const status = (
     path: DagCausalFlow['paths'][number],
-  ): { readonly text: string; readonly tone: string } => {
+  ): { readonly icon: string; readonly text: string; readonly note: string | null; readonly tone: string } => {
     switch (path.status.kind) {
       case 'causal':
-        return { text: 'directed causal path', tone: 'text-ok' }
+        return { icon: 'check_circle', text: 'causal', note: null, tone: 'text-ok' }
       case 'open':
-        return { text: 'open', tone: 'text-danger' }
+        return { icon: 'error', text: 'open', note: null, tone: 'text-danger' }
       case 'open-through-unmeasured':
         return {
-          text: `open through ${path.status.unmeasured.map(name).join(', ')} (unmeasured)`,
+          icon: 'error',
+          text: `open through ${path.status.unmeasured.map(name).join(', ')}, unmeasured`,
+          note: null,
           tone: 'text-danger',
         }
       case 'closed-by-adjustment':
-        return { text: `closed by ${path.status.by.map(name).join(', ')}`, tone: 'text-muted' }
+        return {
+          icon: 'block',
+          text: `closed by ${path.status.by.map(name).join(', ')}`,
+          note: null,
+          tone: 'text-muted',
+        }
       case 'closed-at-collider':
         return {
-          text: `closed at collider ${path.status.colliders.map(name).join(', ')}; opens if adjusted`,
+          icon: 'block',
+          text: `closed at collider ${path.status.colliders.map(name).join(', ')}`,
+          note: 'opens if adjusted',
           tone: 'text-muted',
         }
       default:
@@ -576,13 +596,25 @@ function PathList({
       {flow.paths.map((path) => {
         const verdict = status(path)
         return (
-          <li key={path.nodes.join('>')} className="flex flex-col py-1.5">
-            <span className="text-ink">{path.nodes.map(name).join(' – ')}</span>
-            <span className={`text-label ${verdict.tone}`}>
-              <Metadata>
-                <span>{path.type === 'causal' ? 'causal path' : 'back-door path'}</span>
-                <span>{verdict.text}</span>
-              </Metadata>
+          <li key={path.nodes.join('>')} className="flex flex-col gap-0.5 py-1.5">
+            <span className="text-ink">
+              {path.nodes.map((node, index) => (
+                <Fragment key={node}>
+                  {index > 0 && (
+                    <span className="text-faint">
+                      {forward.has(`${path.nodes[index - 1]}>${node}`) ? ' → ' : ' ← '}
+                    </span>
+                  )}
+                  <span className={latent.has(node) ? 'text-faint' : undefined}>{name(node)}</span>
+                </Fragment>
+              ))}
+            </span>
+            <span className={`flex items-start gap-1 text-label ${verdict.tone}`}>
+              <Icon name={verdict.icon} size={14} className="mt-px shrink-0" />
+              <span>
+                {verdict.text}
+                {verdict.note !== null && <span className="block text-faint">{verdict.note}</span>}
+              </span>
             </span>
           </li>
         )
@@ -727,6 +759,23 @@ function ValidationPanel({
             </p>
           )}
           <PathList document={document} flow={flow} />
+          {[...flow.roles.values()].some(role => role.kind === 'post-treatment') && (
+            <section aria-label="Post-treatment variables" className="mt-3 text-body text-muted">
+              <h4 className="m-0 text-label text-faint">Post-treatment variables</h4>
+              <dl className="m-0">
+                {[...flow.roles].map(([id, role]) => role.kind !== 'post-treatment' ? null : (
+                  <div key={id} className="mt-2">
+                    <dt className="text-ink">{nameOfDagNode(document, id)}: {roleWord(role)}</dt>
+                    <dd className="m-0">{roleDetail(role)}</dd>
+                  </div>
+                ))}
+              </dl>
+              <p className="mb-0 mt-2 text-label text-faint">
+                Each check concerns this variable alone, the total effect, and an unselected sample.
+                A valid single-variable set does not make every larger set valid.
+              </p>
+            </section>
+          )}
         </div>
       )}
       <div
@@ -1283,16 +1332,10 @@ export function DagWorkspace({
       state.timing,
     )
   const boundHere = selectedDocument !== undefined && studyDraft.dagDocument === selectedDocument.id
-  const boundTreatment =
-    boundHere &&
-    selectedDocument.current.graph.nodes.some((node) => node.id === studyDraft.treatment)
-      ? studyDraft.treatment
-      : null
-  const boundOutcome =
-    boundHere && selectedDocument.current.graph.nodes.some((node) => node.id === studyDraft.outcome)
-      ? studyDraft.outcome
-      : null
-  const flow = useMemo(
+  const exploration = selectedDocument === undefined ? null : dagExploration(selectedDocument)
+  const boundTreatment = exploration?.treatment ?? null
+  const boundOutcome = exploration?.outcome ?? null
+  const structuralFlow = useMemo(
     () =>
       selectedDocument !== undefined &&
       boundTreatment !== null &&
@@ -1302,10 +1345,15 @@ export function DagWorkspace({
         : null,
     [boundOutcome, boundTreatment, selectedDocument],
   )
+  const { flow, problem: adjustmentProblem } = useDagAdjustment(selectedDocument, structuralFlow)
   const bind = (part: 'treatment' | 'outcome', node: DagNodeId | null) => {
     if (selectedDocument === undefined) return
+    const selected = { ...dagExploration(selectedDocument), [part]: node }
+    const revised = selectDagExploration(selectedDocument, selected)
+    if (!revised.ok) return
+    onDocumentRevised(revised.value)
     const base = boundHere ? studyDraft : { ...EMPTY_STUDY_DRAFT, dagDocument: selectedDocument.id }
-    onStudyDraftChanged({ ...base, dagDocument: selectedDocument.id, [part]: node })
+    onStudyDraftChanged({ ...base, dagDocument: selectedDocument.id, ...selected })
   }
 
   /** Plan against the document, then join every arrow in one revision; a declared exposure and outcome bind the study when the text names exactly one of each. */
@@ -1321,7 +1369,6 @@ export function DagWorkspace({
       dispatch({ type: 'paste-refused', problem: revised.error })
       return
     }
-    onDocumentRevised(revised.value)
     const observedNamed = (name: string | null): DagNodeId | null =>
       name === null
         ? null
@@ -1330,13 +1377,23 @@ export function DagWorkspace({
           )?.id ?? null)
     const treatment = observedNamed(plan.value.exposure)
     const outcome = observedNamed(plan.value.outcome)
+    const previous = dagExploration(revised.value)
+    const selected = {
+      treatment: treatment ?? previous.treatment,
+      outcome: outcome ?? previous.outcome,
+    }
+    const explored = selectDagExploration(revised.value, selected)
+    if (!explored.ok) {
+      dispatch({ type: 'paste-refused', problem: { kind: 'invalid-exploration' } })
+      return
+    }
+    onDocumentRevised(explored.value)
     if (treatment !== null || outcome !== null) {
       const base = boundHere ? studyDraft : { ...EMPTY_STUDY_DRAFT, dagDocument: revised.value.id }
       onStudyDraftChanged({
         ...base,
         dagDocument: revised.value.id,
-        treatment: treatment ?? base.treatment,
-        outcome: outcome ?? base.outcome,
+        ...selected,
       })
     }
     dispatch({ type: 'paste-applied' })
@@ -2058,7 +2115,11 @@ export function DagWorkspace({
         document={document}
         flow={flow}
         onUseForStudy={() => {
-          if (!boundHere) onStudyDraftChanged({ ...EMPTY_STUDY_DRAFT, dagDocument: document.id })
+          onStudyDraftChanged({
+            ...(boundHere ? studyDraft : EMPTY_STUDY_DRAFT),
+            dagDocument: document.id,
+            ...dagExploration(document),
+          })
           onUseForStudy()
         }}
         onUseForRootCause={
@@ -2136,7 +2197,7 @@ export function DagWorkspace({
   return (
     <WorkbenchLayout
       id="dag"
-      stage={stage}
+      stage={<>{adjustmentProblem !== null && <Alert tone="danger">{adjustmentProblem}</Alert>}{stage}</>}
       stageScroll
       inspector={{
         title: 'Inspector',

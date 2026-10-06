@@ -1,6 +1,5 @@
 import { canvasMotion } from '@/lib/motion'
-import { createPortal } from 'react-dom'
-import { escapeFor, pushLayer } from '@/lib/dismissal'
+import { FloatingWindow } from '@/components/ui/FloatingWindow'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createStore } from 'zustand/vanilla'
 import { useStore as useAppStore } from 'zustand'
@@ -45,6 +44,7 @@ import {
   type DagEditProblem,
   type DagEdgeId,
   type DagNodeId,
+  type EditableDag,
   type DirectedDagEdge,
 } from '@/domain/dag'
 import type { DiscoveryCandidate } from '@/domain/dagEvidence'
@@ -58,6 +58,7 @@ import {
   separateCards,
   type DagLayout,
   type DagRoute,
+  type LayoutPoint,
   type LayoutProblem,
 } from './elkLayout'
 import { dagCardSize } from './dagCardSize'
@@ -71,7 +72,14 @@ import { placeRouteLabels, routeLabelText, type RouteLabel } from './routeLabels
 
 const SketchStroke = lazy(() => import('./SketchStroke'))
 export type DrawingStyle = 'clean' | 'sketch'
-type VariableView = 'all' | 'connected'
+export type VariableView = 'all' | 'connected'
+
+export function visibleDagGraph(graph: EditableDag, view: VariableView): EditableDag {
+  if (view === 'all') return graph
+  const connected = new Set(graph.edges.flatMap((edge) => [edge.cause, edge.effect]))
+  const nodes = graph.nodes.filter((node) => connected.has(node.id))
+  return isNonEmpty(nodes) ? { ...graph, nodes } : graph
+}
 
 interface DagNodeData extends Record<string, unknown> {
   readonly name: string
@@ -636,7 +644,7 @@ export function useDrawingStyle(): readonly [DrawingStyle, () => void] {
   return [useAppStore(drawingStore, (state) => state.style), toggleDrawingStyle]
 }
 
-/** How a graph canvas is viewed: expanded to the window or not, laid out across or down, wheel locked or not. */
+/** How a graph canvas is viewed: in a floating window or not, laid out across or down, wheel locked or not. */
 export interface CanvasView {
   readonly expanded: boolean
   readonly orientation: DagLayoutOrientation
@@ -670,15 +678,6 @@ export function useCanvasView(
     observer.observe(element)
     return () => observer.disconnect()
   }, [host, expanded])
-  useEffect(() => (expanded ? pushLayer(EXPANDED_CANVAS_LAYER) : undefined), [expanded])
-  useEffect(() => {
-    if (!expanded) return undefined
-    const escape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && escapeFor(EXPANDED_CANVAS_LAYER, event)) setExpanded(false)
-    }
-    window.addEventListener('keydown', escape)
-    return () => window.removeEventListener('keydown', escape)
-  }, [expanded])
   return {
     expanded,
     orientation,
@@ -701,8 +700,10 @@ export function CanvasControls({
   tidy,
   labels,
   variables,
+  expand = true,
 }: {
   readonly view: CanvasView
+  readonly expand?: boolean
   readonly tidy?: () => void
   readonly labels?: { readonly shown: boolean; readonly onToggle: () => void }
   readonly variables?: {
@@ -713,7 +714,7 @@ export function CanvasControls({
 }) {
   const { fitView } = useReactFlow()
   const [drawing, toggleDrawing] = useDrawingStyle()
-  const { orientation, viewLocked, expanded } = view
+  const { orientation, viewLocked } = view
   const control = flowControl
   return (
     // Tidy fits the view, so the editor's strip carries no separate fit button.
@@ -808,19 +809,22 @@ export function CanvasControls({
       >
         <Icon name={viewLocked ? 'lock' : 'lock_open'} size={14} />
       </button>
-      <button
-        type="button"
-        className={control}
-        title={
-          expanded ? 'Return the graph to the page (Esc)' : 'Expand the graph to the whole window'
-        }
-        aria-label={expanded ? 'Return graph to the page' : 'Expand graph'}
-        aria-pressed={expanded}
-        onClick={view.toggleExpanded}
-      >
-        <Icon name={expanded ? 'close_fullscreen' : 'open_in_full'} size={14} />
-      </button>
+      {expand && !view.expanded && <ExpandControl view={view} />}
     </FlowControls>
+  )
+}
+
+function ExpandControl({ view }: { readonly view: CanvasView }) {
+  return (
+    <button
+      type="button"
+      className={flowControl}
+      title="Open the graph in a floating window"
+      aria-label="Expand graph"
+      onClick={view.toggleExpanded}
+    >
+      <Icon name="open_in_full" size={14} />
+    </button>
   )
 }
 
@@ -857,7 +861,6 @@ const describeConnectionNotice = (notice: ConnectionNotice): string => {
 }
 
 /** One canvas at a time, so the layer stack needs no per-instance id. */
-const EXPANDED_CANVAS_LAYER = 'dag-canvas-expanded'
 
 const IDLE_HINT =
   'Draw an arrow by dragging from one card to another. Move a card by dragging its name. Select an arrow to reverse or remove it. To reconnect an arrow, drag either endpoint to another card.'
@@ -883,7 +886,46 @@ const retainedLayout = (state: LayoutState): DagLayout | null => {
   }
 }
 
-const canvasModel = (
+async function placeAndRoute(
+  graph: EditableDag,
+  automatic: DagLayout,
+  placement:
+    | { readonly kind: 'role'; readonly flow: DagCausalFlow }
+    | { readonly kind: 'held'; readonly held: ReadonlyMap<string, LayoutPoint> },
+  orientation: DagLayoutOrientation,
+  size: DagCardSize,
+): Promise<Result<DagLayout, LayoutProblem>> {
+  try {
+    const { routeFixedDag } = await import('./fixedRouting')
+    const byRoles =
+      placement.kind === 'role'
+        ? (await import('./roleLayout')).placeByRole(graph, placement.flow, orientation, size)
+        : null
+    const positions =
+      byRoles === null
+        ? await extendHeldPositions(graph, placement.kind === 'held' ? placement.held : new Map(), size)
+        : byRoles.ok
+          ? await separateCards(byRoles.value, size)
+          : byRoles
+    return positions.ok ? await routeFixedDag(graph, positions.value, size, automatic) : positions
+  } catch (cause) {
+    return err({ kind: 'engine', message: cause instanceof Error ? cause.message : String(cause) })
+  }
+}
+
+export async function studyLayout(
+  graph: EditableDag,
+  flow: DagCausalFlow | null,
+  orientation: DagLayoutOrientation,
+  size: DagCardSize,
+): Promise<Result<DagLayout, LayoutProblem>> {
+  const automatic = await layoutDag(graph, orientation, size)
+  if (!automatic.ok || flow === null || graph.nodes.length > ROLE_LAYOUT_LIMIT) return automatic
+  const placed = await placeAndRoute(graph, automatic.value, { kind: 'role', flow }, orientation, size)
+  return placed.ok ? placed : automatic
+}
+
+export const canvasModel = (
   document: DagDocument,
   candidate: DiscoveryCandidate | null,
   flow: DagCausalFlow | null,
@@ -1074,13 +1116,10 @@ export function DagCanvas({
   const disconnectedCount = document.current.graph.nodes.filter(
     (node) => !connectedIds.has(node.id),
   ).length
-  const visibleGraph = useMemo(() => {
-    if (variableView === 'all') return document.current.graph
-    const connected = document.current.graph.nodes.filter((node) => connectedIds.has(node.id))
-    return isNonEmpty(connected)
-      ? { ...document.current.graph, nodes: connected }
-      : document.current.graph
-  }, [document.current.graph, variableView, connectedIds])
+  const visibleGraph = useMemo(
+    () => visibleDagGraph(document.current.graph, variableView),
+    [document.current.graph, variableView],
+  )
   const [layoutState, setLayoutState] = useState<LayoutState>({ kind: 'pending', previous: null })
   const [layoutAttempt, setLayoutAttempt] = useState(0)
   const size = useMemo(
@@ -1112,29 +1151,13 @@ export function DagCanvas({
       // ELK still runs first: its self-loop shapes are kept when another step places the cards.
       if (result.ok && (preserve || byRole)) {
         const automatic = result.value
-        const placed = await (async (): Promise<Result<DagLayout, LayoutProblem>> => {
-          try {
-            const { routeFixedDag } = await import('./fixedRouting')
-            const byRoles =
-              byRole && flow !== null
-                ? (await import('./roleLayout')).placeByRole(visibleGraph, flow, orientation, size)
-                : null
-            const positions =
-              byRoles === null
-                ? await extendHeldPositions(visibleGraph, held, size)
-                : byRoles.ok
-                  ? await separateCards(byRoles.value, size)
-                  : byRoles
-            return positions.ok
-              ? await routeFixedDag(visibleGraph, positions.value, size, automatic)
-              : positions
-          } catch (cause) {
-            return err({
-              kind: 'engine',
-              message: cause instanceof Error ? cause.message : String(cause),
-            })
-          }
-        })()
+        const placed = await placeAndRoute(
+          visibleGraph,
+          automatic,
+          byRole && flow !== null ? { kind: 'role', flow } : { kind: 'held', held },
+          orientation,
+          size,
+        )
         // A role placement that fails leaves ELK's drawing in place rather than an empty canvas.
         result = placed.ok || !byRole ? placed : ok(automatic)
       }
@@ -1467,7 +1490,7 @@ export function DagCanvas({
       ref={hostRef}
       className={
         expanded
-          ? 'fixed inset-3 z-(--z-dialog) flex flex-col overflow-hidden rounded-xl border border-edge bg-well float'
+          ? 'relative flex min-h-0 flex-1 flex-col overflow-hidden'
           : 'relative flex min-h-[22rem] flex-1 flex-col overflow-hidden rounded-xl border border-edge bg-well @max-md/panel:min-h-[26rem]'
       }
       aria-label="Causal DAG editor"
@@ -1655,9 +1678,16 @@ export function DagCanvas({
       </div>
     </div>
   )
-  // Expanded, the canvas is portalled to the body: the workbench pane declares `container-type: size`,
-  // which makes it the containing block for fixed positioning, so in place the layer would be inset
-  // from the pane and clipped by its neighbours instead of filling the window.
-  // `document` here is the DAG document prop, so the global is named explicitly.
-  return expanded ? createPortal(canvas, globalThis.document.body) : canvas
+  return expanded ? (
+    <FloatingWindow
+      label={document.name}
+      onClose={view.toggleExpanded}
+      defaultWidth={1100}
+      defaultHeight={720}
+    >
+      {canvas}
+    </FloatingWindow>
+  ) : (
+    canvas
+  )
 }

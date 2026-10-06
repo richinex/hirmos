@@ -82,7 +82,7 @@ export type DagCausalRole =
   /** Collision point of a closed path. */
   | { readonly kind: 'collider'; readonly paths: number }
   /** Descendant of the treatment off every causal path. */
-  | { readonly kind: 'post-treatment' }
+  | { readonly kind: 'post-treatment'; readonly relationship: PostTreatmentRelationship }
   /** Ancestor of the outcome only. */
   | { readonly kind: 'outcome-predictor' }
   /** Ancestor of the treatment only. */
@@ -94,6 +94,11 @@ export interface DagEdgeFlow {
   readonly causal: boolean
   readonly biasing: boolean
 }
+
+export type PostTreatmentRelationship =
+  | { readonly kind: 'outcome-descendant' }
+  | { readonly kind: 'mediator-descendant' }
+  | { readonly kind: 'other'; readonly adjustment: 'unchecked' | 'sufficient' | 'insufficient' }
 
 export type DagPathStatus =
   | { readonly kind: 'causal' }
@@ -327,6 +332,14 @@ export function analyseDagCausalFlow(
   const descendantsOfTreatment = reachable(edges, treatment, 'forward')
   const ancestorsOfOutcome = reachable(edges, outcome, 'backward')
   const ancestorsOfTreatment = reachable(edges, treatment, 'backward')
+  const descendantsOfOutcome = reachable(edges, outcome, 'forward')
+  // A node that reaches the outcome only through the treatment is no common cause of the two
+  // (Cinelli, Forney and Pearl, 2022, Models 2, 9 and 10), so its ancestry ignores the treatment's arrows.
+  const causesOfOutcome = reachable(
+    edges.filter((edge) => edge.cause !== treatment),
+    outcome,
+    'backward',
+  )
   const biasing = backdoorEdges(edges, treatment, outcome, new Set())
 
   const flows = new Map<DagEdgeId, DagEdgeFlow>()
@@ -379,6 +392,9 @@ export function analyseDagCausalFlow(
     if (path.type === 'backdoor')
       for (const node of interior) backdoorCounts.set(node, (backdoorCounts.get(node) ?? 0) + 1)
   }
+  // Use full reachability, not the capped path list, to identify descendants of mediators.
+  const mediators = [...descendantsOfTreatment].filter(id => id !== outcome && ancestorsOfOutcome.has(id))
+  const descendantsOfMediators = new Set(mediators.flatMap(id => [...reachable(edges, id, 'forward')]))
   for (const node of graph.nodes) {
     const id = node.id
     let role: DagCausalRole
@@ -386,13 +402,20 @@ export function analyseDagCausalFlow(
     else if (id === outcome) role = { kind: 'outcome' }
     else if (onCausalPath.has(id)) role = { kind: 'mediator', alsoCollider: colliderCounts.has(id) }
     else if (latent.has(id)) role = { kind: 'unmeasured' }
-    else if (backdoorCounts.has(id) && ancestorsOfTreatment.has(id) && ancestorsOfOutcome.has(id))
+    else if (backdoorCounts.has(id) && ancestorsOfTreatment.has(id) && causesOfOutcome.has(id))
       role = { kind: 'confounder', paths: backdoorCounts.get(id) ?? 0 }
     else if (backdoorCounts.has(id))
       role = { kind: 'backdoor-variable', paths: backdoorCounts.get(id) ?? 0 }
     else if (colliderCounts.has(id)) role = { kind: 'collider', paths: colliderCounts.get(id) ?? 0 }
-    else if (descendantsOfTreatment.has(id)) role = { kind: 'post-treatment' }
-    else if (ancestorsOfOutcome.has(id)) role = { kind: 'outcome-predictor' }
+    else if (descendantsOfTreatment.has(id)) role = {
+      kind: 'post-treatment',
+      relationship: descendantsOfOutcome.has(id)
+        ? { kind: 'outcome-descendant' }
+        : descendantsOfMediators.has(id)
+          ? { kind: 'mediator-descendant' }
+          : { kind: 'other', adjustment: 'unchecked' },
+    }
+    else if (causesOfOutcome.has(id)) role = { kind: 'outcome-predictor' }
     else if (ancestorsOfTreatment.has(id)) role = { kind: 'pre-treatment' }
     else role = { kind: 'unrelated' }
     roles.set(id, role)
@@ -433,11 +456,28 @@ export function roleDetail(role: DagCausalRole): string | null {
         ? 'Adjusting would open a closed path and introduce collider bias'
         : `Adjusting would open ${role.paths} closed paths and introduce collider bias`
     case 'post-treatment':
-      return 'Keep out of adjustment'
+      switch (role.relationship.kind) {
+        case 'outcome-descendant':
+          return 'A consequence of the outcome. Adjusting can introduce selection bias when estimating the total effect.'
+        case 'mediator-descendant':
+          return 'A consequence of a mediator. Adjusting can partly control for the mediator and bias the total-effect estimate.'
+        case 'other':
+          switch (role.relationship.adjustment) {
+            case 'sufficient':
+              return 'A consequence of treatment outside its directed paths to the outcome. Adjusting for this variable alone is valid for the total effect in this graph, but may reduce precision.'
+            case 'insufficient':
+              return 'A consequence of treatment outside its directed paths to the outcome. This variable alone does not provide valid adjustment for the total effect.'
+            case 'unchecked':
+              return 'A consequence of treatment outside its directed paths to the outcome. This relationship alone does not determine whether adjustment introduces bias.'
+            default: return assertNever(role.relationship.adjustment)
+          }
+        default:
+          return assertNever(role.relationship)
+      }
     case 'outcome-predictor':
       return 'Not required to close a back-door path; may improve precision'
     case 'pre-treatment':
-      return 'Not on any path'
+      return 'A cause of treatment whose directed paths to the outcome, if any, pass through treatment. Adjusting may reduce precision. In linear models, it can amplify bias from remaining unmeasured confounding.'
     case 'unrelated':
       return 'Not connected to the effect'
     default:
@@ -466,7 +506,12 @@ export function roleWord(role: DagCausalRole): string {
     case 'collider':
       return 'Collider'
     case 'post-treatment':
-      return 'Post-treatment'
+      switch (role.relationship.kind) {
+        case 'outcome-descendant': return 'Outcome descendant'
+        case 'mediator-descendant': return 'Mediator descendant'
+        case 'other': return 'Post-treatment'
+        default: return assertNever(role.relationship)
+      }
     case 'outcome-predictor':
       return 'Outcome predictor'
     case 'pre-treatment':

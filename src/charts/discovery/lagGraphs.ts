@@ -49,8 +49,6 @@ const strengthColour = (strength: LagLinkStrength, scale: number, theme: ChartTh
       return mix(theme.muted, theme.signal, Math.min(1, strength.value / Math.max(scale, 1e-9)))
     case 'structural':
       return theme.ink
-    case 'assumption':
-      return theme.bone
     default:
       return assertNever(strength)
   }
@@ -74,7 +72,7 @@ const symbolFor = (endpoint: LagEndpoint): string => {
 }
 
 const widthFor = (strength: LagLinkStrength, scale: number): number =>
-  strength.kind === 'assumption' || strength.kind === 'structural'
+  strength.kind === 'structural'
     ? 1.6
     : 1 + 2.2 * Math.min(1, strengthMagnitude(strength) / Math.max(scale, 1e-9))
 

@@ -146,7 +146,7 @@ test('an unmeasured variable declared in the text is drawn as one', async ({ pag
   await expect(page.getByRole('listbox').getByRole('option', { name: 'U', exact: true })).toHaveCount(0)
   await page.keyboard.press('Escape')
   // The back-door path runs through U, and U is unmeasured: the front-door example's point, stated by the workspace.
-  await expect(page.locator('main').getByText('open through U (unmeasured)', { exact: false })).toBeVisible()
+  await expect(page.locator('main').getByText('open through U, unmeasured', { exact: false })).toBeVisible()
 
   // A lag has no meaning without time order, and the refusal says which arrow asked for one.
   await paste(page, 'dag { X -> Y [lag=1] }')

@@ -899,6 +899,7 @@ export type AnalysisWorkerCommand =
       /** One display name per specification role, used in refusal messages. */
       readonly names: readonly string[]
     }
+  | { readonly kind: 'adjustment-validate'; readonly request: WorkerRequestId; readonly values: Float64Array; readonly design: AdjustmentValidationDesign }
   | {
       readonly kind: 'dag-check'
       readonly request: WorkerRequestId
@@ -1778,6 +1779,7 @@ export type AnalysisWorkerEvent =
       readonly request: WorkerRequestId
       readonly result: SwigEvidence
     }
+  | { readonly kind: 'adjustment-validation-succeeded'; readonly request: WorkerRequestId; readonly result: AdjustmentValidation[] }
   | {
       readonly kind: 'dag-check-succeeded'
       readonly request: WorkerRequestId
@@ -2874,6 +2876,7 @@ const commandSchema = z.discriminatedUnion('kind', [
       names: z.array(z.string()).max(256),
     })
     .strict(),
+  z.object({ kind: z.literal('adjustment-validate'), request: requestSchema, values: z.instanceof(Float64Array), design: adjustmentValidationDesignSchema }).strict(),
   z
     .object({
       kind: z.literal('dag-check'),
@@ -3966,6 +3969,7 @@ const eventSchema = z.discriminatedUnion('kind', [
       result: swigEvidenceSchema,
     })
     .strict(),
+  z.object({ kind: z.literal('adjustment-validation-succeeded'), request: requestSchema, result: z.array(adjustmentValidationSchema) }).strict(),
   z
     .object({
       kind: z.literal('dag-check-succeeded'),
@@ -4726,6 +4730,9 @@ export function parseAnalysisWorkerEvent(
       result: parsed.data.result,
     })
   }
+  if (parsed.data.kind === 'adjustment-validation-succeeded') {
+    return ok({ kind: 'adjustment-validation-succeeded', request: request.value, result: parsed.data.result })
+  }
   if (parsed.data.kind === 'dag-check-succeeded') {
     const result = dagCheckEvidenceSchema.safeParse(parsed.data.result)
     return result.success
@@ -5083,3 +5090,4 @@ import {
 } from '@/domain/gcmInfluence'
 import { sharpRdEvidenceSchema, type SharpRdEvidence } from '@/domain/sharpRd'
 import { adjustedDidSpecificationSchema, type AdjustedDidSpecification } from '@/domain/adjustedDid'
+import { adjustmentValidationSchema, adjustmentValidationDesignSchema, type AdjustmentValidation, type AdjustmentValidationDesign } from '@/domain/adjustmentValidation'

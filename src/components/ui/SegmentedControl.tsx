@@ -181,6 +181,7 @@ export function SegmentedControl<V extends string>({
   const host = useRef<HTMLDivElement>(null)
   const viewport = useRef<HTMLDivElement>(null)
   const [layout, setLayout] = useState<Layout | null>(null)
+  const [columns, setColumns] = useState(options.length)
   const [knob, setKnob] = useState<Knob | null>(null)
   const [gesture, setGesture] = useState<Gesture<V>>({ kind: 'idle' })
   const [hover, setHover] = useState<Hover | null>(null)
@@ -214,6 +215,30 @@ export function SegmentedControl<V extends string>({
     })
     const next = { frames, width: element.clientWidth, height: element.clientHeight }
     setLayout((previous) => (sameLayout(previous, next) ? previous : next))
+    if (fill) {
+      // Rows of equal length: four in one row or two by two, never three and one.
+      const style = getComputedStyle(element)
+      const gap = parseFloat(style.columnGap) || 0
+      const available =
+        element.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
+      const widest = Math.max(
+        ...labels.map((label) => {
+          const own = getComputedStyle(label)
+          const content = label.querySelector(':scope > span')?.getBoundingClientRect().width ?? 0
+          return (
+            content +
+            parseFloat(own.paddingLeft) +
+            parseFloat(own.paddingRight) +
+            parseFloat(own.borderLeftWidth) +
+            parseFloat(own.borderRightWidth)
+          )
+        }),
+      )
+      let fit = labels.length
+      while (fit > 1 && fit * widest + (fit - 1) * gap > available) fit -= 1
+      const balanced = Math.ceil(labels.length / Math.ceil(labels.length / fit))
+      setColumns((previous) => (previous === balanced ? previous : balanced))
+    }
     const target = wrap
       ? undefined
       : frames[labels.findIndex((label) => label.dataset['segmentPreview'] === 'true')]
@@ -225,7 +250,7 @@ export function SegmentedControl<V extends string>({
         target.left + target.width / 2 >= previous.frame.left + previous.frame.width / 2
       return { frame: target, forward }
     })
-  }, [wrap])
+  }, [wrap, fill])
 
   useLayoutEffect(measure)
 
@@ -450,6 +475,7 @@ export function SegmentedControl<V extends string>({
   const control = (
     <div
       ref={host}
+      style={fill ? { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` } : undefined}
       role="radiogroup"
       aria-label={ariaLabel}
       aria-disabled={disabled || undefined}
@@ -519,7 +545,7 @@ export function SegmentedControl<V extends string>({
           ),
         form === 'line' && 'w-max max-w-none flex-nowrap gap-1 border-b border-hair',
         dragEnabled && 'touch-pan-y',
-        fill ? 'flex w-full' : form === 'line' ? 'flex' : 'inline-flex',
+        fill ? 'grid w-full' : form === 'line' ? 'flex' : 'inline-flex',
         // On a narrow panel a setting spans the row, so the choice reads as one bar rather than a stub.
         narrowFill && '@max-md/panel:flex @max-md/panel:w-full @max-md/panel:max-w-full',
         className,
@@ -555,7 +581,7 @@ export function SegmentedControl<V extends string>({
                 'has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-signal',
               form === 'line' ? 'shrink-0 rounded-sm' : 'rounded-md',
               SIZE[form][size],
-              fill &&'min-w-max flex-1 basis-0 text-center',
+              fill && 'min-w-0 text-center',
               // Equal widths while they fit; no option narrower than its own label, so a long set wraps to a second row.
               narrowFill &&
                 '@max-md/panel:min-w-max @max-md/panel:flex-1 @max-md/panel:basis-0 @max-md/panel:text-center',

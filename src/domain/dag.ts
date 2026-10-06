@@ -127,6 +127,36 @@ export interface DagDocument {
   /** Append-only revision record, including branches no longer reachable through redo. */
   readonly audit: NonEmptyArray<DagDraftRevision>
   readonly current: DagDraftRevision
+  /** Canvas exploration only; saved studies retain their own causal question. */
+  readonly exploration?: DagExploration
+}
+
+export interface DagExploration {
+  readonly treatment: DagNodeId | null
+  readonly outcome: DagNodeId | null
+}
+
+export const EMPTY_DAG_EXPLORATION: DagExploration = { treatment: null, outcome: null }
+
+/** Retain only observed endpoints present in the active revision. */
+export function dagExploration(document: DagDocument): DagExploration {
+  const selected = document.exploration ?? EMPTY_DAG_EXPLORATION
+  const observed = (id: DagNodeId | null) =>
+    id !== null && document.current.graph.nodes.some(node => node.id === id && node.kind === 'observed')
+      ? id : null
+  return { treatment: observed(selected.treatment), outcome: observed(selected.outcome) }
+}
+
+export function selectDagExploration(
+  document: DagDocument,
+  selected: DagExploration,
+): Result<DagDocument, { readonly kind: 'invalid-exploration' }> {
+  const valid = (id: DagNodeId | null) =>
+    id === null || document.current.graph.nodes.some(node => node.id === id && node.kind === 'observed')
+  if (!valid(selected.treatment) || !valid(selected.outcome) ||
+      (selected.treatment !== null && selected.treatment === selected.outcome))
+    return err({ kind: 'invalid-exploration' })
+  return ok({ ...document, exploration: selected })
 }
 
 export type DagOriginChoice = 'domain-knowledge' | 'experimental-design' | 'discovery-informed'

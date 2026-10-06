@@ -203,7 +203,7 @@ pub use tlearner::{fit_tlearner, TLearnerError, TLearnerFit};
 pub use unobserved::{infer_kappa_t, infer_kappa_y, unobserved_common_cause_grid};
 pub use vecm::{chow_break, select_coint_rank, vecm_fit, vecm_select_order, VecmResult};
 mod adjustment_sets;
-pub use adjustment_sets::{dagitty_adjustment_sets, AdjustmentSetAnalysis, AdjustmentSetError};
+pub use adjustment_sets::{dagitty_adjustment_sets, validate_adjustment_set, SuppliedAdjustment, AdjustmentSetAnalysis, AdjustmentSetError};
 
 pub mod panel_glm;
 

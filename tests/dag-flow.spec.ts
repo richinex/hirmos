@@ -1,4 +1,14 @@
 import { expect, test } from '@playwright/test'
+import { roleDetail } from '../src/domain/dagFlow'
+
+test('role explanations qualify precision and post-treatment adjustment claims', () => {
+  expect(roleDetail({ kind: 'pre-treatment' })).toBe(
+    'A cause of treatment whose directed paths to the outcome, if any, pass through treatment. Adjusting may reduce precision. In linear models, it can amplify bias from remaining unmeasured confounding.',
+  )
+  expect(roleDetail({ kind: 'post-treatment', relationship: { kind: 'other', adjustment: 'unchecked' } })).toBe(
+    'A consequence of treatment outside its directed paths to the outcome. This relationship alone does not determine whether adjustment introduces bias.',
+  )
+})
 
 /**
  * The causal flow analysis on the corpus from Octopus's test suite and the Mixtape DAGs the scott-c
@@ -74,4 +84,54 @@ test('derives roles, flows, paths, and adjustment from treatment-to-outcome path
   expect(r.discrimination.roles.O).toBe('mediator-collider')
   expect(r.discrimination.adjustment.kind).toBe('unnecessary')
   expect(r.discrimination.paths).toContain('D-O-A-Y:closed-at-collider')
+})
+
+/**
+ * Cinelli, Forney and Pearl (2022), "A Crash Course in Good and Bad Controls": the role and the
+ * adjustment verdict for Z in each of the paper's graphs, Models 1 to 18 and the two variations.
+ */
+test('classifies Z in every graph of the good and bad controls crash course', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Domain corpus runs once')
+  await page.goto('/app')
+  const models: Record<string, readonly [string, readonly string[], string, string]> = {
+    '1': ['Z>X Z>Y X>Y', [], 'confounder', 'sufficient'],
+    '2': ['U>Z Z>X U>Y X>Y', ['U'], 'backdoor-variable', 'sufficient'],
+    '3': ['U>X U>Z Z>Y X>Y', ['U'], 'backdoor-variable', 'sufficient'],
+    '4': ['Z>X Z>M X>M M>Y', [], 'confounder', 'sufficient'],
+    '5': ['U>Z Z>X U>M X>M M>Y', ['U'], 'backdoor-variable', 'sufficient'],
+    '6': ['U>X U>Z Z>M X>M M>Y', ['U'], 'backdoor-variable', 'sufficient'],
+    '7': ['U1>X U1>Z U2>Z U2>Y X>Y', ['U1', 'U2'], 'collider', 'unnecessary'],
+    '7, variation': ['U1>X U1>Z U2>Z U2>Y Z>Y X>Y', ['U1', 'U2'], 'backdoor-variable', 'none'],
+    '8': ['Z>Y X>Y', [], 'outcome-predictor', 'unnecessary'],
+    '9': ['Z>X X>Y', [], 'pre-treatment', 'unnecessary'],
+    '10': ['Z>X U>X U>Y X>Y', ['U'], 'pre-treatment', 'none'],
+    '11': ['X>Z Z>Y', [], 'mediator', 'unnecessary'],
+    '11, variation': ['X>Z Z>Y U>Z U>Y', ['U'], 'mediator-collider', 'unnecessary'],
+    '12': ['X>M M>Y M>Z', [], 'post-treatment', 'unnecessary'],
+    '13': ['X>M Z>M M>Y', [], 'outcome-predictor', 'unnecessary'],
+    '14': ['X>Y X>Z', [], 'post-treatment', 'unnecessary'],
+    '15': ['X>Y X>Z Z>W U>W U>Y', ['U'], 'post-treatment', 'unnecessary'],
+    '16': ['X>Y X>Z U>Z U>Y', ['U'], 'collider', 'unnecessary'],
+    '17': ['X>Y X>Z Y>Z', [], 'collider', 'unnecessary'],
+    '18': ['X>Y Y>Z', [], 'post-treatment', 'unnecessary'],
+  }
+  const results: Record<string, { role: string; adjustment: { kind: string; variables?: string[] } }> = await page.evaluate(async (models) => {
+    const flow = await import(new URL('/src/domain/dagFlow.ts', window.location.href).href)
+    return Object.fromEntries(Object.entries(models).map(([model, [arrows, latent]]) => {
+      const edges = arrows.split(' ').map((arrow) => arrow.split('>'))
+      const names = [...new Set(edges.flat())]
+      const analysis = flow.analyseDagCausalFlow({
+        kind: 'editable-dag',
+        nodes: names.map((id) => (latent.includes(id) ? { kind: 'latent', id, name: id } : { kind: 'observed', id, column: `0:${id}`, name: id })),
+        edges: edges.map(([cause, effect], index) => ({ kind: 'directed', id: `e${index}`, cause, effect, timing: { kind: 'contemporaneous' }, support: { kind: 'unstated' }, evidence: [] })),
+      }, 'X', 'Y')
+      const role = analysis.roles.get('Z')
+      return [model, { role: role.kind === 'mediator' && role.alsoCollider ? 'mediator-collider' : role.kind, adjustment: analysis.adjustment }]
+    }))
+  }, models)
+  for (const [model, [, , role, adjustment]] of Object.entries(models)) {
+    expect(results[model].role, `Model ${model}`).toBe(role)
+    expect(results[model].adjustment.kind, `Model ${model}`).toBe(adjustment)
+    if (adjustment === 'sufficient') expect(results[model].adjustment.variables, `Model ${model}`).toEqual(['Z'])
+  }
 })

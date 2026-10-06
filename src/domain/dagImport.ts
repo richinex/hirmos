@@ -29,6 +29,7 @@ export interface DagImportPlan {
 }
 
 export type DagImportPlanProblem =
+  | { readonly kind: 'invalid-exploration' }
   | { readonly kind: 'text'; readonly problem: DagTextProblem }
   | { readonly kind: 'no-arrows' }
   | { readonly kind: 'unmarked-variables'; readonly names: NonEmptyArray<string> }
@@ -78,6 +79,8 @@ export const describeDagImportProblem = (
   problem: DagImportPlanProblem | DagImportProblem,
 ): string => {
   switch (problem.kind) {
+    case 'invalid-exploration':
+      return 'Choose different observed variables for treatment and outcome.'
     case 'text':
       return describeDagTextProblem(problem.problem)
     case 'no-arrows':

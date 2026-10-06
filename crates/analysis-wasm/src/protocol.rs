@@ -2,6 +2,16 @@
 
 use super::*;
 
+#[derive(Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub(crate) enum SuppliedAdjustmentEvidence {
+    Valid,
+    Endpoints { nodes: Vec<usize> },
+    Unobserved { nodes: Vec<usize> },
+    ForbiddenDescendants { nodes: Vec<usize> },
+    OpenNoncausalPath,
+}
+
 #[derive(Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum StructuralVersion { GaussianComponentsV1 }
@@ -1280,6 +1290,7 @@ pub(crate) enum AnalysisCommand {
         unobserved: Vec<usize>,
         estimand: IdentificationEstimand,
     },
+    AdjustmentValidate { nodes: usize, edges: Vec<(usize, usize)>, treatment: usize, outcome: usize, unobserved: Vec<usize>, sets: Vec<Vec<usize>> },
     SwigAnalysis { specification: crate::swig_analysis::Specification, names: Vec<String> },
     DagCheck {
         rows: usize,
@@ -3067,6 +3078,7 @@ pub(crate) enum AnalysisResult {
         graphical_identification: GraphicalIdentificationEvidence,
         counterfactual_identification: CounterfactualIdentificationEvidence,
     },
+    AdjustmentValidation { checks: Vec<SuppliedAdjustmentEvidence> },
     SwigAnalysis { result: crate::swig_analysis::Evidence },
     DagCheck {
         observations: usize,

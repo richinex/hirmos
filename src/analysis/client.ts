@@ -2387,3 +2387,10 @@ export function runSurrogatePath(
     values,
   )
 }
+import type { AdjustmentValidation, AdjustmentValidationDesign } from '@/domain/adjustmentValidation'
+
+export function validateAdjustmentSets(design: AdjustmentValidationDesign): Promise<Result<AdjustmentValidation[], AnalysisWorkerProblem>> {
+  const request = newWorkerRequestId()
+  const values = new Float64Array(0)
+  return post('adjustment-validation-succeeded', { kind: 'adjustment-validate', request, values, design }, values)
+}

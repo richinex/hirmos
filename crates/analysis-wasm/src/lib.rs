@@ -641,6 +641,9 @@ pub fn run_analysis(
             &unobserved,
             estimand,
         ),
+        AnalysisCommand::AdjustmentValidate { nodes, edges, treatment, outcome, unobserved, sets } => {
+            identification::validate_supplied(nodes, &edges, treatment, outcome, &unobserved, &sets)
+        }
         AnalysisCommand::SwigAnalysis { specification, names } => {
             swig_analysis::analyse(specification, &names).map(|result| AnalysisResult::SwigAnalysis { result })
         },

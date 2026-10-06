@@ -1,4 +1,3 @@
-import type { DagDocument } from './dag'
 import type { DiscoveryRunArtifact } from './discovery'
 import { assertNever, isNonEmpty, mapNonEmpty, type NonEmptyArray } from './dop'
 
@@ -16,7 +15,6 @@ export type LagLinkStrength =
   | { readonly kind: 'signed-weight'; readonly value: number }
   | { readonly kind: 'nonnegative'; readonly value: number }
   | { readonly kind: 'structural' }
-  | { readonly kind: 'assumption' }
 
 export interface LagVariable {
   readonly id: string
@@ -46,7 +44,6 @@ export type LagGraphSemantics =
   | 'weighted-directed-evidence'
   | 'lagged-information'
   | 'neural-lagged-granger'
-  | 'temporal-dag'
 
 export interface LagGraph {
   readonly variables: NonEmptyArray<LagVariable>
@@ -92,7 +89,6 @@ export const strengthMagnitude = (strength: LagLinkStrength): number => {
     case 'nonnegative':
       return Math.abs(strength.value)
     case 'structural':
-    case 'assumption':
       return 1
     default:
       return assertNever(strength)
@@ -109,8 +105,6 @@ export const describeStrength = (strength: LagLinkStrength): string => {
       return `strength ${strength.value.toFixed(3)}`
     case 'structural':
       return 'reported adjacency'
-    case 'assumption':
-      return 'user assumption'
     default:
       return assertNever(strength)
   }
@@ -395,38 +389,6 @@ export function lagGraphFromRun(run: LagResolvedDiscoveryRun, regime = 0): LagGr
       return { graph: lagGraphFromCmlpRun(run), warnings: [] }
     default:
       return assertNever(run)
-  }
-}
-
-/** The editable DAG as a lag graph: the "lag expansion on demand" hook. */
-export function lagGraphFromDag(document: DagDocument): LagGraph {
-  const nodes = document.current.graph.nodes
-  const index = new Map(nodes.map((node, position) => [node.id, position]))
-  const links: LagLink[] = []
-  for (const edge of document.current.graph.edges) {
-    const from = index.get(edge.cause)
-    const to = index.get(edge.effect)
-    if (from === undefined || to === undefined) continue
-    links.push({
-      from,
-      to,
-      lag: edge.timing.kind === 'contemporaneous' ? 0 : edge.timing.lag,
-      fromEndpoint: 'tail',
-      toEndpoint: 'arrow',
-      strength: { kind: 'assumption' },
-      mark: null,
-    })
-  }
-  const variables = nodes.map((node) => ({
-    id: node.id,
-    name: node.name,
-    latent: node.kind === 'latent',
-  }))
-  return {
-    variables: isNonEmpty(variables) ? variables : [{ id: 'none', name: '—', latent: false }],
-    tauMax: Math.max(0, ...links.map((link) => link.lag)),
-    links,
-    semantics: 'temporal-dag',
   }
 }
 

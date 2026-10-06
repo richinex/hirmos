@@ -289,7 +289,23 @@ const envelopeSchema = z.object({
   grangerEvidence: z.array(artifact).default([]),
   countSeriesModels: z.array(artifact).default([]),
   discoveryRuns: z.array(artifact),
-  dagDocuments: z.array(artifact),
+  dagDocuments: z.array(artifact.superRefine((record, ctx) => {
+    if (record.exploration === undefined) return
+    const selection = z.object({
+      treatment: z.string().min(1).nullable(),
+      outcome: z.string().min(1).nullable(),
+    }).strict().safeParse(record.exploration)
+    if (!selection.success) {
+      ctx.addIssue({ code: 'custom', message: 'Invalid DAG exploration selection.' })
+      return
+    }
+    const current = record.current as DagDocument['current'] | undefined
+    const valid = (id: string | null) => id === null ||
+      current?.graph.nodes.some(node => node.id === id && node.kind === 'observed') === true
+    if (!valid(selection.data.treatment) || !valid(selection.data.outcome) ||
+        (selection.data.treatment !== null && selection.data.treatment === selection.data.outcome))
+      ctx.addIssue({ code: 'custom', message: 'DAG exploration must name distinct observed variables in its current revision.' })
+  })),
   dagChecks: z.array(artifact).default([]),
   swigAnalyses: z.array(swigAnalysisSchema).default([]),
   interventionQueries: z

@@ -60,9 +60,15 @@ test('DAG actions share dimensions on desktop and in the mobile inspector', asyn
   expect(add!.height).toBe(paste!.height)
   if (mobile) await page.getByRole('button', { name: 'Inspector', exact: true }).click()
   const selector = page.getByRole('radiogroup', { name: 'DAG inspector' })
-  const choices = await selector.getByRole('radio').evaluateAll(elements => elements.map(element => element.getBoundingClientRect().top))
+  // Equal rows (four in one, or two by two) and no tab drawn over another.
+  const choices = await selector.getByRole('radio').evaluateAll(elements => elements.map(element => {
+    const box = element.getBoundingClientRect()
+    return { top: Math.round(box.top), left: box.left, right: box.right }
+  }))
   expect(choices).toHaveLength(4)
-  expect(Math.max(...choices) - Math.min(...choices)).toBeLessThan(1)
+  const rows = Object.values(Object.groupBy(choices, choice => choice.top)).map(row => row!.toSorted((a, b) => a.left - b.left))
+  expect(new Set(rows.map(row => row.length)).size).toBe(1)
+  for (const row of rows) for (let i = 1; i < row.length; i += 1) expect(row[i].left).toBeGreaterThanOrEqual(row[i - 1].right - 0.5)
   await selector.getByRole('radio', { name: 'Intervene', exact: true }).check()
   await expect(selector.getByRole('radio', { name: 'Intervene', exact: true })).toBeChecked()
   await selector.getByRole('radio', { name: 'Selection', exact: true }).check()

@@ -28,6 +28,76 @@ pub enum AdjustmentSetError {
     SameEndpoint,
     UnobservedOutOfRange,
     ZeroMaxResults,
+    AdjustmentOutOfRange,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SuppliedAdjustment {
+    Valid,
+    Endpoints { nodes: Vec<usize> },
+    Unobserved { nodes: Vec<usize> },
+    ForbiddenDescendants { nodes: Vec<usize> },
+    OpenNoncausalPath,
+}
+
+/// Validate a supplied set using the same proper-backdoor reduction as enumeration.
+/// Unlike minimal-set enumeration, this also accepts valid nonminimal sets.
+pub fn validate_adjustment_set(
+    dag: &Dag,
+    treatment: usize,
+    outcome: usize,
+    unobserved: &[usize],
+    adjustment: &[usize],
+) -> Result<SuppliedAdjustment, AdjustmentSetError> {
+    if dag.n < 2 {
+        return Err(AdjustmentSetError::TooFewNodes);
+    }
+    if treatment >= dag.n || outcome >= dag.n {
+        return Err(AdjustmentSetError::EndpointOutOfRange);
+    }
+    if treatment == outcome {
+        return Err(AdjustmentSetError::SameEndpoint);
+    }
+    if unobserved.iter().any(|&n| n >= dag.n) {
+        return Err(AdjustmentSetError::UnobservedOutOfRange);
+    }
+    if adjustment.iter().any(|&n| n >= dag.n) {
+        return Err(AdjustmentSetError::AdjustmentOutOfRange);
+    }
+    let selected = adjustment.iter().copied().collect::<BTreeSet<_>>();
+    let endpoints = selected
+        .iter()
+        .copied()
+        .filter(|&n| n == treatment || n == outcome)
+        .collect::<Vec<_>>();
+    if !endpoints.is_empty() {
+        return Ok(SuppliedAdjustment::Endpoints { nodes: endpoints });
+    }
+    let latent = selected
+        .iter()
+        .copied()
+        .filter(|n| unobserved.contains(n))
+        .collect::<Vec<_>>();
+    if !latent.is_empty() {
+        return Ok(SuppliedAdjustment::Unobserved { nodes: latent });
+    }
+    let causal = proper_causal_path_nodes(dag, treatment, outcome);
+    let mut without_treatment = causal.clone();
+    without_treatment.remove(&treatment);
+    let forbidden = inclusive_descendants(dag, &without_treatment);
+    let nodes = selected
+        .intersection(&forbidden)
+        .copied()
+        .collect::<Vec<_>>();
+    if !nodes.is_empty() {
+        return Ok(SuppliedAdjustment::ForbiddenDescendants { nodes });
+    }
+    let backdoor = proper_backdoor_graph(dag, treatment, &causal);
+    Ok(if backdoor.d_separated(treatment, outcome, &selected) {
+        SuppliedAdjustment::Valid
+    } else {
+        SuppliedAdjustment::OpenNoncausalPath
+    })
 }
 
 #[derive(Debug, Clone)]

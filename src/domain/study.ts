@@ -1433,7 +1433,11 @@ export function identificationFrom(
         : role.kind === 'collider'
           ? 'a collider; adjusting would open a path'
           : role.kind === 'post-treatment'
-            ? 'a descendant of the treatment'
+            ? role.relationship.kind === 'mediator-descendant'
+              ? 'a descendant of a mediator; adjusting can bias the total-effect estimate'
+              : role.relationship.kind === 'outcome-descendant'
+                ? 'a descendant of the outcome; adjusting can introduce selection bias'
+                : null
             : null
     return reason === null
       ? []

@@ -66,7 +66,6 @@ const markMeanings = (semantics: LagGraphSemantics): readonly MarkMeaning[] => {
     case 'weighted-directed-evidence':
     case 'lagged-information':
     case 'neural-lagged-granger':
-    case 'temporal-dag':
       return []
     default:
       return assertNever(semantics)
@@ -250,7 +249,7 @@ function LagGraphFigure({
           <span className="text-micro text-faint">Directed structure</span>
         )}
         <span className="flex items-center gap-2 text-micro text-faint">
-          {graph.links.length} {graph.semantics === 'temporal-dag' ? 'arrow' : 'link'}
+          {graph.links.length} link
           {graph.links.length === 1 ? '' : 's'}
           {graph.tauMax > 0 ? (
             <Metadata>

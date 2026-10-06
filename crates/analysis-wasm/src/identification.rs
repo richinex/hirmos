@@ -2,6 +2,67 @@
 
 use super::*;
 
+pub(crate) fn validate_supplied(
+    nodes: usize,
+    edges: &[(usize, usize)],
+    treatment: usize,
+    outcome: usize,
+    unobserved: &[usize],
+    sets: &[Vec<usize>],
+) -> Result<AnalysisResult, String> {
+    use hirmos_causal_core::{validate_adjustment_set, SuppliedAdjustment};
+    if !(2..=256).contains(&nodes)
+        || sets.len() > 256
+        || edges
+            .iter()
+            .any(|&(a, b)| a >= nodes || b >= nodes || a == b)
+    {
+        return Err("Adjustment validation requires a valid graph with 2 to 256 nodes.".into());
+    }
+    let mut degree = vec![0usize; nodes];
+    for &(_, b) in edges {
+        degree[b] += 1;
+    }
+    let mut ready: Vec<usize> = (0..nodes).filter(|&n| degree[n] == 0).collect();
+    let mut visited = 0;
+    while let Some(a) = ready.pop() {
+        visited += 1;
+        for &(_, b) in edges.iter().filter(|&&(from, _)| from == a) {
+            degree[b] -= 1;
+            if degree[b] == 0 {
+                ready.push(b);
+            }
+        }
+    }
+    if visited != nodes {
+        return Err("Adjustment validation requires an acyclic graph.".into());
+    }
+    let dag = Dag::new(nodes, edges);
+    let checks = sets
+        .iter()
+        .map(|set| {
+            validate_adjustment_set(&dag, treatment, outcome, unobserved, set)
+                .map(|result| match result {
+                    SuppliedAdjustment::Valid => SuppliedAdjustmentEvidence::Valid,
+                    SuppliedAdjustment::Endpoints { nodes } => {
+                        SuppliedAdjustmentEvidence::Endpoints { nodes }
+                    }
+                    SuppliedAdjustment::Unobserved { nodes } => {
+                        SuppliedAdjustmentEvidence::Unobserved { nodes }
+                    }
+                    SuppliedAdjustment::ForbiddenDescendants { nodes } => {
+                        SuppliedAdjustmentEvidence::ForbiddenDescendants { nodes }
+                    }
+                    SuppliedAdjustment::OpenNoncausalPath => {
+                        SuppliedAdjustmentEvidence::OpenNoncausalPath
+                    }
+                })
+                .map_err(|problem| format!("Invalid adjustment specification: {problem:?}"))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(AnalysisResult::AdjustmentValidation { checks })
+}
+
 pub(crate) fn backdoor_identification(
     nodes: usize,
     names: &[String],
@@ -328,12 +389,25 @@ mod tests {
             edges.push((confounder, 1));
         }
         let started = std::time::Instant::now();
-        let result = backdoor_identification(nodes, &names, &edges, 0, 1, &[], IdentificationEstimand::Ate).unwrap();
+        let result = backdoor_identification(
+            nodes,
+            &names,
+            &edges,
+            0,
+            1,
+            &[],
+            IdentificationEstimand::Ate,
+        )
+        .unwrap();
         let elapsed = started.elapsed();
         let value = serde_json::to_value(&result).unwrap();
         assert_eq!(value["result"]["kind"], "identified");
-        let canonical: Vec<usize> = serde_json::from_value(value["result"]["canonicalSet"].clone()).unwrap();
+        let canonical: Vec<usize> =
+            serde_json::from_value(value["result"]["canonicalSet"].clone()).unwrap();
         assert_eq!(canonical, (2..nodes).collect::<Vec<_>>());
-        assert!(elapsed.as_secs_f64() < 5.0, "an {nodes}-node graph took {elapsed:?}");
+        assert!(
+            elapsed.as_secs_f64() < 5.0,
+            "an {nodes}-node graph took {elapsed:?}"
+        );
     }
 }

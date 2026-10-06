@@ -231,7 +231,7 @@ test('Proposition 99 can hide disconnected variables without changing its DAG', 
     await page.evaluate(t => document.documentElement.setAttribute('data-theme', t), theme)
     await page.screenshot({ path: info.outputPath(`prop99-connected-${theme}.png`) })
   }
-  await page.getByRole('button', { name: 'Return graph to the page', exact: true }).click()
+  await page.getByRole('button', { name: 'Close the floating window', exact: true }).click()
   await unexpandedEditor.scrollIntoViewIfNeeded()
   await expect.poll(() => page.locator('.react-flow__node').evaluateAll(nodes => nodes.every(n => {
     const b = n.getBoundingClientRect(); const canvas = n.closest('[aria-label="Causal DAG editor"]')!.getBoundingClientRect()

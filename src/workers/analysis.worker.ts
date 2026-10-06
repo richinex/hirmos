@@ -435,6 +435,8 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
       }
     case 'swig-analysis':
       return { kind: 'swigAnalysis', specification: command.specification, names: command.names }
+    case 'adjustment-validate':
+      return { kind: 'adjustmentValidate', ...command.design }
     case 'dag-check':
       return {
         kind: 'dagCheck',
@@ -1327,6 +1329,15 @@ self.onmessage = (message: MessageEvent<unknown>) => {
           request: command.request,
           result: parsed.data.result,
         })
+        return
+      }
+      case 'adjustment-validate': {
+        const parsed = z.object({ kind: z.literal('adjustmentValidation'), checks: z.array(adjustmentValidationSchema) }).strict().safeParse(decoded)
+        if (!parsed.success || parsed.data.checks.length !== command.design.sets.length) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: 'Invalid adjustment validation response.' })
+          return
+        }
+        emit({ kind: 'adjustment-validation-succeeded', request: command.request, result: parsed.data.checks })
         return
       }
       case 'dag-check': {
@@ -2289,3 +2300,4 @@ import { gcmInfluenceResponseSchema } from '@/domain/gcmInfluence'
 import { parseSharpRdEvidence } from '@/domain/sharpRd'
 import { staggeredEvidenceSchema, sameStaggeredSpecification } from '@/domain/staggeredDid'
 import { sameDidSpecification } from '@/domain/adjustedDid'
+import { adjustmentValidationSchema } from '@/domain/adjustmentValidation'
