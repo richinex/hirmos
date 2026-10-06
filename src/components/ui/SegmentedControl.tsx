@@ -72,7 +72,6 @@ export interface SegmentedControlProps<V extends string> {
   readonly variant?: 'track' | 'line'
   /** Stretch to the container and give every segment the same width. Use only with labels of similar length. */
   readonly fill?: boolean
-  /** A wrapping choice grid for longer catalogues: no sliding knob; each chip carries its own selected surface, focus ring, press acknowledgement, and a hatch when disabled. */
   readonly wrap?: boolean
   /**
    * `well` gives the control its own surface: the pressed track behind a sliding knob, or the recessed
@@ -556,7 +555,7 @@ export function SegmentedControl<V extends string>({
                 'has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-signal',
               form === 'line' ? 'shrink-0 rounded-sm' : 'rounded-md',
               SIZE[form][size],
-              fill && 'min-w-0 flex-1 basis-0 whitespace-normal text-center',
+              fill &&'min-w-max flex-1 basis-0 text-center',
               // Equal widths while they fit; no option narrower than its own label, so a long set wraps to a second row.
               narrowFill &&
                 '@max-md/panel:min-w-max @max-md/panel:flex-1 @max-md/panel:basis-0 @max-md/panel:text-center',
