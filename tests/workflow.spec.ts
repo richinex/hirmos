@@ -463,11 +463,11 @@ test('keeps the current chapter visible until a cold lazy chapter is ready', asy
   const navigation = page.getByRole('navigation', { name: 'Workspace sections' })
   await navigation.getByRole('button', { name: /DAG workspace/ }).click()
   await chunkRequested
-  await expect(page).toHaveURL(/\/app$/)
+  await expect(page).toHaveURL(/\/app\/projects\/[^/]+\/data$/)
   await expect(page.getByRole('heading', { name: 'Set the analysis dataset' })).toBeVisible()
   await expect(page.getByRole('status', { name: 'Loading DAG editor…' })).toHaveCount(0)
 
   releaseChunk()
-  await expect(page).toHaveURL(/\/app\/dag$/)
+  await expect(page).toHaveURL(/\/app\/projects\/[^/]+\/dag$/)
   await expect(page.getByRole('button', { name: 'Substantive knowledge' })).toBeVisible()
 })

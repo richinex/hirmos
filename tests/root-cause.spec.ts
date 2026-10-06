@@ -29,7 +29,7 @@ test('the DAG opens standalone root-cause analysis and saves its result', async 
   await page.getByRole('textbox', { name: /Rationale/ }).first().fill('Y is twice X in this verification dataset.')
   await page.getByRole('button', { name: 'Add the arrow' }).click()
   await page.getByRole('button', { name: 'Use for causal model analysis', exact: true }).click()
-  await expect(page).toHaveURL(/\/app\/root-cause$/)
+  await expect(page).toHaveURL(/\/app\/projects\/[^/]+\/root-cause$/)
   await expect(page.getByRole('region', { name: 'Root-cause setup' })).toContainText('X affects Y')
   await expect(page.getByLabel('Refitted estimates', { exact: true })).toBeHidden()
   await expect(page.getByLabel('Observed X', { exact: true })).toBeVisible()
@@ -209,8 +209,8 @@ test('the DAG opens standalone root-cause analysis and saves its result', async 
     const snapshot = await loadProject(header.id)
     return snapshot.ok && snapshot.value.rootCause.runs.length === 1 && snapshot.value.studyDraft.dagDocument === null
   })).toBe(true)
+  // A reload reopens the project from its URL and asks for the file again.
   await page.reload()
-  await page.getByRole('button', { name: 'Open Root-cause workflow', exact: true }).click()
   await page.getByRole('heading', { name: 'Choose the data file again' }).waitFor()
   await page.locator('input[type=file]').setInputFiles(csv)
   await page.getByRole('navigation', { name: 'Workspace sections' }).getByRole('button', { name: /Causal model analysis/ }).click()
@@ -339,7 +339,7 @@ test('root-cause navigation preserves the treatment-effect chapter sequence', as
   const start = chapters.ids.indexOf('dag')
   expect(chapters.ids.slice(start, start + 5)).toEqual(['dag', 'study', 'estimation', 'sensitivity', 'counterfactual'])
   expect(chapters.ids.indexOf('root-cause')).toBe(chapters.ids.indexOf('survival') - 1)
-  expect(chapters.route).toEqual({ ok: true, value: { kind: 'chapter', chapter: 'root-cause' } })
+  expect(chapters.route).toEqual({ ok: true, value: { kind: 'chapter', chapter: 'root-cause', project: null } })
 })
 
 test('the root-cause worker preserves signed shifts, percentiles and resumable random state', async ({ page }) => {

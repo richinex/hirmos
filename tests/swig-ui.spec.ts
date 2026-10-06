@@ -131,9 +131,9 @@ test('SWIG UI builds, checks separation, restores and preserves the source DAG',
       }),
     )
     .toBe(3)
+  // A reload reopens the project from its URL, on the DAG workspace it was showing.
   await page.reload()
-  await page.getByRole('button', { name: 'Open Severity, dose and recovery', exact: true }).click()
-  await page.locator('#data-profile-title').waitFor({ timeout: 60_000 })
+  await page.getByRole('heading', { name: 'DAG workspace', exact: true }).waitFor({ timeout: 60_000 })
   await enter(page, mobile)
   await expect(page.getByTestId('swig-conclusion')).toContainText('d-separated given severity')
   await closeInspector(page, mobile)

@@ -59,7 +59,7 @@ test('a fresh IDC*-only project reaches and runs binary ETT estimation', async (
   await expect(treated).not.toHaveText(await untreated.innerText())
 
   await page.getByRole('button', { name: 'Continue to estimation' }).click()
-  await expect(page).toHaveURL(/\/app\/estimation$/)
+  await expect(page).toHaveURL(/\/app\/projects\/[^/]+\/estimation$/)
   await expect(page.getByRole('heading', { name: 'Estimation', exact: true })).toBeVisible()
   await expect(page.getByRole('radio', { name: /Binary ETT by IDC\*/ })).toBeChecked()
   const run = page.getByRole('button', { name: /Run binary ETT by IDC\*/i })

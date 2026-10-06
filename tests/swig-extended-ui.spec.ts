@@ -94,8 +94,8 @@ test('qualified DiD accepts an optional rationale and restores its assessment', 
       }),
     )
     .toBe(1)
+  // A reload reopens the project from its URL and asks for the file again.
   await page.reload()
-  await page.getByRole('button', { name: 'Open DiD graph integration', exact: true }).click()
   await expect(
     page.getByRole('heading', { name: 'Choose the data file again', exact: true }),
   ).toBeVisible()
@@ -104,7 +104,7 @@ test('qualified DiD accepts an optional rationale and restores its assessment', 
     mimeType: 'text/csv',
     buffer: Buffer.from('D,Y0,Y1\n0,1,2\n1,2,4\n0,2,3\n1,3,5\n'),
   })
-  await page.locator('#data-profile-title').waitFor({ timeout: 60000 })
+  await page.getByRole('heading', { name: 'DAG workspace', exact: true }).waitFor({ timeout: 60000 })
   if (mobile) await page.getByRole('button', { name: 'Expand section list' }).click()
   await page
     .getByRole('navigation', { name: 'Workspace sections' })

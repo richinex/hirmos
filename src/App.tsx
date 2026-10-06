@@ -506,7 +506,8 @@ function App() {
     }, 400)
     return () => window.clearTimeout(handle)
   }, [workflow, refreshSaved])
-  const reopenProject = async (id: SavedProjectHeader['id']) => {
+  /** Opens a saved project; false when it is not in this browser's store or cannot be read. */
+  const reopenProject = async (id: SavedProjectHeader['id']): Promise<boolean> => {
     setReopenProblem(null)
     setExampleNotice(null)
     const loaded = await loadProject(id)
@@ -518,7 +519,7 @@ function App() {
             ? 'That project is no longer saved. Choose another project or import a bundle.'
             : describeSnapshotProblem(loaded.error),
       )
-      return
+      return false
     }
     const snapshot = loaded.value
     if (
@@ -532,11 +533,12 @@ function App() {
         if (fingerprint.ok && fingerprint.value === snapshot.profile.source.fingerprint) {
           dispatch({ type: 'project-reopened', snapshot })
           dispatch({ type: 'project-restored', file: cached })
-          return
+          return true
         }
       }
     }
     dispatch({ type: 'project-reopened', snapshot })
+    return true
   }
   const removeProject = async (entry: SavedProjectHeader) => {
     const removed = await deleteProject(entry.id)
@@ -846,6 +848,35 @@ function App() {
   const requestedChapter =
     route.ok && route.value.kind === 'chapter' ? route.value.chapter : defaultChapter
   const activeChapter = chapterIsAvailable(requestedChapter) ? requestedChapter : defaultChapter
+  const openProjectId = workflow.kind === 'awaiting-project' ? null : workflow.project.id
+  const requestedProject = route.ok && route.value.kind === 'chapter' ? route.value.project : null
+  // A project URL reopens that project, once per visit; the requested chapter shows once its data is back.
+  const restoringProject = useRef<string | null>(null)
+  useEffect(() => {
+    if (requestedProject === null) {
+      restoringProject.current = null
+      return
+    }
+    if (workflow.kind !== 'awaiting-project' || restoringProject.current === requestedProject)
+      return
+    restoringProject.current = requestedProject
+    // A shipped example reopens with its bundled data, as its Open button does; other projects ask for the file.
+    const example = SHIPPED_EXAMPLES.find((item) => item.id === requestedProject)
+    const opening =
+      example === undefined
+        ? reopenProject(requestedProject)
+        : openExample(example).then(() => true)
+    void opening.then((found) => {
+      if (!found) replace(chapterPath('projects'))
+    })
+    // reopenProject is recreated each render; the guard above keeps this to one attempt per project URL.
+  }, [requestedProject, workflow.kind])
+  // While that project is still loading or waiting for its file, keep the requested chapter in the URL.
+  const restoringRequestedChapter =
+    requestedProject !== null &&
+    (openProjectId === null || openProjectId === requestedProject) &&
+    workflow.kind !== 'profiled' &&
+    requestedChapter !== activeChapter
   const activeName = CHAPTERS.find((chapter) => chapter.id === activeChapter)?.name ?? 'Hirmos'
 
   // Keep the current chapter on screen while a cold code chunk is fetched. The request counter prevents
@@ -868,7 +899,7 @@ function App() {
       }
       const request = ++navigationRequest.current
       const commit = () => {
-        if (navigationRequest.current === request) navigate(chapterPath(chapter))
+        if (navigationRequest.current === request) navigate(chapterPath(chapter, openProjectId))
       }
       const load = PANEL_LOADERS[chapter]
       if (load === undefined) {
@@ -877,7 +908,7 @@ function App() {
       }
       void load().then(commit, commit)
     },
-    [workflow.kind, closeProject],
+    [workflow.kind, closeProject, openProjectId],
   )
 
   const warmableChapterKey = chapters
@@ -907,15 +938,27 @@ function App() {
   // rewrite to the canonical path without adding history, and the tab title follows.
   useEffect(() => {
     document.title = `${activeName}, Hirmos`
-    if (!route.ok) return
-    const canonical = chapterPath(activeChapter)
-    if (route.value.kind === 'chapter' && route.value.chapter !== activeChapter) replace(canonical)
-    else if (
-      route.value.kind === 'chapter' &&
+    if (!route.ok || restoringRequestedChapter) return
+    const canonical = chapterPath(activeChapter, openProjectId)
+    if (route.value.kind === 'default') {
+      if (openProjectId !== null) replace(canonical)
+      return
+    }
+    if (
+      route.value.chapter !== activeChapter ||
+      route.value.project !== (activeChapter === 'projects' ? null : openProjectId) ||
       !isCanonicalLocation(location.pathname, location.search, route.value)
     )
       replace(canonical)
-  }, [activeChapter, activeName, location.pathname, location.search, route])
+  }, [
+    activeChapter,
+    activeName,
+    location.pathname,
+    location.search,
+    route,
+    openProjectId,
+    restoringRequestedChapter,
+  ])
 
   const railProject =
     project === null

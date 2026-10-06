@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import { err, ok, type Result } from './dop'
+import { brand, err, ok, type Result } from './dop'
+import type { ProjectId } from './workflow'
 
 export const CHAPTER_IDS = [
   'projects',
@@ -96,39 +97,63 @@ export const chapterLabel = (chapter: ChapterId): string => CHAPTER_METADATA[cha
 
 const chapterSchema = z.enum(CHAPTER_IDS)
 
-/** Every screen the shell can show. The public root is the landing page; workbench routes live under `/app`. */
+/**
+ * Every screen the shell can show. The public root is the landing page; workbench routes live under `/app`.
+ * A chapter inside an open project names that project, so a reload can reopen it.
+ */
 export type Route =
-  { readonly kind: 'default' } | { readonly kind: 'chapter'; readonly chapter: ChapterId }
+  | { readonly kind: 'default' }
+  | { readonly kind: 'chapter'; readonly chapter: ChapterId; readonly project: ProjectId | null }
 
 export type RouteProblem =
   | { readonly kind: 'unknown-path'; readonly path: string }
   | { readonly kind: 'invalid-chapter-query'; readonly value: string }
 
-export const chapterPath = (chapter: ChapterId): string => `/app/${chapter}`
+/** The project list never names a project; every other chapter does while one is open. */
+export const chapterPath = (chapter: ChapterId, project: ProjectId | null = null): string =>
+  project === null || chapter === 'projects'
+    ? `/app/${chapter}`
+    : `/app/projects/${encodeURIComponent(project)}/${chapter}`
 
 export const routePath = (route: Route): string =>
-  route.kind === 'default' ? '/app' : chapterPath(route.chapter)
+  route.kind === 'default' ? '/app' : chapterPath(route.chapter, route.project)
+
+/** Project ids are generated UUIDs or example slugs; anything else in that position is not a project. */
+const projectSegment = z.string().regex(/^[A-Za-z0-9-]{1,64}$/u)
 
 /**
- * Parse a workbench location. The path form (`/app/dag`) is canonical; `/app?chapter=dag`
- * still parses so early Hirmos links keep working, and the shell rewrites it to the path.
+ * Parse a workbench location. Inside a project the canonical form is `/app/projects/<id>/dag`; with no
+ * project open it is `/app/dag`. `/app?chapter=dag` still parses so early Hirmos links keep working, and the
+ * shell rewrites both older forms to the canonical path.
  */
 export function parseRoute(pathname: string, search: string): Result<Route, RouteProblem> {
   const segments = pathname.split('/').filter((segment) => segment.length > 0)
-  if (segments.at(0) !== 'app' || segments.length > 2)
-    return err({ kind: 'unknown-path', path: pathname })
+  if (segments.at(0) !== 'app') return err({ kind: 'unknown-path', path: pathname })
+  // `/app/projects/<id>/<chapter>`: a chapter of an open project. The bare id opens its data chapter.
+  if (segments.at(1) === 'projects' && segments.length > 2) {
+    const id = projectSegment.safeParse(decodeURIComponent(segments[2]!))
+    const chapter = chapterSchema.safeParse(segments.at(3) ?? 'data')
+    if (segments.length > 4 || !id.success || !chapter.success || chapter.data === 'projects')
+      return err({ kind: 'unknown-path', path: pathname })
+    return ok({
+      kind: 'chapter',
+      chapter: chapter.data,
+      project: brand<string, 'ProjectId'>(id.data),
+    })
+  }
+  if (segments.length > 2) return err({ kind: 'unknown-path', path: pathname })
   const segment = segments.at(1)
   if (segment !== undefined) {
     const parsed = chapterSchema.safeParse(segment)
     return parsed.success
-      ? ok({ kind: 'chapter', chapter: parsed.data })
+      ? ok({ kind: 'chapter', chapter: parsed.data, project: null })
       : err({ kind: 'unknown-path', path: pathname })
   }
   const query = new URLSearchParams(search).get('chapter')
   if (query === null) return ok({ kind: 'default' })
   const parsed = chapterSchema.safeParse(query)
   return parsed.success
-    ? ok({ kind: 'chapter', chapter: parsed.data })
+    ? ok({ kind: 'chapter', chapter: parsed.data, project: null })
     : err({ kind: 'invalid-chapter-query', value: query })
 }
 
