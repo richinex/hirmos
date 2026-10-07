@@ -67,7 +67,7 @@ test('saved ITS shows trimming and seasonal span without blocking the fit',async
   await page.getByRole('checkbox',{name:'y',exact:true}).check()
   await page.getByRole('radio',{name:'Complete contiguous interval',exact:true}).click()
   await page.getByRole('button',{name:/Create prepared dataset/}).click()
-  await expect(page.getByRole('heading',{name:'Build a DAG or run discovery',exact:true})).toBeVisible()
+  await expect(page.getByRole('heading',{name:'Next steps',exact:true})).toBeVisible()
   await chapter(page,/Time-series analysis/)
   await page.getByRole('radio',{name:'Interrupted series',exact:true}).click()
   await choose(page,'Series','y')

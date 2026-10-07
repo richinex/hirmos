@@ -41,7 +41,7 @@ for(const mode of ['event-study','ddd','bacon'] as const)test(`Mixtape ${mode}: 
   if(mode!=='ddd'){await choose(page,'Unit column','unit');await choose(page,'Time column','period')}
   await page.getByRole('button',{name:'Select all columns',exact:true}).click()
   await page.getByRole('button',{name:/Create prepared/}).click()
-  await expect(page.getByRole('heading',{name:'Build a DAG or run discovery',exact:true})).toBeVisible({timeout:90_000})
+  await expect(page.getByRole('heading',{name:'Next steps',exact:true})).toBeVisible({timeout:90_000})
   await chapter(page,/Estimation/)
   await page.getByRole('radio',{name:'Regression designs',exact:true}).click()
   await page.getByRole('radio',{name:mode==='event-study'?'Event study':mode==='ddd'?'Interactions / DDD':'Bacon decomposition',exact:true}).click()

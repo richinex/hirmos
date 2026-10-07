@@ -1,3 +1,5 @@
+import {restoreMissingDagExploration} from './dagProvenance'
+import type {PowerRecord} from './powerPlanning'
 import { surrogateRunMatchesProfile, type SurrogateRun, type SurrogateRunId } from './surrogateRun'
 import type { SwigAnalysis } from './swig'
 import { deleteArtifact, type DeletionTarget } from './artifactLifecycle'
@@ -138,6 +140,7 @@ export type Workflow =
       readonly source: SelectedSource
       readonly profile: DatasetProfile
       readonly prepared: PreparedDatasetArtifact | null
+      readonly powerPlanning: PowerRecord | null
       readonly stationarity: StationarityEvidenceArtifact | null
       readonly grangerEvidence: readonly GrangerEvidenceArtifact[]
       readonly countSeriesModels: readonly CountSeriesModelArtifact[]
@@ -228,6 +231,7 @@ export type WorkflowEvent =
   | { readonly type: 'swig-analysis-created'; readonly analysis: SwigAnalysis }
   | { readonly type: 'swig-analysis-deleted'; readonly id: SwigAnalysis['id'] }
   | { readonly type: 'intervention-query-deleted'; readonly query: InterventionQueryArtifact['id'] }
+  | { readonly type: 'power-planning-recorded'; readonly record: PowerRecord }
   | { readonly type: 'study-draft-changed'; readonly draft: StudyDesignDraft }
   | {
       readonly type: 'study-identified'
@@ -428,6 +432,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
               throw new Error('unreachable')
             })(),
           prepared: snapshot.prepared,
+          powerPlanning: snapshot.powerPlanning,
           stationarity: snapshot.stationarity,
           grangerEvidence: snapshot.grangerEvidence,
           countSeriesModels: snapshot.countSeriesModels,
@@ -534,6 +539,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
           project: state.project,
           origin: state.origin,
           source: state.source,
+          powerPlanning: null,
           profile: event.profile,
           prepared: null,
           stationarity: null,
@@ -764,6 +770,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
           ),
         }
       }
+      if (event.type === 'power-planning-recorded') return {...state,powerPlanning:event.record}
       if (event.type === 'study-draft-changed') return { ...state, studyDraft: event.draft }
       if (
         event.type === 'swig-analysis-created' &&
@@ -795,6 +802,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
       ) {
         return {
           ...state,
+          dagDocuments: state.dagDocuments.map(document=>restoreMissingDagExploration(document,[...state.studies,event.study])),
           studies: [...state.studies, event.study],
           identifications: [...state.identifications, event.identification],
         }

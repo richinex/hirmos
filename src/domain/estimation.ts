@@ -1,3 +1,4 @@
+import {covariateBalanceSchema} from './covariateBalance'
 import { z } from 'zod'
 import { ridgeConfigurationSchema, ridgeMatches, type RidgeConfiguration } from './ridgeAugmented'
 import type { RidgeAugmentedEvidence } from './remixExtensions'
@@ -1201,6 +1202,7 @@ export const treatmentModelStoppedEarly = (model: TreatmentModelEvidence): boole
 export const propensityWeightingEvidenceSchema = z
   .object({
     kind: z.literal('propensityWeighting'),
+    balance: covariateBalanceSchema.default({kind:'notRecorded'}),
     target: z.enum(['ate', 'att']),
     observations: z.number().int().positive(),
     treatmentModel: treatmentModelEvidenceSchema,
@@ -1245,6 +1247,7 @@ export type GridSliceEvidence = z.infer<typeof gridSliceEvidenceSchema>
 export const propensityMatchingEvidenceSchema = z
   .object({
     kind: z.literal('propensityMatching'),
+    balance: covariateBalanceSchema.default({kind:'notRecorded'}),
     target: z.enum(['ate', 'att']),
     observations: z.number().int().positive(),
     treatmentModel: treatmentModelEvidenceSchema,
@@ -1261,6 +1264,7 @@ export const propensityMatchingEvidenceSchema = z
 export const doublyRobustEvidenceSchema = z
   .object({
     kind: z.literal('doublyRobust'),
+    balance: covariateBalanceSchema.default({kind:'notRecorded'}),
     target: z.enum(['ate', 'att']),
     observations: z.number().int().positive(),
     /** The treatment model's parameter count: the constant plus one per design column. */

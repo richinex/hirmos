@@ -1,3 +1,4 @@
+import { NumberInput } from '@/components/ui/NumberInput'
 import { RunPicker } from '@/components/ui/RunPicker'
 import { formatCount } from '@/lib/format/number'
 import { SettingsDisclosure } from '@/components/ui/SettingsDisclosure'
@@ -717,9 +718,8 @@ export function RootCausePanel(props: Props) {
                         {graph.value.nodes.map((node) => (
                           <label key={node.id}>
                             <span className={fieldLabel}>Shift in {node.name}</span>
-                            <input
+                            <NumberInput
                               className={field('text', 'mt-1')}
-                              type="number"
                               step="any"
                               value={shifts[node.id] ?? ''}
                               placeholder="Leave unchanged"
@@ -751,10 +751,9 @@ export function RootCausePanel(props: Props) {
                           label="Refitted estimates"
                           help="Number of times the model is refitted to sampled observations to calculate the summary and percentile bounds."
                         />
-                        <input
+                        <NumberInput
                           id={`${fields}-repetitions`}
                           className={field('text', 'mt-1')}
-                          type="number"
                           min={1}
                           value={repetitions}
                           onChange={(event) => setRepetitions(Number(event.target.value))}
@@ -767,10 +766,9 @@ export function RootCausePanel(props: Props) {
                           label="Random seed"
                           help="Starting value for random sampling when starting a new random sequence."
                         />
-                        <input
+                        <NumberInput
                           id={`${fields}-seed`}
                           className={field('text', 'mt-1')}
-                          type="number"
                           min={0}
                           value={seed}
                           onChange={(event) => setSeed(Number(event.target.value))}
@@ -815,10 +813,9 @@ export function RootCausePanel(props: Props) {
                             label="Distribution samples"
                             help="Number of generated observations used to approximate the model distributions in each attribution calculation."
                           />
-                          <input
+                          <NumberInput
                             id={`${fields}-samples`}
                             className={field('text', 'mt-1')}
-                            type="number"
                             min={1}
                             value={samples}
                             onChange={(event) => setSamples(Number(event.target.value))}

@@ -311,8 +311,20 @@ pub(crate) fn propensity_matching(
     let matched =
         hirmos_causal_core::propensity::match_on_score_target(&responses, &treated, &propensity, target.kernel())
             .map_err(|cause| format!("propensity matching could not pair the arms: {cause:?}"))?;
+    let identities: Vec<f64> = (0..rows).map(|r| r as f64).collect();
+    let paired = hirmos_causal_core::propensity::match_on_score_target(&identities, &treated, &propensity, target.kernel())
+        .map_err(|_| "The matched row identities could not be recovered.".to_owned())?;
+    let mut weights = vec![0.0; rows];
+    for row in 0..rows {
+        if matches!(target, PropensityTarget::Ate) || treated[row] {
+            weights[row] += 1.0;
+            weights[paired.matches[row] as usize] += 1.0;
+        }
+    }
+    let balance = propensity_balance(&design, &treated, &weights, target);
     let treated_rows = treated.iter().filter(|&&t| t).count();
     Ok(AnalysisResult::PropensityMatching {
+        balance,
         target,
         observations: rows,
         treatment_model,
@@ -368,7 +380,17 @@ pub(crate) fn doubly_robust_estimate(
             })
         }
     };
+    let weights: Vec<f64> = scores.propensity.iter().zip(&treated).map(|(&p, &t)| {
+        match (target, t) {
+            (PropensityTarget::Att, true) => 1.0,
+            (PropensityTarget::Att, false) => p / (1.0 - p),
+            (PropensityTarget::Ate, true) => 1.0 / p,
+            (PropensityTarget::Ate, false) => 1.0 / (1.0 - p),
+        }
+    }).collect();
+    let balance = propensity_balance(&design, &treated, &weights, target);
     Ok(AnalysisResult::DoublyRobust {
+        balance,
         target,
         observations: rows,
         parameters: design[0].len() + 1,
@@ -493,9 +515,28 @@ pub(crate) fn propensity_weighting(
         treated_weight_sum: estimate.treated_weight_sum,
         control_weight_sum: estimate.control_weight_sum,
         propensity,
+        balance: propensity_balance(&design, &treated, &estimate.weights, target),
         treated,
         weights: estimate.weights,
         outcome: responses,
         interval,
     })
+}
+
+fn propensity_balance(design: &[Vec<f64>], treated: &[bool], weights: &[f64], target: PropensityTarget) -> CovariateBalanceEvidence {
+    use hirmos_causal_core::covariate_balance::{balance, CovariateKind, Denominator, Scale};
+    let (reference, denominator) = match target {
+        PropensityTarget::Ate => ("pooled", Denominator::Pooled),
+        PropensityTarget::Att => ("treated", Denominator::Treated),
+    };
+    let mut rows = Vec::new();
+    for column in 0..design[0].len() {
+        let values: Vec<_> = design.iter().map(|row| row[column]).collect();
+        let kind = if values.iter().all(|&v| v == 0.0 || v == 1.0) { CovariateKind::Binary } else { CovariateKind::Continuous };
+        match balance(&values, treated, Some(weights), kind, Scale::Standardized(denominator)) {
+            Ok(result) => rows.push(CovariateBalanceRow { column, before: result.before, after: result.after.expect("weights supplied"), denominator: result.denominator, used_full_sample_spread: result.used_full_sample_spread }),
+            Err(_) => return CovariateBalanceEvidence::Unavailable { reason: "Balance could not be calculated for these covariates and weights. The effect estimate is unchanged.".to_owned() },
+        }
+    }
+    CovariateBalanceEvidence::Available { reference: reference.to_owned(), rows }
 }

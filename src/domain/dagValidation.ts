@@ -1,4 +1,3 @@
-import { canonicalAdjustment, type DagAdjustmentAnalysis } from './dagFlow'
 import { z } from 'zod'
 import { assertNever, brand, isNonEmpty, type Brand, type NonEmptyArray } from './dop'
 import type {
@@ -169,7 +168,6 @@ export type { DagAdjustmentAnalysis } from './dagFlow'
 export interface DagStudyBindingAnalysis {
   readonly treatment: DagNodeId
   readonly outcome: DagNodeId
-  readonly adjustment: DagAdjustmentAnalysis
   /** Lagged arrows the contemporaneous adjustment analysis leaves to CausalEffects. */
   readonly laggedArrows: number
 }
@@ -332,7 +330,6 @@ export function inspectDagStudyBinding(
     value: {
       treatment,
       outcome,
-      adjustment: canonicalAdjustment(document.current.graph, treatment, outcome),
       laggedArrows: document.current.graph.edges.filter((edge) => edge.timing.kind === 'lagged')
         .length,
     },

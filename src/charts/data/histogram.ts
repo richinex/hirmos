@@ -55,7 +55,11 @@ export function histogramOption(view: HistogramView, theme: ChartTheme): ECharts
         return `${edgeLabel(edges[index])} to ${edgeLabel(edges[index + 1])}<br/><strong>${formatCount(counts[index]).text}</strong> values`
       },
     },
-    xAxis: categoryAxis(theme, labels),
+    // Bars sit on the category axis; rules sit on a hidden numeric axis over the same bins, so each keeps its exact value.
+    xAxis: [
+      categoryAxis(theme, labels),
+      { type: 'value', min: -0.5, max: counts.length - 0.5, show: false },
+    ],
     yAxis: { ...valueAxis(theme), min: 0 },
     series: [
       {
@@ -71,10 +75,16 @@ export function histogramOption(view: HistogramView, theme: ChartTheme): ECharts
             borderWidth: 1,
           },
         },
-        markLine:
-          marks.length === 0
-            ? undefined
-            : {
+      },
+      ...(marks.length === 0
+        ? []
+        : [
+            {
+              type: 'line' as const,
+              xAxisIndex: 1,
+              data: [],
+              silent: true,
+              markLine: {
                 silent: true,
                 symbol: 'none',
                 lineStyle: { color: theme.muted, type: 'dashed', width: 1 },
@@ -85,13 +95,21 @@ export function histogramOption(view: HistogramView, theme: ChartTheme): ECharts
                   formatter: (params: { readonly name?: string }) => params.name ?? '',
                 },
                 // Two marks often fall a bin apart, so their labels take turns on either side of their rules.
-                data: marks.map((mark, index) => ({
-                  name: mark.name,
-                  xAxis: binPosition(view.bins, mark.value),
-                  label: { position: index % 2 === 0 ? 'insideEndTop' : 'insideEndBottom' },
-                })),
+                data: marks.map((mark, index) => {
+                  const color = mark.tone === undefined ? theme.muted : theme[mark.tone]
+                  return {
+                    name: mark.name,
+                    xAxis: binPosition(view.bins, mark.value),
+                    lineStyle: { color },
+                    label: {
+                      color,
+                      position: index % 2 === 0 ? 'insideEndTop' : 'insideEndBottom',
+                    },
+                  }
+                }),
               },
-      },
+            },
+          ]),
     ],
   }
 }

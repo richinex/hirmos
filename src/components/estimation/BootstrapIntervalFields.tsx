@@ -1,3 +1,4 @@
+import { NumberInput } from '@/components/ui/NumberInput'
 import { ParameterLabel } from '@/components/ui/ParameterLabel'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { field, fieldLabel, fieldRow } from '@/components/ui/recipes'
@@ -40,10 +41,9 @@ export function BootstrapIntervalFields({
         <div className={fieldRow.three}>
           <label className="block">
             <span className={fieldLabel}>Bootstrap rounds</span>
-            <input
+            <NumberInput
               className={field('text', 'mt-1 w-full')}
               aria-label="Bootstrap rounds"
-              type="number"
               min={2}
               max={2000}
               value={value.rounds}
@@ -57,10 +57,9 @@ export function BootstrapIntervalFields({
           </label>
           <label className="block">
             <span className={fieldLabel}>Bootstrap seed</span>
-            <input
+            <NumberInput
               className={field('text', 'mt-1 w-full')}
               aria-label="Bootstrap seed"
-              type="number"
               min={0}
               max={4294967295}
               value={value.seed}

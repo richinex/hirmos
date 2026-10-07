@@ -1,3 +1,4 @@
+import { NumberInput } from '@/components/ui/NumberInput'
 import { useMemo, useState } from 'react'
 import type { DagDocument } from '@/domain/dag'
 import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
@@ -447,10 +448,9 @@ export function SwigWorkspace({
               </label>
               <label>
                 <span className={fieldLabel}>Value</span>
-                <input
+                <NumberInput
                   aria-label={`Intervention value ${index + 1}`}
                   className={field('text', 'mt-1')}
-                  type="number"
                   step="any"
                   value={row.value}
                   onChange={(event) =>

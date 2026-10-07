@@ -20,3 +20,30 @@ export const adjustmentValidationDesignSchema = z
   })
   .strict()
 export type AdjustmentValidationDesign = z.infer<typeof adjustmentValidationDesignSchema>
+
+export const adjustmentRecommendationSchema = z.discriminatedUnion('kind', [
+  z
+    .object({
+      kind: z.literal('available'),
+      nodes: z.array(node),
+      guarantee: z.enum(['established', 'notEstablished']),
+    })
+    .strict(),
+  z.object({ kind: z.literal('unavailable'), reason: z.string() }).strict(),
+])
+export type AdjustmentRecommendation = z.infer<typeof adjustmentRecommendationSchema>
+export const adjustmentGraphSchema = z.discriminatedUnion('kind', [
+  z
+    .object({
+      kind: z.literal('identified'),
+      canonicalSet: z.array(node),
+      emptyValid: z.boolean(),
+      recommendation: adjustmentRecommendationSchema,
+    })
+    .strict(),
+  z.object({ kind: z.literal('notIdentified') }).strict(),
+])
+export const adjustmentResponseSchema = z
+  .object({ checks: z.array(adjustmentValidationSchema), analysis: adjustmentGraphSchema })
+  .strict()
+export type AdjustmentResponse = z.infer<typeof adjustmentResponseSchema>

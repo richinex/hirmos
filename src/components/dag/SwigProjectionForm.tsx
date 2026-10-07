@@ -1,3 +1,4 @@
+import { NumberInput, numberValue } from '@/components/ui/NumberInput'
 import type { DagDocument } from '@/domain/dag'
 import type { SwigProjection } from '@/domain/swigProjection'
 import { Select } from '@/components/ui/Select'
@@ -49,14 +50,13 @@ export function SwigProjectionForm({
                 <span className={fieldLabel}>
                   {key === 'start' ? 'First period' : 'Last period'}
                 </span>
-                <input
-                  type="number"
+                <NumberInput
                   min={-32}
                   max={32}
                   aria-label={key === 'start' ? 'First expansion period' : 'Last expansion period'}
                   className={field('text', 'mt-1')}
                   value={value[key]}
-                  onChange={(e) => onChange({ ...value, [key]: e.target.valueAsNumber })}
+                  onChange={(e) => onChange({ ...value, [key]: numberValue(e.target) })}
                 />
               </label>
             ))}

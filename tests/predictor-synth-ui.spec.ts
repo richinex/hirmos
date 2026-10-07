@@ -22,7 +22,7 @@ test('Texas predictor-based synthetic control: full UI, plots, run row, oracle a
   await choose(page, 'Time column', 'period')
   await page.getByRole('button', { name: 'Select all columns', exact: true }).click()
   await page.getByRole('button', { name: /Create prepared/ }).click()
-  await expect(page.getByRole('heading', { name: 'Build a DAG or run discovery', exact: true })).toBeVisible({ timeout: 90_000 })
+  await expect(page.getByRole('heading', { name: 'Next steps', exact: true })).toBeVisible({ timeout: 90_000 })
   await createDag(page, 'Texas intervention')
   await addArrow(page, 'policy', 'bmprison', 'The policy intervention can change the prison population. The synthetic-control comparison uses untreated states to construct the no-intervention path.')
   await identify(page, { graph: 'Texas intervention', treatment: 'policy', outcome: 'bmprison', target: /^Treated rows/, mechanism: 'Policy change', sentence: 'Texas is exposed from 1994; the donor states are untreated.' })

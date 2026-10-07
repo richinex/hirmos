@@ -1,3 +1,6 @@
+import { NumberInput } from '@/components/ui/NumberInput'
+import {CovariateBalanceResult} from './CovariateBalanceResult'
+import {DagRevisionNotice} from '@/components/study/DagRevisionNotice'
 import { RunActions } from '@/components/ui/RunActions'
 import { PredictorSyntheticControls } from './PredictorSyntheticControls'
 import { PredictorSyntheticResult } from './PredictorSyntheticResult'
@@ -2359,8 +2362,8 @@ export const ResultCard = memo(function ResultCard({
         bins: summary.bins,
         nullCount: 0,
         marks: [
-          { name: 'average', value: run.evidence.average },
-          { name: 'median', value: summary.median },
+          { name: 'average', value: run.evidence.average, tone: 'signal' },
+          { name: 'median', value: summary.median, tone: 'info' },
         ],
       },
       theme,
@@ -2368,6 +2371,7 @@ export const ResultCard = memo(function ResultCard({
   }, [run, study.treatment.name, study.outcome.name, theme])
   const body = (
     <>
+      <DagRevisionNotice study={study} />
       {run.kind === 'panel-intervention-run' && run.evidence.kind === 'panelAdjusted' && (
         <AdjustedDidConvergenceWarning evidence={run.evidence} />
       )}
@@ -2400,6 +2404,7 @@ export const ResultCard = memo(function ResultCard({
           />
         </div>
       )}
+      {(run.kind === 'propensity-weighting-run' || run.kind === 'propensity-matching-run' || run.kind === 'doubly-robust-run') && <CovariateBalanceResult evidence={run.evidence.balance} augmented={run.kind === 'doubly-robust-run'} />}
       {overlap !== null && (
         <div className="mt-3">
           <ExpandableChart
@@ -4879,6 +4884,17 @@ export function EstimationPanel({
               ? { kind: 'logistic', model: logistic }
               : { kind: 'boosted', model: boostedCommand(picked.grid, picked.searched) }
           const record = (run: Parameters<typeof causalEstimateFrom>[2]) => {
+            if (run.kind === 'propensity-weighting-run' || run.kind === 'propensity-matching-run' || run.kind === 'doubly-robust-run') {
+              const balance = run.evidence.balance
+              if (balance.kind === 'available') {
+                const labels = columns.slice(2).flatMap((column, i) => {
+                  const levels = design.value.levels[i+2]!
+                  return levels.length === 0 ? [column.name] : levels.map(level => column.name + ' = ' + String(level))
+                })
+                run = {...run, evidence:{...run.evidence,balance:{...balance,labels}}} as typeof run
+              }
+            }
+
             const estimate = causalEstimateFrom(study, identification, run)
             finish(
               estimate === null
@@ -5208,8 +5224,7 @@ export function EstimationPanel({
                     label="Control value"
                     help={ESTIMATION_PARAMETER_HELP.frontdoor.controlValue}
                   />
-                  <input
-                    type="number"
+                  <NumberInput
                     step="any"
                     aria-label="Front-door control value"
                     className={field('text', 'mt-1 w-full')}
@@ -5231,8 +5246,7 @@ export function EstimationPanel({
                     label="Treatment value"
                     help={ESTIMATION_PARAMETER_HELP.frontdoor.treatmentValue}
                   />
-                  <input
-                    type="number"
+                  <NumberInput
                     step="any"
                     aria-label="Front-door treatment value"
                     className={field('text', 'mt-1 w-full')}
@@ -5258,8 +5272,7 @@ export function EstimationPanel({
                     label="Bootstrap resamples"
                     help={ESTIMATION_PARAMETER_HELP.frontdoor.bootstrapResamples}
                   />
-                  <input
-                    type="number"
+                  <NumberInput
                     min={20}
                     max={5000}
                     aria-label="Front-door bootstrap resamples"
@@ -5282,8 +5295,7 @@ export function EstimationPanel({
                     label="Bootstrap seed"
                     help={ESTIMATION_PARAMETER_HELP.frontdoor.bootstrapSeed}
                   />
-                  <input
-                    type="number"
+                  <NumberInput
                     min={0}
                     aria-label="Front-door bootstrap seed"
                     className={field('text', 'mt-1 w-full')}
@@ -5315,8 +5327,7 @@ export function EstimationPanel({
                   label="Bootstrap resamples"
                   help={ESTIMATION_PARAMETER_HELP.instrumentalVariable.bootstrapResamples}
                 />
-                <input
-                  type="number"
+                <NumberInput
                   min={20}
                   max={5000}
                   aria-label="Instrumental-variable bootstrap resamples"
@@ -5339,8 +5350,7 @@ export function EstimationPanel({
                   label="Bootstrap seed"
                   help={ESTIMATION_PARAMETER_HELP.instrumentalVariable.bootstrapSeed}
                 />
-                <input
-                  type="number"
+                <NumberInput
                   min={0}
                   aria-label="Instrumental-variable bootstrap seed"
                   className={field('text', 'mt-1 w-full')}
@@ -5707,9 +5717,8 @@ export function EstimationPanel({
                         label="Autoregressive order"
                         help={ESTIMATION_PARAMETER_HELP.adjustedRegression.autoregressiveOrder}
                       />
-                      <input
+                      <NumberInput
                         aria-label="Autoregressive order"
-                        type="number"
                         min={0}
                         max={MAX_ARMA_ORDER}
                         className={field('text', 'mt-1')}
@@ -5736,9 +5745,8 @@ export function EstimationPanel({
                         label="Moving-average order"
                         help={ESTIMATION_PARAMETER_HELP.adjustedRegression.movingAverageOrder}
                       />
-                      <input
+                      <NumberInput
                         aria-label="Moving-average order"
-                        type="number"
                         min={0}
                         max={MAX_ARMA_ORDER}
                         className={field('text', 'mt-1')}
@@ -5765,9 +5773,8 @@ export function EstimationPanel({
                         label="Optimiser iterations"
                         help={ESTIMATION_PARAMETER_HELP.adjustedRegression.armaIterations}
                       />
-                      <input
+                      <NumberInput
                         aria-label="Optimiser iterations"
-                        type="number"
                         min={1}
                         className={field('text', 'mt-1')}
                         value={configuration.errors.maxIter}
@@ -5818,8 +5825,7 @@ export function EstimationPanel({
                   label="Fold seed"
                   help={ESTIMATION_PARAMETER_HELP.dml.foldSeed}
                 />
-                <input
-                  type="number"
+                <NumberInput
                   min={0}
                   aria-label="Fold seed"
                   className={field('text', 'mt-1')}
@@ -5894,8 +5900,7 @@ export function EstimationPanel({
                     label="Iteration limit"
                     help={ESTIMATION_PARAMETER_HELP.propensity.maxIter}
                   />
-                  <input
-                    type="number"
+                  <NumberInput
                     min={1}
                     max={100000}
                     aria-label="Iteration limit"
@@ -6131,8 +6136,7 @@ export function EstimationPanel({
                             label="Learner seed"
                             help={ESTIMATION_PARAMETER_HELP.tLearner.learnerSeed}
                           />
-                          <input
-                            type="number"
+                          <NumberInput
                             min={0}
                             aria-label="Learner seed"
                             className={field('text', 'mt-1')}
@@ -6194,8 +6198,7 @@ export function EstimationPanel({
                   label="Maximum lag"
                   help={ESTIMATION_PARAMETER_HELP.ardl.maximumLag}
                 />
-                <input
-                  type="number"
+                <NumberInput
                   min={1}
                   max={24}
                   aria-label="Maximum lag"
@@ -6271,8 +6274,7 @@ export function EstimationPanel({
                   label="Maximum lags"
                   help={ESTIMATION_PARAMETER_HELP.vecm.maximumLags}
                 />
-                <input
-                  type="number"
+                <NumberInput
                   min={1}
                   max={24}
                   aria-label="Maximum lags"
@@ -6339,8 +6341,7 @@ export function EstimationPanel({
                   label="Chow split after row"
                   help={ESTIMATION_PARAMETER_HELP.vecm.chowBreakRow}
                 />
-                <input
-                  type="number"
+                <NumberInput
                   min={4}
                   max={prepared.observations - 4}
                   aria-label="Chow split after row"
@@ -6463,8 +6464,7 @@ export function EstimationPanel({
                   {configuration.start.kind === 'row' && (
                     <label className="text-body text-ink">
                       First post-intervention row
-                      <input
-                        type="number"
+                      <NumberInput
                         min={3}
                         max={prepared.observations}
                         aria-label="First post-intervention row"
@@ -6544,8 +6544,7 @@ export function EstimationPanel({
                     label="Cross-fit folds"
                     help={ESTIMATION_PARAMETER_HELP.syntheticControl.crossFitFolds}
                   />
-                  <input
-                    type="number"
+                  <NumberInput
                     min={2}
                     max={20}
                     aria-label="Cross-fit folds"
@@ -6568,8 +6567,7 @@ export function EstimationPanel({
                     label="Inference alpha"
                     help={ESTIMATION_PARAMETER_HELP.syntheticControl.inferenceAlpha}
                   />
-                  <input
-                    type="number"
+                  <NumberInput
                     min={0.001}
                     max={0.5}
                     step={0.01}
@@ -6740,8 +6738,7 @@ export function EstimationPanel({
                         label="Placebo replications"
                         help={ESTIMATION_PARAMETER_HELP.panelIntervention.placeboReplications}
                       />
-                      <input
-                        type="number"
+                      <NumberInput
                         min={2}
                         max={2000}
                         aria-label="Panel placebo replications"
@@ -6764,8 +6761,7 @@ export function EstimationPanel({
                         label="Placebo seed"
                         help={ESTIMATION_PARAMETER_HELP.panelIntervention.placeboSeed}
                       />
-                      <input
-                        type="number"
+                      <NumberInput
                         min={0}
                         max={0xffff_ffff}
                         aria-label="Panel placebo seed"
@@ -6797,8 +6793,7 @@ export function EstimationPanel({
                   label="Warmup"
                   help={ESTIMATION_PARAMETER_HELP.nuts.warmup}
                 />
-                <input
-                  type="number"
+                <NumberInput
                   min={10}
                   max={5000}
                   aria-label="Warmup"
@@ -6821,8 +6816,7 @@ export function EstimationPanel({
                   label="Draws"
                   help={ESTIMATION_PARAMETER_HELP.nuts.draws}
                 />
-                <input
-                  type="number"
+                <NumberInput
                   min={10}
                   max={5000}
                   aria-label="Draws"
@@ -6845,8 +6839,7 @@ export function EstimationPanel({
                   label="Seed"
                   help={ESTIMATION_PARAMETER_HELP.nuts.seed}
                 />
-                <input
-                  type="number"
+                <NumberInput
                   min={0}
                   aria-label="Sampler seed"
                   className={field('text', 'mt-1 w-full')}
@@ -6878,8 +6871,7 @@ export function EstimationPanel({
                     label="Warmup"
                     help={ESTIMATION_PARAMETER_HELP.nuts.warmup}
                   />
-                  <input
-                    type="number"
+                  <NumberInput
                     min={10}
                     max={5000}
                     aria-label="Warmup"
@@ -6902,8 +6894,7 @@ export function EstimationPanel({
                     label="Draws per chain"
                     help={ESTIMATION_PARAMETER_HELP.nuts.draws}
                   />
-                  <input
-                    type="number"
+                  <NumberInput
                     min={10}
                     max={5000}
                     aria-label="Draws per chain"
@@ -6926,8 +6917,7 @@ export function EstimationPanel({
                     label="Seed"
                     help={ESTIMATION_PARAMETER_HELP.nuts.seed}
                   />
-                  <input
-                    type="number"
+                  <NumberInput
                     min={0}
                     aria-label="Sampler seed"
                     className={field('text', 'mt-1')}
@@ -6959,8 +6949,7 @@ export function EstimationPanel({
                   label="State budget"
                   help={ESTIMATION_PARAMETER_HELP.discreteBn.stateBudget}
                 />
-                <input
-                  type="number"
+                <NumberInput
                   min={2}
                   max={10}
                   aria-label="State budget"
@@ -6980,8 +6969,7 @@ export function EstimationPanel({
                   label="Equivalent sample size"
                   help={ESTIMATION_PARAMETER_HELP.discreteBn.equivalentSampleSize}
                 />
-                <input
-                  type="number"
+                <NumberInput
                   min={0.1}
                   step="any"
                   aria-label="Equivalent sample size"
@@ -7098,8 +7086,7 @@ export function EstimationPanel({
                     label="Forecast periods"
                     help={ESTIMATION_PARAMETER_HELP.ingarch.forecastPeriods}
                   />
-                  <input
-                    type="number"
+                  <NumberInput
                     min={1}
                     max={240}
                     className={field('text', 'mt-1 w-full')}
@@ -7121,8 +7108,7 @@ export function EstimationPanel({
                     label="Control value"
                     help={ESTIMATION_PARAMETER_HELP.ingarch.controlValue}
                   />
-                  <input
-                    type="number"
+                  <NumberInput
                     step="any"
                     className={field('text', 'mt-1 w-full')}
                     value={configuration.controlValue}
@@ -7137,8 +7123,7 @@ export function EstimationPanel({
                     label="Treatment value"
                     help={ESTIMATION_PARAMETER_HELP.ingarch.treatmentValue}
                   />
-                  <input
-                    type="number"
+                  <NumberInput
                     step="any"
                     className={field('text', 'mt-1 w-full')}
                     value={configuration.treatmentValue}
@@ -7157,8 +7142,7 @@ export function EstimationPanel({
                       label="Decay δ"
                       help={ESTIMATION_PARAMETER_HELP.ingarch.decay}
                     />
-                    <input
-                      type="number"
+                    <NumberInput
                       min={0}
                       max={1}
                       step={0.05}
@@ -7229,8 +7213,7 @@ export function EstimationPanel({
                     label="Neighbours k"
                     help={ESTIMATION_PARAMETER_HELP.causalEffects.neighbours}
                   />
-                  <input
-                    type="number"
+                  <NumberInput
                     min={1}
                     max={100}
                     className={field('text', 'mt-1 w-full')}
@@ -7356,8 +7339,7 @@ export function EstimationPanel({
                             label="Lag"
                             help={ESTIMATION_PARAMETER_HELP.causalEffects.lag}
                           />
-                          <input
-                            type="number"
+                          <NumberInput
                             min={0}
                             max={temporalAdjustmentMaxLag}
                             className={field('text', 'mt-1')}
@@ -7446,8 +7428,7 @@ export function EstimationPanel({
                             label="Lag"
                             help={ESTIMATION_PARAMETER_HELP.causalEffects.lag}
                           />
-                          <input
-                            type="number"
+                          <NumberInput
                             min={0}
                             max={temporalAdjustmentMaxLag}
                             className={field('text', 'mt-1')}
@@ -7501,8 +7482,7 @@ export function EstimationPanel({
                     label="Treatment lag"
                     help={ESTIMATION_PARAMETER_HELP.causalEffects.treatmentLag}
                   />
-                  <input
-                    type="number"
+                  <NumberInput
                     min={0}
                     max={20}
                     className={field('text', 'mt-1 w-full')}
@@ -7521,8 +7501,7 @@ export function EstimationPanel({
                     label="From value"
                     help={ESTIMATION_PARAMETER_HELP.causalEffects.fromValue}
                   />
-                  <input
-                    type="number"
+                  <NumberInput
                     step="any"
                     className={field('text', 'mt-1 w-full')}
                     value={configuration.interventions[0]}
@@ -7543,8 +7522,7 @@ export function EstimationPanel({
                     label="To value"
                     help={ESTIMATION_PARAMETER_HELP.causalEffects.toValue}
                   />
-                  <input
-                    type="number"
+                  <NumberInput
                     step="any"
                     className={field('text', 'mt-1 w-full')}
                     value={configuration.interventions[1]}
@@ -7602,8 +7580,7 @@ export function EstimationPanel({
                         label="Bootstrap samples"
                         help={ESTIMATION_PARAMETER_HELP.causalEffects.bootstrapSamples}
                       />
-                      <input
-                        type="number"
+                      <NumberInput
                         min={20}
                         max={5000}
                         aria-label="CausalEffects bootstrap samples"
@@ -7658,8 +7635,7 @@ export function EstimationPanel({
                           label="Observations per block"
                           help={ESTIMATION_PARAMETER_HELP.causalEffects.observationsPerBlock}
                         />
-                        <input
-                          type="number"
+                        <NumberInput
                           min={1}
                           aria-label="CausalEffects observations per block"
                           className={field('text', 'mt-1 w-full')}
@@ -7685,8 +7661,7 @@ export function EstimationPanel({
                         label="Confidence level"
                         help={ESTIMATION_PARAMETER_HELP.causalEffects.confidenceLevel}
                       />
-                      <input
-                        type="number"
+                      <NumberInput
                         min={50}
                         max={99.9}
                         step={0.1}
@@ -7713,8 +7688,7 @@ export function EstimationPanel({
                         label="Bootstrap seed"
                         help={ESTIMATION_PARAMETER_HELP.causalEffects.bootstrapSeed}
                       />
-                      <input
-                        type="number"
+                      <NumberInput
                         min={0}
                         aria-label="CausalEffects bootstrap seed"
                         className={field('text', 'mt-1 w-full')}
@@ -7783,8 +7757,7 @@ export function EstimationPanel({
                   {configuration.start.kind === 'row' && (
                     <label className="text-body text-ink">
                       First post-intervention row
-                      <input
-                        type="number"
+                      <NumberInput
                         min={9}
                         max={prepared.observations}
                         aria-label="First post-intervention row"
@@ -7835,8 +7808,7 @@ export function EstimationPanel({
                   {configuration.window.kind === 'to-row' && (
                     <label className="text-body text-ink">
                       Last evaluated row
-                      <input
-                        type="number"
+                      <NumberInput
                         min={1}
                         max={prepared.observations}
                         aria-label="Last evaluated row"

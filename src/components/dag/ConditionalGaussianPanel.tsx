@@ -1,3 +1,4 @@
+import { NumberInput } from '@/components/ui/NumberInput'
 import { RunActions } from '@/components/ui/RunActions'
 import { useMemo, useState } from 'react'
 import { RunFold } from '@/components/ui/RunFold'
@@ -537,8 +538,7 @@ function ConditionalGaussianForm({
                         ))}
                       </Select>
                     ) : (
-                      <input
-                        type="number"
+                      <NumberInput
                         step="any"
                         className={field('text')}
                         aria-label={`${n.name} Gaussian value`}

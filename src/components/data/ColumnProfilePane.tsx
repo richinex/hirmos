@@ -115,8 +115,8 @@ function NumericSummary({
           bins: profile.histogram,
           nullCount: profile.nullCount,
           marks: [
-            { name: 'mean', value: profile.mean },
-            { name: 'median', value: profile.quartiles.median },
+            { name: 'mean', value: profile.mean, tone: 'signal' },
+            { name: 'median', value: profile.quartiles.median, tone: 'info' },
           ],
         },
         theme,

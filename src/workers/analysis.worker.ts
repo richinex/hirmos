@@ -1,3 +1,5 @@
+import {rawBalanceSchema} from '@/domain/covariateBalance'
+import {powerEvidenceSchema} from '@/domain/powerPlanning'
 import { surrogatePathEvidenceSchema, surrogatePathMatches } from '@/domain/surrogatePath'
 import {
   surrogateDiagnosticEvidenceSchema,
@@ -435,6 +437,8 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
       }
     case 'swig-analysis':
       return { kind: 'swigAnalysis', specification: command.specification, names: command.names }
+    case 'raw-balance': return {kind:'rawBalance',rows:command.rows,columns:command.columns,treatedReference:command.treatedReference}
+    case 'power-planning': return {kind:'powerPlanning',specification:command.specification}
     case 'adjustment-validate':
       return { kind: 'adjustmentValidate', ...command.design }
     case 'dag-check':
@@ -1331,13 +1335,23 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         })
         return
       }
+      case 'raw-balance': {
+        const parsed=rawBalanceSchema.safeParse(decoded)
+        if(!parsed.success || parsed.data.rows.length!==command.columns-1 || parsed.data.rows.some((r,i)=>r.column!==i)){fail(command.request,{kind:'worker-protocol-failed',detail:'Balance returned an invalid column mapping.'});return}
+        emit({kind:'raw-balance-succeeded',request:command.request,result:parsed.data});return
+      }
+      case 'power-planning': {
+        const parsed=z.object({kind:z.literal('powerPlanning'),result:powerEvidenceSchema}).strict().safeParse(decoded)
+        if(!parsed.success || parsed.data.result.kind!==command.specification.kind){fail(command.request,{kind:'worker-protocol-failed',detail:'The power calculation returned an invalid result.'});return}
+        emit({kind:'power-planning-succeeded',request:command.request,result:parsed.data.result});return
+      }
       case 'adjustment-validate': {
-        const parsed = z.object({ kind: z.literal('adjustmentValidation'), checks: z.array(adjustmentValidationSchema) }).strict().safeParse(decoded)
+        const parsed = adjustmentResponseSchema.extend({ kind: z.literal('adjustmentValidation') }).safeParse(decoded)
         if (!parsed.success || parsed.data.checks.length !== command.design.sets.length) {
           fail(command.request, { kind: 'worker-protocol-failed', detail: 'Invalid adjustment validation response.' })
           return
         }
-        emit({ kind: 'adjustment-validation-succeeded', request: command.request, result: parsed.data.checks })
+        emit({ kind: 'adjustment-validation-succeeded', request: command.request, result: { checks: parsed.data.checks, analysis: parsed.data.analysis } })
         return
       }
       case 'dag-check': {
@@ -2300,4 +2314,4 @@ import { gcmInfluenceResponseSchema } from '@/domain/gcmInfluence'
 import { parseSharpRdEvidence } from '@/domain/sharpRd'
 import { staggeredEvidenceSchema, sameStaggeredSpecification } from '@/domain/staggeredDid'
 import { sameDidSpecification } from '@/domain/adjustedDid'
-import { adjustmentValidationSchema } from '@/domain/adjustmentValidation'
+import { adjustmentResponseSchema } from '@/domain/adjustmentValidation'

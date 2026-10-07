@@ -45,6 +45,29 @@ pub enum AdjustmentSetError {
     },
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Optimality {
+    NotIdentifiable,
+    Checked {
+        unique_set: bool,
+        condition_i: bool,
+        condition_ii: bool,
+    },
+}
+
+impl Optimality {
+    pub fn established(&self) -> bool {
+        match self {
+            Self::NotIdentifiable => false,
+            Self::Checked {
+                unique_set,
+                condition_i,
+                condition_ii,
+            } => *unique_set || (*condition_i && *condition_ii),
+        }
+    }
+}
+
 pub const fn mark(s: &str) -> Edge {
     let b = s.as_bytes();
     [b[0], b[1], b[2]]
@@ -834,8 +857,7 @@ impl CausalEffects {
         Some(oset.into_iter().collect())
     }
 
-    /// Tigramite's `_check_validity(Z)`: a set is valid when it blocks every non-causal
-    /// path from X to Y in the projected time-indexed graph.
+    /// Tigramite's path-only check; explicit sets also require member validation.
     pub fn is_valid_adjustment_set(&self, adjustment_set: &[Node]) -> bool {
         let conditions = adjustment_set.iter().copied().collect();
         !self.check_path(
@@ -851,17 +873,11 @@ impl CausalEffects {
         )
     }
 
-    /// Explain a failed explicit-set validity check without changing Tigramite's criterion.
-    /// The open-path item is the decisive reason. Member-specific items are added only when
-    /// their relationship to the time-indexed query or forbidden-node set is observable.
+    /// Check explicit members and noncausal-path blocking.
     pub fn explicit_adjustment_problems(
         &self,
         adjustment_set: &[Node],
     ) -> Vec<ExplicitAdjustmentProblem> {
-        if self.is_valid_adjustment_set(adjustment_set) {
-            return Vec::new();
-        }
-
         let mut problems = Vec::new();
         for &node in adjustment_set {
             if self.x.contains(&node) {
@@ -878,7 +894,9 @@ impl CausalEffects {
                 problems.push(ExplicitAdjustmentProblem::ForbiddenNode(node));
             }
         }
-        problems.push(ExplicitAdjustmentProblem::OpenNonCausalPath);
+        if !self.is_valid_adjustment_set(adjustment_set) {
+            problems.push(ExplicitAdjustmentProblem::OpenNonCausalPath);
+        }
         problems
     }
 
@@ -897,12 +915,11 @@ impl CausalEffects {
                 .get_optimal_set_with_minimization(OptimalSetMinimization::CollidersOnly)
                 .ok_or(AdjustmentSetError::NotIdentifiable),
             AdjustmentSetSelection::Explicit(adjustment_set) => {
-                if self.is_valid_adjustment_set(adjustment_set) {
+                let problems = self.explicit_adjustment_problems(adjustment_set);
+                if problems.is_empty() {
                     Ok(adjustment_set.clone())
                 } else {
-                    Err(AdjustmentSetError::InvalidExplicitSet {
-                        problems: self.explicit_adjustment_problems(adjustment_set),
-                    })
+                    Err(AdjustmentSetError::InvalidExplicitSet { problems })
                 }
             }
         }
@@ -912,6 +929,19 @@ impl CausalEffects {
     /// and the conditions separately, as `return_separate_sets=True` does.
     pub fn optimal_set_parts(
         &self,
+    ) -> Option<(
+        BTreeSet<Node>,
+        BTreeSet<Node>,
+        BTreeSet<Node>,
+        BTreeSet<Node>,
+    )> {
+        self.optimal_set_parts_given(&self.s, &self.vancs)
+    }
+
+    fn optimal_set_parts_given(
+        &self,
+        conditions: &BTreeSet<Node>,
+        vancs: &BTreeSet<Node>,
     ) -> Option<(
         BTreeSet<Node>,
         BTreeSet<Node>,
@@ -948,17 +978,17 @@ impl CausalEffects {
                             return None;
                         }
                         let in_bounds = -(self.tau_max as i32) <= tau && tau <= 0;
-                        let reachable = if self.vancs.contains(&spouse) {
+                        let reachable = if vancs.contains(&spouse) {
                             true
                         } else {
-                            let mut conditions: BTreeSet<Node> =
-                                parents.union(&self.vancs).copied().collect();
-                            conditions.extend(self.s.iter().copied());
+                            let mut path_conditions: BTreeSet<Node> =
+                                parents.union(vancs).copied().collect();
+                            path_conditions.extend(conditions.iter().copied());
                             let target: BTreeSet<Node> = [spouse].into_iter().collect();
                             !self.check_path(
                                 &self.x,
                                 &target,
-                                &conditions,
+                                &path_conditions,
                                 &[mark("***")],
                                 &[mark("***")],
                                 PathType::Any,
@@ -992,7 +1022,173 @@ impl CausalEffects {
         if self.x.intersection(&collider_parents).next().is_some() {
             return None;
         }
-        Some((parents, colliders, collider_parents, self.s.clone()))
+        Some((parents, colliders, collider_parents, conditions.clone()))
+    }
+
+    fn any_path(
+        &self,
+        start: &BTreeSet<Node>,
+        end: &BTreeSet<Node>,
+        conditions: &BTreeSet<Node>,
+    ) -> bool {
+        self.check_path(
+            start,
+            end,
+            conditions,
+            &[mark("***")],
+            &[mark("***")],
+            PathType::Any,
+            false,
+            false,
+            None,
+        )
+    }
+
+    fn has_unique_adjustment_set(&self) -> bool {
+        let allowed: BTreeSet<_> = (0..self.n)
+            .flat_map(|i| (0..=self.tau_max).map(move |t| (i, -(t as i32))))
+            .filter(|v| !self.forbidden_nodes.contains(v))
+            .collect();
+        let mut stack = vec![(self.s.clone(), allowed)];
+        let mut count = 0;
+        while let Some((included, remaining)) = stack.pop() {
+            let roots = self
+                .x
+                .union(&self.y)
+                .copied()
+                .chain(included.iter().copied())
+                .collect();
+            let ancestors = self.get_ancestors(&roots);
+            let separator: Vec<_> = ancestors
+                .intersection(&remaining)
+                .copied()
+                .filter(|v| !self.x.contains(v) && !self.y.contains(v))
+                .collect();
+            if !self.is_valid_adjustment_set(&separator) {
+                continue;
+            }
+            if included == remaining {
+                count += 1;
+                if count == 2 {
+                    return false;
+                }
+            } else if let Some(&v) = remaining.difference(&included).next() {
+                let mut excluded = remaining.clone();
+                excluded.remove(&v);
+                stack.push((included.clone(), excluded));
+                let mut added = included;
+                added.insert(v);
+                stack.push((added, remaining));
+            }
+        }
+        count == 1
+    }
+
+    fn optimality_collider_paths(
+        &self,
+        sources: &BTreeSet<Node>,
+        targets: &BTreeSet<Node>,
+        inside: &BTreeSet<Node>,
+        condition_i: bool,
+    ) -> bool {
+        for &source in sources {
+            let mut stack = vec![(source, Vec::<Node>::new())];
+            let mut invalid_subsets = Vec::<BTreeSet<Node>>::new();
+            while let Some((node, mut path)) = stack.pop() {
+                path.push(node);
+                let mut suitable: BTreeSet<_> = self.get_spouses(node).into_iter().collect();
+                if !condition_i && path.len() == 1 {
+                    suitable.extend(self.get_children(node));
+                }
+                for next in suitable {
+                    if next.1 < -(self.tau_max as i32) || next.1 > 0 || path.contains(&next) {
+                        continue;
+                    }
+                    if !condition_i && !targets.contains(&next) && !self.vancs.contains(&next) {
+                        continue;
+                    }
+                    if inside.contains(&next) {
+                        let extended: BTreeSet<_> = path.iter().copied().chain([next]).collect();
+                        if condition_i && invalid_subsets.iter().any(|s| s.is_subset(&extended)) {
+                            continue;
+                        }
+                        stack.push((next, path.clone()));
+                    }
+                    if targets.contains(&next) {
+                        if !condition_i {
+                            return true;
+                        }
+                        let conditions: BTreeSet<_> =
+                            self.s.iter().copied().chain(path.iter().copied()).collect();
+                        let new_ancestors = self.get_ancestors(&conditions);
+                        let vancs = self
+                            .anc_x
+                            .union(&self.anc_y)
+                            .copied()
+                            .chain(new_ancestors)
+                            .filter(|v| !self.forbidden_nodes.contains(v))
+                            .collect();
+                        if self.optimal_set_parts_given(&conditions, &vancs).is_some() {
+                            return false;
+                        }
+                        let pathset: BTreeSet<_> = path.iter().copied().collect();
+                        stack.retain(|(q, p)| {
+                            !pathset.is_subset(&p.iter().copied().chain([*q]).collect())
+                        });
+                        invalid_subsets.push(pathset);
+                    }
+                }
+            }
+        }
+        condition_i
+    }
+
+    /// Runge (2021), Theorem 3; mirrors Tigramite's `check_optimality`.
+    pub fn check_optimality(&self) -> Optimality {
+        let Some((parents, colliders, collider_parents, _)) = self.optimal_set_parts() else {
+            return Optimality::NotIdentifiable;
+        };
+        let unique_set = self.has_unique_adjustment_set();
+        let oset: BTreeSet<_> = parents
+            .union(&colliders)
+            .copied()
+            .chain(collider_parents)
+            .collect();
+        let targets: BTreeSet<_> = self.y.union(&self.mediators).copied().collect();
+        let n_nodes = targets
+            .union(&colliders)
+            .flat_map(|&v| self.get_spouses(v))
+            .filter(|v| {
+                !self.forbidden_nodes.contains(v)
+                    && !oset.contains(v)
+                    && !self.s.contains(v)
+                    && !targets.contains(v)
+                    && !colliders.contains(v)
+            })
+            .collect();
+        let inside = oset.union(&self.s).copied().collect();
+        let condition_i = self.optimality_collider_paths(&n_nodes, &targets, &inside, true);
+        let mut condition_ii = true;
+        for &e in oset.difference(&parents) {
+            let conditions = self
+                .s
+                .iter()
+                .copied()
+                .chain(oset.iter().copied().filter(|&v| v != e))
+                .collect();
+            let source = [e].into_iter().collect();
+            if self.any_path(&self.x, &source, &conditions)
+                && !self.optimality_collider_paths(&source, &targets, &inside, false)
+            {
+                condition_ii = false;
+                break;
+            }
+        }
+        Optimality::Checked {
+            unique_set,
+            condition_i,
+            condition_ii,
+        }
     }
 }
 

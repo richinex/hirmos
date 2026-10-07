@@ -1,3 +1,4 @@
+import {resolveStudyDagRevision,studyRevisionNotice} from './dagProvenance'
 import type { CounterfactualRunArtifact } from './counterfactual'
 import type { DagDocument } from './dag'
 import type { DatasetProfile } from './dataset'
@@ -43,7 +44,7 @@ export interface ResultManifest {
   readonly stationarity: StationarityEvidenceArtifact | null
   readonly dag: {
     readonly id: DagDocument['id']
-    readonly name: DagDocument['name']
+    readonly name: StudySpecification['dagName']
     readonly revision: DagDocument['current']['id']
     readonly origin: DagDocument['origin']
     readonly graph: DagDocument['current']['graph']
@@ -80,10 +81,9 @@ export function buildResultManifest(
   const study = inputs.studies.find((candidate) => candidate.id === run.study) ?? null
   const identification =
     inputs.identifications.find((candidate) => candidate.id === run.identification) ?? null
-  const document =
-    study === null
-      ? null
-      : (inputs.documents.find((candidate) => candidate.id === study.dagDocument) ?? null)
+  const provenance=study===null?null:resolveStudyDagRevision(study,inputs.documents)
+  const recorded=provenance!==null&&(provenance.kind==='current'||provenance.kind==='earlier')?provenance:null
+  const notice=provenance===null?null:studyRevisionNotice(provenance)
   const warnings =
     run.eligibility.kind === 'caution'
       ? run.eligibility.unresolved.map(
@@ -116,15 +116,15 @@ export function buildResultManifest(
     prepared: inputs.prepared,
     stationarity: inputs.stationarity,
     dag:
-      document === null
+      recorded === null
         ? null
         : {
-            id: document.id,
-            name: document.name,
-            revision: document.current.id,
-            origin: document.origin,
-            graph: document.current.graph,
-            validation: document.current.validation,
+            id: recorded.document.id,
+            name: study!.dagName,
+            revision: recorded.revision.id,
+            origin: recorded.document.origin,
+            graph: recorded.revision.graph,
+            validation: recorded.revision.validation,
           },
     study,
     identification,
@@ -136,7 +136,7 @@ export function buildResultManifest(
       study === null
         ? []
         : inputs.counterfactualRuns.filter((counterfactual) => counterfactual.study === study.id),
-    warnings,
+    warnings: notice===null?warnings:[notice,...warnings],
   }
 }
 

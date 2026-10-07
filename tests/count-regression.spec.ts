@@ -71,7 +71,7 @@ for(const name of names)test(`${name} completes using the UI and survives projec
   await choose(page,'Time column','period')
   for(const column of s.headers.filter(c=>!['unit','period'].includes(c)))await page.getByRole('checkbox',{name:column,exact:true}).first().check()
   await page.getByRole('button',{name:/Create prepared/}).click()
-  await expect(page.getByRole('heading',{name:'Build a DAG or run discovery',exact:true})).toBeVisible({timeout:60_000})
+  await expect(page.getByRole('heading',{name:'Next steps',exact:true})).toBeVisible({timeout:60_000})
   await chapter(page,/Time-series analysis/)
   await expect(page.getByRole('heading',{name:'Time-series analysis',exact:true})).toBeVisible()
   await expect(page.getByRole('heading',{name:'Estimation',exact:true})).toHaveCount(0)

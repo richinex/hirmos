@@ -1,3 +1,4 @@
+import { NumberInput } from '@/components/ui/NumberInput'
 import type { ReactNode } from 'react'
 import { ParameterLabel } from '@/components/ui/ParameterLabel'
 import { SettingsDisclosure, type SettingsSummaryItem } from '@/components/ui/SettingsDisclosure'
@@ -64,8 +65,7 @@ export function BoostedSearchFields({
             label="Search folds"
             help={ESTIMATION_PARAMETER_HELP.propensity.splits}
           />
-          <input
-            type="number"
+          <NumberInput
             min={2}
             max={20}
             aria-label="Search folds"
@@ -80,8 +80,7 @@ export function BoostedSearchFields({
         </label>
         <label className="block">
           <ParameterLabel className={fieldLabel} label="Tree seed" help={seedHelp} />
-          <input
-            type="number"
+          <NumberInput
             min={0}
             max={4294967295}
             aria-label="Tree seed"

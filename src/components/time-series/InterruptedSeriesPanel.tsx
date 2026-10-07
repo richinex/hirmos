@@ -1,3 +1,4 @@
+import { NumberInput } from '@/components/ui/NumberInput'
 import { RunActions } from '@/components/ui/RunActions'
 import type { ReactNode } from 'react'
 import { useWorkflow } from '@/components/WorkflowProvider'
@@ -365,9 +366,8 @@ export function InterruptedSeriesPanel(
                         label="Intervention row"
                         help={ESTIMATION_PARAMETER_HELP.interruptedSeries.interventionRow}
                       />
-                      <input
+                      <NumberInput
                         aria-label="Intervention row"
-                        type="number"
                         min={2}
                         max={rows}
                         className={field('text', 'mt-1')}
@@ -381,9 +381,8 @@ export function InterruptedSeriesPanel(
                         label="Lag"
                         help={ESTIMATION_PARAMETER_HELP.interruptedSeries.lag}
                       />
-                      <input
+                      <NumberInput
                         aria-label="Lag"
-                        type="number"
                         min={0}
                         className={field('text', 'mt-1')}
                         value={draft.lag}
@@ -422,9 +421,8 @@ export function InterruptedSeriesPanel(
                           label="Until row"
                           help={ESTIMATION_PARAMETER_HELP.interruptedSeries.untilRow}
                         />
-                        <input
+                        <NumberInput
                           aria-label="Until row"
-                          type="number"
                           min={2}
                           max={rows}
                           className={field('text', 'mt-1')}
@@ -448,9 +446,8 @@ export function InterruptedSeriesPanel(
                           : ESTIMATION_PARAMETER_HELP.interruptedSeries.seasonalTerms
                       }
                     />
-                    <input
+                    <NumberInput
                       aria-label="Seasonal terms"
-                      type="number"
                       min={0}
                       max={12}
                       className={field('text', 'mt-1')}
@@ -502,9 +499,8 @@ export function InterruptedSeriesPanel(
                             label="Newey–West bandwidth"
                             help={ESTIMATION_PARAMETER_HELP.interruptedSeries.neweyWestBandwidth}
                           />
-                          <input
+                          <NumberInput
                             aria-label="Newey–West bandwidth"
-                            type="number"
                             min={0}
                             className={field('text', 'mt-1')}
                             placeholder="Automatic"
@@ -527,9 +523,8 @@ export function InterruptedSeriesPanel(
                                 ESTIMATION_PARAMETER_HELP.adjustedRegression.autoregressiveOrder
                               }
                             />
-                            <input
+                            <NumberInput
                               aria-label="Autoregressive order"
-                              type="number"
                               min={0}
                               max={MAX_ARMA_ORDER}
                               className={field('text', 'mt-1')}
@@ -548,9 +543,8 @@ export function InterruptedSeriesPanel(
                               label="Moving-average order"
                               help={ESTIMATION_PARAMETER_HELP.adjustedRegression.movingAverageOrder}
                             />
-                            <input
+                            <NumberInput
                               aria-label="Moving-average order"
-                              type="number"
                               min={0}
                               max={MAX_ARMA_ORDER}
                               className={field('text', 'mt-1')}
@@ -569,9 +563,8 @@ export function InterruptedSeriesPanel(
                               label="Optimiser iterations"
                               help={ESTIMATION_PARAMETER_HELP.adjustedRegression.armaIterations}
                             />
-                            <input
+                            <NumberInput
                               aria-label="Optimiser iterations"
-                              type="number"
                               min={1}
                               className={field('text', 'mt-1')}
                               value={armaDraft.maxIter}

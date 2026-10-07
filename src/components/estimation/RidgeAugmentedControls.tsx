@@ -1,3 +1,4 @@
+import { NumberInput } from '@/components/ui/NumberInput'
 import { SettingsStep } from '@/components/ui/SettingsStep'
 import { ColumnChecklist } from '@/components/ui/ColumnChecklist'
 import { ParameterLabel } from '@/components/ui/ParameterLabel'
@@ -125,10 +126,9 @@ export function RidgeAugmentedControls({
         {r.kind === 'fixed' ? (
           <label>
             <span className={fieldLabel}>Lambda</span>
-            <input
+            <NumberInput
               className={field('text', 'mt-1 w-full')}
               aria-label="Ridge lambda"
-              type="number"
               min={0.00000001}
               step="any"
               value={r.lambda}
@@ -159,10 +159,9 @@ export function RidgeAugmentedControls({
                   label="Held-out block length"
                   help="Cross-validation leaves out consecutive pre-treatment periods."
                 />
-                <input
+                <NumberInput
                   className={field('text', 'mt-1 w-full')}
                   aria-label="Ridge held-out block length"
-                  type="number"
                   min={1}
                   value={r.holdoutLength}
                   onChange={(e) =>
@@ -179,10 +178,9 @@ export function RidgeAugmentedControls({
                   label="Candidate grid steps"
                   help="The grid contains this number of steps plus its starting candidate."
                 />
-                <input
+                <NumberInput
                   className={field('text', 'mt-1 w-full')}
                   aria-label="Ridge grid steps"
-                  type="number"
                   min={1}
                   value={r.steps}
                   onChange={(e) =>

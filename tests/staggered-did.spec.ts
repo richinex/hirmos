@@ -229,7 +229,7 @@ for(const adjustment of [
   await choose(page,'Time column','year')
   for(const name of ['outcome','treated','lpop']) await page.getByRole('checkbox',{name,exact:true}).first().check()
   await page.getByRole('button',{name:/Create prepared/}).click()
-  await expect(page.getByRole('heading',{name:'Build a DAG or run discovery',exact:true})).toBeVisible({timeout:60_000})
+  await expect(page.getByRole('heading',{name:'Next steps',exact:true})).toBeVisible({timeout:60_000})
   await createDag(page,'Treatment and employment')
   await addArrow(page,'treated','outcome','Treatment may change county employment.')
   await identify(page,{graph:'Treatment and employment',treatment:'treated',outcome:'outcome',target:/Treated rows/,mechanism:'Policy change',sentence:'Compare adoption cohorts with counties not yet or never treated under parallel untreated trends.'})

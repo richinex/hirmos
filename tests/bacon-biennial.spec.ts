@@ -31,7 +31,7 @@ test('Bacon accepts biennial years, preserves labels, and matches consecutive-pe
   await page.getByRole('button', { name: 'Select all columns', exact: true }).click()
   await page.getByRole('button', { name: /Create prepared/ }).click()
   await expect(
-    page.getByRole('heading', { name: 'Build a DAG or run discovery', exact: true }),
+    page.getByRole('heading', { name: 'Next steps', exact: true }),
   ).toBeVisible()
   await chapter(page, /Estimation/)
   await page.getByRole('radio', { name: 'Regression designs', exact: true }).click()

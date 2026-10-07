@@ -1,3 +1,4 @@
+import { NumberInput } from '@/components/ui/NumberInput'
 import { RunActions } from '@/components/ui/RunActions'
 import { RunDetails } from '@/components/ui/RunDetails'
 import { Metadata } from '@/components/ui/Metadata'
@@ -376,8 +377,7 @@ function RunCard({
       <div className={well('mt-3 grid items-start gap-3 p-3 @md/panel:grid-cols-[auto_1fr]')}>
         <label className="block text-body text-ink">
           <span className={fieldLabel}>Inspect plotted point</span>
-          <input
-            type="number"
+          <NumberInput
             min={1}
             max={view.plottedObservations}
             aria-label="Inspect plotted point"
@@ -925,8 +925,7 @@ export function CounterfactualPanel({
                     <span className={fieldLabel}>
                       Set {study?.treatment.name ?? 'treatment'} to
                     </span>
-                    <input
-                      type="number"
+                    <NumberInput
                       step="any"
                       aria-label="First intervention value"
                       className={field('text', 'mt-1')}
@@ -944,8 +943,7 @@ export function CounterfactualPanel({
                   </label>
                   <label className="block">
                     <span className={fieldLabel}>and to</span>
-                    <input
-                      type="number"
+                    <NumberInput
                       step="any"
                       aria-label="Second intervention value"
                       className={field('text', 'mt-1')}
@@ -979,8 +977,7 @@ export function CounterfactualPanel({
                       {state.configuration.schedule.kind === 'point' ? (
                         <label className="block">
                           <span className={fieldLabel}>Intervention row</span>
-                          <input
-                            type="number"
+                          <NumberInput
                             min={selectedMaxLag + 1}
                             max={prepared.observations}
                             className={field('text', 'mt-1')}
@@ -1001,8 +998,7 @@ export function CounterfactualPanel({
                       ) : (
                         <label className="block">
                           <span className={fieldLabel}>First intervention row</span>
-                          <input
-                            type="number"
+                          <NumberInput
                             min={selectedMaxLag + 1}
                             max={prepared.observations}
                             className={field('text', 'mt-1')}
@@ -1023,8 +1019,7 @@ export function CounterfactualPanel({
                       )}
                       <label className="block">
                         <span className={fieldLabel}>Horizon points</span>
-                        <input
-                          type="number"
+                        <NumberInput
                           min={1}
                           max={dynamicMaxHorizon}
                           className={field('text', 'mt-1')}
@@ -1076,8 +1071,7 @@ export function CounterfactualPanel({
                     <div>
                       <label className="block max-w-xs">
                         <span className={fieldLabel}>Noise scale</span>
-                        <input
-                          type="number"
+                        <NumberInput
                           step="any"
                           min={0.0001}
                           aria-label="Observation noise scale"
@@ -1120,8 +1114,7 @@ export function CounterfactualPanel({
                     <div className="grid max-w-4xl items-start gap-4 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
                       <label className="block">
                         <span className={fieldLabel}>Bootstrap refits</span>
-                        <input
-                          type="number"
+                        <NumberInput
                           min={20}
                           max={5000}
                           className={field('text', 'mt-1')}
@@ -1171,8 +1164,7 @@ export function CounterfactualPanel({
                       {dynamicBootstrap.blockLength.kind === 'fixed' && (
                         <label className="block">
                           <span className={fieldLabel}>Points per block</span>
-                          <input
-                            type="number"
+                          <NumberInput
                             min={1}
                             max={Math.max(1, prepared.observations - selectedMaxLag - 1)}
                             className={field('text', 'mt-1')}
@@ -1197,8 +1189,7 @@ export function CounterfactualPanel({
                       )}
                       <label className="block">
                         <span className={fieldLabel}>Confidence level</span>
-                        <input
-                          type="number"
+                        <NumberInput
                           min={50}
                           max={99}
                           step={1}
@@ -1217,8 +1208,7 @@ export function CounterfactualPanel({
                       </label>
                       <label className="block">
                         <span className={fieldLabel}>Seed</span>
-                        <input
-                          type="number"
+                        <NumberInput
                           min={0}
                           max={0xffff_ffff}
                           step={1}

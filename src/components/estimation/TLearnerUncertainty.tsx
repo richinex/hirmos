@@ -1,3 +1,4 @@
+import { NumberInput } from '@/components/ui/NumberInput'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { field, fieldLabel } from '@/components/ui/recipes'
 import type { TLearnerUncertainty as Settings } from '@/domain/tLearner'
@@ -35,10 +36,9 @@ export function TLearnerUncertainty({
         <>
           <label className="block">
             <span className={fieldLabel}>Bootstrap samples</span>
-            <input
+            <NumberInput
               className={field('text', 'mt-1')}
               aria-label="Bootstrap samples"
-              type="number"
               min={2}
               max={1000}
               value={value.samples}
@@ -52,10 +52,9 @@ export function TLearnerUncertainty({
           </label>
           <label className="block">
             <span className={fieldLabel}>Bootstrap seed</span>
-            <input
+            <NumberInput
               className={field('text', 'mt-1')}
               aria-label="Bootstrap seed"
-              type="number"
               min={0}
               max={4294967295}
               value={value.seed}

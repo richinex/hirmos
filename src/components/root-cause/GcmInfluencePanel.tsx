@@ -1,3 +1,4 @@
+import { NumberInput } from '@/components/ui/NumberInput'
 import { RunPicker } from '@/components/ui/RunPicker'
 import { SettingsDisclosure } from '@/components/ui/SettingsDisclosure'
 import { useMemo, useState, type ReactNode } from 'react'
@@ -446,9 +447,8 @@ export function GcmInfluencePanel(props: Props) {
                   {settings.map((setting) => (
                     <label key={setting.label}>
                       <span className={fieldLabel}>{setting.label}</span>
-                      <input
+                      <NumberInput
                         aria-label={setting.label}
-                        type="number"
                         min={0}
                         step="any"
                         value={setting.value}
@@ -459,9 +459,8 @@ export function GcmInfluencePanel(props: Props) {
                   ))}
                   <label>
                     <span className={fieldLabel}>Random seed</span>
-                    <input
+                    <NumberInput
                       aria-label="Random seed"
-                      type="number"
                       min={0}
                       value={seed}
                       className={field('text', 'mt-1')}

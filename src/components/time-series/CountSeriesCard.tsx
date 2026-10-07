@@ -1,3 +1,4 @@
+import { NumberInput } from '@/components/ui/NumberInput'
 import { RunActions } from '@/components/ui/RunActions'
 import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { useWorkflow } from '@/components/WorkflowProvider'
@@ -367,8 +368,7 @@ export function CountSeriesCard({
               <div className={fieldRow.two}>
                 <label className="block">
                   <span className={fieldLabel}>Candidate start row</span>
-                  <input
-                    type="number"
+                  <NumberInput
                     min={2}
                     max={prepared.observations}
                     className={field('text', 'mt-1')}
@@ -382,8 +382,7 @@ export function CountSeriesCard({
                 </label>
                 <label className="block">
                   <span className={fieldLabel}>Candidate end row</span>
-                  <input
-                    type="number"
+                  <NumberInput
                     min={2}
                     max={prepared.observations}
                     className={field('text', 'mt-1')}
@@ -413,8 +412,7 @@ export function CountSeriesCard({
               {delta > 0 && delta < 1 && (
                 <label className="block max-w-xs">
                   <span className={fieldLabel}>Decay δ</span>
-                  <input
-                    type="number"
+                  <NumberInput
                     min={0.01}
                     max={0.99}
                     step={0.01}

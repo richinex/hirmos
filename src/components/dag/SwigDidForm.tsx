@@ -1,3 +1,4 @@
+import { NumberInput, numberValue } from '@/components/ui/NumberInput'
 import { useState, type Dispatch, type SetStateAction } from 'react'
 import {
   assignSwigRole,
@@ -159,15 +160,14 @@ export function SwigDidForm({
               {timed.map(({ index, role }) => (
                 <label key={index} className="contents">
                   <span className="truncate text-body text-ink">{graph.names[index]}</span>
-                  <input
-                    type="number"
+                  <NumberInput
                     min={role.kind === 'treatment' ? 1 : 0}
                     max={32}
                     step={1}
                     aria-label={`Period for ${graph.names[index]}`}
                     className={field('text')}
                     value={role.period}
-                    onChange={(e) => setPeriod(index, e.target.valueAsNumber)}
+                    onChange={(e) => setPeriod(index, numberValue(e.target))}
                   />
                 </label>
               ))}
@@ -210,26 +210,24 @@ export function SwigDidForm({
         <div className="grid grid-cols-2 gap-3">
           <label>
             <span className={fieldLabel}>Adoption period</span>
-            <input
+            <NumberInput
               aria-label="DiD adoption period"
-              type="number"
               min={1}
               max={32}
               className={field('text', 'mt-1')}
               value={adoption}
-              onChange={(e) => setAdoption(e.target.valueAsNumber)}
+              onChange={(e) => setAdoption(numberValue(e.target))}
             />
           </label>
           <label>
             <span className={fieldLabel}>Outcome period</span>
-            <input
+            <NumberInput
               aria-label="DiD outcome period"
-              type="number"
               min={0}
               max={32}
               className={field('text', 'mt-1')}
               value={outcome}
-              onChange={(e) => setOutcome(e.target.valueAsNumber)}
+              onChange={(e) => setOutcome(numberValue(e.target))}
             />
           </label>
         </div>
@@ -254,15 +252,14 @@ export function SwigDidForm({
         {comparison.kind === 'notYetTreated' && (
           <label className="block">
             <span className={fieldLabel}>Untreated through period</span>
-            <input
+            <NumberInput
               aria-label="Comparison untreated through period"
-              type="number"
               min={0}
               max={32}
               className={field('text', 'mt-1')}
               value={comparison.through}
               onChange={(e) =>
-                setComparison({ kind: 'notYetTreated', through: e.target.valueAsNumber })
+                setComparison({ kind: 'notYetTreated', through: numberValue(e.target) })
               }
             />
           </label>

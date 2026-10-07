@@ -66,7 +66,7 @@ test('DAG actions share dimensions on desktop and in the mobile inspector', asyn
     return { top: Math.round(box.top), left: box.left, right: box.right }
   }))
   expect(choices).toHaveLength(4)
-  const rows = Object.values(Object.groupBy(choices, choice => choice.top)).map(row => row!.toSorted((a, b) => a.left - b.left))
+  const rows = [...new Set(choices.map(choice => choice.top))].map(top => choices.filter(choice => choice.top === top).sort((a, b) => a.left - b.left))
   expect(new Set(rows.map(row => row.length)).size).toBe(1)
   for (const row of rows) for (let i = 1; i < row.length; i += 1) expect(row[i].left).toBeGreaterThanOrEqual(row[i - 1].right - 0.5)
   await selector.getByRole('radio', { name: 'Intervene', exact: true }).check()

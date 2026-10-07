@@ -65,7 +65,7 @@ export const prepare = async (page: Page, options: {
     for (const column of options.columns) await page.getByRole('checkbox', { name: column, exact: true }).first().check()
   }
   await page.getByRole('button', { name: /Create prepared/ }).click()
-  await expect(page.getByRole('heading', { name: 'Build a DAG or run discovery', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Next steps', exact: true })).toBeVisible()
 }
 
 export const addArrow = async (page: Page, cause: string, effect: string, rationale: string, lag?: number): Promise<void> => {
@@ -135,11 +135,22 @@ export const identify = async (page: Page, options: {
  * a canonical set that adds outcome predictors), take the named one; the first minimal set unless told.
  */
 export const identifyEffect = async (page: Page, adjustment: RegExp = /^Minimal set 1/): Promise<void> => {
+  // An earlier study already shows identification text, so a new one is read from the studies count.
+  const studies = async () =>
+    Number((await page.getByText(/^Studies \(\d+\)$/).first().textContent({ timeout: 1000 }).catch(() => null))?.match(/\d+/)?.[0] ?? 0)
+  const before = await studies()
   await page.getByRole('button', { name: 'Identify the effect' }).click()
   const offered = page.getByRole('heading', { name: 'Choose a valid adjustment set' })
-  const recorded = page.getByText(/Identified by|not identified/i).first()
-  await expect(offered.or(recorded).first()).toBeVisible({ timeout: 60_000 })
-  if (await offered.isVisible()) await page.getByRole('button', { name: adjustment }).first().click()
+  await expect
+    .poll(async () => (await offered.isVisible()) || (await studies()) > before, { timeout: 60_000 })
+    .toBe(true)
+  if (!(await offered.isVisible())) return
+  const wanted = page.getByRole('button', { name: adjustment }).first()
+  await (await wanted.count() > 0
+    ? wanted
+    : page.getByRole('button', { name: /^Recommended O-set|^Minimal set 1|^Canonical set/ }).first()
+  ).click()
+  await expect.poll(studies, { timeout: 60_000 }).toBeGreaterThan(before)
 }
 
 /** Pick an estimator in the Estimation chapter, set its options, run it, and wait for the result. */

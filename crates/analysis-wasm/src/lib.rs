@@ -4,6 +4,7 @@
 //! The façade owns browser-facing validation and serialization. It does not reinterpret test
 //! evidence or copy the numerical implementations out of the Hirmos causal core.
 
+mod raw_balance;
 mod causal_forest;
 mod swig_analysis;
 mod honest_did;
@@ -134,6 +135,7 @@ mod dynamic_counterfactual;
 mod estimation;
 mod ardl_model;
 mod identification;
+mod power_planning;
 mod matrix;
 mod preparation;
 mod protocol;
@@ -641,6 +643,8 @@ pub fn run_analysis(
             &unobserved,
             estimand,
         ),
+        AnalysisCommand::RawBalance { rows, columns, treated_reference } => raw_balance::calculate(values,rows,columns,treated_reference),
+        AnalysisCommand::PowerPlanning { specification } => power_planning::calculate(specification).map(|result| AnalysisResult::PowerPlanning { result }),
         AnalysisCommand::AdjustmentValidate { nodes, edges, treatment, outcome, unobserved, sets } => {
             identification::validate_supplied(nodes, &edges, treatment, outcome, &unobserved, &sets)
         }

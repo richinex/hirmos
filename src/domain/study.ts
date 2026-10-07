@@ -935,7 +935,13 @@ export type IdentificationFailure =
   | { readonly kind: 'att-requires-counterfactual-identification'; readonly estimand: 'ATT' }
 
 export type AdjustmentSetChoice =
-  { readonly kind: 'canonical' } | { readonly kind: 'minimal'; readonly ordinal: number }
+  | { readonly kind: 'canonical' }
+  | { readonly kind: 'minimal'; readonly ordinal: number }
+  | {
+      readonly kind: 'supplied'
+      readonly nodes: readonly number[]
+      readonly guarantee: 'established' | 'notEstablished'
+    }
 
 export type IdentifiedBackdoor = Extract<
   BackdoorIdentificationEvidence['result'],
@@ -957,6 +963,11 @@ export const offersAdjustmentChoice = (result: IdentifiedBackdoor): boolean =>
   result.minimalSets.length > 1 || !sameIndexSet(result.minimalSets[0], result.canonicalSet)
 
 export type AdjustmentSetSelection =
+  | {
+      readonly kind: 'supplied'
+      readonly variables: readonly StudyVariable[]
+      readonly guarantee: 'established' | 'notEstablished'
+    }
   | { readonly kind: 'canonical'; readonly variables: readonly StudyVariable[] }
   | {
       readonly kind: 'minimal'
@@ -1095,11 +1106,13 @@ export interface IdentificationArtifact {
   readonly result: Identification
 }
 
-export type IdentificationConstructionProblem = {
-  readonly kind: 'minimal-adjustment-set-out-of-range'
-  readonly ordinal: number
-  readonly available: number
-}
+export type IdentificationConstructionProblem =
+  | { readonly kind: 'invalid-supplied-adjustment' }
+  | {
+      readonly kind: 'minimal-adjustment-set-out-of-range'
+      readonly ordinal: number
+      readonly available: number
+    }
 
 /** The bound DAG's roles and paths for this study, from the contemporaneous graph. */
 export const studyFlow = (study: StudySpecification): DagCausalFlow =>
@@ -1345,6 +1358,24 @@ export function identificationFrom(
   const minimalSets = mapNonEmpty(evidence.result.minimalSets, variablesFrom)
   let adjustment: AdjustmentSetSelection
   switch (choice.kind) {
+    case 'supplied':
+      if (
+        choice.nodes.some(
+          (i) =>
+            !Number.isInteger(i) ||
+            i < 0 ||
+            study.graph.nodes[i]?.column == null ||
+            i === evidence.treatment ||
+            i === evidence.outcome,
+        )
+      )
+        return err({ kind: 'invalid-supplied-adjustment' })
+      adjustment = {
+        kind: 'supplied',
+        variables: variablesFrom(choice.nodes),
+        guarantee: choice.guarantee,
+      }
+      break
     case 'canonical':
       adjustment = { kind: 'canonical', variables: canonicalAdjustmentSet }
       break
@@ -1363,7 +1394,14 @@ export function identificationFrom(
       return assertNever(choice)
   }
   const adjustmentSet = adjustment.variables
-  const flow = studyFlow(study)
+  const flow = analyseDagCausalFlow(
+    study.editableGraph,
+    study.treatment.node,
+    study.outcome.node,
+    adjustmentSet.length === 0
+      ? { kind: 'unnecessary' }
+      : { kind: 'sufficient', variables: adjustmentSet.map((v) => v.node) },
+  )
   const mediators = variableRoles(study)
     .filter((entry) => entry.role.kind === 'mediator')
     .map((entry) => entry.node)

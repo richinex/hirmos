@@ -1,3 +1,4 @@
+import { NumberInput } from '@/components/ui/NumberInput'
 import { RunActions } from '@/components/ui/RunActions'
 import { RunDetails } from '@/components/ui/RunDetails'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
@@ -912,9 +913,8 @@ function LegacySensitivityPanel({
                           label="Simulations"
                           help={SENSITIVITY_PARAMETER_HELP.linearRefutation.simulations}
                         />
-                        <input
+                        <NumberInput
                           aria-label="Simulations"
-                          type="number"
                           min={1}
                           max={2000}
                           className={field('text', 'mt-1')}
@@ -936,9 +936,8 @@ function LegacySensitivityPanel({
                           label="Subset fraction"
                           help={SENSITIVITY_PARAMETER_HELP.linearRefutation.subsetFraction}
                         />
-                        <input
+                        <NumberInput
                           aria-label="Subset fraction"
-                          type="number"
                           step="0.05"
                           min={0.15}
                           max={0.95}
@@ -961,9 +960,8 @@ function LegacySensitivityPanel({
                           label="Seed"
                           help={SENSITIVITY_PARAMETER_HELP.linearRefutation.seed}
                         />
-                        <input
+                        <NumberInput
                           aria-label="Seed"
-                          type="number"
                           min={0}
                           className={field('text', 'mt-1')}
                           value={configuration.seed}
@@ -981,9 +979,8 @@ function LegacySensitivityPanel({
                           label="Ljung–Box lags"
                           help={SENSITIVITY_PARAMETER_HELP.linearRefutation.ljungBoxLags}
                         />
-                        <input
+                        <NumberInput
                           aria-label="Ljung–Box lags"
-                          type="number"
                           min={1}
                           max={200}
                           className={field('text', 'mt-1')}
@@ -1009,8 +1006,7 @@ function LegacySensitivityPanel({
                           label="Fold seed"
                           help={`${SENSITIVITY_PARAMETER_HELP.dmlRefutation.foldSeed} Main fit, placebo, random common cause, then confounding bounds, all from this seed. Use the estimation run’s seed${estimation?.kind === 'double-ml-run' ? ` (${estimation.configuration.seed})` : ''} so the main fit repeats it.`}
                         />
-                        <input
-                          type="number"
+                        <NumberInput
                           min={0}
                           aria-label="Batch fold seed"
                           className={field('text', 'mt-1')}
@@ -1033,9 +1029,8 @@ function LegacySensitivityPanel({
                           label="Seed"
                           help={SENSITIVITY_PARAMETER_HELP.unobservedConfounding.seed}
                         />
-                        <input
+                        <NumberInput
                           aria-label="Seed"
-                          type="number"
                           min={0}
                           className={field('text', 'mt-1')}
                           value={configuration.seed}
@@ -1095,8 +1090,7 @@ function LegacySensitivityPanel({
                               />
                               {range.kind === 'range' && (
                                 <>
-                                  <input
-                                    type="number"
+                                  <NumberInput
                                     step="any"
                                     aria-label={`${title} from`}
                                     className={field('text', 'w-20')}
@@ -1109,8 +1103,7 @@ function LegacySensitivityPanel({
                                     }
                                   />
                                   <span className="text-body text-faint">to</span>
-                                  <input
-                                    type="number"
+                                  <NumberInput
                                     step="any"
                                     aria-label={`${title} to`}
                                     className={field('text', 'w-20')}
@@ -1123,8 +1116,7 @@ function LegacySensitivityPanel({
                                     }
                                   />
                                   <span className="text-body text-faint">in</span>
-                                  <input
-                                    type="number"
+                                  <NumberInput
                                     min={1}
                                     max={200}
                                     aria-label={`${title} steps`}

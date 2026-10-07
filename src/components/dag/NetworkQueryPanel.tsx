@@ -1,3 +1,4 @@
+import { NumberInput, numberValue } from '@/components/ui/NumberInput'
 import { RunActions } from '@/components/ui/RunActions'
 import { useMemo, useState } from 'react'
 import { RunFold } from '@/components/ui/RunFold'
@@ -258,15 +259,14 @@ export function NetworkQueryPanel({
             {(r.kind === 'observe' || r.kind === 'intervene') && (
               <label>
                 <span className={fieldLabel}>State index</span>
-                <input
+                <NumberInput
                   className={field('text')}
-                  type="number"
                   min={0}
                   step={1}
                   aria-label={`${n.name} state index`}
                   value={r.state}
                   onChange={(e) => {
-                    const state = e.target.valueAsNumber
+                    const state = numberValue(e.target)
                     if (Number.isSafeInteger(state) && state >= 0) change(n.id, { ...r, state })
                   }}
                 />
@@ -311,15 +311,14 @@ export function NetworkQueryPanel({
       {ess > 0 && (
         <label>
           <span className={fieldLabel}>Equivalent sample size</span>
-          <input
+          <NumberInput
             className={field('text')}
             aria-label="Query equivalent sample size"
-            type="number"
             min={1}
             value={ess}
             onChange={(e) => {
-              if (Number.isFinite(e.target.valueAsNumber) && e.target.valueAsNumber > 0)
-                setEss(e.target.valueAsNumber)
+              if (Number.isFinite(numberValue(e.target)) && numberValue(e.target) > 0)
+                setEss(numberValue(e.target))
             }}
           />
         </label>

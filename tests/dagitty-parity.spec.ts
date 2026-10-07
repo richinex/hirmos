@@ -32,7 +32,11 @@ const selected = fixtures.filter((fixture) => heavy || fixture.edges.length <= 2
 
 const choose = async (trigger: Locator, label: string) => {
   await trigger.click()
-  await trigger.page().getByRole('listbox').getByRole('option', { name: label, exact: true }).click()
+  await trigger
+    .page()
+    .getByRole('listbox')
+    .getByRole('option', { name: label, exact: true })
+    .click()
 }
 
 const prepare = async (page: Page, fixture: Fixture) => {
@@ -43,10 +47,13 @@ const prepare = async (page: Page, fixture: Fixture) => {
   await page.getByRole('button', { name: /Inspect data/ }).click()
   await page.getByRole('radio', { name: /Independent observations/ }).click()
   for (const node of fixture.nodes) {
-    if (node.kind === 'observed') await page.getByRole('checkbox', { name: node.name, exact: true }).check()
+    if (node.kind === 'observed')
+      await page.getByRole('checkbox', { name: node.name, exact: true }).check()
   }
   await page.getByRole('button', { name: /Create prepared/ }).click()
-  await expect(page.getByRole('status').filter({ hasText: /^Cross-section, / })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('status').filter({ hasText: /^Cross-section, / })).toBeVisible({
+    timeout: 30_000,
+  })
 }
 
 const buildDag = async (page: Page, fixture: Fixture) => {
@@ -74,13 +81,18 @@ const buildDag = async (page: Page, fixture: Fixture) => {
 
 for (const fixture of selected) {
   test(`dagitty parity: ${fixture.label}`, async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name !== 'chromium', 'The numerical parity corpus runs once; mobile layout has separate workflow tests.')
+    test.skip(
+      testInfo.project.name !== 'chromium',
+      'The numerical parity corpus runs once; mobile layout has separate workflow tests.',
+    )
     test.setTimeout(120_000 + fixture.edges.length * 8_000)
     await prepare(page, fixture)
     await buildDag(page, fixture)
     if (fixture.slug === 'small-model-with-mediator') {
       await page.getByRole('button', { name: 'Run checks' }).click()
-      await expect(page.getByText('Conditional-independence results', { exact: true })).toBeVisible({ timeout: 60_000 })
+      await expect(page.getByText('Conditional-independence results', { exact: true })).toBeVisible(
+        { timeout: 60_000 },
+      )
       await page.getByText('Conditional-independence results', { exact: true }).click()
       await expect(page.getByRole('columnheader', { name: 'Holm p' })).toBeVisible()
       await expect(page.getByText('Relabeled-graph comparison', { exact: true })).toBeVisible()
@@ -93,17 +105,27 @@ for (const fixture of selected) {
     await page.getByRole('button', { name: /Tidy graph/ }).click()
     await page.waitForTimeout(400)
     await page.getByLabel('Causal DAG editor').screenshot({ path: `${out}/${fixture.slug}.png` })
-    writeFileSync(`${out}/${fixture.slug}.json`, JSON.stringify({ verdict: (await adjustment.innerText()).replace(/\n+/g, ' ').trim() }))
-    if (!await expectVerdict(adjustment, fixture.expected)) return
-    expect(fixture.expected.canonicalValid, 'dagitty must accept the canonical set Hirmos names').toBe(true)
+    writeFileSync(
+      `${out}/${fixture.slug}.json`,
+      JSON.stringify({ verdict: (await adjustment.innerText()).replace(/\n+/g, ' ').trim() }),
+    )
+    if (!(await expectVerdict(adjustment, fixture.expected))) return
+    expect(
+      fixture.expected.canonicalValid,
+      'dagitty must accept the canonical set Hirmos names',
+    ).toBe(true)
 
     if (fixture.slug === 'extended-confounding-triangle') {
       await page.getByRole('button', { name: 'Use for study' }).click()
       await page.getByRole('radio', { name: 'Observed choice' }).click()
-      await page.getByLabel('Assignment sentence').fill('Treatment arose from observed unit characteristics.')
+      await page
+        .getByLabel('Assignment sentence')
+        .fill('Treatment arose from observed unit characteristics.')
       await page.getByRole('button', { name: 'Identify the effect' }).click()
 
-      await expect(page.getByRole('heading', { name: 'Choose a valid adjustment set' })).toBeVisible()
+      await expect(
+        page.getByRole('heading', { name: 'Choose a valid adjustment set' }),
+      ).toBeVisible()
       await expect(page.getByRole('button', { name: 'Minimal set 1, A, Z' })).toBeVisible()
       await expect(page.getByRole('button', { name: 'Minimal set 2, B, Z' })).toBeVisible()
       await expect(page.getByRole('button', { name: 'Canonical set, A, B, Z' })).toBeVisible()
@@ -115,3 +137,35 @@ for (const fixture of selected) {
     }
   })
 }
+
+test('O-set is recorded as a supplied set and survives project reload', async ({ page }, info) => {
+  test.setTimeout(120000)
+  const fixture = fixtures.find((f) => f.slug === 'extended-confounding-triangle')!
+  await prepare(page, fixture)
+  await buildDag(page, fixture)
+  await page.getByRole('button', { name: 'Use for study' }).click()
+  await page.getByRole('radio', { name: 'Observed choice' }).click()
+  await page
+    .getByLabel('Assignment sentence')
+    .fill('Treatment arose from observed unit characteristics.')
+  await page.getByRole('button', { name: 'Identify the effect' }).click()
+  const choose = page.getByRole('button', { name: /^Recommended O-set,/ })
+  await expect(choose).toBeVisible()
+  await choose.scrollIntoViewIfNeeded()
+  await page.screenshot({ path: info.outputPath('o-set-choice.png') })
+  await choose.click()
+  await expect(
+    page.getByText('Recommended adjustment set (O-set)', { exact: false }).first(),
+  ).toBeVisible()
+  await page.getByRole('button', { name: /^Projects/ }).click()
+  await page.reload()
+  await page.getByRole('button', { name: 'Open dagitty · ' + fixture.label, exact: true }).click()
+  const needs = page.getByRole('heading', { name: 'Choose the data file again', exact: true })
+  await expect(needs.or(page.locator('#data-profile-title'))).toBeVisible()
+  if (await needs.isVisible())
+    await page.locator('input[type=file]').setInputFiles(fixtureDir + fixture.slug + '.csv')
+  await page.getByRole('button', { name: /^Study design/ }).click()
+  await expect(
+    page.getByText('Recommended adjustment set (O-set)', { exact: false }).first(),
+  ).toBeVisible()
+})

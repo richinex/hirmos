@@ -1,3 +1,4 @@
+import { NumberInput } from '@/components/ui/NumberInput'
 import { useMemo, useState, type ReactNode } from 'react'
 import { useJob } from '@/analysis/JobsProvider'
 import { useRunActivity } from '@/lib/useRunActivity'
@@ -420,10 +421,9 @@ export function HonestDidPanel({
   const numeric = (name: string, value: string, change: (v: string) => void, help?: string) => (
     <label className="block">
       <ParameterLabel className={fieldLabel} label={name} help={help ?? name} />
-      <input
+      <NumberInput
         aria-label={name}
         className={field('text', 'mt-1')}
-        type="number"
         step="any"
         value={value}
         onChange={(e) => change(e.target.value)}

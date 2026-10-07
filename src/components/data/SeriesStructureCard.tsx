@@ -1,3 +1,4 @@
+import { NumberInput } from '@/components/ui/NumberInput'
 import { RunActions } from '@/components/ui/RunActions'
 import { Metadata } from '@/components/ui/Metadata'
 import { useJob } from '@/analysis/JobsProvider'
@@ -279,8 +280,7 @@ export function SeriesStructureCard({
         <div className="flex flex-wrap items-end gap-2">
           <label className="text-body text-ink">
             <span className={label('block text-faint')}>Min segment</span>
-            <input
-              type="number"
+            <NumberInput
               min={1}
               max={200}
               className={field('text', 'mt-1 w-20')}
@@ -292,8 +292,7 @@ export function SeriesStructureCard({
           </label>
           <label className="text-body text-ink">
             <span className={label('block text-faint')}>Max lag</span>
-            <input
-              type="number"
+            <NumberInput
               min={1}
               max={400}
               className={field('text', 'mt-1 w-20')}

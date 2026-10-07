@@ -1,3 +1,4 @@
+import { NumberInput, numberValue } from '@/components/ui/NumberInput'
 import { RunActions } from '@/components/ui/RunActions'
 import { RunDetails } from '@/components/ui/RunDetails'
 import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
@@ -850,14 +851,13 @@ function RpcmciControls({
           help={DISCOVERY_PARAMETER_HELP.rpcmci.maximumTransitions}
           htmlFor="rpcmci-maximum-transitions"
         />
-        <input
+        <NumberInput
           id="rpcmci-maximum-transitions"
           className={field('text', 'mt-1')}
-          type="number"
           min={0}
           step={1}
           value={configuration.maxTransitions}
-          onChange={(event) => changeNumber('maxTransitions', event.currentTarget.valueAsNumber)}
+          onChange={(event) => changeNumber('maxTransitions', numberValue(event.currentTarget))}
         />
       </div>
       <div className="text-body text-ink">
@@ -960,15 +960,14 @@ function RpcmciControls({
               help={DISCOVERY_PARAMETER_HELP.rpcmci.switchingThreshold}
               htmlFor="rpcmci-switching-threshold"
             />
-            <input
+            <NumberInput
               id="rpcmci-switching-threshold"
               className={field('text', 'mt-1')}
-              type="number"
               min={0}
               max={1}
               step={0.01}
               value={configuration.switchThres}
-              onChange={(event) => changeNumber('switchThres', event.currentTarget.valueAsNumber)}
+              onChange={(event) => changeNumber('switchThres', numberValue(event.currentTarget))}
             />
           </div>
           <div className="text-body text-ink">
@@ -978,15 +977,14 @@ function RpcmciControls({
               help={DISCOVERY_PARAMETER_HELP.rpcmci.iterationsPerAnnealing}
               htmlFor="rpcmci-iterations"
             />
-            <input
+            <NumberInput
               id="rpcmci-iterations"
               className={field('text', 'mt-1')}
-              type="number"
               min={1}
               max={100}
               step={1}
               value={configuration.numIterations}
-              onChange={(event) => changeNumber('numIterations', event.currentTarget.valueAsNumber)}
+              onChange={(event) => changeNumber('numIterations', numberValue(event.currentTarget))}
             />
           </div>
           <div className="text-body text-ink">
@@ -996,15 +994,14 @@ function RpcmciControls({
               help={DISCOVERY_PARAMETER_HELP.rpcmci.annealingRuns}
               htmlFor="rpcmci-annealing-runs"
             />
-            <input
+            <NumberInput
               id="rpcmci-annealing-runs"
               className={field('text', 'mt-1')}
-              type="number"
               min={1}
               max={50}
               step={1}
               value={configuration.maxAnneal}
-              onChange={(event) => changeNumber('maxAnneal', event.currentTarget.valueAsNumber)}
+              onChange={(event) => changeNumber('maxAnneal', numberValue(event.currentTarget))}
             />
           </div>
           <div className="text-body text-ink">
@@ -1014,14 +1011,13 @@ function RpcmciControls({
               help={DISCOVERY_PARAMETER_HELP.rpcmci.seed}
               htmlFor="rpcmci-seed"
             />
-            <input
+            <NumberInput
               id="rpcmci-seed"
               className={field('text', 'mt-1')}
-              type="number"
               min={0}
               step={1}
               value={configuration.seed}
-              onChange={(event) => changeNumber('seed', event.currentTarget.valueAsNumber)}
+              onChange={(event) => changeNumber('seed', numberValue(event.currentTarget))}
             />
           </div>
         </div>
@@ -1241,15 +1237,14 @@ function GraceControls({
           help={DISCOVERY_PARAMETER_HELP.grace.gateThreshold}
           htmlFor="grace-gate-threshold"
         />
-        <input
+        <NumberInput
           id="grace-gate-threshold"
           className={field('text', 'mt-1')}
-          type="number"
           min={0}
           max={1}
           step={0.05}
           value={configuration.gateThreshold}
-          onChange={(event) => changeNumber('gateThreshold', event.currentTarget.valueAsNumber)}
+          onChange={(event) => changeNumber('gateThreshold', numberValue(event.currentTarget))}
         />
       </div>
       <SettingsDisclosure
@@ -1269,15 +1264,14 @@ function GraceControls({
               help={DISCOVERY_PARAMETER_HELP.grace.epochs}
               htmlFor="grace-epochs"
             />
-            <input
+            <NumberInput
               id="grace-epochs"
               className={field('text', 'mt-1')}
-              type="number"
               min={1}
               max={5000}
               step={1}
               value={configuration.epochs}
-              onChange={(event) => changeNumber('epochs', event.currentTarget.valueAsNumber)}
+              onChange={(event) => changeNumber('epochs', numberValue(event.currentTarget))}
             />
           </div>
           <div className="text-body text-ink">
@@ -1287,15 +1281,14 @@ function GraceControls({
               help={DISCOVERY_PARAMETER_HELP.grace.patience}
               htmlFor="grace-patience"
             />
-            <input
+            <NumberInput
               id="grace-patience"
               className={field('text', 'mt-1')}
-              type="number"
               min={1}
               max={configuration.epochs}
               step={1}
               value={configuration.patience}
-              onChange={(event) => changeNumber('patience', event.currentTarget.valueAsNumber)}
+              onChange={(event) => changeNumber('patience', numberValue(event.currentTarget))}
             />
           </div>
           <div className="text-body text-ink">
@@ -1305,14 +1298,13 @@ function GraceControls({
               help={DISCOVERY_PARAMETER_HELP.grace.seed}
               htmlFor="grace-seed"
             />
-            <input
+            <NumberInput
               id="grace-seed"
               className={field('text', 'mt-1')}
-              type="number"
               min={0}
               step={1}
               value={configuration.seed}
-              onChange={(event) => changeNumber('seed', event.currentTarget.valueAsNumber)}
+              onChange={(event) => changeNumber('seed', numberValue(event.currentTarget))}
             />
           </div>
         </div>
@@ -1372,16 +1364,15 @@ function NeuralControls({
             help={DISCOVERY_PARAMETER_HELP.neural.context}
             htmlFor="clstm-context"
           />
-          <input
+          <NumberInput
             id="clstm-context"
             className={field('text', 'mt-1')}
-            type="number"
             min={1}
             max={100}
             step={1}
             value={configuration.context}
             onChange={(event) => {
-              const context = event.currentTarget.valueAsNumber
+              const context = numberValue(event.currentTarget)
               if (Number.isFinite(context)) onChange({ ...configuration, context })
             }}
           />
@@ -1394,16 +1385,15 @@ function NeuralControls({
           help={DISCOVERY_PARAMETER_HELP.neural.hiddenWidth}
           htmlFor={`${prefix}-hidden`}
         />
-        <input
+        <NumberInput
           id={`${prefix}-hidden`}
           className={field('text', 'mt-1')}
-          type="number"
           min={1}
           max={256}
           step={1}
           value={configuration.kind === 'cmlp' ? configuration.hidden[0] : configuration.hidden}
           onChange={(event) => {
-            const value = event.currentTarget.valueAsNumber
+            const value = numberValue(event.currentTarget)
             if (!Number.isFinite(value)) return
             onChange(
               configuration.kind === 'cmlp'
@@ -1420,14 +1410,13 @@ function NeuralControls({
           help={DISCOVERY_PARAMETER_HELP.neural.sparsity}
           htmlFor={`${prefix}-lambda`}
         />
-        <input
+        <NumberInput
           id={`${prefix}-lambda`}
           className={field('text', 'mt-1')}
-          type="number"
           min={0}
           step={0.001}
           value={configuration.lambda}
-          onChange={(event) => changeNumber('lambda', event.currentTarget.valueAsNumber)}
+          onChange={(event) => changeNumber('lambda', numberValue(event.currentTarget))}
         />
       </div>
       {configuration.kind === 'cmlp' && (
@@ -1507,14 +1496,13 @@ function NeuralControls({
               help={DISCOVERY_PARAMETER_HELP.neural.ridge}
               htmlFor={`${prefix}-ridge`}
             />
-            <input
+            <NumberInput
               id={`${prefix}-ridge`}
               className={field('text', 'mt-1')}
-              type="number"
               min={0}
               step={0.001}
               value={configuration.ridgeLambda}
-              onChange={(event) => changeNumber('ridgeLambda', event.currentTarget.valueAsNumber)}
+              onChange={(event) => changeNumber('ridgeLambda', numberValue(event.currentTarget))}
             />
           </div>
           <div className="text-body text-ink">
@@ -1524,14 +1512,13 @@ function NeuralControls({
               help={DISCOVERY_PARAMETER_HELP.neural.learningRate}
               htmlFor={`${prefix}-learning-rate`}
             />
-            <input
+            <NumberInput
               id={`${prefix}-learning-rate`}
               className={field('text', 'mt-1')}
-              type="number"
               min={0.000001}
               step={0.001}
               value={configuration.learningRate}
-              onChange={(event) => changeNumber('learningRate', event.currentTarget.valueAsNumber)}
+              onChange={(event) => changeNumber('learningRate', numberValue(event.currentTarget))}
             />
           </div>
           <div className="text-body text-ink">
@@ -1541,15 +1528,14 @@ function NeuralControls({
               help={DISCOVERY_PARAMETER_HELP.neural.iterations}
               htmlFor={`${prefix}-iterations`}
             />
-            <input
+            <NumberInput
               id={`${prefix}-iterations`}
               className={field('text', 'mt-1')}
-              type="number"
               min={1}
               max={configuration.kind === 'cmlp' ? 50_000 : 20_000}
               step={1}
               value={configuration.maxIter}
-              onChange={(event) => changeNumber('maxIter', event.currentTarget.valueAsNumber)}
+              onChange={(event) => changeNumber('maxIter', numberValue(event.currentTarget))}
             />
           </div>
           <div className="text-body text-ink">
@@ -1559,15 +1545,14 @@ function NeuralControls({
               help={DISCOVERY_PARAMETER_HELP.neural.checkEvery}
               htmlFor={`${prefix}-check-every`}
             />
-            <input
+            <NumberInput
               id={`${prefix}-check-every`}
               className={field('text', 'mt-1')}
-              type="number"
               min={1}
               max={configuration.maxIter}
               step={1}
               value={configuration.checkEvery}
-              onChange={(event) => changeNumber('checkEvery', event.currentTarget.valueAsNumber)}
+              onChange={(event) => changeNumber('checkEvery', numberValue(event.currentTarget))}
             />
           </div>
           <div className="text-body text-ink">
@@ -1577,14 +1562,13 @@ function NeuralControls({
               help={DISCOVERY_PARAMETER_HELP.neural.lookback}
               htmlFor={`${prefix}-lookback`}
             />
-            <input
+            <NumberInput
               id={`${prefix}-lookback`}
               className={field('text', 'mt-1')}
-              type="number"
               min={1}
               step={1}
               value={configuration.lookback}
-              onChange={(event) => changeNumber('lookback', event.currentTarget.valueAsNumber)}
+              onChange={(event) => changeNumber('lookback', numberValue(event.currentTarget))}
             />
           </div>
           <div className="text-body text-ink">
@@ -1594,14 +1578,13 @@ function NeuralControls({
               help={DISCOVERY_PARAMETER_HELP.neural.seed}
               htmlFor={`${prefix}-seed`}
             />
-            <input
+            <NumberInput
               id={`${prefix}-seed`}
               className={field('text', 'mt-1')}
-              type="number"
               min={0}
               step={1}
               value={configuration.seed}
-              onChange={(event) => changeNumber('seed', event.currentTarget.valueAsNumber)}
+              onChange={(event) => changeNumber('seed', numberValue(event.currentTarget))}
             />
           </div>
         </div>

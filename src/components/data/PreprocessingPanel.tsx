@@ -1,3 +1,4 @@
+import { NumberInput } from '@/components/ui/NumberInput'
 import { RunActions } from '@/components/ui/RunActions'
 import { MetricGrid, MetricTile } from '@/components/ui/figures'
 import { ISO_WEEK_NOTE, TIME_INTERPRETATIONS } from '@/domain/timeInterpretation'
@@ -970,16 +971,15 @@ export function PreprocessingPanel({
   return (
     <section aria-labelledby="preprocessing-title" className="@container/panel">
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <span className={label('text-faint')}>Prepare data</span>
-          <h2 id="preprocessing-title" className="mb-0 mt-2 text-heading text-ink">
+        <div className="flex items-center gap-1.5">
+          <h2 id="preprocessing-title" className="m-0 text-heading text-ink">
             Set the analysis dataset
           </h2>
+          <ParameterHelp
+            label="data preparation"
+            help="Specify how rows are organised, handle missing values, and choose any time-series transformations."
+          />
         </div>
-        <span className="max-w-[52ch] text-body text-faint">
-          Specify how rows are organised, address missing values, and select any required
-          time-series transformations.
-        </span>
       </div>
 
       <div className="grid gap-4 @3xl/panel:grid-cols-2">
@@ -1427,8 +1427,7 @@ export function PreprocessingPanel({
                         label="Longest gap to fill"
                         help="Gaps of up to this many consecutive missing cells in a column are filled. A longer gap is left entirely unfilled, not partially filled."
                       />
-                      <input
-                        type="number"
+                      <NumberInput
                         min={1}
                         max={1000}
                         aria-label="Longest gap to fill"
@@ -1848,17 +1847,21 @@ export function PreprocessingPanel({
       )}
 
       {(preparedCurrent !== null || timeSeriesSelected) && (
-        <section className={panel('mt-4 p-(--panel-space)')} aria-labelledby="diagnostics-title">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-1.5">
-              <h3 id="diagnostics-title" className={cn(sectionTitle, 'm-0')}>
-                Diagnostics
-              </h3>
-              <ParameterHelp
-                label="diagnostics"
-                help="These tests do not change the prepared dataset."
-              />
+        <>
+          <div className="mb-5 mt-12 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-1.5">
+                <h2 id="diagnostics-title" className="m-0 text-heading text-ink">
+                  Data diagnostics
+                </h2>
+                <ParameterHelp
+                  label="diagnostics"
+                  help="Assess relationships between predictors and, for time series, examine temporal properties. These diagnostics do not determine which variables belong in the causal graph."
+                />
+              </div>
             </div>
+          </div>
+          <section className={panel('p-(--panel-space)')} aria-labelledby="diagnostics-title">
             {/* A cross-section has one diagnostic, and one option is not a choice, so the switch appears only when there are several. */}
             {diagnosticOptions.length > 1 && (
               <SegmentedControl
@@ -1870,300 +1873,305 @@ export function PreprocessingPanel({
                 options={diagnosticOptions}
               />
             )}
-          </div>
-          {preparedCurrent === null && (
-            <p role="status" className="mb-0 mt-3 text-body text-faint">
-              Create a version of the prepared dataset to run these diagnostics.
-            </p>
-          )}
-          <div hidden={diagnostic !== 'multicollinearity'} className="mt-4">
-            {preparedCurrent !== null ? (
-              <MulticollinearityCard
-                source={source}
-                profile={profile}
-                prepared={preparedCurrent}
-                onSelection={applyMulticollinearitySelection}
-              />
-            ) : null}
-          </div>
-          <div hidden={diagnostic !== 'stationarity'} className="mt-4">
-            <div>
-              <h4 className="m-0 text-body font-medium text-ink">Stationarity tests</h4>
-              <div className="mt-2 grid gap-3 @3xl/panel:grid-cols-2 @3xl/panel:gap-6">
-                <p className={prose('m-0 text-faint')}>{STATIONARITY_TESTS_NOTE}</p>
-                <p className={prose('m-0 text-faint')}>
-                  These tests evaluate the saved values. To assess a different transformation,
-                  modify it above and create a new version of the prepared dataset.
-                </p>
-              </div>
-            </div>
-            <MethodCaveats methods={STATIONARITY_METHODS} />
-            <fieldset
-              disabled={job.kind === 'running'}
-              className="mt-4 min-w-0 border-0 p-0"
-              aria-label="Stationarity variables"
-            >
-              <legend className={fieldLabel}>Variables to test</legend>
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <p className="m-0 text-body text-faint">
-                  Only selected variables are tested. The prepared dataset is unchanged.
-                </p>
-                <SelectionActions
-                  selectLabel="Select all stationarity variables"
-                  clearLabel="Clear stationarity variables"
-                  onSelectAll={() => selectTestColumns(preparedTimeSeries?.columns ?? [])}
-                  onClear={() => selectTestColumns([])}
+            {preparedCurrent === null && (
+              <p role="status" className="mb-0 mt-3 text-body text-faint">
+                Create a version of the prepared dataset to run these diagnostics.
+              </p>
+            )}
+            <div hidden={diagnostic !== 'multicollinearity'} className="mt-4">
+              {preparedCurrent !== null ? (
+                <MulticollinearityCard
+                  source={source}
+                  profile={profile}
+                  prepared={preparedCurrent}
+                  onSelection={applyMulticollinearitySelection}
                 />
-              </div>
-              <div className="grid gap-1 @md/panel:grid-cols-2 @3xl/panel:grid-cols-3">
-                {(preparedTimeSeries?.columns ?? []).map((column) => (
-                  <label
-                    key={column}
-                    className="flex items-center gap-2 rounded-md px-2 py-1.5 text-body text-ink hover:bg-well"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={testColumns.includes(column)}
-                      onChange={() =>
-                        selectTestColumns(
-                          testColumns.includes(column)
-                            ? testColumns.filter((id) => id !== column)
-                            : [...testColumns, column],
-                        )
-                      }
-                    />
-                    <span className="min-w-0 break-words">{columnName(column)}</span>
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-            <div className="mt-3">
-              <RunActions
-                className="mt-3"
-                running={job.kind === 'running'}
-                onCancel={cancelDiagnostics}
-                orbLabel="Stationarity tests running"
-              >
-                <button
-                  type="button"
-                  className={button(testColumns.length > 0 ? 'signal' : 'quiet')}
-                  disabled={
-                    preparedTimeSeries === null ||
-                    testColumns.length === 0 ||
-                    job.kind === 'running' ||
-                    session.blocked
-                  }
-                  aria-busy={job.kind === 'running'}
-                  onClick={() => void runDiagnostics()}
-                >
-                  Run stationarity tests
-                </button>
-                <span role="status" className="sr-only">
-                  {job.kind === 'running'
-                    ? `${job.progress?.completed ?? 0} of ${job.progress?.total ?? 0} variables completed`
-                    : ''}
-                </span>
-              </RunActions>
+              ) : null}
             </div>
-            {job.kind === 'failed' && (
-              <Alert tone="danger" className="mt-3">
-                <p className="m-0">{job.detail}</p>
-              </Alert>
-            )}
-            {job.kind === 'cancelled' && (
-              <Alert tone="info" className="mt-3">
-                <p className="m-0">Stationarity tests cancelled. No new results were saved.</p>
-              </Alert>
-            )}
-            {stationarityEvidence !== null && (
-              <section className="mt-5 space-y-4" aria-label="Stationarity results">
-                <div className="flex items-center justify-between gap-3">
-                  <h4 className="m-0 text-title font-medium">Results</h4>
+            <div hidden={diagnostic !== 'stationarity'} className="mt-4">
+              <div>
+                <h4 className="m-0 text-body font-medium text-ink">Stationarity tests</h4>
+                <div className="mt-2 grid gap-3 @3xl/panel:grid-cols-2 @3xl/panel:gap-6">
+                  <p className={prose('m-0 text-faint')}>{STATIONARITY_TESTS_NOTE}</p>
+                  <p className={prose('m-0 text-faint')}>
+                    These tests evaluate the saved values. To assess a different transformation,
+                    modify it above and create a new version of the prepared dataset.
+                  </p>
+                </div>
+              </div>
+              <MethodCaveats methods={STATIONARITY_METHODS} />
+              <fieldset
+                disabled={job.kind === 'running'}
+                className="mt-4 min-w-0 border-0 p-0"
+                aria-label="Stationarity variables"
+              >
+                <legend className={fieldLabel}>Variables to test</legend>
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <p className="m-0 text-body text-faint">
+                    Only selected variables are tested. The prepared dataset is unchanged.
+                  </p>
+                  <SelectionActions
+                    selectLabel="Select all stationarity variables"
+                    clearLabel="Clear stationarity variables"
+                    onSelectAll={() => selectTestColumns(preparedTimeSeries?.columns ?? [])}
+                    onClear={() => selectTestColumns([])}
+                  />
+                </div>
+                <div className="grid gap-1 @md/panel:grid-cols-2 @3xl/panel:grid-cols-3">
+                  {(preparedTimeSeries?.columns ?? []).map((column) => (
+                    <label
+                      key={column}
+                      className="flex items-center gap-2 rounded-md px-2 py-1.5 text-body text-ink hover:bg-well"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={testColumns.includes(column)}
+                        onChange={() =>
+                          selectTestColumns(
+                            testColumns.includes(column)
+                              ? testColumns.filter((id) => id !== column)
+                              : [...testColumns, column],
+                          )
+                        }
+                      />
+                      <span className="min-w-0 break-words">{columnName(column)}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              <div className="mt-3">
+                <RunActions
+                  className="mt-3"
+                  running={job.kind === 'running'}
+                  onCancel={cancelDiagnostics}
+                  orbLabel="Stationarity tests running"
+                >
                   <button
                     type="button"
-                    className={button('quiet')}
-                    disabled={job.kind === 'running'}
-                    onClick={clearDiagnostics}
+                    className={button(testColumns.length > 0 ? 'signal' : 'quiet')}
+                    disabled={
+                      preparedTimeSeries === null ||
+                      testColumns.length === 0 ||
+                      job.kind === 'running' ||
+                      session.blocked
+                    }
+                    aria-busy={job.kind === 'running'}
+                    onClick={() => void runDiagnostics()}
                   >
-                    Clear results
+                    Run stationarity tests
                   </button>
-                </div>
-                {stationarityEvidence.variables.map((evidence) => {
-                  const column = profile.columns.find(
-                    (candidate) => candidate.id === evidence.column,
-                  )
-                  const name = column?.name ?? String(evidence.column)
-                  const result = evidence.result
-                  const rows = [
-                    {
-                      name: 'ADF (constant)',
-                      statistic: result.adf.constant.statistic,
-                      p: result.adf.constant.pValue,
-                      fit: `lag ${result.adf.constant.usedLag}, n ${result.adf.constant.observations}`,
-                      critical: labelledCriticalValues('adf', result.adf.constant.criticalValues),
-                    },
-                    {
-                      name: 'ADF (constant + trend)',
-                      statistic: result.adf.constantAndTrend.statistic,
-                      p: result.adf.constantAndTrend.pValue,
-                      fit: `lag ${result.adf.constantAndTrend.usedLag}, n ${result.adf.constantAndTrend.observations}`,
-                      critical: labelledCriticalValues(
-                        'adf',
-                        result.adf.constantAndTrend.criticalValues,
-                      ),
-                    },
-                    {
-                      name: 'KPSS (constant)',
-                      statistic: result.kpss.constant.statistic,
-                      p: result.kpss.constant.pValue,
-                      fit: `lag ${result.kpss.constant.usedLag}`,
-                      critical: labelledCriticalValues('kpss', result.kpss.constant.criticalValues),
-                    },
-                    {
-                      name: 'KPSS (constant + trend)',
-                      statistic: result.kpss.constantAndTrend.statistic,
-                      p: result.kpss.constantAndTrend.pValue,
-                      fit: `lag ${result.kpss.constantAndTrend.usedLag}`,
-                      critical: labelledCriticalValues(
-                        'kpss',
-                        result.kpss.constantAndTrend.criticalValues,
-                      ),
-                    },
-                    {
-                      name: 'Zivot–Andrews (level)',
-                      statistic: result.zivotAndrews.level.statistic,
-                      p: result.zivotAndrews.level.pValue,
-                      fit: `base lag ${result.zivotAndrews.level.baseLags}, break row ${result.zivotAndrews.level.breakIndex + 1}`,
-                      critical: labelledCriticalValues(
-                        'zivot-andrews',
-                        result.zivotAndrews.level.criticalValues,
-                      ),
-                    },
-                    {
-                      name: 'Zivot–Andrews (trend)',
-                      statistic: result.zivotAndrews.trend.statistic,
-                      p: result.zivotAndrews.trend.pValue,
-                      fit: `base lag ${result.zivotAndrews.trend.baseLags}, break row ${result.zivotAndrews.trend.breakIndex + 1}`,
-                      critical: labelledCriticalValues(
-                        'zivot-andrews',
-                        result.zivotAndrews.trend.criticalValues,
-                      ),
-                    },
-                    {
-                      name: 'Zivot–Andrews (level + trend)',
-                      statistic: result.zivotAndrews.levelAndTrend.statistic,
-                      p: result.zivotAndrews.levelAndTrend.pValue,
-                      fit: `base lag ${result.zivotAndrews.levelAndTrend.baseLags}, break row ${result.zivotAndrews.levelAndTrend.breakIndex + 1}`,
-                      critical: labelledCriticalValues(
-                        'zivot-andrews',
-                        result.zivotAndrews.levelAndTrend.criticalValues,
-                      ),
-                    },
-                  ] as const
-                  return (
-                    <article
-                      key={evidence.column}
-                      className={resultSurface('space-y-2 p-3')}
-                      aria-label={`Stationarity result for ${name}`}
+                  <span role="status" className="sr-only">
+                    {job.kind === 'running'
+                      ? `${job.progress?.completed ?? 0} of ${job.progress?.total ?? 0} variables completed`
+                      : ''}
+                  </span>
+                </RunActions>
+              </div>
+              {job.kind === 'failed' && (
+                <Alert tone="danger" className="mt-3">
+                  <p className="m-0">{job.detail}</p>
+                </Alert>
+              )}
+              {job.kind === 'cancelled' && (
+                <Alert tone="info" className="mt-3">
+                  <p className="m-0">Stationarity tests cancelled. No new results were saved.</p>
+                </Alert>
+              )}
+              {stationarityEvidence !== null && (
+                <section className="mt-5 space-y-4" aria-label="Stationarity results">
+                  <div className="flex items-center justify-between gap-3">
+                    <h4 className="m-0 text-title font-medium">Results</h4>
+                    <button
+                      type="button"
+                      className={button('quiet')}
+                      disabled={job.kind === 'running'}
+                      onClick={clearDiagnostics}
                     >
-                      <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                        <div className="min-w-0">
-                          <h5 className="m-0 break-words text-body font-medium text-ink">{name}</h5>
-                          <p className="m-0 text-label text-faint">
-                            {formatCount(result.observations).text} rows
-                            {preparedTimeSeries === null
-                              ? ''
-                              : `, ${describeSeriesTransform(seriesTransformFor(preparedTimeSeries.seriesTransforms, evidence.column))}`}
-                          </p>
-                        </div>
-                        <StationarityVerdict
-                          assessment={evidence.assessment}
-                          transform={
-                            preparedTimeSeries === null
-                              ? { kind: 'levels' }
-                              : seriesTransformFor(
-                                  preparedTimeSeries.seriesTransforms,
-                                  evidence.column,
-                                )
-                          }
-                        />
-                        <button
-                          type="button"
-                          className={button('quiet')}
-                          aria-label={`Delete stationarity result for ${name}`}
-                          disabled={job.kind === 'running'}
-                          onClick={() => deleteDiagnostic(evidence.column)}
-                        >
-                          <Icon name="delete" size={15} />
-                          Delete
-                        </button>
-                      </header>
-                      <MetricGrid
-                        className="stationarity-metrics"
-                        label={`Stationarity p-values for ${name}`}
+                      Clear results
+                    </button>
+                  </div>
+                  {stationarityEvidence.variables.map((evidence) => {
+                    const column = profile.columns.find(
+                      (candidate) => candidate.id === evidence.column,
+                    )
+                    const name = column?.name ?? String(evidence.column)
+                    const result = evidence.result
+                    const rows = [
+                      {
+                        name: 'ADF (constant)',
+                        statistic: result.adf.constant.statistic,
+                        p: result.adf.constant.pValue,
+                        fit: `lag ${result.adf.constant.usedLag}, n ${result.adf.constant.observations}`,
+                        critical: labelledCriticalValues('adf', result.adf.constant.criticalValues),
+                      },
+                      {
+                        name: 'ADF (constant + trend)',
+                        statistic: result.adf.constantAndTrend.statistic,
+                        p: result.adf.constantAndTrend.pValue,
+                        fit: `lag ${result.adf.constantAndTrend.usedLag}, n ${result.adf.constantAndTrend.observations}`,
+                        critical: labelledCriticalValues(
+                          'adf',
+                          result.adf.constantAndTrend.criticalValues,
+                        ),
+                      },
+                      {
+                        name: 'KPSS (constant)',
+                        statistic: result.kpss.constant.statistic,
+                        p: result.kpss.constant.pValue,
+                        fit: `lag ${result.kpss.constant.usedLag}`,
+                        critical: labelledCriticalValues(
+                          'kpss',
+                          result.kpss.constant.criticalValues,
+                        ),
+                      },
+                      {
+                        name: 'KPSS (constant + trend)',
+                        statistic: result.kpss.constantAndTrend.statistic,
+                        p: result.kpss.constantAndTrend.pValue,
+                        fit: `lag ${result.kpss.constantAndTrend.usedLag}`,
+                        critical: labelledCriticalValues(
+                          'kpss',
+                          result.kpss.constantAndTrend.criticalValues,
+                        ),
+                      },
+                      {
+                        name: 'Zivot–Andrews (level)',
+                        statistic: result.zivotAndrews.level.statistic,
+                        p: result.zivotAndrews.level.pValue,
+                        fit: `base lag ${result.zivotAndrews.level.baseLags}, break row ${result.zivotAndrews.level.breakIndex + 1}`,
+                        critical: labelledCriticalValues(
+                          'zivot-andrews',
+                          result.zivotAndrews.level.criticalValues,
+                        ),
+                      },
+                      {
+                        name: 'Zivot–Andrews (trend)',
+                        statistic: result.zivotAndrews.trend.statistic,
+                        p: result.zivotAndrews.trend.pValue,
+                        fit: `base lag ${result.zivotAndrews.trend.baseLags}, break row ${result.zivotAndrews.trend.breakIndex + 1}`,
+                        critical: labelledCriticalValues(
+                          'zivot-andrews',
+                          result.zivotAndrews.trend.criticalValues,
+                        ),
+                      },
+                      {
+                        name: 'Zivot–Andrews (level + trend)',
+                        statistic: result.zivotAndrews.levelAndTrend.statistic,
+                        p: result.zivotAndrews.levelAndTrend.pValue,
+                        fit: `base lag ${result.zivotAndrews.levelAndTrend.baseLags}, break row ${result.zivotAndrews.levelAndTrend.breakIndex + 1}`,
+                        critical: labelledCriticalValues(
+                          'zivot-andrews',
+                          result.zivotAndrews.levelAndTrend.criticalValues,
+                        ),
+                      },
+                    ] as const
+                    return (
+                      <article
+                        key={evidence.column}
+                        className={resultSurface('space-y-2 p-3')}
+                        aria-label={`Stationarity result for ${name}`}
                       >
-                        <MetricTile
-                          label="ADF p-value"
-                          value={formatP(result.adf.constant.pValue)}
-                          context="Constant"
-                          size="compact"
-                        />
-                        <MetricTile
-                          label="KPSS p-value"
-                          value={formatP(result.kpss.constant.pValue)}
-                          context="Constant"
-                          size="compact"
-                        />
-                        <MetricTile
-                          label="Zivot–Andrews p-value"
-                          value={formatP(result.zivotAndrews.levelAndTrend.pValue)}
-                          context="Constant and trend"
-                          size="compact"
-                        />
-                      </MetricGrid>
-                      <details className="group">
-                        <summary className="flex cursor-pointer list-none items-center gap-1.5 text-body text-muted [&::-webkit-details-marker]:hidden">
-                          <Icon
-                            name="chevron_right"
-                            size={16}
-                            className="transition-transform group-open:rotate-90"
+                        <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                          <div className="min-w-0">
+                            <h5 className="m-0 break-words text-body font-medium text-ink">
+                              {name}
+                            </h5>
+                            <p className="m-0 text-label text-faint">
+                              {formatCount(result.observations).text} rows
+                              {preparedTimeSeries === null
+                                ? ''
+                                : `, ${describeSeriesTransform(seriesTransformFor(preparedTimeSeries.seriesTransforms, evidence.column))}`}
+                            </p>
+                          </div>
+                          <StationarityVerdict
+                            assessment={evidence.assessment}
+                            transform={
+                              preparedTimeSeries === null
+                                ? { kind: 'levels' }
+                                : seriesTransformFor(
+                                    preparedTimeSeries.seriesTransforms,
+                                    evidence.column,
+                                  )
+                            }
                           />
-                          Test details for {name}
-                        </summary>
-                        <div className="mt-3 overflow-x-auto">
-                          <TestStatisticsTable rows={rows} density={density} />
-                        </div>
-                      </details>
-                    </article>
-                  )
-                })}
-              </section>
-            )}
-          </div>
-          <div hidden={diagnostic !== 'structure'} className="mt-4">
-            {preparedTimeSeries !== null ? (
-              <SeriesStructureCard
-                embedded
-                source={source}
-                profile={profile}
-                prepared={preparedTimeSeries}
-              />
-            ) : null}
-          </div>
-          <div hidden={diagnostic !== 'granger'} className="mt-4">
-            {preparedTimeSeries !== null ? (
-              <GrangerCard
-                embedded
-                source={source}
-                profile={profile}
-                prepared={preparedTimeSeries}
-                stationarity={stationarityEvidence}
-                evidence={grangerEvidence}
-                onEvidence={onGrangerEvidence}
-              />
-            ) : null}
-          </div>
-        </section>
+                          <button
+                            type="button"
+                            className={button('quiet')}
+                            aria-label={`Delete stationarity result for ${name}`}
+                            disabled={job.kind === 'running'}
+                            onClick={() => deleteDiagnostic(evidence.column)}
+                          >
+                            <Icon name="delete" size={15} />
+                            Delete
+                          </button>
+                        </header>
+                        <MetricGrid
+                          className="stationarity-metrics"
+                          label={`Stationarity p-values for ${name}`}
+                        >
+                          <MetricTile
+                            label="ADF p-value"
+                            value={formatP(result.adf.constant.pValue)}
+                            context="Constant"
+                            size="compact"
+                          />
+                          <MetricTile
+                            label="KPSS p-value"
+                            value={formatP(result.kpss.constant.pValue)}
+                            context="Constant"
+                            size="compact"
+                          />
+                          <MetricTile
+                            label="Zivot–Andrews p-value"
+                            value={formatP(result.zivotAndrews.levelAndTrend.pValue)}
+                            context="Constant and trend"
+                            size="compact"
+                          />
+                        </MetricGrid>
+                        <details className="group">
+                          <summary className="flex cursor-pointer list-none items-center gap-1.5 text-body text-muted [&::-webkit-details-marker]:hidden">
+                            <Icon
+                              name="chevron_right"
+                              size={16}
+                              className="transition-transform group-open:rotate-90"
+                            />
+                            Test details for {name}
+                          </summary>
+                          <div className="mt-3 overflow-x-auto">
+                            <TestStatisticsTable rows={rows} density={density} />
+                          </div>
+                        </details>
+                      </article>
+                    )
+                  })}
+                </section>
+              )}
+            </div>
+            <div hidden={diagnostic !== 'structure'} className="mt-4">
+              {preparedTimeSeries !== null ? (
+                <SeriesStructureCard
+                  embedded
+                  source={source}
+                  profile={profile}
+                  prepared={preparedTimeSeries}
+                />
+              ) : null}
+            </div>
+            <div hidden={diagnostic !== 'granger'} className="mt-4">
+              {preparedTimeSeries !== null ? (
+                <GrangerCard
+                  embedded
+                  source={source}
+                  profile={profile}
+                  prepared={preparedTimeSeries}
+                  stationarity={stationarityEvidence}
+                  evidence={grangerEvidence}
+                  onEvidence={onGrangerEvidence}
+                />
+              ) : null}
+            </div>
+          </section>
+        </>
       )}
     </section>
   )

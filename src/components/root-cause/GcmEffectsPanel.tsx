@@ -1,3 +1,4 @@
+import { NumberInput } from '@/components/ui/NumberInput'
 import { RunPicker } from '@/components/ui/RunPicker'
 import { SettingsDisclosure } from '@/components/ui/SettingsDisclosure'
 import { useMemo, useState, type ReactNode } from 'react'
@@ -196,9 +197,8 @@ function QuantileGroups({
     <>
       <label>
         <span className={fieldLabel}>Quantile groups</span>
-        <input
+        <NumberInput
           aria-label="Quantile groups"
-          type="number"
           min={2}
           max={10}
           className={field('text', 'mt-1')}
@@ -224,9 +224,8 @@ function QuantileGroups({
       {value.scope.kind === 'lowerBound' && (
         <label>
           <span className={fieldLabel}>Minimum group value</span>
-          <input
+          <NumberInput
             aria-label="Minimum group value"
-            type="number"
             className={field('text', 'mt-1')}
             value={value.scope.minimum}
             onChange={(event) =>
@@ -507,9 +506,8 @@ export function GcmEffectsPanel(props: Props) {
                           {mechanism.kind === 'classifier' && (
                             <label className="mt-2 block">
                               <span className={fieldLabel}>Categories, coded from 0</span>
-                              <input
+                              <NumberInput
                                 aria-label={`Categories for ${model.names[i]}`}
-                                type="number"
                                 min={2}
                                 max={7}
                                 value={mechanism.classes}
@@ -556,9 +554,8 @@ export function GcmEffectsPanel(props: Props) {
                   ).map((item) => (
                     <label key={item.key}>
                       <span className={fieldLabel}>{item.label}</span>
-                      <input
+                      <NumberInput
                         aria-label={item.label}
-                        type="number"
                         min={item.min}
                         value={model[item.key]}
                         className={field('text', 'mt-1')}
@@ -570,9 +567,8 @@ export function GcmEffectsPanel(props: Props) {
                   ))}
                   <label>
                     <span className={fieldLabel}>Upper percentile</span>
-                    <input
+                    <NumberInput
                       aria-label="Upper percentile"
-                      type="number"
                       min={51}
                       max={99.9}
                       step={0.1}

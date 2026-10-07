@@ -1,3 +1,4 @@
+import { NumberInput } from '@/components/ui/NumberInput'
 import { useMemo } from 'react'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { SelectionActions } from '@/components/ui/SelectionActions'
@@ -153,10 +154,9 @@ export function StaggeredDidControls({
             label="Anticipation periods"
             help="The number of periods before adoption in which treatment may already affect outcomes."
           />
-          <input
+          <NumberInput
             aria-label="Anticipation periods"
             className={field('text', 'mt-1 w-full')}
-            type="number"
             min={0}
             step={1}
             value={spec.anticipation}
@@ -250,10 +250,9 @@ export function StaggeredDidControls({
       <div className={fieldRow.three}>
         <label>
           <span className={fieldLabel}>Confidence level</span>
-          <input
+          <NumberInput
             aria-label="Staggered confidence level"
             className={field('text', 'mt-1 w-full')}
-            type="number"
             min={0.01}
             max={0.999}
             step={0.01}
@@ -265,10 +264,9 @@ export function StaggeredDidControls({
           <>
             <label>
               <span className={fieldLabel}>Replications</span>
-              <input
+              <NumberInput
                 aria-label="Staggered bootstrap replications"
                 className={field('text', 'mt-1 w-full')}
-                type="number"
                 min={1}
                 step={1}
                 value={spec.inference.iterations}
@@ -280,10 +278,9 @@ export function StaggeredDidControls({
             </label>
             <label>
               <span className={fieldLabel}>Seed</span>
-              <input
+              <NumberInput
                 aria-label="Staggered bootstrap seed"
                 className={field('text', 'mt-1 w-full')}
-                type="number"
                 min={0}
                 step={1}
                 value={spec.inference.seed}
@@ -323,10 +320,9 @@ export function StaggeredDidControls({
               label="First event time"
               help="Periods relative to adoption. Leave blank to retain all supported event times."
             />
-            <input
+            <NumberInput
               aria-label="First event time"
               className={field('text', 'mt-1 w-full')}
-              type="number"
               step={1}
               value={spec.firstEvent ?? ''}
               onChange={(e) =>
@@ -336,10 +332,9 @@ export function StaggeredDidControls({
           </label>
           <label>
             <span className={fieldLabel}>Last event time</span>
-            <input
+            <NumberInput
               aria-label="Last event time"
               className={field('text', 'mt-1 w-full')}
-              type="number"
               step={1}
               value={spec.lastEvent ?? ''}
               onChange={(e) =>
@@ -353,10 +348,9 @@ export function StaggeredDidControls({
               label="Balance through"
               help="Keep cohorts observed for at least this many post-adoption periods and restrict dynamic effects accordingly. Leave blank for all available cohort support. This changes the dynamic aggregation, not the cohort or calendar summaries."
             />
-            <input
+            <NumberInput
               aria-label="Balance event support through"
               className={field('text', 'mt-1 w-full')}
-              type="number"
               min={0}
               step={1}
               value={spec.balance ?? ''}

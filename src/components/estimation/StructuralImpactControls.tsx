@@ -1,3 +1,4 @@
+import { NumberInput } from '@/components/ui/NumberInput'
 import { ParameterLabel } from '@/components/ui/ParameterLabel'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { field, fieldHint, fieldLabel, fieldRow, settingsStack } from '@/components/ui/recipes'
@@ -69,10 +70,9 @@ export function StructuralImpactControls({
               label="Seasons"
               help="Number of positions in a cycle. For monthly observations, 12 represents an annual cycle."
             />
-            <input
+            <NumberInput
               aria-label="Structural seasons"
               className={field('text', 'mt-1 w-full')}
-              type="number"
               min={2}
               step={1}
               value={season.seasons}
@@ -87,10 +87,9 @@ export function StructuralImpactControls({
               label="Season duration"
               help="Number of observations spent at each seasonal position."
             />
-            <input
+            <NumberInput
               aria-label="Season duration"
               className={field('text', 'mt-1 w-full')}
-              type="number"
               min={1}
               step={1}
               value={season.duration}
@@ -109,10 +108,9 @@ export function StructuralImpactControls({
               label="Period"
               help="Enter the number of observations in one cycle. It can be non-integer, for example an approximate annual cycle in weekly data."
             />
-            <input
+            <NumberInput
               aria-label="Structural period"
               className={field('text', 'mt-1 w-full')}
-              type="number"
               min={0}
               step="any"
               value={season.period}
@@ -127,10 +125,9 @@ export function StructuralImpactControls({
               label="Harmonic pairs"
               help="Number of sine and cosine pairs. It must be below half the period."
             />
-            <input
+            <NumberInput
               aria-label="Structural harmonic pairs"
               className={field('text', 'mt-1 w-full')}
-              type="number"
               min={1}
               step={1}
               value={season.pairs}

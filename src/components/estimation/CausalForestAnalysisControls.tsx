@@ -1,3 +1,4 @@
+import { NumberInput } from '@/components/ui/NumberInput'
 import { Select } from '@/components/ui/Select'
 import { ColumnChecklist } from '@/components/ui/ColumnChecklist'
 import { ParameterLabel } from '@/components/ui/ParameterLabel'
@@ -330,8 +331,7 @@ export function CausalForestAnalysisControls({
                   <span className={fieldLabel}>
                     {key === 'seed' ? 'RATE seed' : 'RATE bootstrap replications'}
                   </span>
-                  <input
-                    type="number"
+                  <NumberInput
                     className={field('text', 'mt-1 w-full')}
                     aria-label={key === 'seed' ? 'RATE seed' : 'RATE bootstrap replications'}
                     value={value.ranking.kind === 'external' ? value.ranking[key] : ''}
@@ -412,9 +412,8 @@ export function CausalForestAnalysisControls({
             {value.moderation.within[0] !== undefined && (
               <label>
                 <span className={fieldLabel}>Within-cluster threshold</span>
-                <input
+                <NumberInput
                   aria-label="Within-cluster threshold"
-                  type="number"
                   className={field('text', 'mt-1 w-full')}
                   value={value.moderation.within[0].threshold}
                   onChange={(event) => {

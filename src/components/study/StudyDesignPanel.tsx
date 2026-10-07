@@ -1,3 +1,8 @@
+import { NumberInput } from '@/components/ui/NumberInput'
+import {RawBalanceTable} from './RawBalanceTable'
+import {DagRevisionNotice} from './DagRevisionNotice'
+import { useAdjustmentAnalysis } from '@/analysis/useAdjustmentAnalysis'
+import { validateAdjustmentSets } from '@/analysis/client'
 import { RunActions } from '@/components/ui/RunActions'
 import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { Metadata } from '@/components/ui/Metadata'
@@ -6,7 +11,7 @@ import { RunFold } from '@/components/ui/RunFold'
 import { RunMeta } from '@/components/ui/RunMeta'
 import { Select } from '@/components/ui/Select'
 import { CausalHierarchy } from './CausalHierarchy'
-import { useId, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useJob } from '@/analysis/JobsProvider'
 import { useWorkflow } from '@/components/WorkflowProvider'
 import { JobNotice } from '@/components/ui/JobNotice'
@@ -64,7 +69,6 @@ import {
   estimableIdentification,
   estimandSentence,
   identifiedExpression,
-  offersAdjustmentChoice,
   identifiedExpressionTex,
   CONSISTENCY_STATEMENT,
   DESIGN_ASSUMPTIONS,
@@ -222,13 +226,25 @@ const ROLE_ORDER: readonly DagCausalRole['kind'][] = [
 /** Variables gathered under each role and its description, so a description shared by several variables reads once. */
 const roleGroups = (
   roles: readonly { readonly node: { readonly name: string }; readonly role: DagCausalRole }[],
-): readonly { readonly word: string; readonly detail: string | null; readonly names: string[] }[] => {
-  const groups = new Map<string, { word: string; detail: string | null; rank: number; names: string[] }>()
+): readonly {
+  readonly word: string
+  readonly detail: string | null
+  readonly names: string[]
+}[] => {
+  const groups = new Map<
+    string,
+    { word: string; detail: string | null; rank: number; names: string[] }
+  >()
   for (const { node, role } of roles) {
     const word = roleWord(role)
     const detail = roleDetail(role)
     const key = `${word}\u0000${detail ?? ''}`
-    const group = groups.get(key) ?? { word, detail, rank: ROLE_ORDER.indexOf(role.kind), names: [] }
+    const group = groups.get(key) ?? {
+      word,
+      detail,
+      rank: ROLE_ORDER.indexOf(role.kind),
+      names: [],
+    }
     group.names.push(node.name)
     groups.set(key, group)
   }
@@ -348,7 +364,9 @@ function IdentificationOutcome({
       const selectedLabel =
         result.adjustment.kind === 'canonical'
           ? 'Canonical adjustment set'
-          : `Minimal adjustment set ${result.adjustment.ordinal + 1}`
+          : result.adjustment.kind === 'supplied'
+            ? 'Recommended adjustment set (O-set)'
+            : `Minimal adjustment set ${result.adjustment.ordinal + 1}`
       return (
         <Alert tone="ok" icon="function" live={false} className="mt-3">
           <p className="m-0">Identified by back-door adjustment</p>
@@ -361,6 +379,13 @@ function IdentificationOutcome({
               </>
             )}
           </p>
+          {result.adjustment.kind === 'supplied' && (
+            <p className="mb-0 mt-1 text-muted">
+              {result.adjustment.guarantee === 'established'
+                ? 'Graphical optimality is established under the efficiency theorem’s assumptions; this does not guarantee the narrowest interval in this sample.'
+                : 'This is a valid O-set. Graphical optimality is not established.'}
+            </p>
+          )}
           {result.adjustment.kind === 'minimal' && (
             <p className="mb-0 mt-1 text-faint">
               Canonical set:{' '}
@@ -552,6 +577,7 @@ function IdentificationCard({
   const title = estimandSentence(study)
   const body = (
     <>
+      <DagRevisionNotice study={study} />
       <p className="mb-0 mt-2 text-body text-muted" aria-label="Assignment and credibility">
         <Metadata>
           <span>
@@ -565,6 +591,7 @@ function IdentificationCard({
         </Metadata>
       </p>
       <IdentificationOutcome study={study} identification={identification} onOpenDag={onOpenDag} />
+      {current && result.kind === 'identified' && <RawBalanceTable key={identification.id} study={study} covariates={result.adjustment.variables} />}
       {current && estimableIdentification(result) && (
         <button type="button" className={button('signal', 'mt-4')} onClick={onContinue}>
           Continue to estimation
@@ -615,6 +642,41 @@ function AdjustmentSetChoicePanel({
   readonly evidence: BackdoorIdentificationEvidence
   readonly onChoose: (choice: AdjustmentSetChoice) => void
 }) {
+  const command = backdoorIdentificationCommand(study)
+  const design = {
+    nodes: command.nodes,
+    edges: command.edges.map(([a, b]) => [a, b] as [number, number]),
+    treatment: command.treatment,
+    outcome: command.outcome,
+    unobserved: [...command.unobserved],
+    sets: [],
+  }
+  const analysis = useAdjustmentAnalysis(design)
+  const [recording, setRecording] = useState(false)
+  const [problem, setProblem] = useState<string | null>(null)
+  const recommendation =
+    analysis.kind === 'ready' && analysis.value.analysis.kind === 'identified'
+      ? analysis.value.analysis.recommendation
+      : null
+  const active = useRef(true)
+  useEffect(() => {
+    active.current = true
+    return () => {
+      active.current = false
+    }
+  }, [])
+  const accept = async () => {
+    if (recommendation?.kind !== 'available' || recording) return
+    setRecording(true)
+    const checked = await validateAdjustmentSets({ ...design, sets: [recommendation.nodes] })
+    if (!active.current) return
+    setRecording(false)
+    if (!checked.ok || checked.value.checks[0]?.kind !== 'valid') {
+      setProblem('The recommended set could not be validated. No study was recorded.')
+      return
+    }
+    onChoose({ kind: 'supplied', nodes: recommendation.nodes, guarantee: recommendation.guarantee })
+  }
   if (evidence.result.kind === 'notIdentified') return null
   return (
     <section
@@ -627,16 +689,58 @@ function AdjustmentSetChoicePanel({
       <p className={prose('mb-0 mt-1 text-muted')}>
         {evidence.result.kind === 'identified' && evidence.result.minimalSets.length > 1
           ? 'The graph has several minimal valid sets.'
-          : 'The minimal set closes every back-door path. The canonical set adds predictors of the outcome: they close no path, and can narrow the interval.'}{' '}
+          : 'Minimal and canonical sets provide valid adjustment under the graph’s assumptions. They need not have the same precision.'}{' '}
         Choose using measurement quality, observed support and the planned model—not the estimate,
         which has not been run.
       </p>
       <div className="mt-3 grid gap-2">
+        {analysis.kind === 'pending' && (
+          <p className={prose('m-0 text-muted')} role="status">
+            Checking the adjustment recommendation…
+          </p>
+        )}
+        {analysis.kind === 'failed' && <p className={prose('m-0 text-warn')}>{analysis.detail}</p>}
+        {recommendation?.kind === 'available' && (
+          <>
+            <button
+              type="button"
+              className={button('outline', 'justify-start text-left')}
+              disabled={recording}
+              onClick={() => void accept()}
+            >
+              Recommended O-set,{' '}
+              {recommendation.nodes.map((i) => study.graph.nodes[i]!.name).join(', ') ||
+                'no adjustment'}
+            </button>
+            <p className={prose('m-0 text-muted')}>
+              {recommendation.guarantee === 'established'
+                ? 'Graphical optimality is established under the efficiency theorem’s assumptions. This does not guarantee the narrowest interval in this sample.'
+                : 'This set is valid, but graphical optimality is not established. Other valid sets remain available.'}
+            </p>
+            <a
+              className="text-body text-muted underline"
+              href="https://arxiv.org/abs/2102.10324"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Runge (2021): adjustment-set optimality
+            </a>
+          </>
+        )}
+        {recommendation?.kind === 'unavailable' && (
+          <p className={prose('m-0 text-muted')}>{recommendation.reason}</p>
+        )}
+        {problem !== null && (
+          <p role="alert" className={prose('m-0 text-warn')}>
+            {problem}
+          </p>
+        )}
         {evidence.result.minimalSets.map((set, ordinal) => (
           <button
             key={set.join('|')}
             type="button"
             className={button('outline', 'justify-start text-left')}
+            disabled={recording}
             onClick={() => onChoose({ kind: 'minimal', ordinal })}
           >
             Minimal set {ordinal + 1},{' '}
@@ -647,6 +751,7 @@ function AdjustmentSetChoicePanel({
         <button
           type="button"
           className={button('quiet', 'justify-start text-left')}
+          disabled={recording}
           onClick={() => onChoose({ kind: 'canonical' })}
         >
           Canonical set,{' '}
@@ -744,7 +849,9 @@ export function StudyDesignPanel({
     const result = identificationFrom(study, evidence, choice)
     if (!result.ok) {
       setChoiceProblem(
-        `Adjustment set ${result.error.ordinal + 1} is not available; ${result.error.available} minimal sets were returned.`,
+        result.error.kind === 'invalid-supplied-adjustment'
+          ? 'The supplied adjustment set contains an unavailable variable.'
+          : `Adjustment set ${result.error.ordinal + 1} is not available; ${result.error.available} minimal sets were returned.`,
       )
       return
     }
@@ -789,8 +896,7 @@ export function StudyDesignPanel({
       // with its identification once, so the set is chosen before, never switched after.
       if (
         ready.value.estimand.kind !== 'local-cutoff-effect' &&
-        outcome.value.result.kind === 'identified' &&
-        offersAdjustmentChoice(outcome.value.result)
+        outcome.value.result.kind === 'identified'
       ) {
         offerAdjustment({ study: ready.value, evidence: outcome.value })
         session.finish(id)
@@ -958,9 +1064,8 @@ export function StudyDesignPanel({
                 </label>
                 <label className="block">
                   <span className={fieldLabel}>Assignment cutoff</span>
-                  <input
+                  <NumberInput
                     aria-label="Assignment cutoff"
-                    type="number"
                     step="any"
                     className={field('text', 'mt-1')}
                     value={state.draft.cutoff?.value ?? '0'}
@@ -1209,6 +1314,7 @@ export function StudyDesignPanel({
         )}
         {adjustmentChoice !== null && (
           <AdjustmentSetChoicePanel
+            key={adjustmentChoice.study.id}
             study={adjustmentChoice.study}
             evidence={adjustmentChoice.evidence}
             onChoose={(choice) =>

@@ -1,3 +1,4 @@
+import { NumberInput } from '@/components/ui/NumberInput'
 import { RunActions } from '@/components/ui/RunActions'
 import { CountRegressionPanel } from './CountRegressionPanel'
 import { useWorkflow } from '@/components/WorkflowProvider'
@@ -336,8 +337,7 @@ function LongRunModel({
               )}
               <label className="block">
                 <span className={fieldLabel}>Maximum lag</span>
-                <input
-                  type="number"
+                <NumberInput
                   min={1}
                   max={24}
                   className={field('text', 'mt-1')}
@@ -358,8 +358,7 @@ function LongRunModel({
             <SettingsStep number={3} title="Forecast">
               <label className="block max-w-xs">
                 <span className={fieldLabel}>Forecast periods</span>
-                <input
-                  type="number"
+                <NumberInput
                   min={1}
                   max={200}
                   className={field('text', 'mt-1')}

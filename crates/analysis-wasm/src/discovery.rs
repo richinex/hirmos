@@ -1857,6 +1857,7 @@ mod tests {
             | AnalysisCommand::Ocse { .. }
             | AnalysisCommand::GrangerSsrF { .. }
             | AnalysisCommand::BackdoorIdentify { .. }
+            | AnalysisCommand::RawBalance { .. } | AnalysisCommand::PowerPlanning { .. } | AnalysisCommand::AdjustmentValidate { .. }
             | AnalysisCommand::DagCheck { .. }
             | AnalysisCommand::BackdoorLinear { .. }
             | AnalysisCommand::FrontdoorTwoStage { .. }

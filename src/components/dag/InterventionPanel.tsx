@@ -1,3 +1,4 @@
+import { NumberInput, numberValue } from '@/components/ui/NumberInput'
 import { RunActions } from '@/components/ui/RunActions'
 import { Metadata } from '@/components/ui/Metadata'
 import { RunFold } from '@/components/ui/RunFold'
@@ -663,15 +664,14 @@ export function InterventionPanel({
         {condition.kind === 'selected' && condition.state.kind === 'index' && (
           <label className="min-w-0 text-body text-ink">
             <span className={fieldLabel}>State index</span>
-            <input
+            <NumberInput
               aria-label="Condition state index"
-              type="number"
               min={0}
               step={1}
               className={field('text', 'mt-1')}
               value={condition.state.state}
               onChange={(event) => {
-                const state = event.target.valueAsNumber
+                const state = numberValue(event.target)
                 if (Number.isSafeInteger(state) && state >= 0)
                   setCondition((current) =>
                     current.kind === 'selected'
@@ -689,8 +689,7 @@ export function InterventionPanel({
         {!identifiedRoute && (
           <label className="min-w-0 text-body text-ink">
             <span className={fieldLabel}>Equivalent sample size</span>
-            <input
-              type="number"
+            <NumberInput
               min={1}
               step={1}
               aria-label="Equivalent sample size"

@@ -215,3 +215,8 @@ pub mod sun_abraham_fit;
 pub mod augmented_synth;
 pub mod surrogate_index;
 pub mod swig;
+
+pub mod power;
+pub mod power_simulation;
+
+pub mod covariate_balance;

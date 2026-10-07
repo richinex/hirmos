@@ -1,3 +1,5 @@
+import {restoreMissingDagExploration} from './dagProvenance'
+import {powerRecordSchema,type PowerRecord} from './powerPlanning'
 import { surrogateRunSchema, surrogateRunMatchesProfile, type SurrogateRun } from './surrogateRun'
 import { swigAnalysisSchema, type SwigAnalysis } from './swig'
 import { z } from 'zod'
@@ -86,6 +88,7 @@ export interface PersistedProject {
   readonly source: SourceDescriptor | null
   readonly profile: DatasetProfile | null
   readonly prepared: PreparedDatasetArtifact | null
+  readonly powerPlanning: PowerRecord | null
   readonly stationarity: StationarityEvidenceArtifact | null
   readonly grangerEvidence: readonly GrangerEvidenceArtifact[]
   readonly countSeriesModels: readonly CountSeriesModelArtifact[]
@@ -154,6 +157,7 @@ export function snapshotWorkflow(workflow: Workflow, savedAt: string): Persisted
         source: null,
         profile: null,
         prepared: null,
+        powerPlanning: null,
         stationarity: null,
         grangerEvidence: [],
         countSeriesModels: [],
@@ -190,6 +194,7 @@ export function snapshotWorkflow(workflow: Workflow, savedAt: string): Persisted
         source: describeSource(workflow.source),
         profile: workflow.profile,
         prepared: workflow.prepared,
+        powerPlanning: workflow.powerPlanning,
         stationarity: workflow.stationarity,
         grangerEvidence: workflow.grangerEvidence,
         countSeriesModels: workflow.countSeriesModels,
@@ -285,6 +290,7 @@ const envelopeSchema = z.object({
   source: currentSourceSchema.nullable(),
   profile: z.unknown().nullable(),
   prepared: artifact.nullable(),
+  powerPlanning: powerRecordSchema.nullable().default(null),
   stationarity: artifact.nullable(),
   grangerEvidence: z.array(artifact).default([]),
   countSeriesModels: z.array(artifact).default([]),
@@ -1348,7 +1354,7 @@ export function parseSnapshotValue(value: unknown): Result<PersistedProject, Sna
     estimationRuns: estimationRuns as unknown as PersistedProject['estimationRuns'],
     survivalRuns: survivalRuns as unknown as PersistedProject['survivalRuns'],
     dagDocuments: parsed.data.dagDocuments.map((record) =>
-      upgradeDagDocumentRecord(record as Record<string, unknown>),
+      restoreMissingDagExploration(upgradeDagDocumentRecord(record as Record<string, unknown>) as unknown as DagDocument, parsed.data.studies as unknown as readonly StudySpecification[]),
     ) as unknown as PersistedProject['dagDocuments'],
   })
 }

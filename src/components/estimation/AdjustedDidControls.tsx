@@ -1,3 +1,4 @@
+import { NumberInput } from '@/components/ui/NumberInput'
 import { useMemo } from 'react'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { SelectionActions } from '@/components/ui/SelectionActions'
@@ -88,10 +89,9 @@ export function AdjustedDidControls({
         <div className={fieldRow.two}>
           <label>
             <span className={fieldLabel}>Folds</span>
-            <input
+            <NumberInput
               aria-label="DiD folds"
               className={field('text', 'mt-1 w-full')}
-              type="number"
               min={2}
               step={1}
               value={spec.folds}
@@ -108,10 +108,9 @@ export function AdjustedDidControls({
           </label>
           <label>
             <span className={fieldLabel}>Seed</span>
-            <input
+            <NumberInput
               aria-label="DiD seed"
               className={field('text', 'mt-1 w-full')}
-              type="number"
               min={0}
               max={4294967295}
               step={1}
@@ -136,10 +135,9 @@ export function AdjustedDidControls({
               label="Propensity trimming"
               help="Estimated probabilities are clipped to this threshold and one minus it. No units are deleted; clipping does not repair absent overlap."
             />
-            <input
+            <NumberInput
               aria-label="DiD trimming"
               className={field('text', 'mt-1 w-full')}
-              type="number"
               min={0}
               max={0.5}
               step="any"

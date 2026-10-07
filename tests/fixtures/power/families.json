@@ -1,0 +1,5857 @@
+{
+  "power": [
+    {
+      "family": "one_sample_t",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.017360377434116555,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.0020363431334032844,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.032409133739071436,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.08410705589638932,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.010643842387387803,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.15125000742832528,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.3010272706495725,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.050858840920183224,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.47716444243988476,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.010000000000000005,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.010000000000000009,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.01,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.050000000000000024,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.050000000000000044,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.05000000000000001,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.19999999999999996,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.20000000000000018,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.20000000000000012,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.011181354590960695,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.01673552279990287,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.005590193155413853,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.05554127596478557,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.08167942500955361,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.02852231459012767,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.21709471246809206,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.2992499384231452,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.12335330194388869,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.02873344835378481,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.05593720759419796,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.0006192055505775789,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.1348853992309049,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.24676278514547445,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.003296044951618819,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.4337635610320873,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.6583425115251472,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.017078262166055,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.11105067701767994,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 8.846252746952388e-05,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.17675900004801967,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.30825941901782206,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.000791369252957197,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.4439885560527269,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.6075468843330271,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.007505215670708165,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.7725743900247795,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.010000000000000009,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.010000000000000009,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.009999999999999997,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.05000000000000003,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.04999999999999993,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.049999999999999954,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.20000000000000018,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.19999999999999996,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.19999999999999998,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.022055047085962162,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.03887263288846354,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.0019092159593774576,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.09003546432139901,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.14869991933323612,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.01224601940516191,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.28269828279894904,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.4184550526690416,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.06975201420711077,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.3360144749431299,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.4599705502172302,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 1.959454769641931e-06,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.6426758515372771,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.7753624693413885,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 2.326539275005271e-05,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.8837696643816413,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.9554342460140418,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.00035310221367424247,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.7993369110017609,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 3.995485498009543e-09,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.8666483215394375,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.9338975812613689,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 1.4268502224190627e-07,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.967206745826164,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.9869252217717053,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 6.3711711577596475e-06,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.9963296455417956,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.010000000000000002,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.010000000000000009,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.010000000000000004,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.05,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.050000000000000044,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.049999999999999996,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.20000000000000012,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.19999999999999996,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.2,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.11338136339624534,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.17082699893507458,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.00010668509739621642,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.28359241466747337,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.4012215049931951,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.0011835698874887585,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.551697592443128,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.7147958792043805,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.012201171297404681,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.9980425106521614,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.9992388213012336,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 2.3145151907599646e-15,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.9998302862283359,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.9999578749288887,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 2.476499828893034e-13,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.9999924363023132,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.9999991842433807,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 4.6372725072380947e-11,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.9999954123005506,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.0,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.9999986747728005,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.9999998079562155,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.0,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.9999999670461975,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.9999999961482918,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 1.3322676295501878e-15,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.9999999997563174,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.01,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.010000000000000009,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.01,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.05,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.050000000000000044,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.04999999999999999,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.20000000000000012,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.19999999999999996,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.2,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.5905710180850179,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.6853914220414014,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 1.405218191586656e-07,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.8036666605857851,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.8797900194043383,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 4.02744465157227e-06,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.9383649055536254,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.976387832095818,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.0001224499147279021,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 1.0,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 1.0,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": null,
+      "independent_value": 3.22214444362e-42
+    },
+    {
+      "family": "one_sample_t",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 1.0,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 1.0,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 5.212498424779506e-37,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 1.0,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 1.0,
+      "independent_value": null
+    },
+    {
+      "family": "one_sample_t",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 3.0365757088548155e-34,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.025512358868724008,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.0016478516777784136,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.04326661843213439,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.0939456291025596,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.011996976332255996,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.15092337717255694,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.28080815793293923,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.0729740306864463,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.4093377735436568,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.009999999999999997,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.01,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.01,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.04999999999999996,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.049999999999999975,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.049999999999999975,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.20000000000000018,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.2,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.2,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.012275200503499147,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.01869870465299213,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.005065921978060399,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.05690133897159601,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.08077093630022797,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.029392182774087512,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.213403180637279,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.27536310853723545,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.13861339870668338,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.055429208198474716,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.08906228482368539,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.0004729477001523663,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.16514391060487169,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.2530067847337518,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.004336909934373394,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.39328803857775674,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.5549488107147694,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.03427173654573298,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 4.0,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.03623654720971109,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 4.0,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.0009645220748004468,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 4.0,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.06036088273956563,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 4.0,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.12105930370579111,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 4.0,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.0077719924284731364,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 4.0,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.192079997688748,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 4.0,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.3259773481060278,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 4.0,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.05302360469634568,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 4.0,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.4732810738294506,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 4.0,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.009999999999999997,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 4.0,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.01,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 4.0,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.01,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 4.0,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.04999999999999996,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 4.0,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.049999999999999975,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 4.0,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.049999999999999975,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 4.0,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.20000000000000018,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 4.0,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.2,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 4.0,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.2,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 4.0,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.013678898171492697,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 4.0,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.02187337825623381,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 4.0,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.004192181249302784,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 4.0,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.061068433635124264,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 4.0,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.09093572523068705,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 4.0,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.02530970005817299,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 4.0,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.2213575896987321,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 4.0,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.29743829949052447,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 4.0,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.12477154135826157,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 4.0,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.09076513400882695,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 4.0,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.13851990673742565,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 4.0,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.00018144138772509,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 4.0,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.2362637250192366,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 4.0,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.3425553927770315,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 4.0,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.0019619955368637334,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 4.0,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.4890235208939943,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 4.0,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.654586656432375,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 3.0,
+      "ratio": 4.0,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.018718055811759723,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 0.25,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.032548784071636354,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 0.25,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.0011407192572012949,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 0.25,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.054602240147014806,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 0.25,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.11197330155976055,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 0.25,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.008907945095793407,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 0.25,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.17871197773049802,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 0.25,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.31119131672925804,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 0.25,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.05865206325636038,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 0.25,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.4534092663024158,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 0.25,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.009999999999999997,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 0.25,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.01,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 0.25,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.01,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 0.25,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.04999999999999996,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 0.25,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.049999999999999975,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 0.25,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.049999999999999975,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 0.25,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.20000000000000018,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 0.25,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.2,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 0.25,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.2,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 0.25,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.013207802931876402,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 0.25,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.020849066430721524,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 0.25,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.004446043203349629,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 0.25,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.0596772763051411,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 0.25,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.08770462206548468,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 0.25,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.026514716729687807,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 0.25,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.2187133914144384,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 0.25,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.2905448525160452,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 0.25,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.12893312747136615,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 0.25,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.07840558426951316,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 0.25,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.12159756561485657,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 0.25,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.00024546409211829393,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 0.25,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.2125725208265035,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 0.25,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.31364543637012987,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 0.25,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.00252236370882123,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 0.25,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.45868004199023116,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 0.25,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.6246395363814773,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 0.25,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.02269989301824137,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.07643094215028934,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.0002583060603550334,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.11886017583977343,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.20868025176766242,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.002631354920075101,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.3088158297732576,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.4535551743190686,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.023446510335116116,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.6194446976972208,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.009999999999999997,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.01,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.01,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.04999999999999996,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.049999999999999975,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.049999999999999975,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.20000000000000018,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.2,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.2,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.01831200179326465,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.030874742369868438,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.002679644632741929,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.0743847618415833,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.1176934958893448,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.017728025231167642,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.24611668248792484,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.35072507048805635,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.09682125556932514,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.2288068785809242,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.31089409860830264,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 1.595576004665129e-05,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.44957085501453686,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.5746309123559218,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.0002526943816129376,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.710268251437295,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.8392570571636618,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.003740348275417344,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 4.0,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.12996493313145577,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 4.0,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 7.98481416683671e-05,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 4.0,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.19018623859691852,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 4.0,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.3050622281901928,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 4.0,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.0009874163818161706,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 4.0,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.42241624886250106,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 4.0,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.5697056518061031,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 4.0,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.010988680733098971,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 4.0,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.7282458824632542,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 4.0,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.009999999999999997,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 4.0,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.01,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 4.0,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.01,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 4.0,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.04999999999999996,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 4.0,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.049999999999999975,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 4.0,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.049999999999999975,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 4.0,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.20000000000000018,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 4.0,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.2,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 4.0,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.2,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 4.0,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.023758639765692525,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 4.0,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.04034531962793509,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 4.0,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.001830390024259671,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 4.0,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.08929443909378527,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 4.0,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.14339304322203084,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 4.0,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.013057119017846737,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 4.0,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.27272935809519083,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 4.0,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.3966737644303504,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 4.0,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.07761822483108347,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 4.0,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.3985092019253423,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 4.0,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.49691716645040046,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 4.0,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 1.7006445941838869e-06,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 4.0,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.6400832905128506,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 4.0,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.7497701604486646,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 4.0,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 3.693347037486748e-05,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 4.0,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.8503070861487961,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 4.0,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.9301620534737205,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 10.5,
+      "ratio": 4.0,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.0007881920533439559,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 0.25,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.15995953955276215,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 0.25,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 4.663058591474397e-05,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 0.25,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.22807267818271615,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 0.25,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.3526080824447023,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 0.25,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.0006276833271278429,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 0.25,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.4745986612454445,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 0.25,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.6198543041690083,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 0.25,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.007701548168871892,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 0.25,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.7702036206658657,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 0.25,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.009999999999999997,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 0.25,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.01,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 0.25,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.01,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 0.25,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.04999999999999996,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 0.25,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.049999999999999975,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 0.25,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.049999999999999975,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 0.25,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.20000000000000018,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 0.25,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.2,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 0.25,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.2,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 0.25,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.026653152876501444,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 0.25,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.04514287121110458,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 0.25,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.0015441802762275127,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 0.25,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.096935446760401,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 0.25,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.15567387443995784,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 0.25,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.011383885194571687,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 0.25,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.28594777718085795,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 0.25,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.41715944320031584,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 0.25,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.07023046174673889,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 0.25,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.48165243023531,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 0.25,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.580617816491347,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 0.25,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 5.9838982368885e-07,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 0.25,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.7156166067891213,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 0.25,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.8119131898703724,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 0.25,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 1.4920538314246578e-05,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 0.25,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.8941031029812025,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 0.25,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.9543136642150263,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 0.25,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.00037387706172284374,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.46977764409268324,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 6.952976165808552e-07,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.5689305681423249,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.7054180011138002,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 1.7001542031682825e-05,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.8037649400154937,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.8885511224842644,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.0004164531707186907,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.9513794801741384,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.009999999999999997,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.01,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.01,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.04999999999999996,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.049999999999999975,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.049999999999999975,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.20000000000000018,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.2,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.2,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.05770713327902787,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.09236224807369398,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.0004399601804737857,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.17007504575308746,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.259511022841444,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.004086313060033235,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.4004016061579658,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.5629208277335359,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.03276528645272373,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.9228014673372621,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.952900506156048,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 1.255157706854842e-10,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.9793266319025757,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.9907422946265046,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 8.26609205356365e-09,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.9967206201316634,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.9992067535939413,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 6.439203294501715e-07,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 4.0,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.7212128765389424,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 4.0,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 2.0253666971273116e-08,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 4.0,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.7984027977761157,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 4.0,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.8853791407623512,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 4.0,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 7.65557241344152e-07,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 4.0,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.9354201700477401,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 4.0,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.9699998245441229,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 4.0,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 3.1153501046729685e-05,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 4.0,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.9898473029090656,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 4.0,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.009999999999999997,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 4.0,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.01,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 4.0,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.01,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 4.0,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.04999999999999996,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 4.0,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.049999999999999975,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 4.0,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.049999999999999975,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 4.0,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.20000000000000018,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 4.0,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.2,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 4.0,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.2,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 4.0,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.09500402585913015,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 4.0,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.14424571789791418,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 4.0,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.0001645422383217297,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 4.0,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.2441412070341405,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 4.0,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.35199402581684947,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 4.0,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.0018085048265259701,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 4.0,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.49880274988424933,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 4.0,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.6639580934687372,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 4.0,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.017579070325926514,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 4.0,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.9935008333186796,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 4.0,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.9968648059940289,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 4.0,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 7.566037209503966e-14,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 4.0,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.9990313517757041,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 4.0,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.9996808447192654,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 4.0,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 1.0105004211875029e-11,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 4.0,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.9999209830825124,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 4.0,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.9999876773169835,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 50.0,
+      "ratio": 4.0,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 1.803619442543255e-09,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 0.25,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.7212128765389424,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 0.25,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 2.0253666971273116e-08,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 0.25,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.7984027977761157,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 0.25,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.8853791407623512,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 0.25,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 7.65557241344152e-07,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 0.25,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.9354201700477401,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 0.25,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.9699998245441229,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 0.25,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 3.1153501046729685e-05,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 0.25,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.9898473029090656,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 0.25,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.009999999999999997,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 0.25,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.01,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 0.25,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.01,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 0.25,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.04999999999999996,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 0.25,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.049999999999999975,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 0.25,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.049999999999999975,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 0.25,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.20000000000000018,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 0.25,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.2,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 0.25,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.2,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 0.25,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.09500402585913015,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 0.25,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.14424571789791418,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 0.25,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.0001645422383217297,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 0.25,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.2441412070341405,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 0.25,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.35199402581684947,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 0.25,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.0018085048265259701,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 0.25,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.49880274988424933,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 0.25,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.6639580934687372,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 0.25,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.017579070325926514,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 0.25,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.9935008333186796,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 0.25,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.9968648059940289,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 0.25,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 7.566037209503966e-14,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 0.25,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.9990313517757041,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 0.25,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.9996808447192654,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 0.25,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 1.0105004211875029e-11,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 0.25,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.9999209830825124,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 0.25,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.9999876773169835,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 0.25,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 1.803619442543255e-09,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.9923283041738541,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 1.1825469211928684e-13,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.9962484881251569,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.9988172507035044,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 1.5175927589529772e-11,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.9996033849954737,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.999899775068096,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 2.5847618614333205e-09,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.9999839742869882,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.009999999999999997,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.01,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.01,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.04999999999999996,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.049999999999999975,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.049999999999999975,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.20000000000000018,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.2,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.2,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.28236765396020386,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.37208058543549444,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 7.580096738668141e-06,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.5160052739761747,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.638760031312335,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.0001337720145986954,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.764275772335527,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.8766452497909407,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.0022442391351153207,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.9999999708878891,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.9999999930107574,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 2.678059084254017e-25,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.9999999992296008,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.9999999998958858,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 2.5842438541571834e-22,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.9999999999908166,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.9999999999995918,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 1.0,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 4.716978328439141e-19,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 4.0,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.9999111324392156,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 4.0,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 2.554671520648575e-18,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 4.0,
+      "d": -0.5,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.9999680879983103,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 4.0,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.9999936319685956,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 4.0,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 7.971752376378532e-16,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 4.0,
+      "d": -0.5,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.9999985635369352,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 4.0,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.9999997708598866,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 4.0,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 3.8560651412617667e-13,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 4.0,
+      "d": -0.5,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.9999999790835543,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 4.0,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.009999999999999997,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 4.0,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.01,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 4.0,
+      "d": 0.0,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 0.01,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 4.0,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.04999999999999996,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 4.0,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.049999999999999975,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 4.0,
+      "d": 0.0,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 0.049999999999999975,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 4.0,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.20000000000000018,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 4.0,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.2,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 4.0,
+      "d": 0.0,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.2,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 4.0,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.48165243023531,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 4.0,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.580617816491347,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 4.0,
+      "d": 0.2,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 5.9838982368885e-07,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 4.0,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.7156166067891213,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 4.0,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 0.8119131898703724,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 4.0,
+      "d": 0.2,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 1.4920538314246578e-05,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 4.0,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 0.8941031029812025,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 4.0,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 0.9543136642150263,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 4.0,
+      "d": 0.2,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 0.00037387706172284374,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 4.0,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "two-sided",
+      "value": 0.9999999999999771,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 4.0,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "larger",
+      "value": 0.9999999999999968,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 4.0,
+      "d": 0.8,
+      "alpha": 0.01,
+      "alternative": "smaller",
+      "value": 7.385120287774652e-36,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 4.0,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "two-sided",
+      "value": 0.9999999999999998,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 4.0,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "larger",
+      "value": 1.0,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 4.0,
+      "d": 0.8,
+      "alpha": 0.05,
+      "alternative": "smaller",
+      "value": 2.9865193349540565e-32,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 4.0,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "two-sided",
+      "value": 1.0,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 4.0,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "larger",
+      "value": 1.0,
+      "independent_value": null
+    },
+    {
+      "family": "normal_two_sample",
+      "n": 200.0,
+      "ratio": 4.0,
+      "d": 0.8,
+      "alpha": 0.2,
+      "alternative": "smaller",
+      "value": 2.9452111832296064e-28,
+      "independent_value": null
+    }
+  ],
+  "solves": [
+    {
+      "family": "one_sample_t",
+      "ratio": 1.0,
+      "alternative": "two-sided",
+      "target": 0.5,
+      "d": 0.3,
+      "n": 44.624790382597325,
+      "mde": 0.22181799859336163
+    },
+    {
+      "family": "one_sample_t",
+      "ratio": 1.0,
+      "alternative": "two-sided",
+      "target": 0.8,
+      "d": 0.3,
+      "n": 89.14936472045834,
+      "mde": 0.31709876532047765
+    },
+    {
+      "family": "one_sample_t",
+      "ratio": 1.0,
+      "alternative": "two-sided",
+      "target": 0.95,
+      "d": 0.3,
+      "n": 146.32147258109774,
+      "mde": 0.40803127674744316
+    },
+    {
+      "family": "one_sample_t",
+      "ratio": 1.0,
+      "alternative": "larger",
+      "target": 0.5,
+      "d": 0.3,
+      "n": 31.44904741695312,
+      "mde": 0.1854906528008193
+    },
+    {
+      "family": "one_sample_t",
+      "ratio": 1.0,
+      "alternative": "larger",
+      "target": 0.8,
+      "d": 0.3,
+      "n": 70.06790408991662,
+      "mde": 0.2804084620976428
+    },
+    {
+      "family": "one_sample_t",
+      "ratio": 1.0,
+      "alternative": "larger",
+      "target": 0.95,
+      "d": 0.3,
+      "n": 121.6131421669699,
+      "mde": 0.37100048458893436
+    },
+    {
+      "family": "one_sample_t",
+      "ratio": 1.0,
+      "alternative": "smaller",
+      "target": 0.5,
+      "d": -0.3,
+      "n": 31.449047416953103,
+      "mde": -0.1854906528008193
+    },
+    {
+      "family": "one_sample_t",
+      "ratio": 1.0,
+      "alternative": "smaller",
+      "target": 0.8,
+      "d": -0.3,
+      "n": 70.06790408991665,
+      "mde": -0.2804084620976428
+    },
+    {
+      "family": "one_sample_t",
+      "ratio": 1.0,
+      "alternative": "smaller",
+      "target": 0.95,
+      "d": -0.3,
+      "n": 121.6131421669699,
+      "mde": -0.37100048458893436
+    },
+    {
+      "family": "normal_two_sample",
+      "ratio": 0.25,
+      "alternative": "two-sided",
+      "target": 0.5,
+      "d": 0.3,
+      "n": 213.3901935817399,
+      "mde": 0.48996303644373584
+    },
+    {
+      "family": "normal_two_sample",
+      "ratio": 0.25,
+      "alternative": "two-sided",
+      "target": 0.8,
+      "d": 0.3,
+      "n": 436.0478060710622,
+      "mde": 0.7003955240090293
+    },
+    {
+      "family": "normal_two_sample",
+      "ratio": 0.25,
+      "alternative": "two-sided",
+      "target": 0.95,
+      "d": 0.3,
+      "n": 721.9282830384775,
+      "mde": 0.901202555542189
+    },
+    {
+      "family": "normal_two_sample",
+      "ratio": 0.25,
+      "alternative": "larger",
+      "target": 0.5,
+      "d": 0.3,
+      "n": 150.30796967196744,
+      "mde": 0.4112131122421101
+    },
+    {
+      "family": "normal_two_sample",
+      "ratio": 0.25,
+      "alternative": "larger",
+      "target": 0.8,
+      "d": 0.3,
+      "n": 343.4754018909069,
+      "mde": 0.6216197107268588
+    },
+    {
+      "family": "normal_two_sample",
+      "ratio": 0.25,
+      "alternative": "larger",
+      "target": 0.95,
+      "d": 0.3,
+      "n": 601.2318786875583,
+      "mde": 0.8224268132545743
+    },
+    {
+      "family": "normal_two_sample",
+      "ratio": 0.25,
+      "alternative": "smaller",
+      "target": 0.5,
+      "d": -0.3,
+      "n": 150.30796967196744,
+      "mde": -0.4112131122421101
+    },
+    {
+      "family": "normal_two_sample",
+      "ratio": 0.25,
+      "alternative": "smaller",
+      "target": 0.8,
+      "d": -0.3,
+      "n": 343.4754018909069,
+      "mde": -0.6216197107268588
+    },
+    {
+      "family": "normal_two_sample",
+      "ratio": 0.25,
+      "alternative": "smaller",
+      "target": 0.95,
+      "d": -0.3,
+      "n": 601.2318786875583,
+      "mde": -0.8224268132545743
+    },
+    {
+      "family": "normal_two_sample",
+      "ratio": 1.0,
+      "alternative": "two-sided",
+      "target": 0.5,
+      "d": 0.3,
+      "n": 85.35607711301547,
+      "mde": 0.3098799657690508
+    },
+    {
+      "family": "normal_two_sample",
+      "ratio": 1.0,
+      "alternative": "two-sided",
+      "target": 0.8,
+      "d": 0.3,
+      "n": 174.41912242947052,
+      "mde": 0.4429690071044152
+    },
+    {
+      "family": "normal_two_sample",
+      "ratio": 1.0,
+      "alternative": "two-sided",
+      "target": 0.95,
+      "d": 0.3,
+      "n": 288.7713132153153,
+      "mde": 0.5699693076833419
+    },
+    {
+      "family": "normal_two_sample",
+      "ratio": 1.0,
+      "alternative": "larger",
+      "target": 0.5,
+      "d": 0.3,
+      "n": 60.12318787852957,
+      "mde": 0.2600764141377351
+    },
+    {
+      "family": "normal_two_sample",
+      "ratio": 1.0,
+      "alternative": "larger",
+      "target": 0.8,
+      "d": 0.3,
+      "n": 137.3901597406879,
+      "mde": 0.39314621038431896
+    },
+    {
+      "family": "normal_two_sample",
+      "ratio": 1.0,
+      "alternative": "larger",
+      "target": 0.95,
+      "d": 0.3,
+      "n": 240.49275224254183,
+      "mde": 0.5201484995370526
+    },
+    {
+      "family": "normal_two_sample",
+      "ratio": 1.0,
+      "alternative": "smaller",
+      "target": 0.5,
+      "d": -0.3,
+      "n": 60.12318787852957,
+      "mde": -0.2600764141377351
+    },
+    {
+      "family": "normal_two_sample",
+      "ratio": 1.0,
+      "alternative": "smaller",
+      "target": 0.8,
+      "d": -0.3,
+      "n": 137.3901597406879,
+      "mde": -0.39314621038431896
+    },
+    {
+      "family": "normal_two_sample",
+      "ratio": 1.0,
+      "alternative": "smaller",
+      "target": 0.95,
+      "d": -0.3,
+      "n": 240.49275224254183,
+      "mde": -0.5201484995370526
+    },
+    {
+      "family": "normal_two_sample",
+      "ratio": 4.0,
+      "alternative": "two-sided",
+      "target": 0.5,
+      "d": 0.3,
+      "n": 53.34754792120863,
+      "mde": 0.24498161856697898
+    },
+    {
+      "family": "normal_two_sample",
+      "ratio": 4.0,
+      "alternative": "two-sided",
+      "target": 0.8,
+      "d": 0.3,
+      "n": 109.0119535838083,
+      "mde": 0.35019811870548834
+    },
+    {
+      "family": "normal_two_sample",
+      "ratio": 4.0,
+      "alternative": "two-sided",
+      "target": 0.95,
+      "d": 0.3,
+      "n": 180.48207075941573,
+      "mde": 0.45060031671584316
+    },
+    {
+      "family": "normal_two_sample",
+      "ratio": 4.0,
+      "alternative": "larger",
+      "target": 0.5,
+      "d": 0.3,
+      "n": 37.57699316547529,
+      "mde": 0.20560667938727223
+    },
+    {
+      "family": "normal_two_sample",
+      "ratio": 4.0,
+      "alternative": "larger",
+      "target": 0.8,
+      "d": 0.3,
+      "n": 85.86885056613117,
+      "mde": 0.310810481135759
+    },
+    {
+      "family": "normal_two_sample",
+      "ratio": 4.0,
+      "alternative": "larger",
+      "target": 0.95,
+      "d": 0.3,
+      "n": 150.30796965657973,
+      "mde": 0.4112122988489815
+    },
+    {
+      "family": "normal_two_sample",
+      "ratio": 4.0,
+      "alternative": "smaller",
+      "target": 0.5,
+      "d": -0.3,
+      "n": 37.57699316547529,
+      "mde": -0.20560667938727223
+    },
+    {
+      "family": "normal_two_sample",
+      "ratio": 4.0,
+      "alternative": "smaller",
+      "target": 0.8,
+      "d": -0.3,
+      "n": 85.86885056613117,
+      "mde": -0.310810481135759
+    },
+    {
+      "family": "normal_two_sample",
+      "ratio": 4.0,
+      "alternative": "smaller",
+      "target": 0.95,
+      "d": -0.3,
+      "n": 150.30796965657973,
+      "mde": -0.4112122988489815
+    }
+  ],
+  "proportions": [
+    {
+      "p1": 0.0,
+      "p2": 0.0,
+      "h": 0.0
+    },
+    {
+      "p1": 0.0,
+      "p2": 0.1,
+      "h": -0.6435011087932844
+    },
+    {
+      "p1": 0.0,
+      "p2": 0.5,
+      "h": -1.5707963267948968
+    },
+    {
+      "p1": 0.0,
+      "p2": 0.9,
+      "h": -2.498091544796509
+    },
+    {
+      "p1": 0.0,
+      "p2": 1.0,
+      "h": -3.141592653589793
+    },
+    {
+      "p1": 0.01,
+      "p2": 0.0,
+      "h": 0.2003348423231196
+    },
+    {
+      "p1": 0.01,
+      "p2": 0.1,
+      "h": -0.44316626647016477
+    },
+    {
+      "p1": 0.01,
+      "p2": 0.5,
+      "h": -1.370461484471777
+    },
+    {
+      "p1": 0.01,
+      "p2": 0.9,
+      "h": -2.2977567024733894
+    },
+    {
+      "p1": 0.01,
+      "p2": 1.0,
+      "h": -2.9412578112666736
+    },
+    {
+      "p1": 0.2,
+      "p2": 0.0,
+      "h": 0.9272952180016122
+    },
+    {
+      "p1": 0.2,
+      "p2": 0.1,
+      "h": 0.2837941092083278
+    },
+    {
+      "p1": 0.2,
+      "p2": 0.5,
+      "h": -0.6435011087932846
+    },
+    {
+      "p1": 0.2,
+      "p2": 0.9,
+      "h": -1.5707963267948966
+    },
+    {
+      "p1": 0.2,
+      "p2": 1.0,
+      "h": -2.214297435588181
+    },
+    {
+      "p1": 0.5,
+      "p2": 0.0,
+      "h": 1.5707963267948968
+    },
+    {
+      "p1": 0.5,
+      "p2": 0.1,
+      "h": 0.9272952180016124
+    },
+    {
+      "p1": 0.5,
+      "p2": 0.5,
+      "h": 0.0
+    },
+    {
+      "p1": 0.5,
+      "p2": 0.9,
+      "h": -0.9272952180016121
+    },
+    {
+      "p1": 0.5,
+      "p2": 1.0,
+      "h": -1.5707963267948963
+    },
+    {
+      "p1": 1.0,
+      "p2": 0.0,
+      "h": 3.141592653589793
+    },
+    {
+      "p1": 1.0,
+      "p2": 0.1,
+      "h": 2.498091544796509
+    },
+    {
+      "p1": 1.0,
+      "p2": 0.5,
+      "h": 1.5707963267948963
+    },
+    {
+      "p1": 1.0,
+      "p2": 0.9,
+      "h": 0.6435011087932843
+    },
+    {
+      "p1": 1.0,
+      "p2": 1.0,
+      "h": 0.0
+    }
+  ]
+}

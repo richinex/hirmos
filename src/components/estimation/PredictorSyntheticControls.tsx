@@ -1,3 +1,4 @@
+import { NumberInput } from '@/components/ui/NumberInput'
 import { memo } from 'react'
 import { usePanelCatalog } from './usePanelCatalog'
 import { SettingsStep } from '@/components/ui/SettingsStep'
@@ -335,8 +336,7 @@ export const PredictorSyntheticControls = memo(function PredictorSyntheticContro
             {Array.from({ length: predictorCount }, (_, index) => (
               <label key={index}>
                 <span className={fieldLabel}>Predictor weight {index + 1}</span>
-                <input
-                  type="number"
+                <NumberInput
                   min={0}
                   step="any"
                   aria-label={`Predictor weight ${index + 1}`}

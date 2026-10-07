@@ -60,7 +60,40 @@ pub(crate) fn validate_supplied(
                 .map_err(|problem| format!("Invalid adjustment specification: {problem:?}"))
         })
         .collect::<Result<Vec<_>, _>>()?;
-    Ok(AnalysisResult::AdjustmentValidation { checks })
+    let analysis = match dagitty_adjustment_sets(&dag, treatment, outcome, unobserved, 1)
+        .map_err(|e| format!("Adjustment analysis failed: {e:?}"))? {
+        AdjustmentSetAnalysis::NotIdentified => AdjustmentGraphEvidence::NotIdentified,
+        AdjustmentSetAnalysis::Identified { canonical, .. } => {
+            let empty_valid = validate_adjustment_set(&dag, treatment, outcome, unobserved, &[])
+                .map_err(|e| format!("Adjustment analysis failed: {e:?}"))? == SuppliedAdjustment::Valid;
+            let recommendation = if nodes > 16 {
+                AdjustmentRecommendation::Unavailable { reason: "The optimality check supports up to 16 graph variables. Validity and canonical adjustment remain available.".into() }
+            } else {
+                use hirmos_causal_core::causal_effects::{CausalEffects, StationaryGraph, Optimality, mark};
+                let mut graph = StationaryGraph::new(nodes, 0);
+                for &(a,b) in edges { graph.set(a,b,0,mark("-->")); graph.set(b,a,0,mark("<--")); }
+                let hidden: Vec<_> = unobserved.iter().map(|&v|(v,0)).collect();
+                let effects = CausalEffects::new(graph, &[(treatment,0)], &[(outcome,0)], &[], &hidden);
+                if effects.no_causal_path {
+                    return Ok(AnalysisResult::AdjustmentValidation { checks, analysis: AdjustmentGraphEvidence::Identified {
+                        canonical_set: canonical, empty_valid,
+                        recommendation: AdjustmentRecommendation::Unavailable { reason: "There is no directed treatment-to-outcome path. The O-set efficiency recommendation does not apply.".into() }
+                    }});
+                }
+                let set: Vec<_> = effects.get_optimal_set().ok_or("Adjustment engines disagree about identification")?
+                    .into_iter().map(|(v,_)|v).collect();
+                if validate_adjustment_set(&dag, treatment, outcome, unobserved, &set)
+                    .map_err(|e|format!("Adjustment validation failed: {e:?}"))? != SuppliedAdjustment::Valid {
+                    return Err("The proposed O-set did not pass adjustment validation.".into());
+                }
+                let optimality = effects.check_optimality();
+                if matches!(optimality, Optimality::NotIdentifiable) { return Err("Optimality check disagrees with adjustment validity.".into()); }
+                AdjustmentRecommendation::Available { nodes: set, guarantee: if optimality.established() { OptimalityGuarantee::Established } else { OptimalityGuarantee::NotEstablished } }
+            };
+            AdjustmentGraphEvidence::Identified { canonical_set: canonical, empty_valid, recommendation }
+        }
+    };
+    Ok(AnalysisResult::AdjustmentValidation { checks, analysis })
 }
 
 pub(crate) fn backdoor_identification(

@@ -182,6 +182,8 @@ export const escapeHtml = (value: string): string =>
 export interface ReferenceMark {
   readonly name: string
   readonly value: number
+  /** A theme colour that tells two rules apart, such as a mean from a median; muted when absent. */
+  readonly tone?: 'signal' | 'info'
 }
 
 /**

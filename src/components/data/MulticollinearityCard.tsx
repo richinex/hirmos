@@ -1,3 +1,4 @@
+import { NumberInput } from '@/components/ui/NumberInput'
 import { RunActions } from '@/components/ui/RunActions'
 import { Metadata } from '@/components/ui/Metadata'
 import { useJob } from '@/analysis/JobsProvider'
@@ -179,8 +180,7 @@ export function MulticollinearityCard({
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
               <span className={fieldLabel}>|r| threshold</span>
-              <input
-                type="number"
+              <NumberInput
                 min={0.01}
                 max={1}
                 step={0.01}
@@ -195,8 +195,7 @@ export function MulticollinearityCard({
             </label>
             <label className="block">
               <span className={fieldLabel}>VIF threshold</span>
-              <input
-                type="number"
+              <NumberInput
                 min={1.01}
                 step={0.5}
                 className={field('text', 'mt-1 w-full @xl/panel:w-28')}

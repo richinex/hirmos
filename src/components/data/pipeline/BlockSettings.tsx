@@ -1,3 +1,4 @@
+import { NumberInput } from '@/components/ui/NumberInput'
 import { Metadata } from '@/components/ui/Metadata'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { Icon } from '@/components/Icon'
@@ -782,8 +783,7 @@ export function BlockSettings({
           </Rows>
           <label className="block">
             <span className={fieldLabel}>Keep the first</span>
-            <input
-              type="number"
+            <NumberInput
               min={0}
               className={field('text', 'mt-1 w-32')}
               value={block.limit ?? ''}

@@ -21,7 +21,7 @@ test('supplied adjustment sets match Dagitty through the worker', async ({ page 
         sets: [c.set],
       })
       if (!result.ok) throw Error(JSON.stringify(result.error))
-      results.push(result.value[0].kind === 'valid')
+      results.push(result.value.checks[0].kind === 'valid')
     }
     return results
   }, fixture.cases)

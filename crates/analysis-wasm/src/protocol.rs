@@ -4,6 +4,24 @@ use super::*;
 
 #[derive(Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
+pub(crate) enum AdjustmentRecommendation {
+    Available { nodes: Vec<usize>, guarantee: OptimalityGuarantee },
+    Unavailable { reason: String },
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum OptimalityGuarantee { Established, NotEstablished }
+
+#[derive(Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub(crate) enum AdjustmentGraphEvidence {
+    Identified { canonical_set: Vec<usize>, empty_valid: bool, recommendation: AdjustmentRecommendation },
+    NotIdentified,
+}
+
+#[derive(Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
 pub(crate) enum SuppliedAdjustmentEvidence {
     Valid,
     Endpoints { nodes: Vec<usize> },
@@ -1290,6 +1308,8 @@ pub(crate) enum AnalysisCommand {
         unobserved: Vec<usize>,
         estimand: IdentificationEstimand,
     },
+    RawBalance { rows: usize, columns: usize, treated_reference: bool },
+    PowerPlanning { specification: crate::power_planning::Request },
     AdjustmentValidate { nodes: usize, edges: Vec<(usize, usize)>, treatment: usize, outcome: usize, unobserved: Vec<usize>, sets: Vec<Vec<usize>> },
     SwigAnalysis { specification: crate::swig_analysis::Specification, names: Vec<String> },
     DagCheck {
@@ -2687,6 +2707,8 @@ pub(crate) enum DagFalsificationEvidence {
     rename_all_fields = "camelCase"
 )]
 pub(crate) enum AnalysisResult {
+    RawBalance { rows: Vec<crate::raw_balance::Row> },
+    PowerPlanning { result: crate::power_planning::Evidence },
     SurrogatePath { evidence: crate::surrogate::PathEvidence },
     SurrogateDiagnostics { evidence: crate::surrogate::DiagnosticEvidence },
     Surrogate { evidence: crate::surrogate::Evidence },
@@ -3078,7 +3100,7 @@ pub(crate) enum AnalysisResult {
         graphical_identification: GraphicalIdentificationEvidence,
         counterfactual_identification: CounterfactualIdentificationEvidence,
     },
-    AdjustmentValidation { checks: Vec<SuppliedAdjustmentEvidence> },
+    AdjustmentValidation { checks: Vec<SuppliedAdjustmentEvidence>, analysis: AdjustmentGraphEvidence },
     SwigAnalysis { result: crate::swig_analysis::Evidence },
     DagCheck {
         observations: usize,
@@ -3110,6 +3132,7 @@ pub(crate) enum AnalysisResult {
         fixed_effects: FixedEffectsEvidence,
     },
     PropensityWeighting {
+        balance: CovariateBalanceEvidence,
         #[serde(default)]
         target: PropensityTarget,
         observations: usize,
@@ -3135,6 +3158,7 @@ pub(crate) enum AnalysisResult {
         scores: Vec<GridCandidateScore>,
     },
     PropensityMatching {
+        balance: CovariateBalanceEvidence,
         #[serde(default)]
         target: PropensityTarget,
         observations: usize,
@@ -3148,6 +3172,7 @@ pub(crate) enum AnalysisResult {
         matches: Vec<f64>,
     },
     DoublyRobust {
+        balance: CovariateBalanceEvidence,
         #[serde(default)]
         target: PropensityTarget,
         observations: usize,
@@ -3911,4 +3936,20 @@ pub(crate) struct SeriesStructureEvidence {
     /// Segment ends as one-based row numbers, without the final row.
     pub(crate) change_points: Vec<usize>,
     pub(crate) pelt_penalty: f64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CovariateBalanceRow {
+    pub column: usize,
+    pub before: f64,
+    pub after: f64,
+    pub denominator: f64,
+    pub used_full_sample_spread: bool,
+}
+#[derive(Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub enum CovariateBalanceEvidence {
+    Available { reference: String, rows: Vec<CovariateBalanceRow> },
+    Unavailable { reason: String },
 }

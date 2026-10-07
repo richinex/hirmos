@@ -2387,10 +2387,20 @@ export function runSurrogatePath(
     values,
   )
 }
-import type { AdjustmentValidation, AdjustmentValidationDesign } from '@/domain/adjustmentValidation'
+import type { AdjustmentResponse, AdjustmentValidationDesign } from '@/domain/adjustmentValidation'
 
-export function validateAdjustmentSets(design: AdjustmentValidationDesign): Promise<Result<AdjustmentValidation[], AnalysisWorkerProblem>> {
+export function validateAdjustmentSets(design: AdjustmentValidationDesign): Promise<Result<AdjustmentResponse, AnalysisWorkerProblem>> {
   const request = newWorkerRequestId()
   const values = new Float64Array(0)
   return post('adjustment-validation-succeeded', { kind: 'adjustment-validate', request, values, design }, values)
+}
+
+export function calculatePower(specification: import('@/domain/powerPlanning').PowerRequest): Promise<Result<import('@/domain/powerPlanning').PowerEvidence, AnalysisWorkerProblem>> {
+  const request=newWorkerRequestId(), values=new Float64Array(0)
+  return post('power-planning-succeeded',{kind:'power-planning',request,values,specification},values)
+}
+
+export function calculateRawBalance(values:Float64Array,rows:number,columns:number,treatedReference:boolean):Promise<Result<import('@/domain/covariateBalance').RawBalance,AnalysisWorkerProblem>> {
+ const request=newWorkerRequestId()
+ return post('raw-balance-succeeded',{kind:'raw-balance',request,values,rows,columns,treatedReference},values)
 }

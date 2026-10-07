@@ -1,3 +1,4 @@
+import {PowerPlanningPanel} from '@/components/data/PowerPlanningPanel'
 import { Metadata } from '@/components/ui/Metadata'
 import { declareColumn, declarationsOf, type DeclaredType } from '@/domain/fileReading'
 import { causalModelRunCount } from '@/domain/rootCauseAnalysis'
@@ -1589,6 +1590,7 @@ function App() {
                         onEditSource={openSourceEditor}
                         onDeclare={declareColumnType}
                       >
+                        <PowerPlanningPanel key={workflow.project.id} />
                         <PreprocessingPanel
                           key={workflow.profile.id}
                           source={workflow.source}
@@ -1610,19 +1612,10 @@ function App() {
                           }
                         />
                         {workflow.prepared !== null && (
-                          <section
-                            className="rounded-xl bg-panel lift p-4"
-                            aria-labelledby="prepared-next-title"
-                          >
-                            <span className={label('text-faint')}>Continue</span>
-                            <h3 id="prepared-next-title" className={cn(sectionTitle, 'mb-1 mt-1')}>
-                              Build a DAG or run discovery
+                          <section aria-labelledby="prepared-next-title" className="grid gap-2">
+                            <h3 id="prepared-next-title" className={label('m-0 text-faint')}>
+                              Next steps
                             </h3>
-                            <p className="mb-3 mt-0 text-body text-faint">
-                              Proceed directly to a DAG specified from substantive knowledge and the
-                              study design, or run discovery methods to obtain candidate empirical
-                              relations.
-                            </p>
                             <div className="flex flex-wrap gap-2">
                               <button
                                 type="button"

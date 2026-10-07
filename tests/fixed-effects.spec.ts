@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { parseSnapshotValue } from '../src/domain/persistence'
-import { chapter, choose, identify } from './examples/support'
+import { chapter, choose, identify, identifyEffect } from './examples/support'
 
 // The shipped cohort now asks for ATT. Regression requires its own population-effect study;
 // changing the estimator must not silently change that target.
@@ -39,7 +39,7 @@ test('fixed effects by unit absorb the provider-level regressors and cluster the
   await page.getByRole('radio', { name: /Independent observations/ }).click()
   await page.getByRole('button', { name: 'Select all columns', exact: true }).click()
   await page.getByRole('button', { name: /Create prepared/ }).click()
-  await page.getByRole('heading', { name: 'Build a DAG or run discovery', exact: true }).waitFor({ timeout: 120_000 })
+  await page.getByRole('heading', { name: 'Next steps', exact: true }).waitFor({ timeout: 120_000 })
 
   const sections = page.getByRole('navigation', { name: 'Workspace sections' })
   await sections.getByRole('button', { name: /DAG workspace/ }).click()
@@ -61,7 +61,7 @@ test('fixed effects by unit absorb the provider-level regressors and cluster the
   await choose('Outcome', 'lnw')
   await page.getByRole('radio', { name: /Observed choice/ }).click()
   await page.getByRole('textbox', { name: 'Assignment sentence' }).fill('Whether a session involved unprotected sex was decided by the provider and the client.')
-  await page.getByRole('button', { name: 'Identify the effect', exact: true }).click()
+  await identifyEffect(page)
   await page.getByText(/Identified by/).first().waitFor({ timeout: 60_000 })
 
   await sections.getByRole('button', { name: /Estimation/ }).click()
@@ -184,7 +184,7 @@ test('time-only effects keep unit clustering independent and survive saved-run d
   expect(Math.abs(evidence.errorModel.standardError - 0.17244713009492182)).toBeLessThan(1e-9)
   expect(evidence.degreesOfFreedom).toBe(119)
   expect(parseSnapshotValue(saved).ok).toBe(true)
-  await page.reload()
+  await page.goto('/app/projects')
   await page.getByLabel('Exported project file', { exact: true }).setInputFiles({ name: 'time-only.hirmos.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(exported)) })
   await expect(page.getByRole('heading', { name: 'Choose the data file again', exact: true })).toBeVisible()
   await page.locator('input[type=file]').setInputFiles(fileURLToPath(new URL('./fixtures/cohort-march.csv', import.meta.url)))

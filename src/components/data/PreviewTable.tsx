@@ -1,3 +1,4 @@
+import { NumberInput } from '@/components/ui/NumberInput'
 import { Select } from '@/components/ui/Select'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
@@ -159,8 +160,7 @@ function FilterEditor({
           <>
             <label className="text-body text-ink">
               Min
-              <input
-                type="number"
+              <NumberInput
                 step="any"
                 className={field('text', 'mt-1 w-32')}
                 value={draft.min}
@@ -170,8 +170,7 @@ function FilterEditor({
             </label>
             <label className="text-body text-ink">
               Max
-              <input
-                type="number"
+              <NumberInput
                 step="any"
                 className={field('text', 'mt-1 w-32')}
                 value={draft.max}

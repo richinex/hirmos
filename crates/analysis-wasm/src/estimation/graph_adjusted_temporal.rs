@@ -2,6 +2,52 @@
 
 use super::*;
 
+#[cfg(test)]
+mod explicit_adjustment_safety {
+    use super::*;
+
+    #[test]
+    fn mediator_returns_structured_refusal_before_fitting() {
+        let mut graph = vec![vec![vec![String::new(); 1]; 3]; 3];
+        for (a, b) in [(0, 1), (1, 2)] {
+            graph[a][b][0] = "-->".into();
+            graph[b][a][0] = "<--".into();
+        }
+        let rows = 20;
+        let values: Vec<f64> = (0..3)
+            .flat_map(|j| (0..rows).map(move |i| (i * i + j * i + 1) as f64))
+            .collect();
+        let result = causal_effects_total(
+            &values,
+            rows,
+            3,
+            0,
+            &graph,
+            &[(0, 0)],
+            &[(2, 0)],
+            &[],
+            TotalEffectEstimator::Linear {
+                adjustment: CausalEffectsAdjustmentSelection::Explicit {
+                    nodes: vec![(1, 0)],
+                },
+            },
+            [0., 1.],
+            CausalEffectsUncertainty::None,
+            |_, _, _| panic!("invalid adjustment must not fit"),
+        )
+        .unwrap();
+        let result = serde_json::to_value(result).unwrap();
+        assert_eq!(result["identifiable"], false);
+        assert_eq!(result["fit"]["kind"], "invalidAdjustment");
+        assert_eq!(result["fit"]["problems"][0]["kind"], "forbiddenNode");
+        assert_eq!(
+            result["fit"]["problems"][0]["node"],
+            serde_json::json!([1, 0])
+        );
+        assert_eq!(result["fittedObservations"], 0);
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn causal_effects_total(
     values: &[f64],

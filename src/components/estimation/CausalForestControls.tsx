@@ -1,3 +1,4 @@
+import { NumberInput } from '@/components/ui/NumberInput'
 import { ParameterLabel } from '@/components/ui/ParameterLabel'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { SettingsDisclosure } from '@/components/ui/SettingsDisclosure'
@@ -24,9 +25,8 @@ export function CausalForestControls({
   ) => (
     <label key={label}>
       <ParameterLabel className={fieldLabel} label={label} help={help} />
-      <input
+      <NumberInput
         aria-label={label}
-        type="number"
         className={field('text', 'mt-1 w-full')}
         value={Number.isNaN(value) ? '' : value}
         min={min}

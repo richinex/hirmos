@@ -1,3 +1,4 @@
+import { NumberInput } from '@/components/ui/NumberInput'
 import { RunActions } from '@/components/ui/RunActions'
 import { Metadata } from '@/components/ui/Metadata'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
@@ -1389,9 +1390,8 @@ function TransitionControls({
       <div className="mt-1 grid gap-3 @md/panel:grid-cols-[minmax(8rem,12rem)_1fr]">
         <label className="block">
           <span className={fieldHint}>Number of states</span>
-          <input
+          <NumberInput
             className={field('text', 'mt-1 w-full')}
-            type="number"
             min={2}
             max={32}
             step={1}
@@ -2246,9 +2246,8 @@ export function SurvivalPanel({
         label="Prediction horizon"
         help="The last follow-up time the fitted curve is drawn to, in the duration column's units."
       />
-      <input
+      <NumberInput
         className={field('text', 'mt-1 w-full')}
-        type="number"
         min={0.001}
         step="any"
         value={value}
@@ -2317,10 +2316,9 @@ export function SurvivalPanel({
                 {FOREST_PARAMETERS.map(({ key, title, help }) => (
                   <label className="block" key={key}>
                     <ParameterLabel className={fieldLabel} label={title} help={help} />
-                    <input
+                    <NumberInput
                       aria-label={title}
                       className={field('text', 'mt-1 w-full')}
-                      type="number"
                       min={1}
                       step={1}
                       value={draft.settings[key]}
@@ -2339,10 +2337,9 @@ export function SurvivalPanel({
                     label="Prediction row"
                     help="Draw the fitted survival curve for the covariate values in this prepared row. Row numbering begins at 1. This is a fitted prediction, not an out-of-bag prediction."
                   />
-                  <input
+                  <NumberInput
                     aria-label="Prediction row"
                     className={field('text', 'mt-1 w-full')}
-                    type="number"
                     min={1}
                     max={prepared.observations}
                     step={1}
@@ -2571,9 +2568,8 @@ export function SurvivalPanel({
                 label="Penalty"
                 help="An L2 penalty shrinks coefficients toward zero after covariates are scaled by their sample standard deviations. Use zero to fit without a penalty."
               />
-              <input
+              <NumberInput
                 className={field('text', 'mt-1 w-full')}
-                type="number"
                 min={0}
                 step="any"
                 value={draft.penalizer}
@@ -2587,9 +2583,8 @@ export function SurvivalPanel({
                 label="Confidence level"
                 help="The percentage used for coefficient and time-ratio intervals."
               />
-              <input
+              <NumberInput
                 className={field('text', 'mt-1 w-full')}
-                type="number"
                 min={1}
                 max={99.9}
                 step="any"
@@ -3129,9 +3124,8 @@ export function SurvivalPanel({
               <>
                 <label className="block">
                   <span className={fieldLabel}>Penalty strength</span>
-                  <input
+                  <NumberInput
                     className={field('text', 'mt-1 w-full')}
-                    type="number"
                     min={Number.EPSILON}
                     step="any"
                     value={penalty.strength}
@@ -3145,9 +3139,8 @@ export function SurvivalPanel({
                 </label>
                 <label className="block">
                   <span className={fieldLabel}>L1 ratio</span>
-                  <input
+                  <NumberInput
                     className={field('text', 'mt-1 w-full')}
-                    type="number"
                     min={0}
                     max={1}
                     step="any"
@@ -3168,9 +3161,8 @@ export function SurvivalPanel({
                 label="Confidence level"
                 help="The percentage used for coefficient and hazard-ratio intervals."
               />
-              <input
+              <NumberInput
                 className={field('text', 'mt-1 w-full')}
-                type="number"
                 min={1}
                 max={99.9}
                 step="any"
@@ -3220,9 +3212,8 @@ export function SurvivalPanel({
                 label="Compare through time"
                 help="The follow-up time the restricted mean is taken to. Event-free time is averaged up to here, so the difference is in the duration column's units."
               />
-              <input
+              <NumberInput
                 className={field('text', 'mt-1 w-full')}
-                type="number"
                 min={0.001}
                 step="any"
                 value={draft.truncationTime}
@@ -3503,9 +3494,8 @@ export function SurvivalPanel({
                     <>
                       <label className="block">
                         <span className={fieldLabel}>Entry state</span>
-                        <input
+                        <NumberInput
                           className={field('text', 'mt-1 w-full')}
-                          type="number"
                           min={1}
                           max={input.states.length}
                           step={1}
@@ -3528,9 +3518,8 @@ export function SurvivalPanel({
                       </label>
                       <label className="block">
                         <span className={fieldLabel}>Entry time</span>
-                        <input
+                        <NumberInput
                           className={field('text', 'mt-1 w-full')}
-                          type="number"
                           step="any"
                           value={input.entry.time}
                           onChange={(event) => {

@@ -115,6 +115,9 @@ export interface DagPathFact {
 }
 
 export type DagAdjustmentAnalysis =
+  | { readonly kind: 'pending' }
+  | { readonly kind: 'failed'; readonly detail: string }
+  | { readonly kind: 'unsupported' }
   | { readonly kind: 'unnecessary' }
   | { readonly kind: 'sufficient'; readonly variables: readonly DagNodeId[] }
   | { readonly kind: 'none' }
@@ -270,54 +273,11 @@ export const backdoorEdges = (
   return marked
 }
 
-const backdoorOpen = (
-  edges: readonly DirectedDagEdge[],
-  treatment: DagNodeId,
-  outcome: DagNodeId,
-  conditioned: ReadonlySet<DagNodeId>,
-): boolean => backdoorEdges(edges, treatment, outcome, conditioned).size > 0
-
-/**
- * The canonical adjustment set: ancestors of the treatment or the outcome, minus both endpoints,
- * minus every node on or descended from a proper causal path, minus unmeasured nodes. Sufficient
- * whenever any observed set is (Perković and others, 2018); latent confounding shows as no valid set.
- */
-export function canonicalAdjustment(
-  graph: EditableDag,
-  treatment: DagNodeId,
-  outcome: DagNodeId,
-): DagAdjustmentAnalysis {
-  const edges = contemporaneous(graph)
-  if (!backdoorOpen(edges, treatment, outcome, new Set())) return { kind: 'unnecessary' }
-  const descendantsOfTreatment = reachable(edges, treatment, 'forward')
-  const ancestorsOfOutcome = reachable(edges, outcome, 'backward')
-  const onCausalPath = new Set<DagNodeId>()
-  for (const node of descendantsOfTreatment)
-    if (node === outcome || ancestorsOfOutcome.has(node)) onCausalPath.add(node)
-  const forbidden = new Set<DagNodeId>([treatment, outcome])
-  for (const node of onCausalPath) {
-    forbidden.add(node)
-    for (const descendant of reachable(edges, node, 'forward')) forbidden.add(descendant)
-  }
-  const latent = new Set(
-    graph.nodes.filter((node) => node.kind === 'latent').map((node) => node.id),
-  )
-  const candidates = new Set<DagNodeId>()
-  for (const node of [...reachable(edges, treatment, 'backward'), ...ancestorsOfOutcome]) {
-    if (!forbidden.has(node) && !latent.has(node)) candidates.add(node)
-  }
-  const backdoorGraph = edges.filter(
-    (edge) => !(edge.cause === treatment && onCausalPath.has(edge.effect)),
-  )
-  return backdoorOpen(backdoorGraph, treatment, outcome, candidates)
-    ? { kind: 'none' }
-    : { kind: 'sufficient', variables: [...candidates].sort() }
-}
-
 export function analyseDagCausalFlow(
   graph: EditableDag,
   treatment: DagNodeId,
   outcome: DagNodeId,
+  adjustment: DagAdjustmentAnalysis = { kind: 'pending' },
 ): DagCausalFlow {
   const edges = contemporaneous(graph)
   const laggedArrows =
@@ -350,7 +310,6 @@ export function analyseDagCausalFlow(
     flows.set(edge.id, { causal, biasing: biasing.has(edge.id) })
   }
 
-  const adjustment = canonicalAdjustment(graph, treatment, outcome)
   const adjusted = new Set<DagNodeId>(adjustment.kind === 'sufficient' ? adjustment.variables : [])
   const raw = enumeratePaths(
     edges.map((edge) => ({ from: edge.cause, to: edge.effect })),
@@ -393,8 +352,12 @@ export function analyseDagCausalFlow(
       for (const node of interior) backdoorCounts.set(node, (backdoorCounts.get(node) ?? 0) + 1)
   }
   // Use full reachability, not the capped path list, to identify descendants of mediators.
-  const mediators = [...descendantsOfTreatment].filter(id => id !== outcome && ancestorsOfOutcome.has(id))
-  const descendantsOfMediators = new Set(mediators.flatMap(id => [...reachable(edges, id, 'forward')]))
+  const mediators = [...descendantsOfTreatment].filter(
+    (id) => id !== outcome && ancestorsOfOutcome.has(id),
+  )
+  const descendantsOfMediators = new Set(
+    mediators.flatMap((id) => [...reachable(edges, id, 'forward')]),
+  )
   for (const node of graph.nodes) {
     const id = node.id
     let role: DagCausalRole
@@ -407,14 +370,15 @@ export function analyseDagCausalFlow(
     else if (backdoorCounts.has(id))
       role = { kind: 'backdoor-variable', paths: backdoorCounts.get(id) ?? 0 }
     else if (colliderCounts.has(id)) role = { kind: 'collider', paths: colliderCounts.get(id) ?? 0 }
-    else if (descendantsOfTreatment.has(id)) role = {
-      kind: 'post-treatment',
-      relationship: descendantsOfOutcome.has(id)
-        ? { kind: 'outcome-descendant' }
-        : descendantsOfMediators.has(id)
-          ? { kind: 'mediator-descendant' }
-          : { kind: 'other', adjustment: 'unchecked' },
-    }
+    else if (descendantsOfTreatment.has(id))
+      role = {
+        kind: 'post-treatment',
+        relationship: descendantsOfOutcome.has(id)
+          ? { kind: 'outcome-descendant' }
+          : descendantsOfMediators.has(id)
+            ? { kind: 'mediator-descendant' }
+            : { kind: 'other', adjustment: 'unchecked' },
+      }
     else if (causesOfOutcome.has(id)) role = { kind: 'outcome-predictor' }
     else if (ancestorsOfTreatment.has(id)) role = { kind: 'pre-treatment' }
     else role = { kind: 'unrelated' }
@@ -469,7 +433,8 @@ export function roleDetail(role: DagCausalRole): string | null {
               return 'A consequence of treatment outside its directed paths to the outcome. This variable alone does not provide valid adjustment for the total effect.'
             case 'unchecked':
               return 'A consequence of treatment outside its directed paths to the outcome. This relationship alone does not determine whether adjustment introduces bias.'
-            default: return assertNever(role.relationship.adjustment)
+            default:
+              return assertNever(role.relationship.adjustment)
           }
         default:
           return assertNever(role.relationship)
@@ -507,10 +472,14 @@ export function roleWord(role: DagCausalRole): string {
       return 'Collider'
     case 'post-treatment':
       switch (role.relationship.kind) {
-        case 'outcome-descendant': return 'Outcome descendant'
-        case 'mediator-descendant': return 'Mediator descendant'
-        case 'other': return 'Post-treatment'
-        default: return assertNever(role.relationship)
+        case 'outcome-descendant':
+          return 'Outcome descendant'
+        case 'mediator-descendant':
+          return 'Mediator descendant'
+        case 'other':
+          return 'Post-treatment'
+        default:
+          return assertNever(role.relationship)
       }
     case 'outcome-predictor':
       return 'Outcome predictor'

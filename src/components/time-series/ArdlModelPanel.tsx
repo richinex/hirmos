@@ -1,3 +1,4 @@
+import { NumberInput } from '@/components/ui/NumberInput'
 import { RunActions } from '@/components/ui/RunActions'
 import type { ReactNode } from 'react'
 import { useWorkflow } from '@/components/WorkflowProvider'
@@ -364,10 +365,9 @@ export function ArdlModelPanel(props: TimeSeriesPanelProps & { readonly selector
                               <span className={fieldLabel}>
                                 {searching ? 'Maximum lag' : 'Lag order'}
                               </span>
-                              <input
+                              <NumberInput
                                 aria-label={`Lag for ${c.name}`}
                                 className={field('text', 'mt-1')}
-                                type="number"
                                 min={0}
                                 max={24}
                                 value={role.lag}
@@ -409,9 +409,8 @@ export function ArdlModelPanel(props: TimeSeriesPanelProps & { readonly selector
                       <span className={fieldLabel}>
                         {searching ? 'Maximum outcome lag' : 'Outcome lag'}
                       </span>
-                      <input
+                      <NumberInput
                         className={field('text', 'mt-1')}
-                        type="number"
                         min={0}
                         max={24}
                         value={outcomeLag}
@@ -449,9 +448,8 @@ export function ArdlModelPanel(props: TimeSeriesPanelProps & { readonly selector
                       {mode === 'rGrid' && (
                         <label className="block max-w-xs">
                           <span className={fieldLabel}>Minimum outcome lag</span>
-                          <input
+                          <NumberInput
                             className={field('text', 'mt-1')}
-                            type="number"
                             min={1}
                             max={24}
                             value={minimum}
@@ -470,9 +468,8 @@ export function ArdlModelPanel(props: TimeSeriesPanelProps & { readonly selector
                             {mode === 'rHorizontal' && (
                               <label>
                                 <span className={fieldLabel}>Starting lag for {c.name}</span>
-                                <input
+                                <NumberInput
                                   className={field('text', 'mt-1')}
-                                  type="number"
                                   min={c.id === outcome ? 1 : 0}
                                   max={24}
                                   value={starting[c.id] ?? '1'}
@@ -485,9 +482,8 @@ export function ArdlModelPanel(props: TimeSeriesPanelProps & { readonly selector
                             {(mode === 'rHorizontal' || c.id !== outcome) && (
                               <label>
                                 <span className={fieldLabel}>Fixed lag for {c.name}</span>
-                                <input
+                                <NumberInput
                                   className={field('text', 'mt-1')}
-                                  type="number"
                                   min={c.id === outcome ? 1 : 0}
                                   max={24}
                                   placeholder="Search this series"
@@ -538,9 +534,8 @@ export function ArdlModelPanel(props: TimeSeriesPanelProps & { readonly selector
                   <div className={fieldRow.two}>
                     <label>
                       <span className={fieldLabel}>Initial observations to exclude</span>
-                      <input
+                      <NumberInput
                         className={field('text', 'mt-1')}
-                        type="number"
                         min={0}
                         placeholder="Use the largest lag"
                         value={holdBack}
@@ -549,9 +544,8 @@ export function ArdlModelPanel(props: TimeSeriesPanelProps & { readonly selector
                     </label>
                     <label>
                       <span className={fieldLabel}>Multiplier horizon</span>
-                      <input
+                      <NumberInput
                         className={field('text', 'mt-1')}
-                        type="number"
                         min={0}
                         max={200}
                         value={horizon}

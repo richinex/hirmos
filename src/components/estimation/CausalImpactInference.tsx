@@ -1,3 +1,4 @@
+import { NumberInput } from '@/components/ui/NumberInput'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { ParameterLabel } from '@/components/ui/ParameterLabel'
 import { field, fieldLabel, fieldRow, settingsStack } from '@/components/ui/recipes'
@@ -111,10 +112,9 @@ export function CausalImpactInference({
               label="Posterior draws"
               help="Draws retained after warmup. More draws can reduce Monte Carlo error; they do not correct an unsuitable model."
             />
-            <input
+            <NumberInput
               className={field('text', 'mt-1 w-full')}
               aria-label="Posterior draws"
-              type="number"
               min={2}
               step={1}
               value={settings.draws}
@@ -135,10 +135,9 @@ export function CausalImpactInference({
               label="Warmup iterations"
               help="Initial Gibbs iterations discarded before collecting posterior draws."
             />
-            <input
+            <NumberInput
               className={field('text', 'mt-1 w-full')}
               aria-label="Warmup iterations"
-              type="number"
               min={0}
               step={1}
               value={settings.warmup}
@@ -155,10 +154,9 @@ export function CausalImpactInference({
           </label>
           <label className="block">
             <span className={fieldLabel}>Seed</span>
-            <input
+            <NumberInput
               className={field('text', 'mt-1 w-full')}
               aria-label="Bayesian impact seed"
-              type="number"
               min={0}
               max={4294967295}
               step={1}
@@ -184,10 +182,9 @@ export function CausalImpactInference({
                 label="Prior level scale"
                 help="Prior scale of changes in the latent level, relative to the outcome's pre-intervention standard deviation. This is a modelling choice, not a significance threshold."
               />
-              <input
+              <NumberInput
                 className={field('text', 'mt-1 w-full')}
                 aria-label="Prior level scale"
-                type="number"
                 min={0.000001}
                 step="any"
                 value={settings.priorLevelSd}

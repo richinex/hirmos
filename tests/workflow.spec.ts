@@ -153,7 +153,7 @@ test('keeps temporal discovery usable on a phone without widening the page', asy
   await page.getByRole('checkbox', { name: 'DriversKilled', exact: true }).check()
   await page.getByRole('checkbox', { name: 'drivers', exact: true }).check()
   await page.getByRole('button', { name: 'Create prepared dataset version' }).click()
-  await expect(page.getByRole('heading', { name: 'Build a DAG or run discovery', exact: true })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('heading', { name: 'Next steps', exact: true })).toBeVisible({ timeout: 30_000 })
 
   await page.getByRole('radio', { name: /Granger/ }).click()
   const mobileGranger = page.getByRole('region', { name: 'Granger predictive test' })

@@ -1,3 +1,4 @@
+import { NumberInput } from '@/components/ui/NumberInput'
 import { RunActions } from '@/components/ui/RunActions'
 import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { Metadata } from '@/components/ui/Metadata'
@@ -635,6 +636,9 @@ function AdjustmentSentence({
 }) {
   const name = (node: DagNodeId) => nameOfDagNode(document, node)
   switch (flow.adjustment.kind) {
+    case 'pending': return <p className="m-0 text-body text-faint" role="status">Checking adjustment validity…</p>
+    case 'failed': return <p className="m-0 text-body text-warn">{flow.adjustment.detail}</p>
+    case 'unsupported': return <p className="m-0 text-body text-faint">Use the temporal effect analysis to check adjustment for a lagged graph.</p>
     case 'unnecessary':
       return (
         <p data-adjustment="unnecessary" className="m-0 text-body text-faint">
@@ -1898,10 +1902,9 @@ export function DagWorkspace({
         {document.dataset.kind === 'time-series' && state.timing.kind === 'lagged' ? (
           <label className="block min-w-0">
             <span className={fieldLabel}>Lag</span>
-            <input
+            <NumberInput
               aria-label="Lag"
               className={field('text', 'mt-1')}
-              type="number"
               min={1}
               max={Math.max(1, document.dataset.observations - 1)}
               value={state.timing.lag}
@@ -2060,9 +2063,8 @@ export function DagWorkspace({
                   {selectedEdgeDraft.timing.kind === 'lagged' && (
                     <label className="block">
                       <span className={fieldLabel}>Arrow lag</span>
-                      <input
+                      <NumberInput
                         className={field('text', 'mt-1')}
-                        type="number"
                         min={1}
                         max={Math.max(1, document.dataset.observations - 1)}
                         value={selectedEdgeDraft.timing.lag}
