@@ -40,7 +40,6 @@ test('planning UI calculates, refuses invalid values, and records simulations', 
     await page.getByRole('button', { name: 'Expand section list' }).click()
   await page.getByRole('button', { name: /^Data studio/ }).click()
   const panel = page.getByTestId('power-planning')
-  await panel.locator('summary').first().click()
   await panel.getByRole('button', { name: 'Calculate planning result' }).click()
   await expect(panel.getByTestId('power-result')).toContainText(
     'Minimum detectable standardized effect',
@@ -119,7 +118,6 @@ test('planning persists across reload and cancellation does not replace the save
     .click()
   await expect(page.locator('#data-profile-title')).toBeVisible()
   const panel = page.getByTestId('power-planning')
-  await panel.locator('summary').first().click()
   const literature = panel.getByText(/^Literature: statsmodels, power and sample-size calculations/)
   await expect(literature).not.toBeVisible()
   await panel.getByText('Planning assumptions', { exact: true }).click()
@@ -143,7 +141,6 @@ test('planning persists across reload and cancellation does not replace the save
   // Sticky routing reopens the project on reload.
   await page.reload()
   await expect(page.locator('#data-profile-title')).toBeVisible()
-  await panel.locator('summary').first().click()
   await expect(panel.getByLabel('Group 1 size', { exact: true })).toHaveValue('80')
   await expect(panel.getByTestId('power-result')).toContainText('Observations in group 1')
   await expect(panel.getByTestId('power-result')).toContainText('80 in group 2')
@@ -154,8 +151,7 @@ test('planning persists across reload and cancellation does not replace the save
   await page.screenshot({ path: info.outputPath('planning-dark.png') })
   // Resizing a phone viewport switches to the desktop layout, which mounts the fold closed.
   if ((await panel.getAttribute('open')) === null)
-    await panel.locator('summary').first().click()
-  await panel.getByRole('radiogroup', { name: 'Planning calculation' }).getByRole('radio', { name: 'Simulation', exact: true }).click()
+    await panel.getByRole('radiogroup', { name: 'Planning calculation' }).getByRole('radio', { name: 'Simulation', exact: true }).click()
   await panel.getByLabel('Replications', { exact: true }).fill('10000')
   await panel.getByLabel('Treated units', { exact: true }).fill('1000')
   await panel.getByLabel('Control units', { exact: true }).fill('1000')

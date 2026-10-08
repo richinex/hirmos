@@ -1,7 +1,7 @@
 import { Alert } from '@/components/ui/Alert'
-import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { MetricGrid, MetricTile } from '@/components/ui/figures'
 import { NumberInput, numberValue } from '@/components/ui/NumberInput'
+import { ParameterHelp } from '@/components/ui/ParameterLabel'
 import { RadioList } from '@/components/ui/RadioList'
 import { RunDetails } from '@/components/ui/RunDetails'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
@@ -309,14 +309,17 @@ export function PowerPlanningPanel() {
       ? (['independentT', 'oneSampleT', 'pairedT', 'independentNormal'] as const)
       : (['independent', 'equalClusters', 'twoPeriodDid'] as const)
   return (
-    <details className={panel('px-4 py-3 text-body')} data-testid="power-planning">
-      <DisclosureSummary icon="calculate" className="cursor-pointer text-ink">
-        Sample size and power planning
-      </DisclosureSummary>
-      <div className="mt-3 grid gap-4">
-        <p className={prose('m-0 text-muted')}>
-          Plan sample size, power or a minimum detectable effect for a specified design.
-        </p>
+    <section aria-labelledby="power-planning-title" data-testid="power-planning">
+      <div className="mb-5 flex items-center gap-1.5">
+        <h2 id="power-planning-title" className="m-0 text-heading text-ink">
+          Sample size and power planning
+        </h2>
+        <ParameterHelp
+          label="sample size and power planning"
+          help="Plan sample size, power or a minimum detectable effect for a specified design."
+        />
+      </div>
+      <div className={panel('grid gap-4 p-(--panel-space) text-body')}>
         <fieldset
           disabled={running || session.blocked}
           className="m-0 grid min-w-0 gap-4 border-0 p-0"
@@ -588,6 +591,6 @@ export function PowerPlanningPanel() {
           </div>
         </RequirementsFold>
       </div>
-    </details>
+    </section>
   )
 }
