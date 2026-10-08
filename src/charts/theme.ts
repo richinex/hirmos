@@ -78,7 +78,7 @@ const FALLBACK: ChartTheme = {
   warn: '#8a5700',
   danger: '#b23a3a',
   categorical: CATEGORICAL_RAMP,
-  font: "Lato, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+  font: "'Asta Sans Variable', 'Asta Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif",
   mono: "'Fira Code Variable', 'Fira Code', 'Courier New', Courier, monospace",
   labelSize: 11,
   bodySize: 12,

@@ -158,8 +158,8 @@ export const fieldHint = 'mt-1 text-body text-faint text-pretty'
 /**
  * Which typeface, and why (index.css rule 5).
  *
- * The slab for headings, and only the elements that mean a heading: h1 to h3 take it from index.css.
- * Lato for everything read or operated: prose, labels, buttons, table cells and every number. Mono is a
+ * Asta Sans for everything read or operated: headings, prose, labels, buttons, table cells and every
+ * number; h1 to h3 take the heading weight from index.css. Mono is a
  * reading aid, not a house style: it buys a fixed pitch and unambiguous shapes, so 1/l and 0/O stay
  * apart in an id you may have to retype, and it costs legibility in running text. So mono only for what
  * is read character by character: code, ids, locators, hashes.

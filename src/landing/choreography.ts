@@ -28,7 +28,6 @@ const groups: readonly { readonly selector: string; readonly children: string }[
   },
   { selector: '.structures-section .section-intro', children: ':scope > *' },
   { selector: '.structure-grid', children: ':scope > article' },
-  { selector: '.final-cta', children: ':scope > *' },
 ]
 
 const drawOn = (path: SVGPathElement, duration: number, delay: number): void => {

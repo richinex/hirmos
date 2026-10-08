@@ -40,13 +40,14 @@
       the alternating status pulse eases at its turning points. Reduced motion removes movement,
       not status feedback. JavaScript canvas movement reads the same tokens through lib/motion.ts.
 
-   5. TYPE IS THREE FACES ON A RHYTHM. Roboto Slab, a slab serif, for headings: it reads at a distance
-      and has an industrial but friendly voice. Lato, a humanist sans, in its two weights for everything
-      else: prose, labels, buttons, tables, figures. Fira Code only for what is read character by
-      character (`literal()`, code). The root is 16px and is the only pixel size; every other size, line
-      height and vertical margin is rem. One rhythm unit is 1.5rem (24px). Sizes come from a modular
-      scale, 1.2 on a phone and 1.333 from 720px up, so a headline grows with the format while the
-      reading size stays put. Lato has no 500 or 600, so `font-medium` and `font-semibold` are bold.
+   5. TYPE IS ONE FACE ON A RHYTHM. Asta Sans for headings and for everything else: prose, labels,
+      buttons, tables, figures. Its numerals are the closest measured match to the scale lettering of a
+      Faber-Castell slide rule: a flat-topped 3, a flagged 1 with no foot, round bowls. Headings differ by
+      size and weight, not by face. Fira Code only for what is read character by character (`literal()`,
+      code). The root is 16px and is the only pixel size; every other size, line height and vertical
+      margin is rem. One rhythm unit is 1.5rem (24px). Sizes come from a modular scale, 1.2 on a phone and
+      1.333 from 720px up, so a headline grows with the format while the reading size stays put. Asta Sans
+      has no italic, so emphasis in italic is the browser's oblique.
 
    6. TEXTURE IS CLEAN AND GRAINY. A subtle noise and a radial gradient on the band so a large flat blue
       reads as a surface lit from above; a one-pixel top highlight and a faint gradient on a filled
@@ -56,12 +57,12 @@
    The two faces of the palette live in themes.css under :root[data-theme=...], with a pre-paint boot
    script in index.html. Light is the default. */
 @theme {
-  --font-sans: Lato, 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  --font-heading: 'Roboto Slab Variable', 'Roboto Slab', Rockwell, Georgia, serif;
+  --font-sans: 'Asta Sans Variable', 'Asta Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-heading: 'Asta Sans Variable', 'Asta Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
   --font-mono: 'Fira Code Variable', 'Fira Code', 'Courier New', Courier, monospace;
-  /* Lato carries regular and bold. Both medium and semibold resolve to bold. */
-  --font-weight-medium: 700;
-  --font-weight-semibold: 700;
+  /* Asta Sans is variable from 300 to 800, so medium and semibold are true weights. */
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
 
   /* The house curve is the default for every transition utility, so a button's 150ms colour change
      rides the same ease-out as .pop and .rise instead of Tailwind's own curve. */
@@ -161,9 +162,9 @@
 /* Radius: rounded-md for every action and every single-line field (`button()`, `iconControl()`,
    `chromeAction()`, `field()`, the table search) and for every choice among a few options (segments,
    facets, view switches), so controls read as one family; rounded-lg for rows, small cards and multi-line
-   fields, rounded-xl for section cards and blocks, rounded-3xl for floating windows and sheets. The one
-   capsule is the landing's call to action. Progress tracks, drag handles and dots are shapes, not
-   controls. Anything else is drift. */
+   fields, rounded-xl for section cards and blocks, rounded-3xl for floating windows and sheets. The
+   landing's call to action is an action like any other. Progress tracks, drag handles and dots are
+   shapes, not controls. Anything else is drift. */
 
 /* The layering order, in one readable list. Increments of 10 leave room; nothing floats
    without a name here. */

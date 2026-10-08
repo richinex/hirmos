@@ -1,5 +1,5 @@
 /* The workbench is a viewport-locked instrument; the landing page is a scrolling document, set like the
-   workbench: the slab for headings, Lato for everything else, sizes on the rhythm unit. */
+   workbench: Asta Sans throughout, sizes on the rhythm unit. */
 
 :root[data-surface="landing"],
 :root[data-surface="landing"] body,
@@ -61,15 +61,17 @@
 @keyframes landing-slot-in { to { transform: translateY(0); } }
 .landing-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin-top: 2.25rem; }
 /* The one action: the complement as a fill under dark ink, lit from above. Height from line-height. */
-.landing-primary { display: inline-flex; align-items: center; justify-content: center; line-height: 3rem; border-radius: 999px; padding: 0 1.5rem; background-color: var(--color-signal); background-image: linear-gradient(to bottom, rgb(255 255 255 / .16), rgb(255 255 255 / 0)); box-shadow: inset 0 1px 0 rgb(255 255 255 / .35), 0 1px 1px rgb(0 0 0 / .12); color: var(--color-signal-ink); font-size: var(--text-title); font-weight: 700; transition: background-color var(--motion-fast) var(--default-transition-timing-function), transform var(--motion-fast) var(--default-transition-timing-function); }
+.landing-primary { display: inline-flex; align-items: center; justify-content: center; line-height: 3rem; border-radius: var(--radius-md); padding: 0 1.5rem; background-color: var(--color-signal); background-image: linear-gradient(to bottom, rgb(255 255 255 / .16), rgb(255 255 255 / 0)); box-shadow: inset 0 1px 0 rgb(255 255 255 / .35), 0 1px 1px rgb(0 0 0 / .12); color: var(--color-signal-ink); font-size: var(--text-subtitle); font-weight: 500; transition: background-color var(--motion-fast) var(--default-transition-timing-function), transform var(--motion-fast) var(--default-transition-timing-function); }
 .landing-primary:hover { color: var(--color-signal-ink); background-color: var(--color-signal-hover); }
+/* The second action: an outline on the band, so the signal stays the one fill. */
+.landing-secondary { display: inline-flex; align-items: center; justify-content: center; line-height: calc(3rem - 2px); border: 1px solid var(--color-rail-faint); border-radius: var(--radius-md); padding: 0 1.5rem; color: var(--color-rail-ink); font-size: var(--text-subtitle); font-weight: 500; transition: background-color var(--motion-fast) var(--default-transition-timing-function); }
+.landing-secondary:hover { color: var(--color-rail-ink); background-color: rgb(255 255 255 / .08); }
 /* These anchors are drawn as controls, not prose links, so they opt out of the base underline. */
-.landing-wordmark, .landing-primary { text-decoration: none; }
+.landing-wordmark, .landing-primary, .landing-secondary { text-decoration: none; }
 
 .landing-content { position: relative; }
 .landing-content .landing-eyebrow { color: var(--color-faint); }
-.workflow-section, .feature-section, .structures-section { padding-block: 6rem; border-top: 1px solid var(--color-line); scroll-margin-top: 2rem; }
-.workflow-section { border-top: 0; }
+.workflow-section, .feature-section, .structures-section { padding-block: 6rem; scroll-margin-top: 2rem; }
 .section-intro { max-width: 48rem; }
 .section-intro h2, .feature-copy h2 { margin: 0; color: var(--color-ink); font-size: var(--text-display-sub); font-weight: 500; letter-spacing: -.01em; line-height: 1.2; text-wrap: balance; }
 .section-intro > p:last-child, .feature-copy > p { max-width: 65ch; margin: 1.5rem 0 0; color: var(--color-muted); font-size: var(--text-subtitle); line-height: 1.5rem; text-wrap: pretty; }
@@ -133,10 +135,7 @@
 .structure-art--cross::before { background: radial-gradient(circle, var(--color-bone) 0 3px, transparent 4px); background-size: 2.45rem 2.1rem; }
 .structure-art--cross::after { inset: 18% 8% 26% 12%; border-bottom: 2px solid var(--color-signal); transform: rotate(-13deg); transform-origin: bottom left; }
 
-.final-cta { display: grid; justify-items: center; padding-block: 6rem; border-top: 1px solid var(--color-line); text-align: center; }
-.final-cta h2 { max-width: 48rem; margin: 1.5rem 0 0; color: var(--color-ink); font-size: var(--text-display-sub); font-weight: 500; letter-spacing: -.01em; line-height: 1.2; }
-.final-cta .landing-primary { margin-top: 1.5rem; }
-.landing-footer { display: flex; align-items: center; justify-content: space-between; gap: 2rem; min-height: 6rem; border-top: 1px solid var(--color-line); color: var(--color-faint); font-size: var(--text-label); }
+.landing-footer { display: flex; align-items: center; justify-content: space-between; gap: 2rem; min-height: 6rem; color: var(--color-faint); font-size: var(--text-label); }
 .landing-footer .landing-wordmark { color: var(--color-ink); }
 .landing-footer p { flex: 1; margin: 0; text-align: center; }
 
@@ -159,7 +158,7 @@
 @media (max-width: 620px) {
   .landing-hero-copy { padding-top: min(25rem, 47svh); padding-bottom: 3rem; }
   .landing-actions { align-items: stretch; }
-  .landing-primary { justify-content: center; }
+  .landing-primary, .landing-secondary { justify-content: center; }
   .workflow-list li { grid-template-columns: 2.25rem minmax(0, 1fr); gap: .75rem; }
   .workflow-list li > div { grid-template-columns: 1fr; gap: .5rem; }
   .evidence-figure { grid-template-columns: 1fr; }
@@ -169,7 +168,6 @@
   .backdoor-figure { min-height: 0; padding: .5rem; }
   .adjustment-record { grid-template-columns: 1fr; gap: .3rem; }
   .adjustment-record b { margin-bottom: .6rem; text-align: left; }
-  .final-cta { padding-block: 4.5rem; }
   .landing-footer { flex-wrap: wrap; justify-content: space-between; gap: 1rem; padding-block: 1.5rem; }
 }
 

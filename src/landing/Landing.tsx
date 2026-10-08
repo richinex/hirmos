@@ -1,6 +1,8 @@
 import { Fragment, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { HirmosMark } from '@/components/HirmosMark'
 import { InternalLink } from '@/components/ui/InternalLink'
+import { SHIPPED_EXAMPLES } from '@/domain/example'
+import { chapterPath } from '@/domain/navigation'
 import { choreographLanding } from './choreography'
 import type { HirmosGraph } from './HirmosGraph'
 
@@ -8,6 +10,8 @@ import type { HirmosGraph } from './HirmosGraph'
 // its fallback for React's reveal window, and the fallback here is the same empty placeholder the
 // static shell in index.html already paints, so nothing may appear and move in between.
 const graphChunk = import('./HirmosGraph')
+// The textbook example, opened with its bundled data at its graph.
+const NSW_EXAMPLE = SHIPPED_EXAMPLES.find((example) => example.sourceName === 'lalonde.csv')
 
 /** The hero headline, one slot per word so the reveal is markup, not a script. */
 const HEADLINE = 'A scratchpad for causal inference.'.split(' ')
@@ -261,6 +265,11 @@ export function Landing() {
               <InternalLink className="landing-primary" href="/app">
                 Start an analysis
               </InternalLink>
+              {NSW_EXAMPLE !== undefined && (
+                <InternalLink className="landing-secondary" href={chapterPath('dag', NSW_EXAMPLE.id)}>
+                  Open the NSW example
+                </InternalLink>
+              )}
             </div>
           </section>
         </div>
@@ -373,14 +382,6 @@ export function Landing() {
               <p>Use independent observations for DAG identification and compatible estimators.</p>
             </article>
           </div>
-        </section>
-
-        <section className="landing-width final-cta" aria-labelledby="final-title">
-          <HirmosMark className="landing-mark" size={28} />
-          <h2 id="final-title">Start a new causal analysis</h2>
-          <InternalLink className="landing-primary" href="/app">
-            Open Hirmos
-          </InternalLink>
         </section>
 
         <footer className="landing-width landing-footer">

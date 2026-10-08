@@ -7,14 +7,9 @@ import { useDocTheme } from '@/components/ui/useDocTheme'
 import { updateFavicon } from '@/lib/brand'
 import { useScrollActivity } from '@/lib/useScrollActivity'
 import { recoverFromStalePreload } from '@/lib/preloadRecovery'
-// The three faces: Roboto Slab for headings, Lato in its two weights for everything read or operated,
-// Fira Code for what is read character by character. Self-hosted; each stack in index.css names a
-// web-safe face after it.
-import '@fontsource-variable/roboto-slab'
-import '@fontsource/lato/400.css'
-import '@fontsource/lato/700.css'
-import '@fontsource/lato/400-italic.css'
-import '@fontsource/lato/700-italic.css'
+// The two faces: Asta Sans for everything read or operated, headings included, and Fira Code for what is
+// read character by character. Self-hosted; each stack in index.css names a web-safe face after it.
+import '@fontsource-variable/asta-sans'
 import '@fontsource-variable/fira-code'
 import 'xterm/css/xterm.css'
 import 'material-symbols/sharp.css'

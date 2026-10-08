@@ -110,7 +110,7 @@ export type RouteProblem =
   | { readonly kind: 'invalid-chapter-query'; readonly value: string }
 
 /** The project list never names a project; every other chapter does while one is open. */
-export const chapterPath = (chapter: ChapterId, project: ProjectId | null = null): string =>
+export const chapterPath = (chapter: ChapterId, project: ProjectId | null = null): `/app/${string}` =>
   project === null || chapter === 'projects'
     ? `/app/${chapter}`
     : `/app/projects/${encodeURIComponent(project)}/${chapter}`
