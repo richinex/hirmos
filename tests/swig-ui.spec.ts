@@ -1,5 +1,50 @@
 import { expect, test, type Page } from '@playwright/test'
 
+test('rebuilding a saved delta graph selects it without adding another entry', async ({ page }, info) => {
+  test.setTimeout(90_000)
+  const mobile = info.project.name === 'mobile-chromium'
+  await page.goto('/app/projects')
+  await page.getByRole('button', { name: 'Open Severity, dose and recovery', exact: true }).click()
+  await page.locator('#data-profile-title').waitFor({ timeout: 60_000 })
+  await enter(page, mobile)
+  await select(page, 'Intervention variable 1', 'dose')
+  await page.getByRole('spinbutton', { name: 'Intervention value 1' }).fill('0')
+  await page.getByRole('textbox', { name: 'SWIG assumptions and rationale' }).fill('Algebraic graph-selection check.')
+  const configureDelta = async () => {
+    await page.getByRole('radio', { name: 'Δ-SWIG', exact: true }).click()
+    await select(page, 'Earlier outcome', 'dose')
+    await select(page, 'Later outcome', 'recovery')
+    for (const title of ['Earlier outcome', 'Later outcome']) {
+      const group = page.getByRole('group', { name: title, exact: true })
+      await group.getByRole('button', { name: 'Add additive term' }).click()
+      await page.getByRole('textbox', { name: `${title} term 1`, exact: true }).fill('shared severity mechanism')
+      await group.getByRole('checkbox', { name: 'severity', exact: true }).check()
+    }
+  }
+  const graph = page.getByLabel('Read-only SWIG graph', { exact: true })
+  const construct = async (nodes: number) => {
+    await page.getByRole('button', { name: 'Construct graph', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Separation checks' })).toBeVisible()
+    await closeInspector(page, mobile)
+    await expect(graph.locator('.react-flow__node')).toHaveCount(nodes)
+  }
+  await configureDelta()
+  await construct(5)
+  await inspector(page, mobile)
+  await page.getByRole('radio', { name: 'New analysis', exact: true }).click()
+  await page.getByRole('radio', { name: 'SWIG', exact: true }).click()
+  await construct(4)
+  await inspector(page, mobile)
+  await page.getByRole('radio', { name: 'New analysis', exact: true }).click()
+  await configureDelta()
+  await construct(5)
+  await expect(graph.locator('.react-flow__node').filter({ hasText: '−' })).toHaveCount(1)
+  if (mobile) await page.getByRole('button', { name: 'Saved graphs (2)', exact: true }).click()
+  await expect(page.getByText('Saved graphs (2)', { exact: true })).toHaveCount(1)
+  if (mobile) await page.keyboard.press('Escape')
+  await page.screenshot({ path: info.outputPath('rebuilt-delta.png') })
+})
+
 test('shared cancellation saves nothing, while navigation preserves a completed run', async ({
   page,
 }, info) => {

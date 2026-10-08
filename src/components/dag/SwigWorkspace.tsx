@@ -206,7 +206,10 @@ export function SwigWorkspace({
       ),
     [records, document.id, prepared.id],
   )
-  const entry = entries.find((item) => item.graph.id === selected) ?? entries.at(-1) ?? null
+  const entry =
+    selected === null
+      ? entries.at(-1) ?? null
+      : entries.find((item) => item.recordIds.some((id) => id === selected)) ?? null
   const record = entry?.graph ?? null
   const running = session.job.kind === 'running'
   const locked = running || session.blocked
@@ -882,10 +885,11 @@ export function SwigWorkspace({
             <RunPicker
               label="Saved intervention graphs"
               empty="Construct a graph to record it here."
-              runs={entries.map(({ graph: item, checks: recorded }) => {
+              runs={entries.map((entry) => {
+                const item = entry.graph
                 return {
                   id: item.id,
-                  title: swigGraphTitle({ graph: item, checks: recorded }),
+                  title: swigGraphTitle(entry),
                   createdAt: item.createdAt,
                   deleteLabel: 'Delete this saved graph',
                 }

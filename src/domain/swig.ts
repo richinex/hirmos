@@ -302,6 +302,7 @@ export function describeSwigGraphProblem(problem: SwigGraphProblem): string {
 export interface SwigGraphEntry {
   readonly graph: SwigAnalysis
   readonly checks: readonly SwigAnalysis[]
+  readonly recordIds: readonly SwigAnalysis['id'][]
 }
 
 /** Records share a graph when revision, data, projection and specification match, apart from the query. */
@@ -326,6 +327,7 @@ export function groupSwigAnalyses(records: readonly SwigAnalysis[]): SwigGraphEn
     else group.push(record)
   }
   return [...groups.values()].map((group) => ({
+    recordIds: group.map((record) => record.id),
     graph: group.find((record) => record.specification.query.kind === 'graph') ?? group[0]!,
     checks: group.filter((record) => record.specification.query.kind === 'separation'),
   }))
