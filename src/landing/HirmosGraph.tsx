@@ -76,23 +76,29 @@ const random = (() => {
   }
 })()
 
+const MONO = `'Fira Code Variable', 'Fira Code', ui-monospace, monospace`
+
+/** A label drawn on a canvas in the house mono. Call `redraw` once the face has loaded. */
 function textSprite(
   text: string,
   colour: THREE.Color,
   width: number,
   fontSize: number,
-): THREE.Sprite {
+): THREE.Sprite & { redraw: () => void } {
   const canvas = document.createElement('canvas')
   canvas.width = 512
   canvas.height = 160
-  const context = canvas.getContext('2d')
-  if (context !== null) {
+  const paint = () => {
+    const context = canvas.getContext('2d')
+    if (context === null) return
+    context.clearRect(0, 0, canvas.width, canvas.height)
     context.fillStyle = `#${colour.getHexString()}`
-    context.font = `500 ${fontSize}px "JetBrains Mono Variable", ui-monospace, monospace`
+    context.font = `500 ${fontSize}px ${MONO}`
     context.textAlign = 'center'
     context.textBaseline = 'middle'
     context.fillText(text, canvas.width / 2, canvas.height / 2)
   }
+  paint()
   const texture = new THREE.CanvasTexture(canvas)
   texture.colorSpace = THREE.SRGBColorSpace
   texture.minFilter = THREE.LinearFilter
@@ -100,7 +106,12 @@ function textSprite(
     new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false }),
   )
   sprite.scale.set(width, width * (canvas.height / canvas.width), 1)
-  return sprite
+  return Object.assign(sprite, {
+    redraw: () => {
+      paint()
+      texture.needsUpdate = true
+    },
+  })
 }
 
 /** A soft disc for the observation points: a radial falloff drawn once and shared. */
@@ -151,6 +162,33 @@ function arrowHead(
   return mesh
 }
 
+/** The page gutter, linear from 16px at a 400px screen to 48px at 1440px. */
+const gutter = (width: number) => Math.min(48, Math.max(16, 0.03077 * width + 3.69))
+
+/**
+ * Where the graph may sit, in the scene's own pixels. Beside the copy its centre is level with the centre
+ * of the headline and actions, and its height is what that centre allows on both sides; on a narrow
+ * screen it sits between the header and the headline.
+ */
+function stageArea(element: HTMLElement) {
+  const band = element.closest('.landing-band')
+  const headline = band?.querySelector('.landing-headline')
+  const actions = band?.querySelector('.landing-actions')
+  const header = band?.querySelector('.landing-header__row')
+  if (!band || !headline || !actions || !header) return null
+  const frame = element.getBoundingClientRect()
+  const text = headline.getBoundingClientRect()
+  const buttons = [...actions.children].map((child) => child.getBoundingClientRect())
+  const top = header.getBoundingClientRect().bottom - frame.top
+  const g = gutter(frame.width)
+  if (frame.width < 900)
+    return { left: g, top: top + g, right: frame.width - g, bottom: text.top - frame.top - g }
+  const copyRight = Math.max(text.right, ...buttons.map((box) => box.right)) - frame.left
+  const centre = (text.top + Math.max(...buttons.map((box) => box.bottom))) / 2 - frame.top
+  const half = Math.min(centre - (top + g), frame.height - g - centre)
+  return { left: copyRight + g, top: centre - half, right: frame.width - g, bottom: centre + half }
+}
+
 const easeOut = (t: number) => 1 - (1 - t) ** 3
 const easeInOut = (t: number) => (t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2)
 const clamp01 = (t: number) => Math.min(1, Math.max(0, t))
@@ -173,7 +211,11 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
     const compact = window.matchMedia('(max-width: 900px)').matches
 
     const scene = new THREE.Scene()
-    scene.fog = new THREE.FogExp2(stage.getHex(), dark ? 0.055 : 0.042)
+    // The fog was tuned at a camera distance of 9. Exponential-squared fog depends on density times
+    // distance, so the density is rescaled wherever the framing moves the camera.
+    const FOG_AT_NINE = dark ? 0.055 : 0.042
+    const fog = new THREE.FogExp2(stage.getHex(), FOG_AT_NINE)
+    scene.fog = fog
     const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 40)
     camera.position.set(0, 0, 9)
 
@@ -267,6 +309,7 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
 
     // The variables: flat discs so the glyph sits in front, a ring in the node's tone, the caption below.
     const nodeGroups: THREE.Group[] = []
+    const labels: { redraw: () => void }[] = []
     for (const node of NODES) {
       const group = new THREE.Group()
       group.position.copy(nodePositions.get(node.id) ?? new THREE.Vector3())
@@ -287,6 +330,7 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
       const glyph = textSprite(node.id, live ? signal : ink, 0.4, 118)
       glyph.position.z = 0.03
       const caption = textSprite(node.caption, muted, 1.15, 26)
+      labels.push(glyph, caption)
       caption.position.set(0, -(NODE_RADIUS + 0.22), 0.03)
       group.add(disc, ring, glyph, caption)
       group.scale.setScalar(0)
@@ -353,7 +397,7 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
     const EDGE_STEP = 0.16
     const EDGE_DURATION = 0.6
     const SETTLED = EDGE_AT + EDGE_STEP * edges.length + EDGE_DURATION
-    const springs = nodeGroups.map(() => ({ scale: 0, velocity: 0 }))
+    const NODE_DURATION = 0.6
 
     const layoutCloud = (time: number) => {
       const attribute = cloudGeometry.getAttribute('position') as THREE.BufferAttribute
@@ -375,16 +419,9 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
     }
 
     const layoutGraph = (time: number) => {
-      springs.forEach((spring, index) => {
-        if (still) {
-          nodeGroups[index]?.scale.setScalar(1)
-          return
-        }
-        if (time < NODE_AT + index * NODE_STEP) return
-        const force = -0.16 * (spring.scale - 1)
-        spring.velocity = (spring.velocity + force) * 0.84
-        spring.scale += spring.velocity
-        nodeGroups[index]?.scale.setScalar(Math.max(0, spring.scale))
+      nodeGroups.forEach((group, index) => {
+        const progress = still ? 1 : clamp01((time - NODE_AT - index * NODE_STEP) / NODE_DURATION)
+        group.scale.setScalar(Math.max(0.0001, easeOut(progress)))
       })
       edges.forEach(({ line, head }, index) => {
         const progress = still ? 1 : clamp01((time - EDGE_AT - index * EDGE_STEP) / EDGE_DURATION)
@@ -396,13 +433,21 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
         mesh.visible = settled
         if (!settled) return
         const progress = (time * 0.16 + offset) % 1
-        mesh.position.copy(curve.getPoint(progress))
+        curve.getPoint(progress, mesh.position)
         mesh.scale.setScalar(0.7 + Math.sin(progress * Math.PI) * 0.6)
       })
     }
 
+    // The graph's settled extent: the nodes, the cloud around them and the captions below.
+    const extent = new THREE.Box3()
+    for (const node of NODES) extent.expandByPoint(point(node.point))
+    extent.expandByScalar(NODE_RADIUS + 0.55)
+    const focus = extent.getCenter(new THREE.Vector3())
+    const size = extent.getSize(new THREE.Vector3())
+
     let width = 1
     let height = 1
+    let distance = camera.position.z
     const place = () => {
       width = element.clientWidth
       height = element.clientHeight
@@ -411,29 +456,67 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
       composer?.setSize(width, height)
       lineResolution.set(width, height)
       camera.aspect = width / height
+      const area = stageArea(element) ?? { left: width / 2, top: 0, right: width, bottom: height }
+      // A box w by h at distance d projects to w f / d by h f / d, with f the focal length in pixels.
+      const focal = height / 2 / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))
+      distance = Math.max(
+        (size.x * focal) / (area.right - area.left),
+        (size.y * focal) / (area.bottom - area.top),
+      )
+      fog.density = (FOG_AT_NINE * 9) / distance
+      // The narrow-screen scrim fades in just above the headline, measured rather than guessed.
+      const band = element.closest<HTMLElement>('.landing-band')
+      const headline = band?.querySelector('.landing-headline')
+      if (band && headline)
+        band.style.setProperty('--hero-copy-top', `${Math.round(headline.getBoundingClientRect().top - band.getBoundingClientRect().top)}px`)
+      // Move the projection centre onto the centre of the stage area.
+      const middleX = (area.left + area.right) / 2
+      const middleY = (area.top + area.bottom) / 2
+      camera.setViewOffset(width, height, width / 2 - middleX, height / 2 - middleY, width, height)
       camera.updateProjectionMatrix()
-      const visibleHeight =
-        2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.position.z
-      const visibleWidth = visibleHeight * camera.aspect
-      if (width < 900) {
-        graph.position.set(0.1, visibleHeight * 0.19, 0)
-        graph.scale.setScalar(Math.min(1.12, visibleWidth / 4.3))
-      } else {
-        graph.position.set(visibleWidth * 0.245, 0.08, 0)
-        graph.scale.setScalar(Math.min(1.3, Math.max(1, visibleWidth / 12)))
-      }
     }
     const resizeObserver = new ResizeObserver(place)
     resizeObserver.observe(element)
+    const copy = element.closest('.landing-band')?.querySelector('.landing-hero-copy')
+    if (copy) resizeObserver.observe(copy)
     place()
+    // The labels and the copy's measured box both depend on the faces, so both settle once they load.
+    let disposed = false
+    void document.fonts.load(`500 118px ${MONO}`).then(() => {
+      if (disposed) return
+      labels.forEach((label) => label.redraw())
+      place()
+      if (still) renderer.render(scene, camera)
+    })
 
+    // A fine pointer leans the view: one damped target, split so the camera shifts, its aim is carried 42%
+    // of the way and the graph turns by a smaller amount. Touch, a coarse pointer and reduced motion keep
+    // the centred pose; leaving the page returns it to centre.
     let pointerX = 0
     let pointerY = 0
+    const finePointer = !still && window.matchMedia('(pointer: fine)').matches
     const onPointer = (event: PointerEvent) => {
-      pointerX = event.clientX / Math.max(1, width) - 0.5
-      pointerY = event.clientY / Math.max(1, height) - 0.5
+      if (event.pointerType === 'touch') return
+      pointerX = event.clientX / Math.max(1, window.innerWidth) - 0.5
+      pointerY = event.clientY / Math.max(1, window.innerHeight) - 0.5
     }
-    window.addEventListener('pointermove', onPointer, { passive: true })
+    const onPointerLeave = () => {
+      pointerX = 0
+      pointerY = 0
+    }
+    if (finePointer) {
+      window.addEventListener('pointermove', onPointer, { passive: true })
+      document.documentElement.addEventListener('pointerleave', onPointerLeave)
+    }
+    let leanX = 0
+    let leanY = 0
+    const aim = new THREE.Vector3()
+    const frameCamera = () => {
+      const shiftX = -leanX * 0.7
+      const shiftY = leanY * 0.44
+      camera.position.set(focus.x + shiftX, focus.y + shiftY, focus.z + distance)
+      camera.lookAt(aim.set(focus.x + shiftX * 0.42, focus.y + shiftY * 0.42, focus.z))
+    }
 
     let running = false
     let booted = false
@@ -448,7 +531,7 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
     const render = (now: number) => {
       if (!running) return
       // A stalled tab must not deliver one enormous step to the smoothers.
-      const delta = Math.min((now - lastFrame) / 1000, 0.05)
+      const delta = Math.min((now - lastFrame) / 1000, 1 / 30)
       lastFrame = now
       const time = (now - startTime) / 1000
       layoutCloud(time)
@@ -465,14 +548,15 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
         material.opacity = (live ? 0.78 : 0.62) + pulse * (live ? 0.22 : 0.2)
       }
       // Ambient drift rides on top of the pointer, so the field keeps breathing when the cursor rests.
+      const follow = 1 - Math.pow(1 - 0.055, delta * 60)
+      leanX += (pointerX - leanX) * follow
+      leanY += (pointerY - leanY) * follow
       const sway = Math.sin(time * 0.25) * 0.02
       const driftY = Math.sin(time * 0.11) * 0.018
       const driftX = Math.cos(time * 0.085) * 0.012
-      const targetY = compact ? sway + driftY : sway + driftY + pointerX * 0.07
-      const targetX = compact ? driftX : driftX + pointerY * 0.05
-      const ease = 1 - Math.pow(0.02, delta)
-      graph.rotation.y += (targetY - graph.rotation.y) * ease
-      graph.rotation.x += (targetX - graph.rotation.x) * ease
+      graph.rotation.y = sway + driftY + leanX * 0.055
+      graph.rotation.x = driftX + leanY * 0.026
+      frameCamera()
       if (composer !== null) composer.render()
       else renderer.render(scene, camera)
       if (!still) frame = requestAnimationFrame(render)
@@ -481,8 +565,9 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
 
     // The clock pauses with the loop, so the entrance plays once and scrolling back does not replay it.
     const start = () => {
-      if (!booted || running || !heroVisible || !pageVisible) return
+      if (still || !booted || running || !heroVisible || !pageVisible) return
       running = true
+      element.dataset.animationActive = 'true'
       lastFrame = performance.now()
       if (pausedAt === null) startTime = performance.now()
       else startTime += performance.now() - pausedAt
@@ -492,6 +577,7 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
     const stop = () => {
       if (!running) return
       running = false
+      element.dataset.animationActive = 'false'
       pausedAt = performance.now()
       cancelAnimationFrame(frame)
     }
@@ -530,6 +616,7 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
       if (still) {
         layoutCloud(SETTLED)
         layoutGraph(SETTLED)
+        frameCamera()
         renderer.render(scene, camera)
         return
       }
@@ -538,13 +625,24 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
     // Let the browser reach its next paint before the first frame; the frame can be cancelled during
     // React Strict Mode's deliberate mount/unmount check.
     const bootFrame = requestAnimationFrame(boot)
+    // Development builds expose where each node lands on screen, so the framing can be checked by measurement.
+    if (import.meta.env.DEV)
+      Object.assign(element, {
+        nodesOnScreen: () =>
+          nodeGroups.map((group, index) => {
+            const at = group.getWorldPosition(new THREE.Vector3()).project(camera)
+            return [NODES[index]?.id, Math.round(((at.x + 1) / 2) * width), Math.round(((1 - at.y) / 2) * height)]
+          }),
+      })
 
     return () => {
       cancelAnimationFrame(bootFrame)
       stop()
       resizeObserver.disconnect()
       intersectionObserver.disconnect()
+      disposed = true
       window.removeEventListener('pointermove', onPointer)
+      document.documentElement.removeEventListener('pointerleave', onPointerLeave)
       document.removeEventListener('visibilitychange', onVisibility)
       canvas.removeEventListener('webglcontextlost', onContextLost)
       canvas.removeEventListener('webglcontextrestored', onContextRestored)

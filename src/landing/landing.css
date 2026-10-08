@@ -40,8 +40,8 @@
 }
 .landing-scene { position: absolute; z-index: 0; inset: 0; pointer-events: none; }
 .landing-scene__canvas, .landing-scene canvas { display: block; width: 100%; height: 100%; }
-/* The copy reads over the cloud: the band's own colour, fading out toward the graph. */
-.landing-scrim { position: absolute; z-index: 1; inset: 0; pointer-events: none; background: linear-gradient(90deg, var(--color-rail) 8%, color-mix(in srgb, var(--color-rail) 92%, transparent) 36%, color-mix(in srgb, var(--color-rail) 30%, transparent) 56%, transparent 72%); }
+/* The copy reads over the entrance cloud: the band's own colour, clear by the time it reaches the graph's area. */
+.landing-scrim { position: absolute; z-index: 1; inset: 0; pointer-events: none; background: linear-gradient(90deg, var(--color-rail) 8%, color-mix(in srgb, var(--color-rail) 85%, transparent) 28%, transparent 44%); }
 .landing-header { position: relative; z-index: 3; }
 .landing-header__row { display: flex; align-items: center; justify-content: space-between; gap: 2rem; min-height: 4.5rem; }
 .landing-wordmark { display: inline-flex; align-items: center; gap: .75rem; color: var(--color-rail-ink); font-family: var(--font-heading); font-size: var(--text-title); font-weight: 500; }
@@ -141,7 +141,7 @@
 
 @media (max-width: 900px) {
   .landing-width { width: min(100% - 2rem, 44rem); }
-  .landing-scrim { background: linear-gradient(180deg, color-mix(in srgb, var(--color-rail) 8%, transparent) 0, color-mix(in srgb, var(--color-rail) 25%, transparent) 28%, var(--color-rail) 50%, var(--color-rail) 100%); }
+  .landing-scrim { background: linear-gradient(180deg, transparent 0, transparent calc(var(--hero-copy-top, 60%) - 3rem), var(--color-rail) calc(var(--hero-copy-top, 60%) - .5rem), var(--color-rail) 100%); }
   .landing-hero-copy { width: 100%; margin-top: auto; padding: min(28rem, 50svh) 0 4rem; }
   .landing-headline { max-width: none; }
   .workflow-section, .feature-section, .structures-section { padding-block: 4.5rem; }
@@ -157,8 +157,9 @@
 
 @media (max-width: 620px) {
   .landing-hero-copy { padding-top: min(25rem, 47svh); padding-bottom: 3rem; }
-  .landing-actions { align-items: stretch; }
-  .landing-primary, .landing-secondary { justify-content: center; }
+  /* The two actions stay side by side: padding and text scale with the screen so both fit in one row. */
+  .landing-actions { flex-wrap: nowrap; align-items: stretch; gap: .5rem; }
+  .landing-primary, .landing-secondary { flex: 1 1 auto; justify-content: center; padding-inline: clamp(.45rem, 2.4vw, 1.25rem); font-size: clamp(.8125rem, 3.7vw, var(--text-subtitle)); white-space: nowrap; }
   .workflow-list li { grid-template-columns: 2.25rem minmax(0, 1fr); gap: .75rem; }
   .workflow-list li > div { grid-template-columns: 1fr; gap: .5rem; }
   .evidence-figure { grid-template-columns: 1fr; }
