@@ -30,17 +30,30 @@ function requestRoutes(graph: unknown): Promise<Result<z.infer<typeof response>,
     pending.get(parsed.data.request)?.(ok(parsed.data))
     pending.delete(parsed.data.request)
   }
-  worker.onerror = (event) => {
-    for (const finish of pending.values()) finish(err({ kind: 'engine', message: event.message }))
-    pending.clear()
-    worker?.terminate()
-    worker = undefined
-  }
+  worker.onerror = (event) => abandon(event.message)
   const request = ++sequence
   return new Promise((resolve) => {
-    pending.set(request, resolve)
+    pending.set(request, (result) => {
+      clearTimeout(limit)
+      resolve(result)
+    })
+    // libavoid can loop on some placements; a request that outlives the limit takes the worker down
+    // with it, so later requests start a fresh one instead of queuing behind it.
+    const limit = setTimeout(() => {
+      console.warn('DAG routing exceeded its time limit; the router was restarted.')
+      abandon('The router did not finish in time.')
+    }, ROUTING_LIMIT_MS)
     worker!.postMessage({ request, graph })
   })
+}
+
+const ROUTING_LIMIT_MS = 8000
+
+function abandon(message: string): void {
+  for (const finish of pending.values()) finish(err({ kind: 'engine', message }))
+  pending.clear()
+  worker?.terminate()
+  worker = undefined
 }
 
 /** libavoid routes around cards at their actual positions. No synthetic fallback routes. */
