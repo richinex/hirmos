@@ -964,15 +964,17 @@ export const canvasModel = (
     // Graph surgery: an arrow into the set node is severed, so it is drawn faint and broken.
     const cut = intervention !== null && edge.effect === intervention.set
     // With a binding, the flow overlay distinguishes causal paths, open biasing paths, and other edges.
+    // An arrow on both stays causal, so a directed path reads unbroken; its biasing path still shows
+    // through that path's other arrows.
     const stroke = cut
       ? 'var(--color-faint)'
       : invalid
         ? 'var(--color-danger)'
         : edgeFlow !== null
-          ? edgeFlow.biasing
-            ? 'var(--color-danger)'
-            : edgeFlow.causal
-              ? 'var(--color-ok)'
+          ? edgeFlow.causal
+            ? 'var(--color-ok)'
+            : edgeFlow.biasing
+              ? 'var(--color-danger)'
               : 'var(--color-muted)'
           : unstated
             ? 'var(--color-warn)'
@@ -982,11 +984,13 @@ export const canvasModel = (
     const flowWords =
       edgeFlow === null
         ? ''
-        : edgeFlow.biasing
-          ? '; lies on an open biasing path'
+        : edgeFlow.causal && edgeFlow.biasing
+          ? '; lies on a directed causal path and an open biasing path'
           : edgeFlow.causal
             ? '; lies on a directed causal path'
-            : '; not on an active treatment–outcome path'
+            : edgeFlow.biasing
+              ? '; lies on an open biasing path'
+              : '; not on an active treatment–outcome path'
     const edgeLabel = routeLabelText(edge)
     return [
       {
