@@ -1,8 +1,8 @@
-import {resolveStudyDagRevision,studyRevisionNotice} from './dagProvenance'
+import { resolveStudyDagRevision, studyRevisionNotice } from './dagProvenance'
 import type { CounterfactualRunArtifact } from './counterfactual'
 import type { DagDocument } from './dag'
 import type { DatasetProfile } from './dataset'
-import { adjustmentLabels, type EstimationRunArtifact } from './estimation'
+import { adjustmentLabels, configurationSettings, type EstimationRunArtifact } from './estimation'
 import {
   describeSeriesTransform,
   type PreparedDatasetArtifact,
@@ -81,9 +81,12 @@ export function buildResultManifest(
   const study = inputs.studies.find((candidate) => candidate.id === run.study) ?? null
   const identification =
     inputs.identifications.find((candidate) => candidate.id === run.identification) ?? null
-  const provenance=study===null?null:resolveStudyDagRevision(study,inputs.documents)
-  const recorded=provenance!==null&&(provenance.kind==='current'||provenance.kind==='earlier')?provenance:null
-  const notice=provenance===null?null:studyRevisionNotice(provenance)
+  const provenance = study === null ? null : resolveStudyDagRevision(study, inputs.documents)
+  const recorded =
+    provenance !== null && (provenance.kind === 'current' || provenance.kind === 'earlier')
+      ? provenance
+      : null
+  const notice = provenance === null ? null : studyRevisionNotice(provenance)
   const warnings =
     run.eligibility.kind === 'caution'
       ? run.eligibility.unresolved.map(
@@ -136,7 +139,7 @@ export function buildResultManifest(
       study === null
         ? []
         : inputs.counterfactualRuns.filter((counterfactual) => counterfactual.study === study.id),
-    warnings: notice===null?warnings:[notice,...warnings],
+    warnings: notice === null ? warnings : [notice, ...warnings],
   }
 }
 
@@ -159,10 +162,9 @@ export interface ResultDifference {
 }
 
 const describeConfiguration = (run: EstimationRunArtifact): string =>
-  Object.entries(run.configuration)
-    .filter(([key]) => key !== 'kind')
-    .map(([key, value]) => `${key} ${JSON.stringify(value)}`)
-    .join(', ')
+  configurationSettings(run.configuration)
+    .map((setting) => `${setting.label}: ${setting.value}`)
+    .join('; ')
 
 const describePreparedTransforms = (prepared: PreparedDatasetArtifact): string =>
   prepared.kind === 'prepared-time-series'

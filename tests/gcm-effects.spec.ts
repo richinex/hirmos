@@ -60,7 +60,7 @@ test('intervention effects run from the root-cause selector and retain results o
     const saved = await store.loadProject(header.id)
     return saved.ok && saved.value.rootCause.effects.length === 1 && saved.value.rootCause.selection !== null
   })).toBe(true)
-  await page.reload()
+  await page.goto('/app/projects')
   await page.setViewportSize({ width: 1440, height: 1000 })
   await page.getByRole('button', { name: 'Open Root-cause workflow', exact: true }).click()
   await page.getByRole('heading', { name: 'Choose the data file again' }).waitFor()

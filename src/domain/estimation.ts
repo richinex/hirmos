@@ -1,4 +1,4 @@
-import {covariateBalanceSchema} from './covariateBalance'
+import { covariateBalanceSchema } from './covariateBalance'
 import { z } from 'zod'
 import { ridgeConfigurationSchema, ridgeMatches, type RidgeConfiguration } from './ridgeAugmented'
 import type { RidgeAugmentedEvidence } from './remixExtensions'
@@ -24,6 +24,7 @@ import {
   structuralModelSchema,
   structuralImpactSettingsSchema,
   structuralContributionSchema,
+  type StructuralModel,
 } from './structuralImpact'
 import type { SharpRdConfiguration, SharpRdEvidence } from './sharpRd'
 import { SHARP_RD_METHOD_ID } from './methods'
@@ -31,10 +32,11 @@ import {
   matchesTLearnerUncertainty,
   tLearnerUncertaintyEvidenceSchema,
   tLearnerUncertaintySchema,
+  type TLearnerUncertainty,
 } from './tLearner'
 import { vecmForecastSchema } from './vecmForecast'
 import { ardlLongRunSchema, vecmLongRunSchema } from './longRun'
-import type { ColumnId } from './dataset'
+import { columnNameOf, type ColumnId } from './dataset'
 import { armaErrorFieldsSchema } from './interruptedSeries'
 import type { DagDocument, EditableDag } from './dag'
 import {
@@ -111,7 +113,8 @@ import {
   type StudySpecification,
   type StudyVariable,
 } from './study'
-import { formatStatistic } from '@/lib/format/number'
+import { formatSetPercent, formatSetting, formatStatistic } from '@/lib/format/number'
+import { namesFigure } from '@/lib/format/names'
 
 /**
  * An estimate carries its meaning in the type: the estimand it answers, the scale, a named interval
@@ -453,7 +456,12 @@ import {
   staggeredConfigurationSchema,
   sameStaggeredSpecification,
   recordedStaggeredHeadline,
+  recordedStaggeredAdjustment,
+  staggeredAdjustmentDescriptions,
+  staggeredHeadlineDescriptions,
+  type StaggeredClustering,
   type StaggeredConfiguration,
+  type StaggeredSpecification,
 } from './staggeredDid'
 
 export type PanelInterventionConfiguration =
@@ -1091,11 +1099,14 @@ export const backdoorLinearEvidenceSchema = z
         .object({
           kind: z.literal('cluster'),
           clusters: z.number().int().min(2),
-          correction: z.object({
-            kind: z.literal('fixestNonNested'),
-            parameters: z.number().int().positive(),
-            degreesOfFreedom: z.number().int().positive(),
-          }).strict().optional(),
+          correction: z
+            .object({
+              kind: z.literal('fixestNonNested'),
+              parameters: z.number().int().positive(),
+              degreesOfFreedom: z.number().int().positive(),
+            })
+            .strict()
+            .optional(),
           standardError: z.number().finite().nonnegative(),
           interval: z.tuple([z.number().finite(), z.number().finite()]),
           pValue: z.number().min(0).max(1),
@@ -1202,7 +1213,7 @@ export const treatmentModelStoppedEarly = (model: TreatmentModelEvidence): boole
 export const propensityWeightingEvidenceSchema = z
   .object({
     kind: z.literal('propensityWeighting'),
-    balance: covariateBalanceSchema.default({kind:'notRecorded'}),
+    balance: covariateBalanceSchema.default({ kind: 'notRecorded' }),
     target: z.enum(['ate', 'att']),
     observations: z.number().int().positive(),
     treatmentModel: treatmentModelEvidenceSchema,
@@ -1247,7 +1258,7 @@ export type GridSliceEvidence = z.infer<typeof gridSliceEvidenceSchema>
 export const propensityMatchingEvidenceSchema = z
   .object({
     kind: z.literal('propensityMatching'),
-    balance: covariateBalanceSchema.default({kind:'notRecorded'}),
+    balance: covariateBalanceSchema.default({ kind: 'notRecorded' }),
     target: z.enum(['ate', 'att']),
     observations: z.number().int().positive(),
     treatmentModel: treatmentModelEvidenceSchema,
@@ -1264,7 +1275,7 @@ export const propensityMatchingEvidenceSchema = z
 export const doublyRobustEvidenceSchema = z
   .object({
     kind: z.literal('doublyRobust'),
-    balance: covariateBalanceSchema.default({kind:'notRecorded'}),
+    balance: covariateBalanceSchema.default({ kind: 'notRecorded' }),
     target: z.enum(['ate', 'att']),
     observations: z.number().int().positive(),
     /** The treatment model's parameter count: the constant plus one per design column. */
@@ -6522,6 +6533,1126 @@ export function describeFixedEffects(fixedEffects: FixedEffects): string | null 
   }
 }
 
+/** One estimator setting in words, for run records and comparisons. */
+export interface ConfigurationSetting {
+  readonly key: string
+  readonly label: string
+  readonly value: string
+}
+
+const setting = (key: string, label: string, value: string): ConfigurationSetting => ({
+  key,
+  label,
+  value,
+})
+
+const settingNumber = (value: number): string => formatSetting(value).text
+
+const settingPercent = (proportion: number): string => formatSetPercent(proportion).text
+
+const settingSentence = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1)
+
+const settingNames = (names: readonly string[], noun: string): string =>
+  names.length === 0 ? 'None' : namesFigure(names, noun).value
+
+const settingColumns = (columns: readonly ColumnId[], noun: string): string =>
+  settingNames(columns.map(columnNameOf), noun)
+
+const settingCount = (count: number, singular: string, plural: string): string =>
+  count === 0 ? 'None' : `${count} ${count === 1 ? singular : plural}`
+
+const linearErrorSettings = (errors: LinearErrors): readonly ConfigurationSetting[] => {
+  const described = setting('errors', 'Standard errors', describeCovariance(errors))
+  switch (errors.kind) {
+    case 'classical':
+    case 'hc1':
+    case 'cluster':
+    case 'hac':
+      return [described]
+    case 'arma':
+      return [described, setting('maxIter', 'Optimiser iterations', settingNumber(errors.maxIter))]
+    default:
+      return assertNever(errors)
+  }
+}
+
+const describeLogisticTreatmentModel = (model: LogisticTreatmentModelChoice): string => {
+  switch (model) {
+    case 'newton':
+      return 'Newton'
+    case 'lbfgsb':
+      return 'L-BFGS-B'
+    default:
+      return assertNever(model)
+  }
+}
+
+const describeBoostedScoring = (scoring: BoostedScoring): string => {
+  switch (scoring) {
+    case 'one-model':
+      return 'One model'
+    case 'cross-fitted':
+      return 'Cross-fitted'
+    default:
+      return assertNever(scoring)
+  }
+}
+
+const boostedGridSettings = (grid: BoostedGridChoice): readonly ConfigurationSetting[] => [
+  setting('learningRate', 'Learning rates', formatBoostedGridAxis(grid.learningRate)),
+  setting('maxDepth', 'Tree depths', formatBoostedGridAxis(grid.maxDepth)),
+  setting('nEstimators', 'Tree counts', formatBoostedGridAxis(grid.nEstimators)),
+  setting('splits', 'Search folds', settingNumber(grid.splits)),
+  setting('gridSeed', 'Tree seed', settingNumber(grid.seed)),
+]
+
+const boostedTreatmentModelSettings = (
+  boosted: BoostedTreatmentModelChoice,
+): readonly ConfigurationSetting[] => [
+  ...boostedGridSettings(boosted),
+  setting('scoring', 'Scoring', describeBoostedScoring(boosted.scoring)),
+]
+
+const logisticTreatmentModelSettings = (configuration: {
+  readonly model: LogisticTreatmentModelChoice
+  readonly maxIter: number
+}): readonly ConfigurationSetting[] => [
+  setting('model', 'Treatment model', describeLogisticTreatmentModel(configuration.model)),
+  setting('maxIter', 'Iteration limit', settingNumber(configuration.maxIter)),
+]
+
+/** The iteration limit applies to a logistic fit and the grid to a boosted one, so each is listed only with its model. */
+const propensityTreatmentModelSettings = (configuration: {
+  readonly model: PropensityTreatmentModelChoice
+  readonly maxIter: number
+  readonly boosted: BoostedTreatmentModelChoice
+}): readonly ConfigurationSetting[] => {
+  switch (configuration.model) {
+    case 'newton':
+    case 'lbfgsb':
+      return logisticTreatmentModelSettings({
+        model: configuration.model,
+        maxIter: configuration.maxIter,
+      })
+    case 'boosted':
+      return [
+        setting('model', 'Treatment model', 'Boosted'),
+        ...boostedTreatmentModelSettings(configuration.boosted),
+      ]
+    default:
+      return assertNever(configuration.model)
+  }
+}
+
+const propensityUncertaintySettings = (
+  uncertainty: PropensityUncertainty,
+): readonly ConfigurationSetting[] => {
+  switch (uncertainty.kind) {
+    case 'none':
+      return [setting('uncertainty', 'Uncertainty', 'Point estimate')]
+    case 'bootstrap':
+      return [
+        setting('uncertainty', 'Uncertainty', 'Bootstrap interval'),
+        setting('rounds', 'Bootstrap rounds', settingNumber(uncertainty.rounds)),
+        setting('level', 'Confidence level', settingPercent(uncertainty.level)),
+        setting('seed', 'Bootstrap seed', settingNumber(uncertainty.seed)),
+      ]
+    default:
+      return assertNever(uncertainty)
+  }
+}
+
+const describePropensityWeights = (
+  scale: PropensityWeightingConfiguration['scale'] | ContinuousGpsConfiguration['scale'],
+): string => {
+  switch (scale) {
+    case 'inverseProbability':
+      return 'Inverse probability'
+    case 'inverseDensity':
+      return 'Inverse density'
+    case 'stabilized':
+      return 'Stabilized'
+    default:
+      return assertNever(scale)
+  }
+}
+
+const describeIngarchLink = (link: NegativeBinomialIngarchConfiguration['link']): string => {
+  switch (link) {
+    case 'identity':
+      return 'Additive'
+    case 'log':
+      return 'Multiplicative'
+    default:
+      return assertNever(link)
+  }
+}
+
+const describeIngarchSchedule = (schedule: IngarchInterventionSchedule): string => {
+  switch (schedule.kind) {
+    case 'point':
+      return 'One period'
+    case 'persistent':
+      return 'Persistent'
+    case 'decaying':
+      return `Decaying, δ = ${settingNumber(schedule.delta)}`
+    default:
+      return assertNever(schedule)
+  }
+}
+
+type TLearnerBootstrapMethod = Extract<
+  TLearnerUncertainty,
+  { readonly kind: 'bootstrap' }
+>['method']
+
+const describeTLearnerInterval = (method: TLearnerBootstrapMethod): string => {
+  switch (method) {
+    case 'percentile':
+      return 'Percentile'
+    case 'pivot':
+      return 'Basic'
+    case 'normal':
+      return 'Normal'
+    default:
+      return assertNever(method)
+  }
+}
+
+const tLearnerUncertaintySettings = (
+  uncertainty: TLearnerUncertainty,
+): readonly ConfigurationSetting[] => {
+  switch (uncertainty.kind) {
+    case 'none':
+      return [setting('uncertainty', 'Uncertainty', 'Point estimates')]
+    case 'bootstrap':
+      return [
+        setting('uncertainty', 'Uncertainty', 'Bootstrap intervals'),
+        setting('samples', 'Bootstrap samples', settingNumber(uncertainty.samples)),
+        setting('level', 'Confidence level', settingPercent(uncertainty.level)),
+        setting('method', 'Interval method', describeTLearnerInterval(uncertainty.method)),
+        setting('bootstrapSeed', 'Bootstrap seed', settingNumber(uncertainty.seed)),
+      ]
+    default:
+      return assertNever(uncertainty)
+  }
+}
+
+const tLearnerOutcomeModelSettings = (
+  model: TLearnerOutcomeModel,
+): readonly ConfigurationSetting[] => {
+  switch (model.kind) {
+    case 'forest':
+      return [
+        setting('model', 'Outcome model', 'Random forest'),
+        setting('seed', 'Learner seed', settingNumber(model.seed)),
+        ...tLearnerUncertaintySettings(model.uncertainty),
+      ]
+    case 'boosted-cross-fitted':
+      return [
+        setting('model', 'Outcome model', 'Boosted, cross-fitted'),
+        ...boostedGridSettings(model.grid),
+      ]
+    default:
+      return assertNever(model)
+  }
+}
+
+const describeArdlTrend = (trend: ArdlConfiguration['trend']): string => {
+  switch (trend) {
+    case 'c':
+      return 'Constant'
+    case 'ct':
+      return 'Constant and trend'
+    default:
+      return assertNever(trend)
+  }
+}
+
+const describeVecmDeterministic = (deterministic: VecmDeterministic): string => {
+  switch (deterministic) {
+    case 'n':
+      return 'None'
+    case 'co':
+      return 'Constant outside'
+    case 'ci':
+      return 'Constant inside'
+    case 'coli':
+      return 'Constant and trend'
+    default:
+      return assertNever(deterministic)
+  }
+}
+
+const describeInterventionStart = (start: InterventionStart): string => {
+  switch (start.kind) {
+    case 'from-treatment':
+      return 'Where the treatment turns on'
+    case 'row':
+      return `At row ${start.row}`
+    default:
+      return assertNever(start)
+  }
+}
+
+const describeCausalEffectsAdjustment = (adjustment: CausalEffectsAdjustment): string => {
+  switch (adjustment.kind) {
+    case 'optimal':
+      return 'Complete O-set'
+    case 'minimizedOptimal':
+      return 'Minimized O-set'
+    case 'collidersMinimizedOptimal':
+      return 'Collider-minimized O-set'
+    case 'explicit':
+      return `User-supplied set, ${settingCount(adjustment.nodes.length, 'member', 'members').toLowerCase()}`
+    default:
+      return assertNever(adjustment)
+  }
+}
+
+const totalEffectEstimatorSettings = (
+  estimator: TotalEffectEstimator,
+): readonly ConfigurationSetting[] => {
+  switch (estimator.kind) {
+    case 'linear':
+      return [
+        setting('estimator', 'Effect model', 'Adjusted linear'),
+        setting(
+          'adjustment',
+          'Adjustment set',
+          describeCausalEffectsAdjustment(estimator.adjustment),
+        ),
+      ]
+    case 'knn':
+      return [
+        setting('estimator', 'Effect model', 'Adjusted k-NN'),
+        setting('k', 'Neighbours k', settingNumber(estimator.k)),
+        setting(
+          'adjustment',
+          'Adjustment set',
+          describeCausalEffectsAdjustment(estimator.adjustment),
+        ),
+      ]
+    case 'wrightParents':
+      return [setting('estimator', 'Effect model', 'Wright paths')]
+    default:
+      return assertNever(estimator)
+  }
+}
+
+const describeBlockLength = (blockLength: CausalEffectsBlockLength): string => {
+  switch (blockLength.kind) {
+    case 'fixed':
+      return settingCount(blockLength.length, 'observation', 'observations')
+    case 'cubeRoot':
+      return 'Cube root'
+    default:
+      return assertNever(blockLength)
+  }
+}
+
+const causalEffectsUncertaintySettings = (
+  uncertainty: CausalEffectsUncertainty,
+): readonly ConfigurationSetting[] => {
+  switch (uncertainty.kind) {
+    case 'none':
+      return [setting('uncertainty', 'Sampling uncertainty', 'Point estimate')]
+    case 'bootstrap':
+      return [
+        setting('uncertainty', 'Sampling uncertainty', 'Block bootstrap'),
+        setting('samples', 'Bootstrap samples', settingNumber(uncertainty.samples)),
+        setting('blockLength', 'Block length', describeBlockLength(uncertainty.blockLength)),
+        setting('level', 'Confidence level', settingPercent(uncertainty.confidenceLevel)),
+        setting('seed', 'Bootstrap seed', settingNumber(uncertainty.seed)),
+      ]
+    default:
+      return assertNever(uncertainty)
+  }
+}
+
+const describeStructuralTrend = (trend: StructuralModel['trend']): string => {
+  switch (trend) {
+    case 'level':
+      return 'Local level'
+    case 'linear':
+      return 'Local linear trend'
+    case 'semilocal':
+      return 'Semilocal linear trend'
+    default:
+      return assertNever(trend)
+  }
+}
+
+const describeStructuralSeasonality = (seasonality: StructuralModel['seasonality']): string => {
+  switch (seasonality.kind) {
+    case 'none':
+      return 'None'
+    case 'seasonal':
+      return `${seasonality.seasons} seasons, ${settingCount(seasonality.duration, 'observation', 'observations')} per season`
+    case 'harmonic':
+      return `Harmonics, period ${settingNumber(seasonality.period)}, ${seasonality.pairs} pairs`
+    default:
+      return assertNever(seasonality)
+  }
+}
+
+const bayesianImpactSettings = (
+  inference: BayesianImpactSettings,
+): readonly ConfigurationSetting[] => {
+  const sampler = [
+    setting('draws', 'Posterior draws', settingNumber(inference.draws)),
+    setting('warmup', 'Warmup iterations', settingNumber(inference.warmup)),
+    setting('seed', 'Seed', settingNumber(inference.seed)),
+  ]
+  switch (inference.kind) {
+    case 'bayesian':
+      return [
+        setting('inference', 'Inference', 'Bayesian'),
+        setting('model', 'Bayesian model', 'CausalImpact specification'),
+        ...sampler,
+        setting('priorLevelSd', 'Prior level scale', settingNumber(inference.priorLevelSd)),
+      ]
+    case 'structural':
+      return [
+        setting('inference', 'Inference', 'Bayesian'),
+        setting('model', 'Bayesian model', 'BSTS components'),
+        setting('trend', 'Trend', describeStructuralTrend(inference.model.trend)),
+        setting(
+          'seasonality',
+          'Seasonality',
+          describeStructuralSeasonality(inference.model.seasonality),
+        ),
+        ...sampler,
+      ]
+    default:
+      return assertNever(inference)
+  }
+}
+
+const causalImpactInferenceSettings = (
+  configuration: CausalImpactConfiguration,
+): readonly ConfigurationSetting[] =>
+  configuration.inference === undefined
+    ? [
+        setting('inference', 'Inference', 'Maximum likelihood'),
+        setting('maxIter', 'Optimiser iterations', settingNumber(configuration.maxIter)),
+      ]
+    : bayesianImpactSettings(configuration.inference)
+
+type RidgeCrossValidation = Extract<
+  RidgeConfiguration['regularization'],
+  { readonly kind: 'crossValidation' }
+>
+
+const describeRidgeSelection = (selection: RidgeCrossValidation['selection']): string => {
+  switch (selection) {
+    case 'oneStandardError':
+      return 'One standard error'
+    case 'minimumError':
+      return 'Minimum error'
+    default:
+      return assertNever(selection)
+  }
+}
+
+const ridgeRegularizationSettings = (
+  regularization: RidgeConfiguration['regularization'],
+): readonly ConfigurationSetting[] => {
+  switch (regularization.kind) {
+    case 'fixed':
+      return [
+        setting('lambda', 'Lambda', 'Specified lambda'),
+        setting('lambdaValue', 'Ridge lambda', settingNumber(regularization.lambda)),
+      ]
+    case 'crossValidation':
+      return [
+        setting('lambda', 'Lambda', 'Cross-validation'),
+        setting('selection', 'Selection rule', describeRidgeSelection(regularization.selection)),
+        setting(
+          'holdoutLength',
+          'Held-out block length',
+          settingNumber(regularization.holdoutLength),
+        ),
+        setting('steps', 'Candidate grid steps', settingNumber(regularization.steps)),
+      ]
+    default:
+      return assertNever(regularization)
+  }
+}
+
+const ridgeUncertaintySettings = (
+  uncertainty: RidgeConfiguration['uncertainty'],
+): readonly ConfigurationSetting[] => {
+  switch (uncertainty.kind) {
+    case 'none':
+      return [setting('uncertainty', 'Uncertainty', 'No interval')]
+    case 'jackknifePlus':
+      return [
+        setting('uncertainty', 'Uncertainty', 'Jackknife+'),
+        setting('level', 'Confidence level', settingPercent(uncertainty.confidence)),
+      ]
+    case 'conservative':
+      return [
+        setting('uncertainty', 'Uncertainty', 'Conservative'),
+        setting('level', 'Confidence level', settingPercent(uncertainty.confidence)),
+      ]
+    default:
+      return assertNever(uncertainty)
+  }
+}
+
+const describePredictorSummary = (summary: PredictorSyntheticConfiguration['summary']): string => {
+  switch (summary) {
+    case 'mean':
+      return 'Mean'
+    case 'median':
+      return 'Median'
+    case 'minimum':
+      return 'Minimum'
+    case 'maximum':
+      return 'Maximum'
+    case 'sum':
+      return 'Sum'
+    case 'variance':
+      return 'Variance'
+    case 'standard-deviation':
+      return 'Standard deviation'
+    default:
+      return assertNever(summary)
+  }
+}
+
+const describePredictorWeights = (
+  selection: PredictorSyntheticConfiguration['selection'],
+): string => {
+  switch (selection.kind) {
+    case 'automatic':
+      return 'Estimated'
+    case 'supplied':
+      return `Specified as ${selection.weights.map(settingNumber).join(', ')}`
+    default:
+      return assertNever(selection)
+  }
+}
+
+/** Panel periods are stored as codes that only the panel catalog can name, so a period is reported as chosen and a set of periods by its count. */
+const comparisonSettings = (configuration: {
+  readonly treatedUnit: string | null
+  readonly donorUnits: readonly string[]
+  readonly interventionPeriod: number | null
+}): readonly ConfigurationSetting[] => [
+  setting('treatedUnit', 'Treated unit', configuration.treatedUnit ?? 'Not chosen'),
+  setting('donorUnits', 'Donor units', settingNames(configuration.donorUnits, 'donor units')),
+  setting(
+    'interventionPeriod',
+    'Intervention period',
+    configuration.interventionPeriod === null ? 'Not chosen' : 'Chosen',
+  ),
+]
+
+const syntheticControlSettings = (
+  configuration: SyntheticControlConfiguration,
+): readonly ConfigurationSetting[] => {
+  switch (configuration.specification) {
+    case 'ridge-augmented':
+      return [
+        setting('specification', 'Specification', 'Ridge augmentation'),
+        ...comparisonSettings(configuration),
+        ...ridgeRegularizationSettings(configuration.regularization),
+        ...ridgeUncertaintySettings(configuration.uncertainty),
+      ]
+    case 'predictors':
+      return [
+        setting('specification', 'Specification', 'Predictor balance'),
+        ...comparisonSettings(configuration),
+        setting(
+          'predictors',
+          'Ordinary predictors',
+          settingColumns(configuration.predictors, 'predictors'),
+        ),
+        setting('summary', 'Predictor summary', describePredictorSummary(configuration.summary)),
+        setting(
+          'special',
+          'Period-specific predictors',
+          settingColumns(
+            configuration.special.map((predictor) => predictor.column),
+            'predictors',
+          ),
+        ),
+        setting(
+          'predictorPeriods',
+          'Predictor periods',
+          settingCount(configuration.predictorPeriods.length, 'period', 'periods'),
+        ),
+        setting(
+          'fitPeriods',
+          'Fitting periods',
+          settingCount(configuration.fitPeriods.length, 'period', 'periods'),
+        ),
+        setting(
+          'plotPeriods',
+          'Plot periods',
+          settingCount(configuration.plotPeriods.length, 'period', 'periods'),
+        ),
+        setting(
+          'selection',
+          'Predictor weights',
+          describePredictorWeights(configuration.selection),
+        ),
+      ]
+    case 'outcome-history':
+    case undefined:
+      return [
+        setting('specification', 'Specification', 'Outcome history'),
+        setting('start', 'Intervention start', describeInterventionStart(configuration.start)),
+        setting('donors', 'Donor series', settingColumns(configuration.donors, 'donor series')),
+        setting('crossFitFolds', 'Cross-fit folds', settingNumber(configuration.crossFitFolds)),
+        setting('alpha', 'Inference alpha', settingNumber(configuration.alpha)),
+      ]
+    default:
+      return assertNever(configuration)
+  }
+}
+
+const describeStaggeredInference = (
+  inference: StaggeredSpecification['inference'],
+): readonly ConfigurationSetting[] => {
+  switch (inference.kind) {
+    case 'analytical':
+      return [setting('inference', 'Uncertainty', 'Analytical')]
+    case 'bootstrapPointwise':
+      return [
+        setting('inference', 'Uncertainty', 'Pointwise bootstrap'),
+        setting('iterations', 'Bootstrap replications', settingNumber(inference.iterations)),
+        setting('seed', 'Bootstrap seed', settingNumber(inference.seed)),
+      ]
+    case 'bootstrapSimultaneous':
+      return [
+        setting('inference', 'Uncertainty', 'Simultaneous bootstrap'),
+        setting('iterations', 'Bootstrap replications', settingNumber(inference.iterations)),
+        setting('seed', 'Bootstrap seed', settingNumber(inference.seed)),
+      ]
+    default:
+      return assertNever(inference)
+  }
+}
+
+const describeStaggeredControls = (controls: StaggeredSpecification['controls']): string => {
+  switch (controls) {
+    case 'never-treated':
+      return 'Never treated'
+    case 'not-yet-treated':
+      return 'Not yet treated'
+    default:
+      return assertNever(controls)
+  }
+}
+
+const describeStaggeredBaseline = (baseline: StaggeredSpecification['baseline']): string => {
+  switch (baseline) {
+    case 'varying':
+      return 'Varying'
+    case 'universal':
+      return 'Universal'
+    default:
+      return assertNever(baseline)
+  }
+}
+
+/** Runs saved before clustering was offered clustered by unit. */
+const describeStaggeredClustering = (clustering: StaggeredClustering | undefined): string => {
+  if (clustering === undefined) return 'Each panel unit'
+  switch (clustering.kind) {
+    case 'unit':
+      return 'Each panel unit'
+    case 'column':
+      return columnNameOf(clustering.column)
+    default:
+      return assertNever(clustering)
+  }
+}
+
+const staggeredSettings = (
+  configuration: StaggeredConfiguration,
+): readonly ConfigurationSetting[] => {
+  const specification = configuration.specification
+  return [
+    setting('primary', 'Panel estimator', 'Staggered adoption'),
+    setting(
+      'adjustment',
+      'Adjustment method',
+      staggeredAdjustmentDescriptions[recordedStaggeredAdjustment(specification).kind].label,
+    ),
+    setting('controls', 'Comparison group', describeStaggeredControls(specification.controls)),
+    setting(
+      'baseline',
+      'Pre-treatment baseline',
+      describeStaggeredBaseline(specification.baseline),
+    ),
+    setting(
+      'covariates',
+      'Adjustment covariates',
+      settingColumns(configuration.covariates, 'covariates'),
+    ),
+    setting('anticipation', 'Anticipation periods', settingNumber(specification.anticipation)),
+    setting(
+      'clustering',
+      'Independent clusters',
+      describeStaggeredClustering(configuration.clustering),
+    ),
+    setting(
+      'headline',
+      'Overall ATT',
+      staggeredHeadlineDescriptions[recordedStaggeredHeadline(configuration)].label,
+    ),
+    ...describeStaggeredInference(specification.inference),
+    setting('level', 'Confidence level', settingPercent(specification.confidence)),
+    setting(
+      'firstEvent',
+      'First event time',
+      specification.firstEvent === null ? 'Earliest' : settingNumber(specification.firstEvent),
+    ),
+    setting(
+      'lastEvent',
+      'Last event time',
+      specification.lastEvent === null ? 'Latest' : settingNumber(specification.lastEvent),
+    ),
+    setting(
+      'balance',
+      'Balance through',
+      specification.balance === null ? 'All cohorts' : settingNumber(specification.balance),
+    ),
+  ]
+}
+
+const adjustedDidSettings = (
+  covariates: readonly ColumnId[],
+  specification: AdjustedDidSpecification,
+): readonly ConfigurationSetting[] => {
+  switch (specification.kind) {
+    case 'regression':
+      return [
+        setting('primary', 'Panel estimator', 'Two-period regression'),
+        setting('covariates', 'Covariates', settingColumns(covariates, 'covariates')),
+      ]
+    case 'doublyRobust':
+      return [
+        setting('primary', 'Panel estimator', 'Two-period doubly robust'),
+        setting('covariates', 'Baseline covariates', settingColumns(covariates, 'covariates')),
+        setting('folds', 'Cross-fitting folds', settingNumber(specification.folds)),
+        setting('seed', 'Seed', settingNumber(specification.seed)),
+        setting('trimming', 'Propensity trimming', settingNumber(specification.trimming)),
+        setting(
+          'normalization',
+          'Normalization',
+          didNormalizationLabels[specification.normalization],
+        ),
+      ]
+    default:
+      return assertNever(specification)
+  }
+}
+
+const panelInterventionSettings = (
+  configuration: PanelInterventionConfiguration,
+): readonly ConfigurationSetting[] => {
+  switch (configuration.primary) {
+    case 'sunAbraham':
+      return [
+        setting('primary', 'Panel estimator', 'Sun–Abraham'),
+        setting(
+          'referencePeriods',
+          'Reference event periods',
+          configuration.referencePeriods.map(settingNumber).join(', '),
+        ),
+        setting(
+          'referenceCohorts',
+          'Reference adoption cohorts',
+          settingCount(configuration.referenceCohorts.length, 'cohort', 'cohorts'),
+        ),
+        setting('level', 'Confidence level', settingPercent(configuration.confidence)),
+      ]
+    case 'staggered':
+      return staggeredSettings(configuration)
+    case 'adjusted':
+      return adjustedDidSettings(configuration.covariates, configuration.specification)
+    case 'did':
+      return [setting('primary', 'Panel estimator', 'Difference-in-differences')]
+    case 'syntheticDid':
+    case undefined:
+      return [
+        setting('primary', 'Panel estimator', 'Synthetic difference-in-differences'),
+        setting(
+          'placeboReplications',
+          'Placebo replications',
+          settingNumber(configuration.placeboReplications),
+        ),
+        setting('seed', 'Placebo seed', settingNumber(configuration.seed)),
+      ]
+    default:
+      return assertNever(configuration)
+  }
+}
+
+type ForestAnalysis = NonNullable<CausalForestConfiguration['analysis']>
+
+const describeForestSampling = (sampling: ForestAnalysis['sampling']): string => {
+  switch (sampling.kind) {
+    case 'independent':
+      return 'Independent rows'
+    case 'clustered':
+      return 'Clusters'
+    case 'equal-clusters':
+      return 'Equal cluster weights'
+    default:
+      return assertNever(sampling)
+  }
+}
+
+const describeForestWeighting = (sampling: ForestAnalysis['sampling']): string => {
+  switch (sampling.kind) {
+    case 'independent':
+    case 'clustered':
+      return sampling.weighting.kind === 'uniform' ? 'Uniform row weights' : 'Weight column'
+    case 'equal-clusters':
+      return 'Equal cluster weights'
+    default:
+      return assertNever(sampling)
+  }
+}
+
+const describeForestAverage = (method: ForestAnalysis['averageMethod']): string => {
+  switch (method) {
+    case 'aipw':
+      return 'AIPW'
+    case 'tmle':
+      return 'TMLE'
+    default:
+      return assertNever(method)
+  }
+}
+
+const describeForestProjection = (projection: ForestAnalysis['projection']): string => {
+  switch (projection.kind) {
+    case 'none':
+      return 'Not requested'
+    case 'linear':
+      return [
+        settingCount(projection.columns.length, 'covariate', 'covariates'),
+        projection.overlap ? 'overlap-weighted' : 'all rows',
+        `${projection.covariance.toUpperCase()} errors`,
+      ].join(', ')
+    default:
+      return assertNever(projection)
+  }
+}
+
+const describeForestRanking = (ranking: ForestAnalysis['ranking']): string => {
+  switch (ranking.kind) {
+    case 'none':
+      return 'Not requested'
+    case 'external':
+      return [
+        ranking.target.toUpperCase(),
+        settingCount(ranking.columns.length, 'priority score', 'priority scores'),
+        `quantiles ${ranking.quantiles.map(settingNumber).join(', ')}`,
+        `${ranking.replications} replications`,
+        `seed ${ranking.seed}`,
+      ].join(', ')
+    default:
+      return assertNever(ranking)
+  }
+}
+
+const describeForestModeration = (moderation: ForestAnalysis['moderation']): string =>
+  moderation === undefined
+    ? 'Not requested'
+    : `${settingCount(moderation.between.length, 'between-cluster characteristic', 'between-cluster characteristics')}, ${settingCount(moderation.within.length, 'within-cluster characteristic', 'within-cluster characteristics').toLowerCase()}`
+
+const forestAnalysisSettings = (
+  analysis: ForestAnalysis | undefined,
+): readonly ConfigurationSetting[] =>
+  analysis === undefined
+    ? []
+    : [
+        setting('sampling', 'Sampling units', describeForestSampling(analysis.sampling)),
+        setting('weighting', 'Sample weight', describeForestWeighting(analysis.sampling)),
+        setting(
+          'averageMethod',
+          'Aggregate estimator',
+          describeForestAverage(analysis.averageMethod),
+        ),
+        setting(
+          'projection',
+          'Best linear projection',
+          describeForestProjection(analysis.projection),
+        ),
+        setting('ranking', 'Treatment prioritization', describeForestRanking(analysis.ranking)),
+        setting(
+          'moderation',
+          'Cluster-score moderation',
+          describeForestModeration(analysis.moderation),
+        ),
+      ]
+
+const forestTuningSettings = (
+  tuning: CausalForestConfiguration['tuning'],
+): readonly ConfigurationSetting[] => {
+  switch (tuning.kind) {
+    case 'disabled':
+      return [setting('tuning', 'Parameter tuning', 'Specified settings')]
+    case 'all':
+      return [
+        setting('tuning', 'Parameter tuning', 'Automatic tuning'),
+        setting('tuningTrees', 'Trees per candidate', settingNumber(tuning.trees)),
+        setting('tuningRepetitions', 'Candidate forests', settingNumber(tuning.repetitions)),
+        setting('tuningDraws', 'Parameter draws', settingNumber(tuning.draws)),
+      ]
+    default:
+      return assertNever(tuning)
+  }
+}
+
+const forestHonestySettings = (
+  honesty: CausalForestConfiguration['honesty'],
+): readonly ConfigurationSetting[] => {
+  switch (honesty.kind) {
+    case 'disabled':
+      return [setting('honesty', 'Honesty', 'Same sample')]
+    case 'enabled':
+      return [
+        setting('honesty', 'Honesty', 'Separate samples'),
+        setting('honestyFraction', 'Splitting fraction', settingNumber(honesty.fraction)),
+        setting('prune', 'Empty leaves', honesty.prune ? 'Prune' : 'Retain'),
+      ]
+    default:
+      return assertNever(honesty)
+  }
+}
+
+const describeVariablesPerSplit = (
+  variables: CausalForestConfiguration['variablesPerSplit'],
+): string => {
+  switch (variables.kind) {
+    case 'automatic':
+      return 'Automatic'
+    case 'specified':
+      return settingNumber(variables.count)
+    default:
+      return assertNever(variables)
+  }
+}
+
+const forestRefitSettings = (
+  refit: CausalForestConfiguration['refit'],
+): readonly ConfigurationSetting[] =>
+  refit === undefined
+    ? [setting('refit', 'Importance-selected refit', 'Not requested')]
+    : [
+        setting('refit', 'Importance-selected refit', 'Select and refit'),
+        setting('nuisanceTrees', 'Nuisance trees', settingNumber(refit.nuisanceTrees)),
+        setting('initialTrees', 'Initial forest trees', settingNumber(refit.initialTrees)),
+        setting('outcomeSeed', 'Outcome forest seed', settingNumber(refit.outcomeSeed)),
+        setting('treatmentSeed', 'Treatment forest seed', settingNumber(refit.treatmentSeed)),
+        setting('initialSeed', 'Initial forest seed', settingNumber(refit.initialSeed)),
+      ]
+
+const causalForestSettings = (
+  configuration: CausalForestConfiguration,
+): readonly ConfigurationSetting[] => [
+  setting('trees', 'Trees', settingNumber(configuration.trees)),
+  setting('seed', 'Forest seed', settingNumber(configuration.seed)),
+  setting('level', 'Confidence level', settingPercent(configuration.confidenceLevel)),
+  ...forestTuningSettings(configuration.tuning),
+  ...forestHonestySettings(configuration.honesty),
+  setting('sampleFraction', 'Sample fraction', settingNumber(configuration.sampleFraction)),
+  setting('minimumNodeSize', 'Minimum node size', settingNumber(configuration.minimumNodeSize)),
+  setting('groupSize', 'Trees per variance group', settingNumber(configuration.groupSize)),
+  setting(
+    'variablesPerSplit',
+    'Variables per split',
+    describeVariablesPerSplit(configuration.variablesPerSplit),
+  ),
+  setting('alpha', 'Split balance', settingNumber(configuration.alpha)),
+  setting('imbalancePenalty', 'Imbalance penalty', settingNumber(configuration.imbalancePenalty)),
+  setting(
+    'stabilizeSplits',
+    'Treatment-aware split balance',
+    configuration.stabilizeSplits ? 'Enabled' : 'Disabled',
+  ),
+  ...forestRefitSettings(configuration.refit),
+  ...forestAnalysisSettings(configuration.analysis),
+]
+
+/** An estimator configuration as labelled settings in a fixed order, so two runs compare field by field. */
+export const configurationSettings = (
+  configuration: EstimatorConfiguration,
+): readonly ConfigurationSetting[] => {
+  switch (configuration.kind) {
+    case 'backdoor-linear-regression':
+      return [
+        ...linearErrorSettings(configuration.errors),
+        setting(
+          'fixedEffects',
+          'Fixed effects',
+          describeFixedEffects(configuration.fixedEffects) ?? 'None',
+        ),
+        setting('level', 'Confidence level', settingPercent(configuration.level)),
+      ]
+    case 'frontdoor-two-stage':
+      return [
+        setting('control', 'Control value', settingNumber(configuration.interventions[0])),
+        setting('treatment', 'Treatment value', settingNumber(configuration.interventions[1])),
+        setting('simulations', 'Bootstrap resamples', settingNumber(configuration.simulations)),
+        setting(
+          'sampleSizeFraction',
+          'Resample size',
+          settingPercent(configuration.sampleSizeFraction),
+        ),
+        setting('level', 'Confidence level', settingPercent(configuration.level)),
+        setting('seed', 'Bootstrap seed', settingNumber(configuration.seed)),
+      ]
+    case 'instrumental-variable':
+      return [
+        setting('simulations', 'Bootstrap resamples', settingNumber(configuration.simulations)),
+        setting(
+          'sampleSizeFraction',
+          'Resample size',
+          settingPercent(configuration.sampleSizeFraction),
+        ),
+        setting('level', 'Confidence level', settingPercent(configuration.level)),
+        setting('seed', 'Bootstrap seed', settingNumber(configuration.seed)),
+      ]
+    case 'poisson-glm':
+    case 'negative-binomial-p':
+    case 'sharp-rd':
+    case 'binary-ett-idc-star':
+      return []
+    case 'negative-binomial-ingarch':
+      return [
+        setting('link', 'Mean link', describeIngarchLink(configuration.link)),
+        setting(
+          'pastObservationLags',
+          'Past count lags',
+          configuration.pastObservationLags.map(settingNumber).join(', '),
+        ),
+        setting(
+          'pastMeanLags',
+          'Past mean lags',
+          configuration.pastMeanLags.map(settingNumber).join(', '),
+        ),
+        setting('horizon', 'Forecast periods', settingNumber(configuration.horizon)),
+        setting('control', 'Control value', settingNumber(configuration.controlValue)),
+        setting('treatment', 'Treatment value', settingNumber(configuration.treatmentValue)),
+        setting('schedule', 'Treatment schedule', describeIngarchSchedule(configuration.schedule)),
+      ]
+    case 'propensity-weighting':
+      return [
+        ...propensityTreatmentModelSettings(configuration),
+        setting('scale', 'Weights', describePropensityWeights(configuration.scale)),
+        ...propensityUncertaintySettings(configuration.uncertainty),
+      ]
+    case 'propensity-matching':
+      return propensityTreatmentModelSettings(configuration)
+    case 'doubly-robust':
+      return [
+        ...logisticTreatmentModelSettings(configuration),
+        ...propensityUncertaintySettings(configuration.uncertainty),
+      ]
+    case 'continuous-gps':
+      return [
+        setting('scale', 'Weights', describePropensityWeights(configuration.scale)),
+        ...propensityUncertaintySettings(configuration.uncertainty),
+      ]
+    case 'dml-plr':
+      return [setting('seed', 'Fold seed', settingNumber(configuration.seed))]
+    case 'dml-irm':
+      return [
+        setting(
+          'att',
+          'Effect',
+          configuration.att ? 'Average effect on the treated' : 'Average effect',
+        ),
+        setting('seed', 'Fold seed', settingNumber(configuration.seed)),
+      ]
+    case 't-learner':
+      return tLearnerOutcomeModelSettings(configuration.model)
+    case 'causal-forest':
+      return causalForestSettings(configuration)
+    case 'ardl-pss':
+      return [
+        setting('maxLag', 'Maximum lag', settingNumber(configuration.maxLag)),
+        setting('trend', 'Deterministic terms', describeArdlTrend(configuration.trend)),
+        setting('case', 'PSS case', `Case ${configuration.case}`),
+      ]
+    case 'vecm':
+      return [
+        setting('maxLags', 'Maximum lags', settingNumber(configuration.maxLags)),
+        setting(
+          'deterministic',
+          'Deterministic terms',
+          describeVecmDeterministic(configuration.deterministic),
+        ),
+        setting('significance', 'Trace significance', `${configuration.significance}%`),
+        setting(
+          'breakIndex',
+          'Chow split after row',
+          configuration.breakIndex === null ? 'None' : settingNumber(configuration.breakIndex),
+        ),
+      ]
+    case 'synthetic-control':
+      return syntheticControlSettings(configuration)
+    case 'panel-intervention':
+      return panelInterventionSettings(configuration)
+    case 'negbin-nuts':
+      return [
+        setting('warmup', 'Warmup', settingNumber(configuration.warmup)),
+        setting('samples', 'Draws', settingNumber(configuration.samples)),
+        setting('seed', 'Seed', settingNumber(configuration.seed)),
+      ]
+    case 'bayesian-gaussian':
+      return [
+        setting('warmup', 'Warmup', settingNumber(configuration.warmup)),
+        setting('samples', 'Draws per chain', settingNumber(configuration.samples)),
+        setting('seed', 'Seed', settingNumber(configuration.seed)),
+      ]
+    case 'discrete-bn-query':
+      return [
+        setting('bins', 'State budget', settingNumber(configuration.bins)),
+        setting(
+          'equivalentSampleSize',
+          'Equivalent sample size',
+          settingNumber(configuration.equivalentSampleSize),
+        ),
+      ]
+    case 'causal-effects-total':
+      return [
+        ...totalEffectEstimatorSettings(configuration.estimator),
+        setting('treatmentLag', 'Treatment lag', settingNumber(configuration.treatmentLag)),
+        setting('from', 'From value', settingNumber(configuration.interventions[0])),
+        setting('to', 'To value', settingNumber(configuration.interventions[1])),
+        ...causalEffectsUncertaintySettings(configuration.uncertainty),
+      ]
+    case 'causal-impact':
+      return [
+        setting('start', 'Intervention start', describeInterventionStart(configuration.start)),
+        setting(
+          'window',
+          'Evaluated window',
+          settingSentence(describeEvaluationWindow(configuration.window)),
+        ),
+        setting(
+          'controls',
+          'Control series',
+          settingColumns(configuration.controls, 'control series'),
+        ),
+        ...causalImpactInferenceSettings(configuration),
+      ]
+    default:
+      return assertNever(configuration)
+  }
+}
+
 /** The coefficient, its standard error and interval under the configured error treatment; null when the evidence holds no ARMA fit for an ARMA configuration. */
 export function linearReading(run: {
   readonly configuration: BackdoorLinearConfiguration
@@ -6792,6 +7923,7 @@ export function interventionStartFromTreatment(
 import {
   adjustedDidEvidenceSchema,
   adjustedDidConfigurationSchema,
+  didNormalizationLabels,
   sameDidSpecification,
   type AdjustedDidSpecification,
 } from './adjustedDid'

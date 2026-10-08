@@ -73,7 +73,7 @@ test('each DAG retains its pair across switching, reload and export/import', asy
   await pick(page, 'Treatment branch')
   await expect(page.getByRole('combobox', { name: 'Outcome', exact: true })).toContainText('Z')
   await chapter(page, /^Projects/)
-  await page.reload()
+  await page.goto('/app/projects')
   await page.getByRole('button', { name: 'Open Persistent control graphs', exact: true }).click()
   await restoreSource(page)
   await chapter(page, /DAG workspace/)

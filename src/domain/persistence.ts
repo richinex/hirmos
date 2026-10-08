@@ -234,8 +234,17 @@ export const serialiseSnapshot = (snapshot: PersistedProject): string =>
 export const samePersistedProjectContent = (
   left: PersistedProject,
   right: PersistedProject,
-): boolean =>
-  serialiseSnapshot({ ...left, savedAt: '' }) === serialiseSnapshot({ ...right, savedAt: '' })
+): boolean => canonical({ ...left, savedAt: '' }) === canonical({ ...right, savedAt: '' })
+
+/** The record with object keys sorted: a record read back from storage and one rebuilt in memory list the same fields in different orders. */
+const canonical = (snapshot: PersistedProject): string =>
+  JSON.stringify(snapshot, (_key, value: unknown) => {
+    if (value instanceof Float64Array) return { [F64]: Array.from(value) }
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return value
+    return Object.fromEntries(
+      Object.entries(value).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+    )
+  })
 
 const revive = (_key: string, value: unknown): unknown => {
   if (typeof value === 'object' && value !== null && F64 in value) {

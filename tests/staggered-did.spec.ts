@@ -313,7 +313,7 @@ for(const adjustment of [
     return {valid:valid.ok,invalid:persistence.parseSnapshotValue(bad).ok,unknownCluster:persistence.parseSnapshotValue(cluster).ok,changedClustering:persistence.parseSnapshotValue(unit).ok,changedAdjustment:persistence.parseSnapshotValue(method).ok}
   },snapshot)
   expect(restored).toEqual({valid:true,invalid:false,unknownCluster:false,changedClustering:false,changedAdjustment:false})
-  await page.reload()
+  await page.goto('/app/projects')
   await page.getByRole('button',{name:'Open Staggered DiD source verification',exact:true}).click()
   await expect(page.getByRole('heading',{name:'Choose the data file again',exact:true})).toBeVisible()
   await page.locator('input[type=file]').setInputFiles({name:'mpdta.csv',mimeType:'text/csv',buffer:Buffer.from(csv)})

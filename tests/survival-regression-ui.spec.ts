@@ -88,7 +88,7 @@ test('new survival regressions preserve covariates, validate settings, render an
   await page.getByRole('option', { name: /Aalen regression/ }).click()
   await expect(page.getByTestId('aalen-coefficients').first()).toBeVisible()
   await page.waitForTimeout(1000)
-  await page.reload()
+  await page.goto('/app/projects')
   await page.getByRole('button', { name: `Open ${name}`, exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Choose the data file again' })).toBeVisible()
   await page.locator('input[type=file]').setInputFiles(fileURLToPath(new URL('../docs/2026-09-11-rviews-survival-veteran/data/veteran.csv', import.meta.url)))

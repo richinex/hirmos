@@ -126,11 +126,12 @@ for (const fixture of selected) {
       await expect(
         page.getByRole('heading', { name: 'Choose a valid adjustment set' }),
       ).toBeVisible()
-      await expect(page.getByRole('button', { name: 'Minimal set 1, A, Z' })).toBeVisible()
-      await expect(page.getByRole('button', { name: 'Minimal set 2, B, Z' })).toBeVisible()
-      await expect(page.getByRole('button', { name: 'Canonical set, A, B, Z' })).toBeVisible()
+      await expect(page.getByRole('radio', { name: /^Minimal set 1\s*A, Z$/ })).toBeVisible()
+      await expect(page.getByRole('radio', { name: /^Minimal set 2\s*B, Z$/ })).toBeVisible()
+      await expect(page.getByRole('radio', { name: /^Canonical set\s*A, B, Z$/ })).toBeVisible()
 
-      await page.getByRole('button', { name: 'Minimal set 1, A, Z' }).click()
+      await page.getByRole('radio', { name: /^Minimal set 1\s*A, Z$/ }).check()
+      await page.getByRole('button', { name: 'Record this set' }).click()
       const canvas = page.getByTestId('canvas')
       await expect(canvas.getByText('Minimal adjustment set 1', { exact: false })).toBeVisible()
       await expect(canvas.getByText('Canonical set: A, B, Z.', { exact: true })).toBeVisible()
@@ -139,6 +140,10 @@ for (const fixture of selected) {
 }
 
 test('O-set is recorded as a supplied set and survives project reload', async ({ page }, info) => {
+  test.skip(
+    info.project.name !== 'chromium',
+    'Parity setup is desktop-only; the bite-check test covers the O-set chooser on mobile.',
+  )
   test.setTimeout(120000)
   const fixture = fixtures.find((f) => f.slug === 'extended-confounding-triangle')!
   await prepare(page, fixture)
@@ -149,16 +154,15 @@ test('O-set is recorded as a supplied set and survives project reload', async ({
     .getByLabel('Assignment sentence')
     .fill('Treatment arose from observed unit characteristics.')
   await page.getByRole('button', { name: 'Identify the effect' }).click()
-  const choose = page.getByRole('button', { name: /^Recommended O-set,/ })
-  await expect(choose).toBeVisible()
+  const choose = page.getByRole('radio', { name: /^Recommended O-set/ })
+  await expect(choose).toBeChecked()
   await choose.scrollIntoViewIfNeeded()
   await page.screenshot({ path: info.outputPath('o-set-choice.png') })
-  await choose.click()
+  await page.getByRole('button', { name: 'Record this set' }).click()
   await expect(
     page.getByText('Recommended adjustment set (O-set)', { exact: false }).first(),
   ).toBeVisible()
-  await page.getByRole('button', { name: /^Projects/ }).click()
-  await page.reload()
+  await page.goto('/app/projects')
   await page.getByRole('button', { name: 'Open dagitty · ' + fixture.label, exact: true }).click()
   const needs = page.getByRole('heading', { name: 'Choose the data file again', exact: true })
   await expect(needs.or(page.locator('#data-profile-title'))).toBeVisible()

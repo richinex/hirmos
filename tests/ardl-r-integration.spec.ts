@@ -162,7 +162,7 @@ for (const mode of ['rHorizontal','rGrid','rFixed'] as const) {
     await page.evaluate(()=>document.documentElement.classList.add('dark'))
     await page.screenshot({path:info.outputPath(`${mode}-bounds-dark.png`)})
     await page.evaluate(()=>document.documentElement.classList.remove('dark'))
-    await page.reload()
+    await page.goto('/app/projects')
     await page.getByRole('button',{name:`Open ${projectName}`,exact:true}).click()
     await expect(page.getByRole('heading',{name:'Choose the data file again',exact:true})).toBeVisible()
     await page.locator('input[type=file]').setInputFiles({name:'uk-earnings.csv',mimeType:'text/csv',buffer:Buffer.from(csv)})

@@ -30,7 +30,7 @@ test('book export can be selected, prepared and reopened through the UI', async 
   await page.getByRole('button', { name: 'Inspect data', exact: true }).click()
   await expect(page.locator('#data-profile-title')).toBeVisible({ timeout: 30_000 })
   await page.waitForTimeout(1000)
-  await page.reload()
+  await page.goto('/app/projects')
   await page.getByRole('button', { name: 'Open Book database', exact: true }).click()
   await page.getByLabel('DuckDB export folder').setInputFiles(folder)
   await page.getByRole('button', { name: 'Import database', exact: true }).click()

@@ -85,24 +85,37 @@ fn stationary_covariance_matches_the_lyapunov_solution() {
 // fixture-specific fit tolerances allow different stopping points; they do not establish
 // interchangeable uncertainty in a rank-deficient fit. See the boundary diagnostic test.
 struct Tolerance {
-    /// On each parameter, relative to `max(|value|, 1)`.
+    /// On each parameter, relative to `max(|value|, 1)`; also scales the derived checks below.
     params: f64,
+    span: ParameterSpan,
     llf: f64,
     /// On each standard error, relative to `max(|value|, 1)`.
     bse: f64,
 }
 
+/// How far the fitted parameters may sit from the reference's.
+enum ParameterSpan {
+    /// Within `params` of each value.
+    Relative,
+    /// Within the stretch of ridge statsmodels itself travels between its fit stopped at the
+    /// iteration limit (the named case) and its converged fit: each parameter no further from the
+    /// converged value than that stopped fit is. Where rounding in the likelihood moves the
+    /// optimiser's path along a flat ridge, the reference's own convergence is the bound.
+    ReferenceRidge(&'static str),
+}
+
 /// One error coefficient: the runs coincide to the optimiser's stopping tolerance.
-const TIGHT: Tolerance = Tolerance { params: 5e-5, llf: 1e-7, bse: 1e-5 };
+const TIGHT: Tolerance = Tolerance { params: 5e-5, span: ParameterSpan::Relative, llf: 1e-7, bse: 1e-5 };
 /// Two or three error coefficients: converged points along the ridge.
-const RIDGE: Tolerance = Tolerance { params: 2e-3, llf: 2e-4, bse: 5e-3 };
+const RIDGE: Tolerance = Tolerance { params: 2e-3, span: ParameterSpan::Relative, llf: 2e-4, bse: 5e-3 };
 /// A fit that stopped at statsmodels' default 50-iteration limit before converging: the two
 /// paths have drifted apart along the ridge, so only the likelihood is close; the point each
 /// stops at is not an optimum and the standard errors read from it differ accordingly.
-const ITERATION_LIMIT: Tolerance = Tolerance { params: 1e-2, llf: 2e-4, bse: 5e-2 };
+const ITERATION_LIMIT: Tolerance = Tolerance { params: 1e-2, span: ParameterSpan::Relative, llf: 2e-4, bse: 5e-2 };
 /// The short-design boundary fit has numerically rank-deficient OPG information. This
 /// scaled tolerance is a fixture check, not a 5% relative standard-error guarantee.
-const BOUNDARY: Tolerance = Tolerance { params: 2e-3, llf: 2e-4, bse: 5e-2 };
+const BOUNDARY: Tolerance =
+    Tolerance { params: 2e-3, span: ParameterSpan::ReferenceRidge("x1_arma21"), llf: 2e-4, bse: 5e-2 };
 
 fn relative_maxdev(got: &[f64], want: &[f64]) -> f64 {
     assert_eq!(got.len(), want.len(), "length mismatch");
@@ -116,8 +129,21 @@ fn check_fit(root: &Value, key: &str, tolerance: Tolerance) {
     let max_iter = c["maxiter"].as_u64().unwrap() as usize;
     let fit = fit(&y, &x, order, max_iter);
     let want = floats(&c["params"]);
-    let dev = relative_maxdev(&fit.params, &want);
-    assert!(dev < tolerance.params, "{key} params deviate by {dev}: got {:?} want {:?}", fit.params, want);
+    match tolerance.span {
+        ParameterSpan::Relative => {
+            let dev = relative_maxdev(&fit.params, &want);
+            assert!(dev < tolerance.params, "{key} params deviate by {dev}: got {:?} want {:?}", fit.params, want);
+        }
+        ParameterSpan::ReferenceRidge(stopped) => {
+            let stopped = floats(&root[stopped]["params"]);
+            for (j, ((got, want), stopped)) in fit.params.iter().zip(&want).zip(&stopped).enumerate() {
+                assert!(
+                    (got - want).abs() <= (stopped - want).abs(),
+                    "{key} params[{j}] {got} lies outside the reference's ridge from {stopped} to {want}"
+                );
+            }
+        }
+    }
     assert!((fit.llf - c["llf"].as_f64().unwrap()).abs() < tolerance.llf, "{key} llf {} vs {}", fit.llf, c["llf"]);
     // The objective is the same function: the library's optimum scores the same here.
     assert!((loglike(&want, &y, &x, order) - c["llf"].as_f64().unwrap()).abs() < 1e-9, "{key} llf at the library's params");

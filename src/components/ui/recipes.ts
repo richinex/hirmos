@@ -212,7 +212,7 @@ export const caption = (extra?: string): string => cn('text-label text-faint tex
 
 /** A variable name as a member of a set the reader counts: enclosure marks membership, so it is for sets only, never a name inside a sentence. */
 export const chip = (extra?: string): string =>
-  cn('inline-block rounded-md border border-hair bg-panel px-1.5 py-0.5 text-ink', extra)
+  cn('inline-block rounded border border-hair bg-panel px-1.5 py-px text-label text-ink', extra)
 
 /**
  * A section of the workbench: the outermost surface a reader sees inside a chapter.

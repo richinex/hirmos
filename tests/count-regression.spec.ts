@@ -176,7 +176,7 @@ for(const name of names)test(`${name} completes using the UI and survives projec
     const loaded=await store.loadProject(id)
     return loaded.ok?loaded.value.timeSeriesRuns.length:0
   },snapshot.project.id)).toBe(1)
-  await page.reload()
+  await page.goto('/app/projects')
   await page.getByRole('button',{name:`Open Count regression ${name}`,exact:true}).click()
   await expect(page.getByRole('heading',{name:'Choose the data file again',exact:true})).toBeVisible()
   await page.locator('input[type=file]').setInputFiles({name:'count-regression.csv',mimeType:'text/csv',buffer:Buffer.from(s.csv)})

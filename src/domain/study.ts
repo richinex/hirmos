@@ -208,6 +208,8 @@ export interface StudySpecification {
   readonly graph: StudyGraph
   /** The bound DAG's editable graph at the study's revision, for path and role analysis. */
   readonly editableGraph: EditableDag
+  /** Set when this study checks another study's bite: the same treatment, with a variable it acts on directly as the outcome. */
+  readonly biteOf?: StudyId
 }
 
 export interface StudyDesignDraft {
@@ -227,9 +229,12 @@ export interface StudyDesignDraft {
   }
   readonly consistencyRationale: string
   readonly noInterferenceRationale: string
+  /** The study whose bite this draft checks; absent otherwise, and cleared when the graph, treatment or outcome changes. */
+  readonly biteOf?: StudyId
 }
 
 export type StudyDesignProblem =
+  | { readonly kind: 'bite-specification-mismatch' }
   | { readonly kind: 'cutoff-required' }
   | { readonly kind: 'dag-required' }
   | { readonly kind: 'unknown-dag'; readonly document: DagDocumentId }
@@ -297,7 +302,17 @@ export function readyStudySpecification(
   draft: StudyDesignDraft,
   documents: readonly DagDocument[],
   prepared: PreparedDatasetArtifact,
+  studies: readonly StudySpecification[] = [],
 ): Result<StudySpecification, StudyDesignProblem> {
+  if (draft.biteOf != null) {
+    const parent = studies.find((study) => study.id === draft.biteOf)
+    if (
+      parent === undefined ||
+      parent.preparedDataset !== prepared.id ||
+      !matchesBiteDraft(draft, parent, documents)
+    )
+      return err({ kind: 'bite-specification-mismatch' })
+  }
   if (draft.dagDocument === null) return err({ kind: 'dag-required' })
   const document = documents.find((candidate) => candidate.id === draft.dagDocument)
   if (document === undefined) return err({ kind: 'unknown-dag', document: draft.dagDocument })
@@ -353,6 +368,7 @@ export function readyStudySpecification(
     },
     graph: studyGraphOf(document.current.graph),
     editableGraph: document.current.graph,
+    ...(draft.biteOf === undefined ? {} : { biteOf: draft.biteOf }),
   })
 }
 
@@ -457,6 +473,7 @@ export function previewStudyBinding(
   documents: readonly DagDocument[],
   prepared: PreparedDatasetArtifact,
 ): StudySpecification | null {
+  draft = { ...draft, biteOf: undefined }
   const ready = readyStudySpecification(draft, documents, prepared)
   if (ready.ok) return ready.value
   if (!DESIGN_PROBLEMS.has(ready.error.kind)) return null
@@ -1152,6 +1169,86 @@ export function variableRoles(
 
 export const describeVariableRole = (role: DagCausalRole): string => describeDagCausalRole(role)
 
+/**
+ * The measured mediators the treatment points at directly: the first variables it acts on. Estimating
+ * the treatment's effect on one of them checks the treatment's bite before its effect on the outcome.
+ */
+export function biteVariables(study: StudySpecification): readonly StudyVariable[] {
+  const children = new Set(
+    study.editableGraph.edges
+      .filter((edge) => edge.cause === study.treatment.node)
+      .map((edge) => edge.effect),
+  )
+  return variableRoles(study).flatMap(({ node, role }) =>
+    role.kind === 'mediator' && node.column !== null && children.has(node.node)
+      ? [{ node: node.node, column: node.column, name: node.name }]
+      : [],
+  )
+}
+
+export function biteStudyDraft(study: StudySpecification, outcome: DagNodeId): StudyDesignDraft {
+  const target = study.estimand
+  return {
+    ...EMPTY_STUDY_DRAFT,
+    dagDocument: study.dagDocument,
+    treatment: study.treatment.node,
+    outcome,
+    biteOf: study.id,
+    estimand: target.kind,
+    assignment: study.assignment,
+    consistencyRationale: study.designAssumptions.consistency.rationale ?? '',
+    noInterferenceRationale: study.designAssumptions.noInterference.rationale ?? '',
+    modifier: target.kind === 'conditional-average-treatment-effect' ? target.modifier.node : null,
+    grouping:
+      target.kind === 'conditional-average-treatment-effect' ? target.grouping : { kind: 'levels' },
+    modifiers: 'modifiers' in target ? target.modifiers.map((variable) => variable.node) : [],
+    ...(target.kind === 'local-cutoff-effect'
+      ? { cutoff: { variable: target.running.node, value: String(target.cutoff) } }
+      : {}),
+  }
+}
+
+export function matchesBiteDraft(
+  draft: StudyDesignDraft,
+  parent: StudySpecification,
+  documents: readonly DagDocument[],
+): boolean {
+  if (draft.biteOf !== parent.id || parent.biteOf !== undefined || draft.outcome === null)
+    return false
+  const document = documents.find((item) => item.id === draft.dagDocument)
+  if (
+    document?.current.id !== parent.dagRevision ||
+    document.preparedDataset !== parent.preparedDataset
+  )
+    return false
+  if (!biteVariables(parent).some((variable) => variable.node === draft.outcome)) return false
+  const expected = biteStudyDraft(parent, draft.outcome)
+  return (
+    draft.dagDocument === expected.dagDocument &&
+    draft.treatment === expected.treatment &&
+    draft.estimand === expected.estimand &&
+    draft.assignment.kind === expected.assignment.kind &&
+    draft.assignment.description === expected.assignment.description &&
+    draft.consistencyRationale === expected.consistencyRationale &&
+    draft.noInterferenceRationale === expected.noInterferenceRationale &&
+    (draft.estimand !== 'conditional-average-treatment-effect' ||
+      (draft.modifier === expected.modifier &&
+        draft.grouping.kind === expected.grouping.kind &&
+        (draft.grouping.kind !== 'quantiles' ||
+          expected.grouping.kind !== 'quantiles' ||
+          draft.grouping.bins === expected.grouping.bins))) &&
+    (![
+      'conditional-average-treatment-effect-per-row',
+      'conditional-partial-effect-per-row',
+    ].includes(draft.estimand) ||
+      (draft.modifiers.length === expected.modifiers.length &&
+        draft.modifiers.every((node) => expected.modifiers.includes(node)))) &&
+    (draft.estimand !== 'local-cutoff-effect' ||
+      (draft.cutoff?.variable === expected.cutoff?.variable &&
+        Number(draft.cutoff?.value) === Number(expected.cutoff?.value)))
+  )
+}
+
 /** Convert back-door evidence into a typed identification record with graph results, assumptions, and qualifications kept distinct. */
 export function identificationFrom(
   study: StudySpecification,
@@ -1587,6 +1684,8 @@ export function identifiedInstruments(
 
 export function describeStudyDesignProblem(problem: StudyDesignProblem): string {
   switch (problem.kind) {
+    case 'bite-specification-mismatch':
+      return 'This bite check no longer matches its original study. Start a new check from that study.'
     case 'cutoff-required':
       return 'Choose a measured running variable and enter a finite cutoff.'
     case 'dag-required':

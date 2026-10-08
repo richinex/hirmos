@@ -99,7 +99,7 @@ test('Texas predictor-based synthetic control: full UI, plots, run row, oracle a
     const saved = await store.loadProject(id)
     return saved.ok ? saved.value.estimationRuns.length : 0
   }, snapshot.project.id)).toBe(1)
-  await page.reload()
+  await page.goto('/app/projects')
   await page.getByRole('button', { name: 'Open Texas predictor synthetic control', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Choose the data file again', exact: true })).toBeVisible()
   await page.locator('input[type=file]').setInputFiles(source)

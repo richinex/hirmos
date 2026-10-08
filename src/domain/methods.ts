@@ -1661,6 +1661,15 @@ const BACKDOOR_IDENTIFICATION: MethodDefinition = {
       sources: [VAN_DER_ZANDER_2014, TAKATA_2010],
     },
     {
+      id: caveatId('backdoor-optimal-set'),
+      category: 'interpretation',
+      requirement:
+        'The recommended O-set is graphically optimal only where the efficiency theorem’s assumptions hold; otherwise it is a valid set without that guarantee.',
+      consequenceIfUnmet:
+        'Graphical optimality is asymptotic: it does not guarantee the narrowest interval in this sample.',
+      sources: [RUNGE_2021],
+    },
+    {
       id: caveatId('backdoor-lags-collapsed'),
       category: 'stationarity-and-dynamics',
       requirement:

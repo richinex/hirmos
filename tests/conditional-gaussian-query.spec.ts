@@ -210,7 +210,7 @@ test('maintenance conditional Gaussian observations and interventions render and
     if(!parseSnapshotValue(saved.value).ok)throw Error('Gaussian record failed decoding')
     return saved.value.interventionQueries.length
   })).toBe(2)
-  await page.reload()
+  await page.goto('/app/projects')
   await page.getByRole('button',{name:'Open Maintenance Gaussian queries',exact:true}).click()
   await page.locator('input[type=file][accept*=".csv"]').setInputFiles(csv)
   const sections=page.getByRole('button',{name:'Expand section list',exact:true})

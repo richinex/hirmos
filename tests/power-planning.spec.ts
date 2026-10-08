@@ -152,6 +152,9 @@ test('planning persists across reload and cancellation does not replace the save
   await page.screenshot({ path: info.outputPath('planning-light.png') })
   await page.getByRole('button', { name: 'Change theme' }).click()
   await page.screenshot({ path: info.outputPath('planning-dark.png') })
+  // Resizing a phone viewport switches to the desktop layout, which mounts the fold closed.
+  if ((await panel.getAttribute('open')) === null)
+    await panel.locator('summary').first().click()
   await panel.getByRole('radiogroup', { name: 'Planning calculation' }).getByRole('radio', { name: 'Simulation', exact: true }).click()
   await panel.getByLabel('Replications', { exact: true }).fill('10000')
   await panel.getByLabel('Treated units', { exact: true }).fill('1000')

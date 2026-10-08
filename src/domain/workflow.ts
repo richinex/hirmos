@@ -33,6 +33,7 @@ import type { SurvivalRunArtifact, SurvivalRunId } from './survival'
 import { timeSeriesRunMatches, type TimeSeriesRun, type TimeSeriesRunId } from './timeSeries'
 import {
   EMPTY_STUDY_DRAFT,
+  matchesBiteDraft,
   type IdentificationArtifact,
   type StudyDesignDraft,
   type StudySpecification,
@@ -771,7 +772,12 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
         }
       }
       if (event.type === 'power-planning-recorded') return {...state,powerPlanning:event.record}
-      if (event.type === 'study-draft-changed') return { ...state, studyDraft: event.draft }
+      if (event.type === 'study-draft-changed') {
+        const parent = state.studies.find(study => study.id === event.draft.biteOf)
+        const draft = parent !== undefined && matchesBiteDraft(event.draft, parent, state.dagDocuments)
+          ? event.draft : { ...event.draft, biteOf: undefined }
+        return { ...state, studyDraft: draft }
+      }
       if (
         event.type === 'swig-analysis-created' &&
         state.prepared?.id === event.analysis.preparedDataset &&

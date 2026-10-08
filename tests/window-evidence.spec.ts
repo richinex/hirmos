@@ -83,7 +83,7 @@ test('saved ITS shows trimming and seasonal span without blocking the fit',async
   await page.screenshot({path:info.outputPath('window-evidence.png')})
   await chapter(page,/Projects/)
   await expect(page.getByRole('button',{name:'Open Window evidence',exact:true})).toBeVisible()
-  await page.reload()
+  await page.goto('/app/projects')
   await page.getByRole('button',{name:'Open Window evidence',exact:true}).click()
   await expect(page.getByRole('heading',{name:'Choose the data file again',exact:true})).toBeVisible()
   await page.locator('input[type=file]').setInputFiles(file)

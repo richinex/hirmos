@@ -267,7 +267,7 @@ test('fits clustered Breslow through the UI and preserves the Efron default', as
   expect(saved.evidence.coefficients[1].coefficient).toBeCloseTo(-0.82099531459508091, 9)
   expect(saved.evidence.fitting.robustCovariance[3]).toBeCloseTo(0.23260797648908862, 9)
   expect(saved.configuration.observation.standardErrors.kind).toBe('clustered-breslow')
-  await page.reload()
+  await page.goto('/app/projects')
   await page.getByRole('button', { name: 'Open Clustered Breslow', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Choose the data file again' })).toBeVisible()
   await page.locator('input[type=file]').setInputFiles(testData('kidney.csv'))

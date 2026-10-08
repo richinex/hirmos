@@ -113,7 +113,7 @@ test('horizon controls, plots and saved specifications work through the UI',asyn
   }
   await chapter(page,/Results/)
   await expect(windows).toBeVisible()
-  await page.reload()
+  await page.goto('/app/projects')
   await page.getByRole('button',{name:'Open Surrogate horizon acceptance',exact:true}).click()
   await expect(page.getByRole('heading',{name:'Choose the data file again',exact:true})).toBeVisible()
   await page.locator('input[type=file]').setInputFiles(file)

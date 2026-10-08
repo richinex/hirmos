@@ -96,7 +96,7 @@ test('ATT preview, two-period default, aliases and DR result through the UI', as
   // Historical presentation fixture only. New fits reject unfinished optimizers.
   await page.evaluate(async ({run,study}) => {
     const load = (path:string):Promise<any> => import(/* @vite-ignore */ path)
-    const [{React,createRoot},{ResultCard}] = await Promise.all([load('/tests/support/reactRuntime.ts'),load('/src/components/estimation/EstimationPanel.tsx')])
+    const [{React,createRoot},{ResultCard},{WorkflowProvider}] = await Promise.all([load('/tests/support/reactRuntime.ts'),load('/src/components/estimation/EstimationPanel.tsx'),load('/src/components/WorkflowProvider.tsx')])
     const fixture = structuredClone(run)
     delete fixture.evidence.inference.propensityFit
     fixture.evidence.estimate = fixture.estimate.effect.value = 8.1
@@ -109,7 +109,8 @@ test('ATT preview, two-period default, aliases and DR result through the UI', as
     host.setAttribute('aria-label','Result presentation fixture')
     host.style.cssText = 'position:fixed;inset:0;overflow:auto;z-index:9999;padding:24px;background:var(--color-panel)'
     document.body.append(host)
-    createRoot(host).render(React.createElement(ResultCard,{run:fixture,study,current:true,stepLabel:'panel row'}))
+    // The card reads the workflow store as it does inside the app.
+    createRoot(host).render(React.createElement(WorkflowProvider,null,React.createElement(ResultCard,{run:fixture,study,current:true,stepLabel:'panel row'})))
   },{run,study:snapshot.studies.find((study:{id:string})=>study.id===run.study)})
   const result = page.getByRole('region',{name:'Result presentation fixture'})
   await expect(result.getByTestId('effect-estimate')).toContainText('8.10')

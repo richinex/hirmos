@@ -1,6 +1,7 @@
+import { estimationSelection } from '@/domain/estimationDraft'
 import { NumberInput } from '@/components/ui/NumberInput'
-import {RawBalanceTable} from './RawBalanceTable'
-import {DagRevisionNotice} from './DagRevisionNotice'
+import { RawBalanceTable } from './RawBalanceTable'
+import { DagRevisionNotice } from './DagRevisionNotice'
 import { useAdjustmentAnalysis } from '@/analysis/useAdjustmentAnalysis'
 import { validateAdjustmentSets } from '@/analysis/client'
 import { RunActions } from '@/components/ui/RunActions'
@@ -24,7 +25,7 @@ import { StudyGraphCanvas } from '@/components/dag/StudyGraphCanvas'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { Alert } from '@/components/ui/Alert'
 import { RefusalTile } from '@/components/ui/figures'
-import { RadioList } from '@/components/ui/RadioList'
+import { RadioList, type RadioOption } from '@/components/ui/RadioList'
 import { Formula } from '@/components/ui/Formula'
 import {
   button,
@@ -42,6 +43,7 @@ import {
   prose,
   sectionTitle,
   stepsStack,
+  actionGap,
   well,
 } from '@/components/ui/recipes'
 import { SettingsStep } from '@/components/ui/SettingsStep'
@@ -86,6 +88,8 @@ import {
   newIdentificationId,
   readyStudySpecification,
   variableRoles,
+  biteVariables,
+  biteStudyDraft,
   type AdjustmentSetChoice,
   type BackdoorIdentificationEvidence,
   type IdentificationArtifact,
@@ -565,6 +569,8 @@ function IdentificationCard({
   current,
   onContinue,
   onOpenDag,
+  onCheckBite,
+  studies,
 }: {
   readonly study: StudySpecification
   readonly identification: IdentificationArtifact
@@ -572,12 +578,25 @@ function IdentificationCard({
   readonly onDelete?: () => void
   readonly onContinue: () => void
   readonly onOpenDag: () => void
+  readonly onCheckBite?: (variable: StudyVariable) => void
+  readonly studies: readonly StudySpecification[]
 }) {
   const result = identification.result
   const title = estimandSentence(study)
+  const bite = useMemo(() => biteVariables(study), [study])
+  const checked =
+    study.biteOf === undefined ? null : (studies.find((s) => s.id === study.biteOf) ?? null)
+  const checks = studies.filter((s) => s.biteOf === study.id)
   const body = (
     <>
       <DagRevisionNotice study={study} />
+      {study.biteOf !== undefined && (
+        <p className={caption('mb-0 mt-2')}>
+          {checked === null
+            ? 'Bite check for a study that has been deleted.'
+            : `Bite check for: ${estimandSentence(checked)}.`}
+        </p>
+      )}
       <p className="mb-0 mt-2 text-body text-muted" aria-label="Assignment and credibility">
         <Metadata>
           <span>
@@ -591,13 +610,56 @@ function IdentificationCard({
         </Metadata>
       </p>
       <IdentificationOutcome study={study} identification={identification} onOpenDag={onOpenDag} />
-      {current && result.kind === 'identified' && <RawBalanceTable key={identification.id} study={study} covariates={result.adjustment.variables} />}
+      {current && result.kind === 'identified' && (
+        <RawBalanceTable
+          key={identification.id}
+          study={study}
+          covariates={result.adjustment.variables}
+        />
+      )}
+      {onCheckBite !== undefined && study.biteOf === undefined && bite.length > 0 && (
+        <details className={well('mt-3 px-3 py-2 text-body')}>
+          <DisclosureSummary icon="route" className="cursor-pointer text-ink">
+            Check the treatment’s bite
+          </DisclosureSummary>
+          <p className={caption('mb-0 mt-2')}>
+            Check whether {study.treatment.name} changed a measured intermediate outcome. This
+            provides evidence about a proposed mechanism, but does not establish or rule out an
+            effect on
+            {study.outcome.name}.
+          </p>
+          <ul className="m-0 mt-2 list-none divide-y divide-line p-0">
+            {bite.map((variable) => {
+              const done = checks.filter((s) => s.outcome.node === variable.node).at(-1)
+              return (
+                <li key={variable.node} className="flex flex-wrap items-center gap-3 py-2">
+                  <span className={chip()}>{variable.name}</span>
+                  {done === undefined ? (
+                    <button
+                      type="button"
+                      className={button('outline', undefined, 'sm')}
+                      onClick={() => onCheckBite(variable)}
+                    >
+                      Study as the outcome
+                    </button>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-label text-muted">
+                      <Icon name="description" size={16} />
+                      Study recorded at {formatTime(done.createdAt)}
+                    </span>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        </details>
+      )}
+      <StudyRecord study={study} identification={identification} />
       {current && estimableIdentification(result) && (
         <button type="button" className={button('signal', 'mt-4')} onClick={onContinue}>
           Continue to estimation
         </button>
       )}
-      <StudyRecord study={study} identification={identification} />
     </>
   )
   if (!current) {
@@ -654,6 +716,7 @@ function AdjustmentSetChoicePanel({
   const analysis = useAdjustmentAnalysis(design)
   const [recording, setRecording] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
+  const [selected, setSelected] = useState<string | null>(null)
   const recommendation =
     analysis.kind === 'ready' && analysis.value.analysis.kind === 'identified'
       ? analysis.value.analysis.recommendation
@@ -678,93 +741,82 @@ function AdjustmentSetChoicePanel({
     onChoose({ kind: 'supplied', nodes: recommendation.nodes, guarantee: recommendation.guarantee })
   }
   if (evidence.result.kind === 'notIdentified') return null
+  const result = evidence.result
+  const named = (nodes: readonly number[]) =>
+    nodes.map((index) => study.graph.nodes[index]?.name ?? String(index)).join(', ') ||
+    'No adjustment'
+  const options: RadioOption<string>[] = [
+    ...(recommendation?.kind === 'available'
+      ? [
+          {
+            value: 'recommended',
+            label: 'Recommended O-set',
+            hint: `${named(recommendation.nodes)}. ${
+              recommendation.guarantee === 'established'
+                ? 'Graphical optimality established.'
+                : 'Valid; graphical optimality not established.'
+            }`,
+          },
+        ]
+      : []),
+    ...result.minimalSets.map((set, ordinal) => ({
+      value: `minimal-${ordinal}`,
+      label: `Minimal set ${ordinal + 1}`,
+      hint: named(set),
+    })),
+    { value: 'canonical', label: 'Canonical set', hint: named(result.canonicalSet) },
+  ]
+  const chosen = options.some((option) => option.value === selected)
+    ? selected
+    : (options[0]?.value ?? null)
+  const record = () => {
+    if (chosen === 'recommended') void accept()
+    else if (chosen === 'canonical') onChoose({ kind: 'canonical' })
+    else if (chosen !== null)
+      onChoose({ kind: 'minimal', ordinal: Number(chosen.slice('minimal-'.length)) })
+  }
   return (
-    <section
-      className="mt-4 border-t border-hair pt-4"
-      aria-labelledby="adjustment-set-choice-title"
-    >
+    <section className="max-w-3xl" aria-labelledby="adjustment-set-choice-title">
       <h4 id="adjustment-set-choice-title" className="m-0 text-body font-medium text-ink">
         Choose a valid adjustment set
       </h4>
-      <p className={prose('mb-0 mt-1 text-muted')}>
-        {evidence.result.kind === 'identified' && evidence.result.minimalSets.length > 1
-          ? 'The graph has several minimal valid sets.'
-          : 'Minimal and canonical sets provide valid adjustment under the graph’s assumptions. They need not have the same precision.'}{' '}
-        Choose using measurement quality, observed support and the planned model—not the estimate,
-        which has not been run.
-      </p>
-      <div className="mt-3 grid gap-2">
-        {analysis.kind === 'pending' && (
-          <p className={prose('m-0 text-muted')} role="status">
-            Checking the adjustment recommendation…
-          </p>
-        )}
-        {analysis.kind === 'failed' && <p className={prose('m-0 text-warn')}>{analysis.detail}</p>}
-        {recommendation?.kind === 'available' && (
-          <>
-            <button
-              type="button"
-              className={button('outline', 'justify-start text-left')}
-              disabled={recording}
-              onClick={() => void accept()}
-            >
-              Recommended O-set,{' '}
-              {recommendation.nodes.map((i) => study.graph.nodes[i]!.name).join(', ') ||
-                'no adjustment'}
-            </button>
-            <p className={prose('m-0 text-muted')}>
-              {recommendation.guarantee === 'established'
-                ? 'Graphical optimality is established under the efficiency theorem’s assumptions. This does not guarantee the narrowest interval in this sample.'
-                : 'This set is valid, but graphical optimality is not established. Other valid sets remain available.'}
-            </p>
-            <a
-              className="text-body text-muted underline"
-              href="https://arxiv.org/abs/2102.10324"
-              target="_blank"
-              rel="noreferrer"
-            >
-              Runge (2021): adjustment-set optimality
-            </a>
-          </>
-        )}
-        {recommendation?.kind === 'unavailable' && (
-          <p className={prose('m-0 text-muted')}>{recommendation.reason}</p>
-        )}
-        {problem !== null && (
-          <p role="alert" className={prose('m-0 text-warn')}>
-            {problem}
-          </p>
-        )}
-        {evidence.result.minimalSets.map((set, ordinal) => (
-          <button
-            key={set.join('|')}
-            type="button"
-            className={button('outline', 'justify-start text-left')}
-            disabled={recording}
-            onClick={() => onChoose({ kind: 'minimal', ordinal })}
-          >
-            Minimal set {ordinal + 1},{' '}
-            {set.map((index) => study.graph.nodes[index]?.name ?? String(index)).join(', ') ||
-              'no adjustment'}
-          </button>
-        ))}
-        <button
-          type="button"
-          className={button('quiet', 'justify-start text-left')}
-          disabled={recording}
-          onClick={() => onChoose({ kind: 'canonical' })}
-        >
-          Canonical set,{' '}
-          {evidence.result.canonicalSet
-            .map((index) => study.graph.nodes[index]?.name ?? String(index))
-            .join(', ') || 'no adjustment'}
-        </button>
-      </div>
-      {evidence.result.truncated && (
+      {analysis.kind === 'pending' && (
+        <p className="mb-0 mt-2 text-body text-muted" role="status">
+          Checking the adjustment recommendation…
+        </p>
+      )}
+      {analysis.kind === 'failed' && (
+        <p className="mb-0 mt-2 text-body text-warn">{analysis.detail}</p>
+      )}
+      {recommendation?.kind === 'unavailable' && (
+        <p className="mb-0 mt-2 text-body text-muted">{recommendation.reason}</p>
+      )}
+      <RadioList
+        legend="Adjustment set"
+        legendHidden
+        className="mt-2"
+        value={chosen}
+        onChange={setSelected}
+        options={options}
+      />
+      {result.truncated && (
         <p className="mb-0 mt-2 text-body text-warn">
           The result limit was reached; additional minimal sets may exist.
         </p>
       )}
+      {problem !== null && (
+        <p role="alert" className="mb-0 mt-2 text-body text-warn">
+          {problem}
+        </p>
+      )}
+      <button
+        type="button"
+        className={button('signal', 'mt-3')}
+        disabled={recording || chosen === null}
+        onClick={record}
+      >
+        Record this set
+      </button>
     </section>
   )
 }
@@ -798,6 +850,10 @@ export function StudyDesignPanel({
   const { job } = session
   const adjustmentChoice = useWorkflow((state) => state.adjustmentDecision)
   const offerAdjustment = useWorkflow((state) => state.offerAdjustment)
+  const estimation = useWorkflow((state) =>
+    state.estimationDraft?.prepared === prepared.id ? state.estimationDraft : null,
+  )
+  const changeEstimation = useWorkflow((state) => state.changeEstimation)
   const clearAdjustment = useWorkflow((state) => state.clearAdjustment)
   const [choiceProblem, setChoiceProblem] = useState<string | null>(null)
   useRunActivity(
@@ -807,16 +863,24 @@ export function StudyDesignPanel({
   const rationaleId = useId()
   const state = { draft, job }
   const chooseDag = (documentId: DagDocumentId | null) =>
-    onDraftChanged({ ...draft, dagDocument: documentId, treatment: null, outcome: null })
-  const chooseTreatment = (node: DagNodeId | null) => onDraftChanged({ ...draft, treatment: node })
-  const chooseOutcome = (node: DagNodeId | null) => onDraftChanged({ ...draft, outcome: node })
+    onDraftChanged({
+      ...draft,
+      dagDocument: documentId,
+      treatment: null,
+      outcome: null,
+      biteOf: undefined,
+    })
+  const chooseTreatment = (node: DagNodeId | null) =>
+    onDraftChanged({ ...draft, treatment: node, biteOf: undefined })
+  const chooseOutcome = (node: DagNodeId | null) =>
+    onDraftChanged({ ...draft, outcome: node, biteOf: undefined })
   const document = documents.find((candidate) => candidate.id === state.draft.dagDocument) ?? null
   const dagBasis = document === null ? null : dagBasisOf(document)
   const observedNodes =
     document?.current.graph.nodes.filter((node) => node.kind === 'observed') ?? []
   const readiness = useMemo(
-    () => readyStudySpecification(state.draft, documents, prepared),
-    [documents, prepared, state.draft],
+    () => readyStudySpecification(state.draft, documents, prepared, studies),
+    [documents, prepared, state.draft, studies],
   )
   const preview = useMemo(
     () => previewStudyBinding(state.draft, documents, prepared),
@@ -840,6 +904,18 @@ export function StudyDesignPanel({
       const identification = identifications.find((candidate) => candidate.study === study.id)
       return identification === undefined ? [] : [{ study, identification }]
     })[0] ?? null
+
+  const biteAction = (study: StudySpecification) => {
+    const document = documents.find((item) => item.id === study.dagDocument)
+    if (study.preparedDataset !== prepared.id || document?.current.id !== study.dagRevision)
+      return undefined
+    return (variable: StudyVariable) => {
+      onDraftChanged(biteStudyDraft(study, variable.node))
+      globalThis.document
+        .getElementById('study-form-title')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }
 
   const recordIdentification = (
     study: StudySpecification,
@@ -877,7 +953,7 @@ export function StudyDesignPanel({
   }
 
   const execute = async () => {
-    const ready = readyStudySpecification(state.draft, documents, prepared)
+    const ready = readyStudySpecification(state.draft, documents, prepared, studies)
     if (!ready.ok || state.job.kind === 'running') return
     const id = session.start('analysis', 'Identifying the effect')
     if (id === null) return
@@ -1264,85 +1340,86 @@ export function StudyDesignPanel({
             </div>
           </SettingsStep>
         </div>
-        <dl
-          className="mb-0 mt-10 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-body"
-          aria-label="Estimand and population"
-        >
-          <dt className="text-faint">Estimand</dt>
-          <dd className="m-0 text-ink">
-            {preview === null || preview.estimand.kind !== state.draft.estimand
-              ? 'Complete the selected target and graph binding to preview the estimand.'
-              : describeEstimand(preview)}
-          </dd>
-          <dt className="text-faint">Population</dt>
-          <dd className={num('m-0 text-ink')}>
-            {state.draft.estimand === 'average-treatment-effect-on-treated'
-              ? 'Treated rows (treatment = 1)'
-              : `All ${formatCount(prepared.observations).text} rows`}
-          </dd>
-          <dt className="text-faint">Graph revision</dt>
-          <dd className="m-0 text-ink">
-            {document === null ? (
-              '—'
-            ) : (
-              <>
-                <Metadata>
-                  <span>
-                    <span className={literal()}>{document.current.id.slice(0, 8)}</span>
-                  </span>
-                  <span>
-                    {document.current.graph.edges.length} arrows
-                    {preview !== null && preview.graph.laggedArrows > 0
-                      ? `, ${preview.graph.laggedArrows} lagged`
-                      : ''}
-                  </span>
-                </Metadata>
-              </>
-            )}
-          </dd>
-        </dl>
-        {!readiness.ok && (
-          <Alert tone="danger" className="mt-3">
-            {describeStudyDesignProblem(readiness.error)}
-          </Alert>
-        )}
-        <JobNotice job={job} />
-        {choiceProblem !== null && (
-          <Alert tone="danger" className="mt-3">
-            {choiceProblem}
-          </Alert>
-        )}
-        {adjustmentChoice !== null && (
-          <AdjustmentSetChoicePanel
-            key={adjustmentChoice.study.id}
-            study={adjustmentChoice.study}
-            evidence={adjustmentChoice.evidence}
-            onChoose={(choice) =>
-              recordIdentification(adjustmentChoice.study, adjustmentChoice.evidence, choice)
-            }
-          />
-        )}
-        <RunActions
-          className="mt-4"
-          running={job.kind === 'running'}
-          onCancel={session.cancel}
-          orbLabel="Identification running"
-        >
-          <button
-            type="button"
-            className={button('signal')}
-            disabled={
-              !readiness.ok ||
-              adjustmentChoice !== null ||
-              session.blocked ||
-              job.kind === 'running'
-            }
-            aria-busy={state.job.kind === 'running'}
-            onClick={state.job.kind === 'running' ? undefined : () => void execute()}
+        <SettingsStep number={4} title="Review and identify" className={actionGap}>
+          <dl
+            className="m-0 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-body"
+            aria-label="Estimand and population"
           >
-            Identify the effect
-          </button>
-        </RunActions>
+            <dt className="text-faint">Estimand</dt>
+            <dd className="m-0 text-ink">
+              {preview === null || preview.estimand.kind !== state.draft.estimand
+                ? 'Complete the selected target and graph binding to preview the estimand.'
+                : describeEstimand(preview)}
+            </dd>
+            <dt className="text-faint">Population</dt>
+            <dd className={num('m-0 text-ink')}>
+              {state.draft.estimand === 'average-treatment-effect-on-treated'
+                ? 'Treated rows (treatment = 1)'
+                : `All ${formatCount(prepared.observations).text} rows`}
+            </dd>
+            <dt className="text-faint">Graph revision</dt>
+            <dd className="m-0 text-ink">
+              {document === null ? (
+                '—'
+              ) : (
+                <>
+                  <Metadata>
+                    <span>
+                      <span className={literal()}>{document.current.id.slice(0, 8)}</span>
+                    </span>
+                    <span>
+                      {document.current.graph.edges.length} arrows
+                      {preview !== null && preview.graph.laggedArrows > 0
+                        ? `, ${preview.graph.laggedArrows} lagged`
+                        : ''}
+                    </span>
+                  </Metadata>
+                </>
+              )}
+            </dd>
+          </dl>
+          {!readiness.ok && (
+            <Alert tone="danger" className="mt-3">
+              {describeStudyDesignProblem(readiness.error)}
+            </Alert>
+          )}
+          <JobNotice job={job} />
+          {choiceProblem !== null && (
+            <Alert tone="danger" className="mt-3">
+              {choiceProblem}
+            </Alert>
+          )}
+          <RunActions
+            running={job.kind === 'running'}
+            onCancel={session.cancel}
+            orbLabel="Identification running"
+          >
+            <button
+              type="button"
+              className={button('signal')}
+              disabled={
+                !readiness.ok ||
+                adjustmentChoice !== null ||
+                session.blocked ||
+                job.kind === 'running'
+              }
+              aria-busy={state.job.kind === 'running'}
+              onClick={state.job.kind === 'running' ? undefined : () => void execute()}
+            >
+              Identify the effect
+            </button>
+          </RunActions>
+          {adjustmentChoice !== null && (
+            <AdjustmentSetChoicePanel
+              key={adjustmentChoice.study.id}
+              study={adjustmentChoice.study}
+              evidence={adjustmentChoice.evidence}
+              onChoose={(choice) =>
+                recordIdentification(adjustmentChoice.study, adjustmentChoice.evidence, choice)
+              }
+            />
+          )}
+        </SettingsStep>
       </section>
 
       {newestRecorded !== null && (
@@ -1357,8 +1434,21 @@ export function StudyDesignPanel({
             study={newestRecorded.study}
             identification={newestRecorded.identification}
             current
-            onContinue={onContinue}
+            studies={studies}
+            onContinue={() => {
+              const { identification } = newestRecorded
+              if (estimation?.draft.identification !== identification.id)
+                changeEstimation(prepared.id, {
+                  type: 'identification-chosen',
+                  selection: {
+                    ...estimationSelection(identification, studies, prepared),
+                    encodings: estimation?.draft.encodings ?? {},
+                  },
+                })
+              onContinue()
+            }}
             onOpenDag={onOpenDag}
+            onCheckBite={biteAction(newestRecorded.study)}
           />
         </section>
       )}
@@ -1391,7 +1481,7 @@ export function StudyDesignPanel({
         ) : (
           <RecordList className="mt-2">
             {roleGroups(roles).map((group) => (
-              <RecordRow key={group.word} term={group.word}>
+              <RecordRow key={`${group.word}\u0000${group.detail ?? ''}`} term={group.word}>
                 <RoleChips names={group.names} />
                 {group.detail !== null && <p className={caption('mb-0 mt-1')}>{group.detail}</p>}
               </RecordRow>
@@ -1448,6 +1538,8 @@ export function StudyDesignPanel({
             study={study}
             identification={identification}
             current={false}
+            onCheckBite={biteAction(study)}
+            studies={studies}
             onDelete={() => onDeleteStudy(study.id)}
             onContinue={onContinue}
             onOpenDag={onOpenDag}

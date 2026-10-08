@@ -76,7 +76,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Icon } from '@/components/Icon'
 import { Select } from '@/components/ui/Select'
 import { LagListField } from '@/components/ui/LagListField'
-import { memo, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Fragment, memo, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { EChart } from '@/charts/EChart'
 import { ExpandableChart } from '@/charts/ExpandableChart'
 import type { VisibleWindow } from '@/charts/window'
@@ -195,6 +195,7 @@ import {
   type EstimatorId,
   type TotalEffectEstimator,
   type TreatmentModelEvidence,
+  configurationSettings,
 } from '@/domain/estimation'
 import { ESTIMATION_METHODS, methodDefinition, type MethodEligibility } from '@/domain/methods'
 import {
@@ -889,8 +890,12 @@ function RunRecord({ run }: { readonly run: EstimationRunArtifact }) {
         <dd className={literal('m-0 break-all')}>{run.preparedDataset}</dd>
         <dt>Columns</dt>
         <dd className="m-0">{run.columns.map((column) => column.name).join(', ')}</dd>
-        <dt>Configuration</dt>
-        <dd className={literal('m-0 break-all')}>{JSON.stringify(run.configuration)}</dd>
+        {configurationSettings(run.configuration).map((setting) => (
+          <Fragment key={setting.key}>
+            <dt>{setting.label}</dt>
+            <dd className="m-0">{setting.value}</dd>
+          </Fragment>
+        ))}
         {run.kind === 'causal-forest-run' && (
           <>
             <dt>Fitted forest settings</dt>

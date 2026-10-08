@@ -137,7 +137,7 @@ for(const mode of ['event-study','ddd','bacon'] as const)test(`Mixtape ${mode}: 
   }
   await info.attach('project-bundle',{body:Buffer.from(JSON.stringify(snapshot,null,2)),contentType:'application/json'})
   await expect.poll(()=>page.evaluate(async id=>{const store=await import(new URL('/src/data/projectStore.ts',location.href).href);const saved=await store.loadProject(id);return saved.ok?saved.value.timeSeriesRuns.length:0},snapshot.project.id)).toBe(1)
-  await page.reload()
+  await page.goto('/app/projects')
   await page.getByRole('button',{name:`Open Mixtape ${mode}`,exact:true}).click()
   await expect(page.getByRole('heading',{name:'Choose the data file again',exact:true})).toBeVisible()
   await page.locator('input[type=file]').setInputFiles(source)

@@ -51,7 +51,7 @@ for(const membership of ['numeric','categories'] as const)test('surrogate '+memb
     const saved = await store.loadProject(header.id)
     return saved.ok && saved.value.surrogateRuns.length === 1 && header.estimationRuns === 1
   }, name)).toBe(true)
-  await page.reload()
+  await page.goto('/app/projects')
   await page.getByRole('button', {name: `Open ${name}`, exact: true}).click()
   await expect(page.getByRole('heading', {name:'Choose the data file again',exact:true})).toBeVisible()
   await page.locator('input[type=file]').setInputFiles({name:'surrogate-samples.csv',mimeType:'text/csv',buffer:Buffer.from(sourceCsv)})

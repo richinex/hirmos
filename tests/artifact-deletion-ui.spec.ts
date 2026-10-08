@@ -26,7 +26,7 @@ test('study deletion removes identification records, retains its DAG, and persis
     .getByRole('button', { name: 'Delete study', exact: true })
     .click()
   await chapter(page, /^Projects/)
-  await page.reload()
+  await page.goto('/app/projects')
   await page.getByRole('button', { name: 'Open AI adoption, company-wide', exact: true }).click()
   await expect(page.locator('#data-profile-title')).toBeVisible()
   const saved = await page.evaluate(async () => {
@@ -155,7 +155,7 @@ test('DAG deletion cancels safely, deletes the final DAG, and survives reopening
   await expect(page.getByRole('button', { name: 'Create DAG draft' })).toBeVisible()
   await page.screenshot({ path: info.outputPath('dag-deleted.png') })
   await chapter(page, /^Projects/)
-  await page.reload()
+  await page.goto('/app/projects')
   await page.getByRole('button', { name: 'Open ' + example, exact: true }).click()
   await expect(page.locator('#data-profile-title')).toBeVisible()
   await chapter(page, /DAG workspace/)

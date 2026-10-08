@@ -320,7 +320,7 @@ test('preserves an unstamped saved example even when it has the shipped project 
     const saved = await store.saveProject(stale)
     if (!saved.ok) throw new Error(`Stale example could not be seeded: ${saved.error.kind}`)
   })
-  await page.reload()
+  await page.goto('/app/projects')
 
   await page.getByRole('button', { name: 'Open Seat-belt law and road deaths', exact: true }).click()
   await expect(page.locator('#data-profile-title')).toBeVisible()
@@ -373,7 +373,7 @@ test('opening an unchanged project preserves its saved time', async ({ page }, t
     })
     if (!saved.ok) throw new Error(`Example could not be seeded: ${saved.error.kind}`)
   }, originalSavedAt)
-  await page.reload()
+  await page.goto('/app/projects')
 
   await page.getByRole('button', { name: 'Open Seat-belt law and road deaths', exact: true }).click()
   await page.waitForTimeout(700)

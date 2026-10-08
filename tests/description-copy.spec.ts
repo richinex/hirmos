@@ -1,7 +1,9 @@
 import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 
-const source = (file: string) => readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8')
+// Copy is compared with its line breaks collapsed, so reformatting the source does not change what it says.
+const source = (file: string) =>
+  readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8').replace(/\s+/g, ' ')
 
 test('descriptions name model behaviour while retaining source references', () => {
   const ardl = source('components/time-series/ArdlModelPanel.tsx')

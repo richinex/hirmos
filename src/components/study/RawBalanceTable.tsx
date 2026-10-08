@@ -12,7 +12,8 @@ import { ColumnChecklist } from '@/components/ui/ColumnChecklist'
 import { RunActions } from '@/components/ui/RunActions'
 import { JobNotice } from '@/components/ui/JobNotice'
 import { EvidenceTable, figureColumn } from '@/components/table/EvidenceTable'
-import { button } from '@/components/ui/recipes'
+import { button, well } from '@/components/ui/recipes'
+import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
 
 type LabeledRow = RawBalance['rows'][number] & { readonly name: string }
@@ -112,66 +113,71 @@ export function RawBalanceTable({
   }
   if (covariates.length === 0) return null
   return (
-    <section className="mt-4 space-y-3" aria-label="Raw covariate balance">
-      <ColumnChecklist
-        title="Categorical covariates"
-        help="Select covariates whose values represent categories. Each category is assessed separately. These declarations also apply in Estimation."
-        columns={covariates.map((v) => ({ id: v.column, name: v.name }))}
-        selected={selected}
-        onChange={(next) => {
-          for (const v of covariates)
-            change(study.preparedDataset, {
-              type: 'encoding-declared',
-              column: v.column,
-              encoding: { kind: next.includes(v.column) ? 'categorical' : 'numeric' },
-            })
-        }}
-      />
-      <RunActions
-        running={job.job.kind === 'running'}
-        onCancel={job.cancel}
-        orbLabel="Calculating covariate balance"
-      >
-        <button
-          type="button"
-          className={button('quiet')}
-          disabled={!available || job.blocked || job.job.kind === 'running'}
-          onClick={() => void run()}
-        >
-          Calculate raw balance
-        </button>
-      </RunActions>
-      <JobNotice job={job.job} />
-      {rows !== null && (
-        <EvidenceTable
-          title="Raw covariate balance"
-          help={
-            'Standardised differences compare treated and untreated covariate means before weighting or matching, using ' +
-            (study.estimand.kind === 'average-treatment-effect-on-treated'
-              ? 'the treated-group'
-              : 'the pooled') +
-            ' standard deviation. Binary covariates use Bernoulli variance. Values near zero indicate similar means, not proof of causal identification. Do not remove a required adjustment variable solely because its means are similar.'
-          }
-          rows={rows}
-          rowKey={(r) => String(r.column)}
-          noun="covariate"
-          empty="No covariates to assess."
-          columns={[
-            { id: 'name', header: 'Covariate', value: (r) => r.name },
-            figureColumn<LabeledRow>('difference', 'SMD', (r) => r.difference),
-            {
-              id: 'spread',
-              header: 'Reference spread',
-              value: (r) =>
-                r.usedFullSampleSpread
-                  ? 'Full sample (degenerate reference arm)'
-                  : study.estimand.kind === 'average-treatment-effect-on-treated'
-                    ? 'Treated group'
-                    : 'Pooled',
-            },
-          ]}
+    <details className={well('mt-3 px-3 py-2 text-body')}>
+      <DisclosureSummary icon="balance" className="cursor-pointer text-ink">
+        Raw covariate balance
+      </DisclosureSummary>
+      <div className="mt-2 space-y-3">
+        <ColumnChecklist
+          title="Categorical covariates"
+          help="Select covariates whose values represent categories. Each category is assessed separately. These declarations also apply in Estimation."
+          columns={covariates.map((v) => ({ id: v.column, name: v.name }))}
+          selected={selected}
+          onChange={(next) => {
+            for (const v of covariates)
+              change(study.preparedDataset, {
+                type: 'encoding-declared',
+                column: v.column,
+                encoding: { kind: next.includes(v.column) ? 'categorical' : 'numeric' },
+              })
+          }}
         />
-      )}
-    </section>
+        <RunActions
+          running={job.job.kind === 'running'}
+          onCancel={job.cancel}
+          orbLabel="Calculating covariate balance"
+        >
+          <button
+            type="button"
+            className={button('outline', undefined, 'sm')}
+            disabled={!available || job.blocked || job.job.kind === 'running'}
+            onClick={() => void run()}
+          >
+            Calculate raw balance
+          </button>
+        </RunActions>
+        <JobNotice job={job.job} />
+        {rows !== null && (
+          <EvidenceTable
+            title="Raw covariate balance"
+            help={
+              'Standardised differences compare treated and untreated covariate means before weighting or matching, using ' +
+              (study.estimand.kind === 'average-treatment-effect-on-treated'
+                ? 'the treated-group'
+                : 'the pooled') +
+              ' standard deviation. Binary covariates use Bernoulli variance. Values near zero indicate similar means, not proof of causal identification. Do not remove a required adjustment variable solely because its means are similar.'
+            }
+            rows={rows}
+            rowKey={(r) => String(r.column)}
+            noun="covariate"
+            empty="No covariates to assess."
+            columns={[
+              { id: 'name', header: 'Covariate', value: (r) => r.name },
+              figureColumn<LabeledRow>('difference', 'SMD', (r) => r.difference),
+              {
+                id: 'spread',
+                header: 'Reference spread',
+                value: (r) =>
+                  r.usedFullSampleSpread
+                    ? 'Full sample (degenerate reference arm)'
+                    : study.estimand.kind === 'average-treatment-effect-on-treated'
+                      ? 'Treated group'
+                      : 'Pooled',
+              },
+            ]}
+          />
+        )}
+      </div>
+    </details>
   )
 }

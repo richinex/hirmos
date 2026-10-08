@@ -101,7 +101,7 @@ test('sprinkler article queries are expressible, visible and saved',async({page}
     if(!parseSnapshotValue(saved.value).ok)throw Error('Saved query failed decoding')
     return saved.value.interventionQueries.length
   })).toBe(6)
-  await page.reload()
+  await page.goto('/app/projects')
   await page.getByRole('button',{name:'Open Article probability queries',exact:true}).click()
   await page.locator('input[type=file][accept*=".csv"]').setInputFiles({name:'article-sprinkler.csv',mimeType:'text/csv',buffer:Buffer.from([oracle.names.join(','),...rows].join('\n'))})
   const sections=page.getByRole('button',{name:'Expand section list',exact:true})

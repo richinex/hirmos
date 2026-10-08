@@ -86,7 +86,7 @@ test('real weekly upload restores controls after reload and rejects different co
     const saved = await loadProject(header.id)
     return saved.ok && saved.value.prepared !== null
   })).toBe(true)
-  await page.reload()
+  await page.goto('/app/projects')
   await page.getByRole('list', { name: 'Projects' }).getByRole('button', { name: 'Open Restore weekly preparation', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Choose the data file again' })).toBeVisible()
   await page.locator('input[type=file]').setInputFiles({ name: '105w_tcsp_weekly.parquet', mimeType: 'application/octet-stream', buffer: Buffer.from('different contents') })

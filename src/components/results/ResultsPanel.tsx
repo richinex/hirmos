@@ -48,6 +48,7 @@ import {
   type AppliedAdjustment,
   type EstimationRunArtifact,
   type EstimationRunId,
+  configurationSettings,
 } from '@/domain/estimation'
 import {
   describeSeriesTransform,
@@ -79,7 +80,9 @@ import {
 import { assertNever } from '@/domain/dop'
 import { describeStationarityAssessment } from '@/domain/stationarityAssessment'
 import type { SelectedSource } from '@/domain/workflow'
-import { formatCount, formatP, formatStatistic } from '@/lib/format/number'
+import { formatCount, formatP, formatStatistic, formatWords } from '@/lib/format/number'
+import { MetricGrid, MetricTile } from '@/components/ui/figures'
+import { ParameterHelp } from '@/components/ui/ParameterLabel'
 import { formatTime, formatTimestamp } from '@/lib/format/date'
 import {
   interpretEstimationResult,
@@ -152,9 +155,63 @@ function Section({
   readonly children: React.ReactNode
 }) {
   return (
-    <section className="border-t border-hair pt-3 first:border-0 first:pt-0" aria-label={title}>
+    <section aria-label={title}>
       <h3 className="mb-2 mt-0 text-body font-medium text-ink">{title}</h3>
       <RecordList className="text-body">{children}</RecordList>
+    </section>
+  )
+}
+
+interface BiteCheck {
+  readonly study: StudySpecification
+  readonly run: EstimationRunArtifact | null
+}
+
+/** The latest estimate for each study that checks this study's bite, beside its own estimate. */
+function BiteChecks({
+  study,
+  checks,
+  stepLabel,
+}: {
+  readonly stepLabel: string
+  readonly study: StudySpecification
+  readonly checks: readonly BiteCheck[]
+}) {
+  const title = `Bite of ${study.treatment.name}`
+  return (
+    <section className={panel('p-(--panel-space)')} aria-label={title}>
+      <h3 className="m-0 flex items-center gap-1.5 text-body font-medium text-ink">
+        {title}
+        <ParameterHelp
+          label={title}
+          help={`These estimates assess measured intermediate outcomes. They provide evidence about proposed mechanisms, but do not establish or rule out an effect on ${study.outcome.name}. Each card shows the latest saved estimate for its study.`}
+        />
+      </h3>
+      <MetricGrid className="mt-3">
+        {checks.map(({ study: check, run }) =>
+          run === null ? (
+            <MetricTile
+              key={check.id}
+              label={`Effect on ${check.outcome.name}`}
+              value={formatWords('Not estimated')}
+              context="Run an estimator for this study in Estimation."
+            />
+          ) : (
+            <div key={check.id}>
+              <h4 className="m-0 mb-2 text-body font-medium">Effect on {check.outcome.name}</h4>
+              <EstimateHeadline
+                accent={false}
+                testId={`bite-estimate-${check.id}`}
+                estimate={run.estimate}
+                sentence={resultHeadline(run, check)}
+                scaleLine={resultScaleLine(run, check, stepLabel)}
+                sampleLine={resultSampleLine(run)}
+                stepLabel={stepLabel}
+              />
+            </div>
+          ),
+        )}
+      </MetricGrid>
     </section>
   )
 }
@@ -162,9 +219,13 @@ function Section({
 function Manifest({
   manifest,
   stepLabel,
+  bite,
+  checked,
 }: {
   readonly manifest: ResultManifest
   readonly stepLabel: string
+  readonly bite: readonly BiteCheck[]
+  readonly checked: StudySpecification | null
 }) {
   const { estimation: run, study } = manifest
   const estimate = run.estimate
@@ -225,6 +286,10 @@ function Manifest({
         )}
       </article>
 
+      {study !== null && bite.length > 0 && (
+        <BiteChecks study={study} checks={bite} stepLabel={stepLabel} />
+      )}
+
       {manifest.warnings.length > 0 && (
         <section className={panel('p-(--panel-space)')} aria-label="Unresolved requirements">
           <h3 className="mb-2 mt-0 text-warn text-label font-medium">Requirements to review</h3>
@@ -236,23 +301,14 @@ function Manifest({
         </section>
       )}
 
-      <div className={panel('space-y-3 p-4')} aria-label="Analysis record">
+      <div className={panel('space-y-6 p-4')} aria-label="Analysis record">
         <Section title="Estimator">
           <Row term="Method">{describeEstimator(run.configuration.kind)}</Row>
-          <Row term="Configuration">
-            <dl className="m-0 grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-x-3 gap-y-1">
-              {Object.entries(run.configuration)
-                .filter(([key]) => key !== 'kind')
-                .map(([key, value]) => (
-                  <div key={key} className="contents">
-                    <dt className="text-muted [overflow-wrap:anywhere]">{key}</dt>
-                    <dd className={literal('m-0 text-ink [overflow-wrap:anywhere]')}>
-                      {JSON.stringify(value)}
-                    </dd>
-                  </div>
-                ))}
-            </dl>
-          </Row>
+          {configurationSettings(run.configuration).map((setting) => (
+            <Row key={setting.key} term={setting.label}>
+              {setting.value}
+            </Row>
+          ))}
           <Row term="Pre-run eligibility">
             {run.eligibility.kind === 'eligible'
               ? 'all checks completed'
@@ -272,6 +328,11 @@ function Manifest({
             <Row term="Target quantity">{describeEstimand(study)}</Row>
             <Row term="Treatment">{study.treatment.name}</Row>
             <Row term="Outcome">{study.outcome.name}</Row>
+            {study.biteOf !== undefined && (
+              <Row term="Bite check for">
+                {checked === null ? 'a deleted study' : estimandSentence(checked)}
+              </Row>
+            )}
             <Row term="Assignment">{describeAssignmentKind(study.assignment.kind)}</Row>
             <Row term="Design category">
               {describeStudyDesignCategory(studyDesignCategory(study))}
@@ -832,7 +893,21 @@ export function ResultsPanel({
                 )}
               </section>
             )}
-            {manifest !== null && <Manifest manifest={manifest} stepLabel={stepLabel} />}
+            {manifest !== null && run !== null && (
+              <Manifest
+                manifest={manifest}
+                stepLabel={stepLabel}
+                bite={studies
+                  .filter((check) => check.biteOf === run.study)
+                  .map((check) => ({
+                    study: check,
+                    run:
+                      estimationRuns.filter((candidate) => candidate.study === check.id).at(-1) ??
+                      null,
+                  }))}
+                checked={studies.find((check) => check.id === studyOf(run)?.biteOf) ?? null}
+              />
+            )}
             {manifest?.sensitivity.map((probe) =>
               probe.kind === 'honest-did-run' ? (
                 <HonestDidResult key={probe.id} run={probe} />
