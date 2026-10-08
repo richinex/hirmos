@@ -4,6 +4,33 @@ import { prepare, createDag, chapter } from './examples/support'
 
 const corpus = JSON.parse(readFileSync(new URL('./fixtures/dagitty/examples.json', import.meta.url), 'utf8'))
 
+test('arrows remain visible after importing into an already laid-out DAG and tidying', async ({ page }) => {
+  test.setTimeout(60_000)
+  await page.goto('/app')
+  await page.getByRole('textbox', { name: 'Project name' }).fill('Persistent arrows')
+  await page.getByRole('button', { name: 'Create project' }).click()
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'controls.csv', mimeType: 'text/csv',
+    buffer: Buffer.from('X,Y,Z,M,W\n0,0,1,0,1\n0,1,0,1,0\n1,0,0,0,1\n1,1,1,1,0\n'),
+  })
+  await page.getByRole('button', { name: /Inspect data/ }).click()
+  await prepare(page, { structure: 'cross-section', columns: 'all' })
+  await createDag(page, 'Controls')
+  await expect(page.locator('.react-flow__node')).toHaveCount(5)
+  // Let the empty graph finish measuring before its cards are rearranged.
+  await page.waitForTimeout(1000)
+  await page.getByRole('button', { name: 'From text', exact: true }).click()
+  await page.getByRole('textbox', { name: 'Graph text' }).fill('dag { X [exposure] Y [outcome] Z -> X Z -> Y X -> Y }')
+  await page.getByRole('button', { name: 'Convert to DAG', exact: true }).click()
+  await expect(page.locator('.react-flow__edge-path')).toHaveCount(3)
+  // The regression briefly showed arrows, then lost them after the animation.
+  await page.waitForTimeout(1000)
+  await expect(page.locator('.react-flow__edge-path')).toHaveCount(3)
+  await page.getByRole('button', { name: 'Tidy graph', exact: true }).click()
+  await page.waitForTimeout(1000)
+  await expect(page.locator('.react-flow__edge-path')).toHaveCount(3)
+})
+
 test('ELK routes the dagitty corpus without crossing cards, in both orientations', async ({ page }) => {
   test.setTimeout(90_000)
   await page.goto('/app')

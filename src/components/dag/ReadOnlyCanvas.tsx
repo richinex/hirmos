@@ -10,14 +10,22 @@ import {
 } from './DagCanvas'
 import { Alert } from '@/components/ui/Alert'
 import { FloatingWindow } from '@/components/ui/FloatingWindow'
+import { button } from '@/components/ui/recipes'
 
 const NODE_TYPES = { dagVariable: DagVariableCard }
 const EDGE_TYPES = { dagEdge: DagEdgePath }
 const FIT = { padding: 0.2, maxZoom: 1 }
 
 export type ReadOnlyCanvasState<E extends Edge> =
-  | { readonly kind: 'loading' }
-  | { readonly kind: 'failed'; readonly message: string }
+  | {
+      readonly kind: 'loading'
+      readonly previous?: { readonly nodes: CanvasNode[]; readonly edges: E[] }
+    }
+  | {
+      readonly kind: 'failed'
+      readonly message: string
+      readonly previous?: { readonly nodes: CanvasNode[]; readonly edges: E[] }
+    }
   | { readonly kind: 'ready'; readonly nodes: CanvasNode[]; readonly edges: E[] }
 
 /** A graph drawn with the DAG workspace's cards and routing, without editing. */
@@ -30,6 +38,7 @@ export function ReadOnlyCanvas<E extends Edge>({
   layoutKey,
   className,
   frame = 'well',
+  onRetry,
   children,
 }: {
   readonly host: React.RefObject<HTMLDivElement | null>
@@ -40,8 +49,10 @@ export function ReadOnlyCanvas<E extends Edge>({
   readonly layoutKey: string
   readonly className: string
   readonly frame?: 'well' | 'none'
+  readonly onRetry?: () => void
   readonly children?: ReactNode
 }) {
+  const drawing = state.kind === 'ready' ? state : state.previous
   const canvas = (
     <div
       ref={host}
@@ -57,11 +68,20 @@ export function ReadOnlyCanvas<E extends Edge>({
           {loading}
         </p>
       )}
-      {state.kind === 'failed' && <Alert tone="danger">{state.message}</Alert>}
-      {state.kind === 'ready' && (
+      {state.kind === 'failed' && (
+        <Alert tone="danger">
+          {state.message}
+          {onRetry !== undefined && (
+            <button type="button" className={button('outline')} onClick={onRetry}>
+              Retry layout
+            </button>
+          )}
+        </Alert>
+      )}
+      {drawing !== undefined && (
         <ReactFlow
-          nodes={state.nodes}
-          edges={state.edges}
+          nodes={drawing.nodes}
+          edges={drawing.edges}
           nodeTypes={NODE_TYPES}
           edgeTypes={EDGE_TYPES}
           nodesDraggable={false}
@@ -85,7 +105,12 @@ export function ReadOnlyCanvas<E extends Edge>({
     </div>
   )
   return view.expanded ? (
-    <FloatingWindow label={label} onClose={view.toggleExpanded} defaultWidth={1100} defaultHeight={720}>
+    <FloatingWindow
+      label={label}
+      onClose={view.toggleExpanded}
+      defaultWidth={1100}
+      defaultHeight={720}
+    >
       {canvas}
     </FloatingWindow>
   ) : (

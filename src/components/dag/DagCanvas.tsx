@@ -49,7 +49,7 @@ import {
 } from '@/domain/dag'
 import type { DiscoveryCandidate } from '@/domain/dagEvidence'
 import { affectedDagEdges } from '@/domain/dagValidation'
-import { assertNever, err, isNonEmpty, ok, type Result } from '@/domain/dop'
+import { assertNever, err, isNonEmpty, type Result } from '@/domain/dop'
 import { DEFAULT_CARD_SIZE, type DagCardSize, type DagLayoutOrientation } from './dagCanvasModel'
 import {
   extendHeldPositions,
@@ -894,19 +894,28 @@ async function placeAndRoute(
     | { readonly kind: 'held'; readonly held: ReadonlyMap<string, LayoutPoint> },
   orientation: DagLayoutOrientation,
   size: DagCardSize,
+  signal?: AbortSignal,
 ): Promise<Result<DagLayout, LayoutProblem>> {
   try {
+    signal?.throwIfAborted()
     const { routeFixedDag } = await import('./fixedRouting')
+    signal?.throwIfAborted()
+    const { placeByRole } = await import('./roleLayout')
+    signal?.throwIfAborted()
     const byRoles =
-      placement.kind === 'role'
-        ? (await import('./roleLayout')).placeByRole(graph, placement.flow, orientation, size)
-        : null
+      placement.kind === 'role' ? placeByRole(graph, placement.flow, orientation, size) : null
     const positions =
       byRoles === null
-        ? await extendHeldPositions(graph, placement.kind === 'held' ? placement.held : new Map(), size)
+        ? await extendHeldPositions(
+            graph,
+            placement.kind === 'held' ? placement.held : new Map(),
+            size,
+            signal,
+          )
         : byRoles.ok
-          ? await separateCards(byRoles.value, size)
+          ? await separateCards(byRoles.value, size, signal)
           : byRoles
+    signal?.throwIfAborted()
     return positions.ok ? await routeFixedDag(graph, positions.value, size, automatic) : positions
   } catch (cause) {
     return err({ kind: 'engine', message: cause instanceof Error ? cause.message : String(cause) })
@@ -918,11 +927,11 @@ export async function studyLayout(
   flow: DagCausalFlow | null,
   orientation: DagLayoutOrientation,
   size: DagCardSize,
+  signal?: AbortSignal,
 ): Promise<Result<DagLayout, LayoutProblem>> {
-  const automatic = await layoutDag(graph, orientation, size)
+  const automatic = await layoutDag(graph, orientation, size, signal)
   if (!automatic.ok || flow === null || graph.nodes.length > ROLE_LAYOUT_LIMIT) return automatic
-  const placed = await placeAndRoute(graph, automatic.value, { kind: 'role', flow }, orientation, size)
-  return placed.ok ? placed : automatic
+  return placeAndRoute(graph, automatic.value, { kind: 'role', flow }, orientation, size, signal)
 }
 
 export const canvasModel = (
@@ -1144,6 +1153,7 @@ export function DagCanvas({
   ])
   useEffect(() => {
     let current = true
+    const controller = new AbortController()
     setLayoutState((state) => ({ kind: 'pending', previous: retainedLayout(state) }))
     const preserve =
       previousBinding.current ===
@@ -1151,7 +1161,8 @@ export function DagCanvas({
       placedByHand.current.size > 0
     const held = new Map(latestNodes.current.map((node) => [node.id, node.position]))
     const byRole = flow !== null && !preserve && visibleGraph.nodes.length <= ROLE_LAYOUT_LIMIT
-    void layoutDag(visibleGraph, orientation, size).then(async (result) => {
+    void layoutDag(visibleGraph, orientation, size, controller.signal).then(async (result) => {
+      if (!current) return
       // ELK still runs first: its self-loop shapes are kept when another step places the cards.
       if (result.ok && (preserve || byRole)) {
         const automatic = result.value
@@ -1161,9 +1172,9 @@ export function DagCanvas({
           byRole && flow !== null ? { kind: 'role', flow } : { kind: 'held', held },
           orientation,
           size,
+          controller.signal,
         )
-        // A role placement that fails leaves ELK's drawing in place rather than an empty canvas.
-        result = placed.ok || !byRole ? placed : ok(automatic)
+        result = placed
       }
       if (!current) return
       setLayoutState((state) =>
@@ -1174,6 +1185,7 @@ export function DagCanvas({
     })
     return () => {
       current = false
+      controller.abort()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- layoutKey contains the engine's entire geometry input
   }, [layoutKey, layoutAttempt])
@@ -1216,6 +1228,14 @@ export function DagCanvas({
   const arrange = useCallback(
     (targets: readonly CanvasNode[]) => {
       stopMotion()
+      const update = (next: CanvasNode[]) =>
+        setNodes((current) => {
+          const measurements = new Map(current.map((node) => [node.id, node.measured]))
+          return next.map((node) => {
+            const measured = measurements.get(node.id)
+            return measured === undefined ? node : { ...node, measured }
+          })
+        })
       const starts = new Map(latestNodes.current.map((node) => [node.id, node.position]))
       const moved = targets.some((node) => {
         const from = starts.get(node.id)
@@ -1227,7 +1247,7 @@ export function DagCanvas({
 
       const { duration } = canvasMotion('arrange')
       if (!moved || reducedMotion || duration === 0) {
-        setNodes([...targets])
+        update([...targets])
         if (moved) setRearrangements((count) => count + 1)
         return
       }
@@ -1236,7 +1256,7 @@ export function DagCanvas({
       const step = (now: number) => {
         const t = Math.min(1, (now - began) / duration)
         const eased = 1 - Math.pow(1 - t, 3)
-        setNodes(
+        update(
           targets.map((node) => {
             const from = starts.get(node.id) ?? node.position
             return {
@@ -1629,7 +1649,9 @@ export function DagCanvas({
             className={`m-0 min-w-0 flex-1 text-label ${refusedNotice ? 'text-warn' : 'text-ink'}`}
           >
             {layoutState.kind === 'failed'
-              ? 'The graph could not be laid out. Try Tidy again.'
+              ? layoutState.previous === null
+                ? 'The graph could not be laid out. Select Tidy to retry.'
+                : 'The new layout failed. The previous drawing is shown. Select Tidy to retry.'
               : connectionNotice === null
                 ? ''
                 : describeConnectionNotice(connectionNotice)}

@@ -1,5 +1,4 @@
-import ELK, { type ELK as ElkEngine } from 'elkjs/lib/elk-api'
-import ElkWorker from 'elkjs/lib/elk-worker.min.js?worker'
+import { runLayout } from './layoutEngine'
 import { z } from 'zod'
 import { err, ok, type Result, type NonEmptyArray } from '@/domain/dop'
 import type { EditableDag, DagEdgeId, DagNodeId } from '@/domain/dag'
@@ -27,26 +26,29 @@ export type LayoutProblem =
 export async function separateCards(
   positions: ReadonlyMap<DagNodeId, LayoutPoint>,
   size: DagCardSize,
+  signal?: AbortSignal,
 ): Promise<Result<ReadonlyMap<DagNodeId, LayoutPoint>, LayoutProblem>> {
   if (positions.size < 2) return ok(positions)
   try {
-    engine ??= new ELK({ workerFactory: () => new ElkWorker() })
-    const raw = await engine.layout({
-      id: 'separation',
-      layoutOptions: {
-        'elk.algorithm': 'sporeOverlap',
-        'elk.spacing.nodeNode': '24',
-        'elk.padding': '[top=34,left=34,bottom=34,right=34]',
+    const raw = await runLayout(
+      {
+        id: 'separation',
+        layoutOptions: {
+          'elk.algorithm': 'sporeOverlap',
+          'elk.spacing.nodeNode': '24',
+          'elk.padding': '[top=34,left=34,bottom=34,right=34]',
+        },
+        children: [...positions].map(([id, at]) => ({
+          id,
+          x: at.x,
+          y: at.y,
+          width: size.width,
+          height: size.height,
+        })),
+        edges: [],
       },
-      children: [...positions].map(([id, at]) => ({
-        id,
-        x: at.x,
-        y: at.y,
-        width: size.width,
-        height: size.height,
-      })),
-      edges: [],
-    })
+      signal,
+    )
     const parsed = output.safeParse(raw)
     if (!parsed.success) return err({ kind: 'invalid-result' })
     const separated = new Map<DagNodeId, LayoutPoint>()
@@ -67,6 +69,7 @@ export async function extendHeldPositions(
   graph: EditableDag,
   held: ReadonlyMap<string, LayoutPoint>,
   size: DagCardSize,
+  signal?: AbortSignal,
 ): Promise<Result<ReadonlyMap<DagNodeId, LayoutPoint>, LayoutProblem>> {
   const existing = graph.nodes.flatMap((node) => {
     const position = held.get(node.id)
@@ -77,19 +80,21 @@ export async function extendHeldPositions(
     return ok(new Map(existing.map((node) => [node.id, { x: node.x, y: node.y }])))
   if (existing.length === 0) return err({ kind: 'invalid-result' })
   try {
-    engine ??= new ELK({ workerFactory: () => new ElkWorker() })
     const left = Math.min(...existing.map((node) => node.x))
     const top = Math.min(...existing.map((node) => node.y))
     const width = Math.max(...existing.map((node) => node.x + size.width)) - left
     const height = Math.max(...existing.map((node) => node.y + size.height)) - top
-    const raw = await engine.layout({
-      id: 'packing',
-      layoutOptions: { 'elk.algorithm': 'box', 'elk.spacing.nodeNode': '46' },
-      children: [
-        { id: 'occupied', width, height },
-        ...added.map((node) => ({ id: node.id, width: size.width, height: size.height })),
-      ],
-    })
+    const raw = await runLayout(
+      {
+        id: 'packing',
+        layoutOptions: { 'elk.algorithm': 'box', 'elk.spacing.nodeNode': '46' },
+        children: [
+          { id: 'occupied', width, height },
+          ...added.map((node) => ({ id: node.id, width: size.width, height: size.height })),
+        ],
+      },
+      signal,
+    )
     const parsed = output.safeParse(raw)
     if (!parsed.success) return err({ kind: 'invalid-result' })
     const occupied = parsed.data.children.find((node) => node.id === 'occupied')
@@ -129,62 +134,79 @@ const output = z.object({
     .optional(),
 })
 
-// Vite serves a separate worker chunk. Layout never runs on React's rendering thread.
-let engine: ElkEngine | undefined
 export async function layoutDag(
   graph: EditableDag,
   orientation: DagLayoutOrientation,
   size: DagCardSize,
+  signal?: AbortSignal,
 ): Promise<Result<DagLayout, LayoutProblem>> {
-  return layoutGraph({
-    nodes: graph.nodes,
-    edges: graph.edges.map(edge => ({ ...edge, labelSize: routeLabelSize(edge) })),
-  }, orientation, size)
+  return layoutGraph(
+    {
+      nodes: graph.nodes,
+      edges: graph.edges.map((edge) => ({ ...edge, labelSize: routeLabelSize(edge) })),
+    },
+    orientation,
+    size,
+    signal,
+  )
 }
 
 /** Geometry only: derived graphs do not masquerade as editable DAG documents. */
 export async function layoutGraph<N extends string, E extends string>(
   graph: {
     readonly nodes: readonly { readonly id: N }[]
-    readonly edges: readonly { readonly id: E; readonly cause: N; readonly effect: N; readonly labelSize: { readonly width: number; readonly height: number } }[]
+    readonly edges: readonly {
+      readonly id: E
+      readonly cause: N
+      readonly effect: N
+      readonly labelSize: { readonly width: number; readonly height: number }
+    }[]
   },
   orientation: DagLayoutOrientation,
   size: DagCardSize,
-): Promise<Result<{ readonly nodes: ReadonlyMap<N, LayoutPoint>; readonly routes: ReadonlyMap<E, DagRoute> }, LayoutProblem>> {
+  signal?: AbortSignal,
+): Promise<
+  Result<
+    { readonly nodes: ReadonlyMap<N, LayoutPoint>; readonly routes: ReadonlyMap<E, DagRoute> },
+    LayoutProblem
+  >
+> {
   try {
-    engine ??= new ELK({ workerFactory: () => new ElkWorker() })
-    const raw = await engine.layout({
-      id: 'dag',
-      layoutOptions: {
-        'elk.algorithm': 'layered',
-        'elk.direction': orientation === 'across' ? 'RIGHT' : 'DOWN',
-        'elk.edgeRouting': 'POLYLINE',
-        'elk.spacing.nodeNode': '46',
-        'elk.layered.spacing.nodeNodeBetweenLayers': '86',
-        'elk.spacing.edgeNode': '18',
-        'elk.padding': '[top=34,left=34,bottom=34,right=34]',
-        'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
-        'elk.layered.nodePlacement.favorStraightEdges': 'true',
-        'elk.randomSeed': '1',
+    const raw = await runLayout(
+      {
+        id: 'dag',
+        layoutOptions: {
+          'elk.algorithm': 'layered',
+          'elk.direction': orientation === 'across' ? 'RIGHT' : 'DOWN',
+          'elk.edgeRouting': 'POLYLINE',
+          'elk.spacing.nodeNode': '46',
+          'elk.layered.spacing.nodeNodeBetweenLayers': '86',
+          'elk.spacing.edgeNode': '18',
+          'elk.padding': '[top=34,left=34,bottom=34,right=34]',
+          'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
+          'elk.layered.nodePlacement.favorStraightEdges': 'true',
+          'elk.randomSeed': '1',
+        },
+        children: graph.nodes.map((node) => ({
+          id: node.id,
+          width: size.width,
+          height: size.height,
+        })),
+        edges: graph.edges.map((edge) => ({
+          id: edge.id,
+          sources: [edge.cause],
+          targets: [edge.effect],
+          labels: [
+            {
+              id: `${edge.id}:label`,
+              ...edge.labelSize,
+              layoutOptions: { 'elk.edgeLabels.placement': 'CENTER' },
+            },
+          ],
+        })),
       },
-      children: graph.nodes.map((node) => ({
-        id: node.id,
-        width: size.width,
-        height: size.height,
-      })),
-      edges: graph.edges.map((edge) => ({
-        id: edge.id,
-        sources: [edge.cause],
-        targets: [edge.effect],
-        labels: [
-          {
-            id: `${edge.id}:label`,
-            ...edge.labelSize,
-            layoutOptions: { 'elk.edgeLabels.placement': 'CENTER' },
-          },
-        ],
-      })),
-    })
+      signal,
+    )
     const parsed = output.safeParse(raw)
     if (!parsed.success) return err({ kind: 'invalid-result' })
     const placedNodes = new Map(parsed.data.children.map((node) => [node.id, node]))

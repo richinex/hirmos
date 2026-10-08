@@ -57,8 +57,7 @@ export function StudyGraphCanvas({
           variables={{
             view: variableView,
             disconnected: graph.nodes.length - visibleDagGraph(graph, 'connected').nodes.length,
-            onToggle: () =>
-              setVariableView((current) => (current === 'all' ? 'connected' : 'all')),
+            onToggle: () => setVariableView((current) => (current === 'all' ? 'connected' : 'all')),
           }}
         />
       }
@@ -94,17 +93,45 @@ function StudyGraph({
   const { orientation } = canvasView
   const [drawing] = useDrawingStyle()
   const metrics = useTextMetricsVersion()
+  const [attempt, setAttempt] = useState(0)
+  const previousKey = useRef(layoutKey)
+  const layoutInput = JSON.stringify([
+    layoutKey,
+    document.current.graph,
+    graph,
+    flow?.treatment,
+    flow?.outcome,
+    orientation,
+    drawing,
+    metrics,
+  ])
   const [state, setState] = useState<ReadOnlyCanvasState<Model['edges'][number]>>({
     kind: 'loading',
   })
   useEffect(() => {
     let active = true
-    setState({ kind: 'loading' })
+    const controller = new AbortController()
+    const preserve = previousKey.current === layoutKey
+    previousKey.current = layoutKey
+    setState((state) => ({
+      kind: 'loading',
+      previous: preserve ? (state.kind === 'ready' ? state : state.previous) : undefined,
+    }))
     const size = dagCardSize(document.current.graph.nodes.map((node) => node.name))
-    void studyLayout(graph, flow, orientation, size).then((layout) => {
+    void studyLayout(graph, flow, orientation, size, controller.signal).then((layout) => {
       if (!active) return
       if (!layout.ok) {
-        setState({ kind: 'failed', message: 'The graph could not be laid out.' })
+        setState((state) => {
+          const previous = state.kind === 'ready' ? state : state.previous
+          return {
+            kind: 'failed',
+            previous,
+            message:
+              previous === undefined
+                ? 'The graph could not be laid out.'
+                : 'The new layout failed. The previous drawing is shown.',
+          }
+        })
         return
       }
       const model = canvasModel(document, null, flow, null, layout.value, false, drawing)
@@ -112,13 +139,16 @@ function StudyGraph({
     })
     return () => {
       active = false
+      controller.abort()
     }
-  }, [document, graph, flow, orientation, drawing, metrics])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- layoutInput records graph, target, view and font inputs by value
+  }, [layoutInput, attempt])
   return (
     <ReadOnlyCanvas
       host={hostRef}
       view={canvasView}
       state={state}
+      onRetry={() => setAttempt((attempt) => attempt + 1)}
       label={label}
       loading="Laying out the graph…"
       layoutKey={`${layoutKey}\u0000${orientation}`}
@@ -126,7 +156,8 @@ function StudyGraph({
       frame={frame}
     >
       {variables === undefined ? (
-        overlay !== null && overlay !== undefined && <Panel position="bottom-right">{overlay}</Panel>
+        overlay !== null &&
+        overlay !== undefined && <Panel position="bottom-right">{overlay}</Panel>
       ) : (
         <CanvasControls view={canvasView} expand={false} variables={variables} />
       )}
