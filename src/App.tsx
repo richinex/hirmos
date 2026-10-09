@@ -938,7 +938,7 @@ function App() {
   // The URL always names the chapter on screen: a legacy `?chapter=` link and a gated chapter both
   // rewrite to the canonical path without adding history, and the tab title follows.
   useEffect(() => {
-    document.title = `${activeName}, Hirmos`
+    document.title = `${activeName} - Hirmos`
     if (!route.ok || restoringRequestedChapter) return
     const canonical = chapterPath(activeChapter, openProjectId)
     if (route.value.kind === 'default') {

@@ -1,0 +1,164 @@
+{
+  "repository": "rust-causal-transpile",
+  "purpose": "Generator provenance; Rust tests consume the retained fixtures without Python or R.",
+  "files": [
+    {
+      "formerPath": "ardl.py",
+      "originalSha256": "b9fe5fc715ff95c5588f96908a029fa7a5bdcd4a64cf51958d797f0a46b69ba2",
+      "generatorPath": "oracle/ardl.py"
+    },
+    {
+      "formerPath": "arma_regression.py",
+      "originalSha256": "96af0c8e3dfc96a8d0b95bf7ea2656b9e0fdc34601b29d76b5375fc6d32d3ef0",
+      "generatorPath": "oracle/arma_regression.py"
+    },
+    {
+      "formerPath": "backdoor_identification_fixtures.py",
+      "originalSha256": "5ec6aff287ff6c4f6a5db409171dacd91416dd1124e7d51160801b54e9230e04",
+      "generatorPath": "oracle/backdoor_identification_fixtures.py",
+      "pathAdaptation": "Run/input/output paths adjusted for the transpile repository; numerical logic unchanged."
+    },
+    {
+      "formerPath": "bsts_gibbs.py",
+      "originalSha256": "c73b88a429d50cdfaf7776cedea5189d1934fa9794587f817f8104bdccdcbc34",
+      "generatorPath": "oracle/bsts_gibbs.py"
+    },
+    {
+      "formerPath": "causal_impact.py",
+      "originalSha256": "68fb8c0235f03a360f8efefc58c81e5a325ed2274e83fc87d620caabb79d3712",
+      "generatorPath": "oracle/causal_impact.py"
+    },
+    {
+      "formerPath": "coint_fixtures.py",
+      "originalSha256": "dbc9a9637d88baa66216c656b7a30f11c2646c97ce3fc00df9950c28556ba28e",
+      "generatorPath": "oracle/coint_fixtures.py"
+    },
+    {
+      "formerPath": "counterfactual_scm.py",
+      "originalSha256": "24d71d69b729f6ca64c5a5cb211a2cee5ec1e12c75130366fd226b253dd93d9a",
+      "generatorPath": "oracle/counterfactual_scm.py"
+    },
+    {
+      "formerPath": "dml_att_sensitivity.py",
+      "originalSha256": "ed554b394a78461845707ccc08862649f03545c4704994becb06718c7075bbe1",
+      "generatorPath": "oracle/dml_att_sensitivity.py"
+    },
+    {
+      "formerPath": "dml_fixtures.py",
+      "originalSha256": "11e5eef47ad84c528fd6495449b0228d651338ab3cd8d12fbcbd9de4f845ff9f",
+      "generatorPath": "oracle/dml_fixtures.py"
+    },
+    {
+      "formerPath": "dml_gate.py",
+      "originalSha256": "dc047901de8768b005f7fa0b5e86b47b67f1d9c52970e2333cf4fcc0f4b17484",
+      "generatorPath": "oracle/dml_gate.py"
+    },
+    {
+      "formerPath": "estimation_fixtures.py",
+      "originalSha256": "1641022a669c57b27edb9deccf4ace44f48b99830f3af63544c5deb4b8c20876",
+      "generatorPath": "oracle/estimation_fixtures_hirmos.py"
+    },
+    {
+      "formerPath": "glm.py",
+      "originalSha256": "7118d67f4d341c5417d82f7d408ecdc81f7154068f471978c4ad0dddba4245b2",
+      "generatorPath": "oracle/glm.py"
+    },
+    {
+      "formerPath": "interrupted_series.py",
+      "originalSha256": "5bada1e156bc5bbd3f3e6eaaa53daaa7a0f63e64c795851fb460e39cd7ea7afb",
+      "generatorPath": "oracle/interrupted_series.py",
+      "pathAdaptation": "Run/input/output paths adjusted for the transpile repository; numerical logic unchanged."
+    },
+    {
+      "formerPath": "iv_dowhy.py",
+      "originalSha256": "e272ef7535ba9dd0e1b14b0b56d246aa7c9f2e798ec7026a0eb6b04b3045653c",
+      "generatorPath": "oracle/iv_dowhy.py"
+    },
+    {
+      "formerPath": "nuts_114i.py",
+      "originalSha256": "310612fcc7d94f34404913065d2665012133c57d2e980053041e74a61b5ba9b0",
+      "generatorPath": "oracle/nuts_114i.py"
+    },
+    {
+      "formerPath": "pelt.py",
+      "originalSha256": "777006d6b80320a3f5cba21af29975e70e6fc0e8fb8458b09c1a44fdf0075541",
+      "generatorPath": "oracle/pelt.py"
+    },
+    {
+      "formerPath": "preprocess_fixtures.py",
+      "originalSha256": "4619735ea12728d92dc5c833771d0437a44b565671ff8f2ba426107e13443707",
+      "generatorPath": "oracle/preprocess_fixtures_hirmos.py"
+    },
+    {
+      "formerPath": "preprocessing.py",
+      "originalSha256": "8e01581a4a5563c02456d58e2b1214438c7d8bafb3b1187734d8c0690770e28a",
+      "generatorPath": "oracle/preprocessing.py"
+    },
+    {
+      "formerPath": "refute_dml_fixtures.py",
+      "originalSha256": "67205c8a8e123ff710c68a07575344aadcda130838a471225a8a33f551d20ed0",
+      "generatorPath": "oracle/refute_dml_fixtures.py"
+    },
+    {
+      "formerPath": "refuter_fixtures.py",
+      "originalSha256": "360b661e4536e77c04dab0ea907f7dd164931bf2a3a992c65eda10f1fd8ba17e",
+      "generatorPath": "oracle/refuter_fixtures.py"
+    },
+    {
+      "formerPath": "resampling.py",
+      "originalSha256": "c7ecced28f04da4d597b5c4c164fd1f72be27df0392b7b8826024d50c749ac55",
+      "generatorPath": "oracle/resampling.py"
+    },
+    {
+      "formerPath": "sktree_fixtures.py",
+      "originalSha256": "a5959dd2dffeacc6ed60bc79076c3db8f1b2683fff70df3e779c5b141d92a2a1",
+      "generatorPath": "oracle/sktree_fixtures.py"
+    },
+    {
+      "formerPath": "stl.py",
+      "originalSha256": "070255d93696fe8146ef215f829d93483120c9bdc920e27da642faa16457b460",
+      "generatorPath": "oracle/stl.py"
+    },
+    {
+      "formerPath": "synthetic_control.py",
+      "originalSha256": "5c08fd035450484ed7aa8eb53de69831929bbbe835c8ba06e951bd409d66e9f0",
+      "generatorPath": "oracle/synthetic_control.py"
+    },
+    {
+      "formerPath": "tlearner_fixtures.py",
+      "originalSha256": "397afa3bbd57d620a0c7bbcb03e470d6aa968b49a4a011e8d6e6005d2187c275",
+      "generatorPath": "oracle/tlearner_fixtures.py"
+    },
+    {
+      "formerPath": "tlearner_global_selection.py",
+      "originalSha256": "b63045ed33bbb9656cf0042d7de1767753979e6e907e75d2ba1008ab1310593e",
+      "generatorPath": "oracle/tlearner_global_selection.py"
+    },
+    {
+      "formerPath": "tsdiag.py",
+      "originalSha256": "811fc15faa4fde2ed6c7053f3a4b3ad887194db80f52bcf9fc489ccd16592d5a",
+      "generatorPath": "oracle/tsdiag_hirmos.py"
+    },
+    {
+      "formerPath": "ucm_probe.py",
+      "originalSha256": "478f75b0c4fc141165d63512ec63c2f818c62747869b0e3fbac6366ece9b61fb",
+      "generatorPath": "oracle/ucm_probe.py"
+    },
+    {
+      "formerPath": "unobserved_fixtures.py",
+      "originalSha256": "6e4459968bbca07e1a15c6705c0ba9e188ff02306d1d3220612fe82f992f1900",
+      "generatorPath": "oracle/unobserved_fixtures.py"
+    },
+    {
+      "formerPath": "vecm_fixtures.py",
+      "originalSha256": "244be8d71dd4bf5253b3dbc81594ae8f4660c3d1f7f178f1141ace0d591ec580",
+      "generatorPath": "oracle/vecm_fixtures.py"
+    },
+    {
+      "formerPath": "within_fixtures.py",
+      "originalSha256": "5dc1e280c747fff6c64a0eaf30428113de0463834e0305383fd96965f84fd6af",
+      "generatorPath": "oracle/within_fixtures.py",
+      "pathAdaptation": "Run/input/output paths adjusted for the transpile repository; numerical logic unchanged."
+    }
+  ]
+}

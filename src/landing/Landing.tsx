@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { HirmosMark } from '@/components/HirmosMark'
+import { SourceNotice } from '@/components/SourceNotice'
 import { InternalLink } from '@/components/ui/InternalLink'
 import { SHIPPED_EXAMPLES } from '@/domain/example'
 import { chapterPath } from '@/domain/navigation'
@@ -230,7 +231,7 @@ function EvidenceFigure() {
 export function Landing() {
   const root = useRef<HTMLElement>(null)
   useEffect(() => {
-    document.title = 'Hirmos, browser causal inference workbench'
+    document.title = 'Hirmos - causal inference app'
     return root.current === null ? undefined : choreographLanding(root.current)
   }, [])
   return (
@@ -389,6 +390,7 @@ export function Landing() {
             <HirmosMark className="landing-mark" />
             <span>hirmos</span>
           </InternalLink>
+          <SourceNotice />
         </footer>
       </div>
     </main>

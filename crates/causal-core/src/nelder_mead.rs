@@ -34,7 +34,7 @@ mod tests {
     #[test]
     fn initialization_trajectories_match_lifelines() {
         let fixture: Value = serde_json::from_str(include_str!(
-            "../reproductions/clsa/data/aft-optimizer.json"
+            "../fixtures/optimizers/aft-optimizer.json"
         ))
         .unwrap();
         let times = numbers(&fixture["data"]["duration"]);

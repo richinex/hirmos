@@ -135,7 +135,7 @@
 .structure-art--cross::before { background: radial-gradient(circle, var(--color-bone) 0 3px, transparent 4px); background-size: 2.45rem 2.1rem; }
 .structure-art--cross::after { inset: 18% 8% 26% 12%; border-bottom: 2px solid var(--color-signal); transform: rotate(-13deg); transform-origin: bottom left; }
 
-.landing-footer { display: flex; align-items: center; justify-content: space-between; gap: 2rem; min-height: 6rem; color: var(--color-faint); font-size: var(--text-label); }
+.landing-footer { display: flex; align-items: center; justify-content: space-between; gap: 2rem; min-height: 6rem; color: var(--color-faint); font-size: var(--text-body); }
 .landing-footer .landing-wordmark { color: var(--color-ink); }
 .landing-footer p { flex: 1; margin: 0; text-align: center; }
 

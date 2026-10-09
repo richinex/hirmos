@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { SourceNotice } from '@/components/SourceNotice'
 
 interface AppShellProps {
   /** Id of the stage element the skip link jumps to. */
@@ -45,6 +46,9 @@ export function AppShell({ skipTarget, mode, header, nav, stage, footer }: AppSh
         </main>
       </div>
       {footer}
+      <footer className="shrink-0 border-t border-line px-4 py-2 text-label">
+        <SourceNotice />
+      </footer>
     </div>
   )
 }

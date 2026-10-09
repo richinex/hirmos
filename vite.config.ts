@@ -1,5 +1,6 @@
 import { createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
+import { execFileSync } from 'node:child_process'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
 import react from '@vitejs/plugin-react'
@@ -83,7 +84,12 @@ const pyodideRuntime = (): Plugin => {
 }
 
 export default defineConfig({
-  define: { __APP_VERSION__: JSON.stringify(process.env.npm_package_version ?? '0.0.0') },
+  define: {
+    __APP_VERSION__: JSON.stringify(process.env.npm_package_version ?? '0.0.0'),
+    __SOURCE_REVISION__: JSON.stringify(
+      process.env.CF_PAGES_COMMIT_SHA ?? execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
+    ),
+  },
   plugins: [react(), tailwindcss(), appRoute(), duckdbBinaries(), pyodideRuntime()],
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   // WebCola is CommonJS reached only through a lazily loaded module, so the dev server would otherwise find it mid-session and serve a stale copy.

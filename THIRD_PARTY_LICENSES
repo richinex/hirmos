@@ -1,5 +1,12 @@
 Hirmos — third-party licence texts
 
+Additional upstream declarations and notices are preserved in licenses/upstream/.
+GPL2: licenses/upstream/GPL-2.txt. GPL3: LICENSE.
+GitHub Octicons MIT notice: licenses/octicons.txt.
+ECOS GPL3 text: crates/honest-did-ecos-port/COPYING.
+OSQP and AMD: crates/honest-did-osqp-port/{LICENSE,LICENSE-AMD,NOTICE}.
+See licenses/README.md for inventory scope and outstanding release checks.
+
 One section per licence. NOTICE lists which work each section applies to and the
 copyright holders to read into the template texts below.
 

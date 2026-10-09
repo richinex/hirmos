@@ -1,9 +1,14 @@
 Hirmos — third-party notices
 
+Hirmos - causal inference app
+Copyright (C) 2026 Richard Chukwu
+
 Hirmos is licensed under the GNU General Public License, version 3 or (at your
 option) any later version; see LICENSE. It includes Rust ports of scientific
 software. Each entry below names the original work, its licence, and the Hirmos
-module derived from it. Full licence texts are in THIRD_PARTY_LICENSES.
+module derived from it. Licence texts are in THIRD_PARTY_LICENSES and licenses/.
+This inventory is being extended; outstanding release checks are recorded in
+licenses/README.md. It must not be treated as a complete compliance clearance.
 
 Corresponding Source: the Hirmos repository that contains this file. Anyone who
 receives Hirmos, including the hirmos_analysis wasm binary served by the app,
@@ -93,7 +98,58 @@ Structural time-series components
 --------------------------------
 crates/structural-timeseries preserves Rust ports of R bsts 0.9.11 and
 BOOM 0.9.16 numerical routines. Copyright Google LLC and Steven L. Scott,
-as specified in the source modules. BOOM-derived routines are distributed
+as specified in the source modules. Many BOOM-derived routines are distributed
 under LGPL-2.1-or-later; the text is in licenses/bsts-boom/LICENSE.
+The Kinderman-Ramage normal generator and gamma/exponential routines in
+src/random.rs and src/random/gamma.rs retain GPL-2.0-or-later notices.
+The GPL2 text is preserved in licenses/upstream/GPL-2.txt.
 The new impact adapter and Hirmos integration use the project's GPL-3.0-or-later
 license. Preserved source attribution and reproduction notes accompany the crate.
+
+Additional translated components
+--------------------------------
+The records in licenses/upstream retain the pinned versions, authors and licence
+declarations. Original source-file notices remain applicable.
+
+GRF 2.6.1 — GPL-3.0-or-later for the translated core
+  Copyright (c) 2024 GRF Contributors. https://github.com/grf-labs/grf
+  Port: crates/causal-core/src/grf/. Source adapted to Rust and Hirmos.
+  The tuning port also references DiceKriging; see its source-file notices.
+
+did 2.5.1, DRDID 1.3.0 and BMisc — GPL-3.0
+  Author records: licenses/upstream/{did-2.5.1,DRDID-1.3.0,BMisc}/DESCRIPTION.
+  Port: crates/causal-core/src/staggered_did/.
+
+fixest 0.14.2 — GPL-3.0
+  Author record: licenses/upstream/fixest-0.14.2/DESCRIPTION.
+  Ports: crates/causal-core/src/sun_abraham.rs and sun_abraham_fit.rs.
+  Numerical comparison with fixest does not by itself imply derivation of
+  unrelated regression implementations.
+
+contdid, splines2 and npiv — GPL-3.0 / GPL-3.0-or-later
+  Version and author records: licenses/upstream/{contdid,splines2,npiv}/.
+  Port: crates/causal-core/src/continuous_did/.
+
+HonestDiD — MIT
+  Copyright holder: HonestDiD authors, 2023.
+  Port: crates/causal-core/src/honest_did/.
+  Solver licences are separate: ECOS COPYING and OSQP LICENSE/NOTICE are
+  preserved in crates/honest-did-ecos-port/ and crates/honest-did-osqp-port/.
+  The lp_solve adapter has additional notices in the honest_did module.
+
+cobalt 5.0.0 — GPL-2.0-or-later
+  Author record: licenses/upstream/cobalt-5.0.0/DESCRIPTION.
+  Referenced routines: crates/causal-core/src/covariate_balance.rs.
+
+augsynth 0.2.0 — MIT
+  Copyright holder and declaration: licenses/upstream/augsynth-0.2.0/.
+  Port: crates/causal-core/src/augmented_synth.rs.
+
+synthdid — BSD-3-Clause option
+  Upstream licence and attribution: licenses/upstream/synthdid/.
+  This is distinct from the Synth/kernlab predictor-weight optimisation port.
+
+GitHub Octicons — MIT
+  Copyright (c) 2026 GitHub Inc. https://github.com/primer/octicons
+  GitHub mark adapted to JSX in src/components/SourceNotice.tsx.
+  Full notice: licenses/octicons.txt.

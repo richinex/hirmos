@@ -254,7 +254,7 @@ fn slsqp_aft_trajectories_match_lifelines() {
     use super::generated::__slsqp::{slsqp_body, SLSQP_vars};
     use crate::survival::aft::{AftFamily, NormalizedAftData};
     let fixture: Value = serde_json::from_str(include_str!(
-        "../../reproductions/clsa/data/aft-optimizer.json"
+        "../../fixtures/optimizers/aft-optimizer.json"
     ))
     .unwrap();
     for case in fixture["cases"].as_array().unwrap() {

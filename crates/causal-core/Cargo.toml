@@ -21,7 +21,7 @@ osqp-reference-port = { path = "../honest-did-osqp-port" }
 nalgebra = { version = "0.34", features = ["libm", "std"] }
 puruspe = "0.4"
 faer = { version = "=0.24.4", default-features = false, features = ["std", "linalg"] }
-levenberg-marquardt = { version = "=0.15.0", path = "reference/levenberg-marquardt-0.15.0", features = ["scipy-fma"] }
+levenberg-marquardt = { version = "=0.15.0", path = "vendor/levenberg-marquardt-0.15.0", features = ["scipy-fma"] }
 regex = "1"
 rustfft = { version = "=6.4.1", default-features = false }
 sha1 = "=0.10.7"

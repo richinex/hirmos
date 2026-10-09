@@ -182,7 +182,7 @@ mod tests {
     #[test]
     fn covariance_inverse_and_fallback_match_numpy() {
         let fixture: serde_json::Value = serde_json::from_str(include_str!(
-            "../../reproductions/clsa/data/aft-optimizer.json"
+            "../../fixtures/optimizers/aft-optimizer.json"
         ))
         .unwrap();
         for case in fixture["inverse_cases"].as_array().unwrap() {
