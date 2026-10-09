@@ -380,6 +380,12 @@ const dataWorker = (): Worker => {
 }
 
 /** Profiles the file with the declared column types applied; a Parquet file declares none. */
+/** Starts the engine so a project opens onto a running database. Safe to call repeatedly. */
+export function warmDataEngine(): void {
+  const command: DataWorkerCommand = { kind: 'warm-engine' }
+  dataWorker().postMessage(command)
+}
+
 export function profileSourceInWorker(
   request: ImportRequestId,
   file: File,

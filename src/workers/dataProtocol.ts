@@ -38,6 +38,7 @@ import {
 } from '@/domain/panel'
 
 export type DataWorkerCommand =
+  | { readonly kind: 'warm-engine' }
   | {
       readonly kind: 'preview-time'
       readonly request: ImportRequestId
@@ -210,6 +211,7 @@ export type DataProtocolProblem =
 const requestSchema = z.string().uuid()
 
 const commandSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('warm-engine') }).strict(),
   z
     .object({
       kind: z.literal('preview-time'),
@@ -527,6 +529,7 @@ export function parseDataWorkerCommand(
   if (!parsed.success)
     return err({ kind: 'invalid-command', detail: z.prettifyError(parsed.error) })
   const data = parsed.data
+  if (data.kind === 'warm-engine') return ok({ kind: 'warm-engine' })
   const request = importRequestId(data.request)
   if (!request.ok)
     return err({ kind: 'invalid-command', detail: 'The import request identity is invalid.' })

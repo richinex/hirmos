@@ -1,11 +1,12 @@
-import {PowerPlanningPanel} from '@/components/data/PowerPlanningPanel'
+import { PowerPlanningPanel } from '@/components/data/PowerPlanningPanel'
 import { Metadata } from '@/components/ui/Metadata'
 import { declareColumn, declarationsOf, type DeclaredType } from '@/domain/fileReading'
 import { causalModelRunCount } from '@/domain/rootCauseAnalysis'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { DatabaseFolder } from '@/components/data/DatabaseFolder'
 import {
-  lazy,
+  use,
+  type ComponentType,
   Suspense,
   useCallback,
   useEffect,
@@ -118,20 +119,44 @@ import { assertNever, err, isNonEmpty, type Result } from '@/domain/dop'
 import type { SourceRecipe } from '@/domain/sqlPreparation'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { cn } from '@/lib/utils'
+import { preloadable } from '@/lib/preloadable'
+import { warmDataEngine } from '@/data/client'
 
-const loadDagWorkspace = () => import('@/components/dag/DagWorkspace')
-const loadSurvivalPanel = () => import('@/components/survival/SurvivalPanel')
-const loadRootCausePanel = () => import('@/components/root-cause/RootCausePanel')
-const loadTimeSeriesPanel = () => import('@/components/time-series/TimeSeriesPanel')
-const loadStudyDesignPanel = () => import('@/components/study/StudyDesignPanel')
-const loadEstimationPanel = () => import('@/components/estimation/EstimationWorkspace')
-const loadSensitivityPanel = () => import('@/components/sensitivity/SensitivityPanel')
-const loadCounterfactualPanel = () => import('@/components/counterfactual/CounterfactualPanel')
-const loadResultsPanel = () => import('@/components/results/ResultsPanel')
-const loadSqlPreparationWorkspace = () => import('@/components/data/SqlPreparationWorkspace')
-const loadPipelineWorkspace = () => import('@/components/data/pipeline/PipelineWorkspace')
+const loadDagWorkspace = preloadable(
+  async () => (await import('@/components/dag/DagWorkspace')).DagWorkspace,
+)
+const loadSurvivalPanel = preloadable(
+  async () => (await import('@/components/survival/SurvivalPanel')).SurvivalPanel,
+)
+const loadRootCausePanel = preloadable(
+  async () => (await import('@/components/root-cause/RootCausePanel')).RootCausePanel,
+)
+const loadTimeSeriesPanel = preloadable(
+  async () => (await import('@/components/time-series/TimeSeriesPanel')).TimeSeriesPanel,
+)
+const loadStudyDesignPanel = preloadable(
+  async () => (await import('@/components/study/StudyDesignPanel')).StudyDesignPanel,
+)
+const loadEstimationPanel = preloadable(
+  async () => (await import('@/components/estimation/EstimationWorkspace')).EstimationWorkspace,
+)
+const loadSensitivityPanel = preloadable(
+  async () => (await import('@/components/sensitivity/SensitivityPanel')).SensitivityPanel,
+)
+const loadCounterfactualPanel = preloadable(
+  async () => (await import('@/components/counterfactual/CounterfactualPanel')).CounterfactualPanel,
+)
+const loadResultsPanel = preloadable(
+  async () => (await import('@/components/results/ResultsPanel')).ResultsPanel,
+)
+const loadSqlPreparationWorkspace = preloadable(
+  async () => (await import('@/components/data/SqlPreparationWorkspace')).SqlShell,
+)
+const loadPipelineWorkspace = preloadable(
+  async () => (await import('@/components/data/pipeline/PipelineWorkspace')).PipelineWorkspace,
+)
 
-/** One loader per lazy chapter, shared with the nav prefetch so a hover warms the chunk `lazy` will ask for. */
+/** One loader per lazy chapter, shared with the nav prefetch so a hover warms the chunk the chapter reads. */
 const PANEL_LOADERS: Partial<Record<ChapterId, () => Promise<unknown>>> = {
   survival: loadSurvivalPanel,
   'root-cause': loadRootCausePanel,
@@ -150,39 +175,36 @@ const prefetchChapter = (chapter: ChapterId): void => {
   if (load !== undefined) void load().catch(() => undefined)
 }
 
-const DagWorkspace = lazy(async () => ({ default: (await loadDagWorkspace()).DagWorkspace }))
+/** A chapter whose module is read with use(): once it has arrived, the first render does not suspend. */
+function chapter<P extends object>(load: () => Promise<ComponentType<P>>): ComponentType<P> {
+  return function Chapter(props: P) {
+    const Component = use(load())
+    return <Component {...props} />
+  }
+}
 
-const SurvivalPanel = lazy(async () => ({ default: (await loadSurvivalPanel()).SurvivalPanel }))
-const RootCausePanel = lazy(async () => ({ default: (await loadRootCausePanel()).RootCausePanel }))
-const TimeSeriesPanel = lazy(async () => ({
-  default: (await loadTimeSeriesPanel()).TimeSeriesPanel,
-}))
+const DagWorkspace = chapter(loadDagWorkspace)
 
-const StudyDesignPanel = lazy(async () => ({
-  default: (await loadStudyDesignPanel()).StudyDesignPanel,
-}))
+const SurvivalPanel = chapter(loadSurvivalPanel)
+const RootCausePanel = chapter(loadRootCausePanel)
+const TimeSeriesPanel = chapter(loadTimeSeriesPanel)
 
-const EstimationPanel = lazy(async () => ({
-  default: (await loadEstimationPanel()).EstimationWorkspace,
-}))
+const StudyDesignPanel = chapter(loadStudyDesignPanel)
 
-const SensitivityPanel = lazy(async () => ({
-  default: (await loadSensitivityPanel()).SensitivityPanel,
-}))
+const EstimationPanel = chapter(loadEstimationPanel)
 
-const CounterfactualPanel = lazy(async () => ({
-  default: (await loadCounterfactualPanel()).CounterfactualPanel,
-}))
+const SensitivityPanel = chapter(loadSensitivityPanel)
 
-const ResultsPanel = lazy(async () => ({ default: (await loadResultsPanel()).ResultsPanel }))
+const CounterfactualPanel = chapter(loadCounterfactualPanel)
 
-const SqlShell = lazy(async () => ({ default: (await loadSqlPreparationWorkspace()).SqlShell }))
-const PipelineWorkspace = lazy(async () => ({
-  default: (await loadPipelineWorkspace()).PipelineWorkspace,
-}))
-const SourceEditor = lazy(async () => ({
-  default: (await import('@/components/data/SourceEditor')).SourceEditor,
-}))
+const ResultsPanel = chapter(loadResultsPanel)
+
+const SqlShell = chapter(loadSqlPreparationWorkspace)
+const PipelineWorkspace = chapter(loadPipelineWorkspace)
+const loadSourceEditor = preloadable(
+  async () => (await import('@/components/data/SourceEditor')).SourceEditor,
+)
+const SourceEditor = chapter(loadSourceEditor)
 
 type SqlIntake =
   | { readonly kind: 'idle' }
@@ -926,6 +948,9 @@ function App() {
         if (chapter !== '') prefetchChapter(chapter as ChapterId)
       }
       if (chartsAreReachable) void import('@/charts/registry')
+      warmDataEngine()
+      if (warmableChapterKey.split('|').includes('dag'))
+        void import('@/components/dag/layoutEngine').then((module) => module.warmLayoutEngine())
     }
     if (typeof window.requestIdleCallback !== 'function') {
       const handle = window.setTimeout(warm, 300)

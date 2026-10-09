@@ -10,6 +10,7 @@ import {
   profileColumn,
   profileSource,
   summarizeColumns,
+  warmDuckDbEngine,
 } from '@/data/duckdb'
 import { assertNever } from '@/domain/dop'
 import { previewTimeColumn } from '@/data/duckdb'
@@ -29,6 +30,10 @@ self.onmessage = (message: MessageEvent<unknown>) => {
     }
 
     const command = parsed.value
+    if (command.kind === 'warm-engine') {
+      warmDuckDbEngine()
+      return
+    }
     const source = selectSource(command.file)
     if (!source.ok) {
       const detail = describeSourceSelectionProblem(source.error)

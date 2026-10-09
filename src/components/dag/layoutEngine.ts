@@ -30,6 +30,29 @@ function abandon(reason: unknown): void {
   }
 }
 
+function ensureEngine(): ElkEngine {
+  return (engine ??= new ELK({
+    workerFactory: () => {
+      const worker = new ElkWorker()
+      const current = ++generation
+      worker.addEventListener('error', () => {
+        if (generation === current)
+          abandon(new Error('The graph layout worker stopped. Retry the layout.'))
+      })
+      worker.addEventListener('messageerror', () => {
+        if (generation === current)
+          abandon(new Error('The graph layout worker returned an unreadable response.'))
+      })
+      return worker
+    },
+  }))
+}
+
+/** Starts the layout worker ahead of the first layout. */
+export function warmLayoutEngine(): void {
+  ensureEngine()
+}
+
 function drain(): void {
   if (active !== undefined) return
   const request = queue.shift()
@@ -40,22 +63,8 @@ function drain(): void {
     LIMIT_MS,
   )
   try {
-    engine ??= new ELK({
-      workerFactory: () => {
-        const worker = new ElkWorker()
-        const current = ++generation
-        worker.addEventListener('error', () => {
-          if (generation === current)
-            abandon(new Error('The graph layout worker stopped. Retry the layout.'))
-        })
-        worker.addEventListener('messageerror', () => {
-          if (generation === current)
-            abandon(new Error('The graph layout worker returned an unreadable response.'))
-        })
-        return worker
-      },
-    })
-    void engine.layout(request.graph).then(
+    const current = ensureEngine()
+    void current.layout(request.graph).then(
       (result) => {
         if (active !== request) return
         clearTimeout(timer)

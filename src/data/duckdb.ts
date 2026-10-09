@@ -155,6 +155,11 @@ const engine = (): Promise<DuckDbEngine> => {
   return enginePromise
 }
 
+/** Starts the engine so the first request finds it running. A failure here is retried by that request. */
+export const warmDuckDbEngine = (): void => {
+  void engine().catch(() => undefined)
+}
+
 /** A separate database for work whose catalog and registered files must end with that work. */
 export const isolatedDuckDbEngine = (): Promise<DuckDbEngine> => startEngine()
 
