@@ -573,11 +573,9 @@ impl RegressionModel {
         Ok(PredictionCovariates(values))
     }
 
-    fn coefficient_parameter_order(&self) -> Vec<usize> {
+    fn coefficient_parameter_order(&self) -> impl Iterator<Item = usize> {
         let location = self.family.location_index();
-        let mut order = vec![location];
-        order.extend((0..self.designs.len()).filter(|index| *index != location));
-        order
+        std::iter::once(location).chain((0..self.designs.len()).filter(move |index| *index != location))
     }
 
     pub fn transformed_initial_values(
@@ -626,7 +624,9 @@ impl RegressionModel {
         transformed: &[f64],
     ) -> Result<FlexSurvDistribution, DistributionError> {
         let baseline_count = self.family.parameters().len();
-        let mut linear = transformed[..baseline_count].to_vec();
+        let mut storage = [0.0; 4];
+        let linear = &mut storage[..baseline_count];
+        linear.copy_from_slice(&transformed[..baseline_count]);
         let mut coefficient_offset = baseline_count;
         for parameter_index in self.coefficient_parameter_order() {
             if let Some(matrix) = &self.designs[parameter_index] {
@@ -636,15 +636,10 @@ impl RegressionModel {
                 coefficient_offset = end;
             }
         }
-        let natural = self
-            .family
-            .parameters()
-            .iter()
-            .copied()
-            .zip(linear)
-            .map(|(parameter, value)| self.family.inverse_transform(parameter, value))
-            .collect::<Vec<_>>();
-        self.family.distribution(&natural)
+        for (parameter, value) in self.family.parameters().iter().copied().zip(linear.iter_mut()) {
+            *value = self.family.inverse_transform(parameter, *value);
+        }
+        self.family.distribution(linear)
     }
 
     pub(crate) fn distribution_for_prediction(

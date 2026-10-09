@@ -1,7 +1,7 @@
 //! Matrix preparation and default nested fitting for R Synth's predictor-based specification.
 //! X rows are predictors and columns are donors; Z rows are pre-period outcomes.
 //! This is not the existing outcome-only fitting objective.
-use super::ipop::{simplex_ipop, IpopError, IpopTermination};
+use super::simplex_qp::{self, Error as DonorSolverError, Outcome, Settings};
 use crate::lapack_lu::{dgetrf_fused, dgetrs_fused, reciprocal_condition_one_fused, Transpose};
 use crate::r_nelder_mead::{minimize, NmError, NmTermination};
 use crate::resampling::rounded_nonnegative_sum;
@@ -46,7 +46,7 @@ pub enum SynthError {
     NonFiniteInput,
     ConstantDonorPredictor { predictor: usize },
     InvalidPredictorWeights,
-    DonorSolver(IpopError),
+    DonorSolver(DonorSolverError),
     DonorIterationLimit,
     NelderMead(NmError),
     Bfgs(ROptimError),
@@ -374,10 +374,12 @@ impl SynthMatrices {
         let c = -DVector::from_column_slice(
             oracle_product(&weighted_treated, &self.scaled_donors)?.as_slice(),
         );
-        let fit = simplex_ipop(&h, &c, 5., 1000, 0.0005, 10.).map_err(SynthError::DonorSolver)?;
-        if fit.termination != IpopTermination::SignificantFigures {
-            return Err(SynthError::DonorIterationLimit);
-        }
+        let fit = match simplex_qp::solve(&h, &c, Settings::synthetic_control())
+            .map_err(SynthError::DonorSolver)?
+        {
+            Outcome::Converged(fit) => fit,
+            Outcome::IterationLimit(_) => return Err(SynthError::DonorIterationLimit),
+        };
         let w = DMatrix::from_column_slice(fit.weights.len(), 1, &fit.weights);
         let predictor_residual = treated - oracle_product(&self.scaled_donors, &w)?;
         let weighted_residual = oracle_product(&predictor_residual.transpose(), &v)?;

@@ -34,7 +34,7 @@ test('themes preserve preference, readable tokens and chart palette mode', async
     const expectedFill = await page.evaluate(() => { const probe = document.createElement('span'); probe.style.color='var(--color-rail-ink)'; document.body.append(probe); const value=getComputedStyle(probe).color; probe.remove(); return value })
     expect(fill).toBe(expectedFill)
     await expect(page.getByRole('button', { name: 'Change theme', exact: true })).toHaveAttribute('title', new RegExp(`Theme: ${label}`))
-    expect(await page.locator('.chapter-heading').evaluate(el => getComputedStyle(el).fontFamily)).toContain('Roboto Slab')
+    expect(await page.locator('.chapter-heading').evaluate(el => getComputedStyle(el).fontFamily)).toContain('Asta Sans')
     const audit = await page.evaluate(async () => {
       const css = getComputedStyle(document.documentElement)
       const colour = (name: string) => css.getPropertyValue(`--color-${name}`).trim()
@@ -58,7 +58,7 @@ test('themes preserve preference, readable tokens and chart palette mode', async
     })
     for (const item of audit.contrasts) expect(item.ratio, `${id} ${item.pair}`).toBeGreaterThanOrEqual(4.5)
     expect(audit.palette).toEqual(audit.mode === 'light' ? audit.light : audit.dark)
-    expect(audit.font).toContain('Lato')
+    expect(audit.font).toContain('Asta Sans')
     expect(audit.labelSize).toBeCloseTo(11.11, 1)
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
     await page.screenshot({ path: info.outputPath(`${id}.png`) })

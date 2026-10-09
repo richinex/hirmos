@@ -292,7 +292,7 @@ impl FlexSurvDistribution {
             DistributionKind::Gamma { shape, rate } => {
                 shape * rate.ln() + (shape - 1.0) * time.ln()
                     - rate * time
-                    - puruspe::ln_gamma(shape)
+                    - shape.lgamma()
             }
             DistributionKind::Gompertz { shape, rate } => {
                 let scaled = shape * time;
@@ -316,11 +316,11 @@ impl FlexSurvDistribution {
                     -(sigma * time).ln()
                         + q.abs().ln() * (1.0 - 2.0 * inverse_q_squared)
                         + inverse_q_squared * (q * w - (q * w).exp())
-                        - puruspe::ln_gamma(inverse_q_squared)
+                        - inverse_q_squared.lgamma()
                 }
             }
             DistributionKind::GeneralizedGammaOriginal { shape, scale, k } => {
-                shape.ln() - puruspe::ln_gamma(k) + (shape * k - 1.0) * time.ln()
+                shape.ln() - k.lgamma() + (shape * k - 1.0) * time.ln()
                     - shape * k * scale.ln()
                     - (time / scale).powf(shape)
             }
@@ -374,7 +374,7 @@ impl FlexSurvDistribution {
                     normal_cdf((time.ln() - mean_log) / sd_log)
                 }
             }
-            DistributionKind::Gamma { shape, rate } => puruspe::gammp(shape, rate * time),
+            DistributionKind::Gamma { shape, rate } => shape.igamma(rate * time),
             DistributionKind::Gompertz { shape, rate } => {
                 let coefficient = if shape == 0.0 {
                     -rate * time

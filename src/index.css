@@ -321,8 +321,15 @@ button:not([role='combobox']):not(:disabled):not([aria-disabled='true']):active,
   input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"]), select, textarea { font-size: 1rem; }
 }
 
-/* Material Symbols Sharp — squared terminals match the hairline chrome.
-   Self-hosted, imported in main.tsx; this only fixes the ligature rendering. */
+/* Material Symbols Sharp — squared terminals match the hairline chrome. */
+@font-face {
+  font-family: "Material Symbols Sharp";
+  font-style: normal;
+  font-weight: 300;
+  font-display: block;
+  src: url("./assets/fonts/material-symbols-sharp.woff2") format("woff2");
+}
+
 .msym {
   font-family: "Material Symbols Sharp";
   font-weight: normal;

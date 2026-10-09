@@ -4,11 +4,9 @@ const repository = 'https://github.com/richinex/hirmos'
 const source = `${repository}/tree/${__SOURCE_REVISION__}`
 const licence = `${repository}/blob/${__SOURCE_REVISION__}/LICENSE`
 
-// The links stand apart from running text, so they rest without an underline and gain one on hover.
 const link =
   'inline-flex items-center gap-2 text-muted no-underline underline-offset-4 hover:text-ink hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4'
 
-/** The source and licence notice. The container sets the type size: body on the landing page, label in the app. */
 export function SourceNotice() {
   return (
     <div className="flex flex-wrap items-center justify-end gap-x-5 gap-y-1 text-muted">

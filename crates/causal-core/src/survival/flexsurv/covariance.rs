@@ -80,8 +80,6 @@ fn symmetric_eigen(
     Ok((eigenvalues, matrix))
 }
 
-/// The symmetric covariance square root used by mvtnorm's default
-/// `rmvnorm(method = "eigen")` path.
 pub(crate) fn eigen_covariance_root(
     covariance: &[f64],
     order: usize,

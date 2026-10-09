@@ -7,7 +7,7 @@
 use nalgebra::{DMatrix, DVector};
 
 pub mod synth;
-pub mod ipop;
+pub mod simplex_qp;
 pub mod dataprep;
 mod statistics;
 

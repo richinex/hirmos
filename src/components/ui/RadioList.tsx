@@ -87,6 +87,8 @@ export function RadioList<V extends string>({
       >
         {options.map((option) => {
           const chosen = option.value === value
+          const labelId = `${name}-${option.value}`
+          const hintId = `${labelId}-hint`
           return (
             <div key={option.value} className="relative min-w-0">
               <label
@@ -104,6 +106,8 @@ export function RadioList<V extends string>({
                   value={option.value}
                   checked={chosen}
                   disabled={option.disabled}
+                  aria-labelledby={labelId}
+                  aria-describedby={option.hint === undefined ? undefined : hintId}
                   onChange={() => {
                     if (!chosen) onChange(option.value)
                   }}
@@ -111,12 +115,15 @@ export function RadioList<V extends string>({
                 />
                 <span className="min-w-0">
                   <span
+                    id={labelId}
                     className={cn('block text-body', option.disabled ? 'text-faint' : 'text-ink')}
                   >
                     {option.label}
                   </span>
                   {option.hint !== undefined && (
-                    <span className="block text-label text-faint">{option.hint}</span>
+                    <span id={hintId} className="block text-label text-faint">
+                      {option.hint}
+                    </span>
                   )}
                 </span>
               </label>

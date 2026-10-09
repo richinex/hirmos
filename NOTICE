@@ -153,3 +153,10 @@ GitHub Octicons — MIT
   Copyright (c) 2026 GitHub Inc. https://github.com/primer/octicons
   GitHub mark adapted to JSX in src/components/SourceNotice.tsx.
   Full notice: licenses/octicons.txt.
+
+Numdifftools 0.11.1 — BSD-3-Clause
+  Copyright (c) 2009-2026 Per A. Brodtkorb, John D'Errico.
+  Port: crates/causal-core/src/survival/flexsurv/adaptive_hessian.rs.
+  Central Hessian, Richardson extrapolation, DEA3 and estimate selection.
+  Modified to report typed failures and recover from invalid leading steps.
+  Full terms: licenses/upstream/numdifftools-LICENSE.txt.

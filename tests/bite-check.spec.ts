@@ -38,7 +38,7 @@ test('bite drafts inherit their parent and reject changed questions or graph rev
   expect(result.matches).toBe(true)
   expect(result.retained).toBe(true)
   expect(result.invalid).toEqual(Array(4).fill('bite-specification-mismatch'))
-  expect(result.cleared).toEqual(Array(4).fill(null))
+  expect(result.cleared).toEqual(Array(4).fill(undefined))
   expect(result.stale).toBe('bite-specification-mismatch')
   expect(result.missingParent).toBe('bite-specification-mismatch')
 })
@@ -76,7 +76,10 @@ test('a bite check is recorded against its study, estimated, and paired in Resul
   await page.getByRole('button', { name: 'Open AI usage intensity', exact: true }).click()
   await chapter(page, /^Study design/)
 
-  await page.getByText('Check the treatment’s bite', { exact: true }).click()
+  await page
+    .getByRole('article', { name: /bugs_per_kloc identification$/ })
+    .getByText('Check the treatment’s bite', { exact: true })
+    .click()
   await page.getByRole('button', { name: 'Study as the outcome' }).click()
   await expect(page.getByRole('combobox', { name: 'Outcome' })).toHaveText(/code_volume_kloc/)
   await identifyEffect(page, /^Recommended O-set/)
@@ -100,7 +103,7 @@ test('a bite check is recorded against its study, estimated, and paired in Resul
   const bite = page.getByRole('region', { name: 'Bite of ai_usage' })
   await expect(bite).toContainText('Effect on code_volume_kloc')
   await expect(bite).toContainText('95%')
-  await expect(bite).toContainText('Difference in')
+  await expect(bite).toContainText('Fitted difference in code volume kloc')
   await pick(/on code_volume_kloc/)
   const study = page.getByRole('region', { name: 'Study', exact: true })
   await expect(study).toContainText('Bite check for')
@@ -108,6 +111,7 @@ test('a bite check is recorded against its study, estimated, and paired in Resul
 
   // Sticky routing reopens the project on reload; the link is part of the saved study.
   await page.reload()
+  await expect(page.getByRole('heading', { name: 'Results', exact: true })).toBeVisible()
   await chapter(page, /^Study design/)
   await expect(
     page.getByText('Bite check for: Average effect of ai_usage on bugs_per_kloc.').first(),

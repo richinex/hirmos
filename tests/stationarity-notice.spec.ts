@@ -9,7 +9,7 @@ import { chapter } from './examples/support'
 test('the stage names the series once per reason and its action opens the stationarity pane', async ({ page }, info) => {
   await page.goto('/app/projects')
   await page.getByRole('button', { name: 'Open Seat-belt law and road deaths', exact: true }).click()
-  await page.waitForURL(/\/app\/(?!projects)/)
+  await page.waitForURL(/\/app\/projects\/[^/]+\/[a-z-]+$/)
   await chapter(page, /Discovery lab/)
   const notice = page.getByTestId('eligibility-notice').first()
   await expect(notice).toBeVisible({ timeout: 30_000 })
@@ -26,6 +26,6 @@ test('the stage names the series once per reason and its action opens the statio
     await expect(page.getByRole('region', { name: 'Method requirements' }).getByRole('listitem').filter({ hasText: /^DriversKilled/ })).toBeVisible()
   }
   await action.click()
-  await page.waitForURL(/\/app\/data$/)
+  await page.waitForURL(/\/app\/projects\/[^/]+\/data$/)
   await expect(page.getByRole('radio', { name: /^Stationarity/ })).toBeChecked()
 })

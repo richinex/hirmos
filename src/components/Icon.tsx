@@ -4,8 +4,7 @@ import { cn } from '@/lib/utils'
  * Material Symbols Sharp at weight 300. The squared terminals and uniform monoline stroke let icons
  * sit flush against the 1px chrome, which the old mixed lucide and phosphor set could not.
  *
- * Ligature-based, so the glyph name is the child text. The font is self-hosted and imported once in
- * main.tsx. The landing page does not load it, so a ligature there renders its name as plain text.
+ * Ligature-based, so the glyph name is the child text.
  */
 export function Icon({
   name,

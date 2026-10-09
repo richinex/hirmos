@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { expectVerdict } from './dagitty-verdict'
+import { chapter } from './examples/support'
 
 const fixtureDir = fileURLToPath(new URL('fixtures/dagitty/', import.meta.url))
 
@@ -126,11 +127,11 @@ for (const fixture of selected) {
       await expect(
         page.getByRole('heading', { name: 'Choose a valid adjustment set' }),
       ).toBeVisible()
-      await expect(page.getByRole('radio', { name: /^Minimal set 1\s*A, Z$/ })).toBeVisible()
-      await expect(page.getByRole('radio', { name: /^Minimal set 2\s*B, Z$/ })).toBeVisible()
-      await expect(page.getByRole('radio', { name: /^Canonical set\s*A, B, Z$/ })).toBeVisible()
+      await expect(page.getByRole('radio', { name: 'Minimal set 1', exact: true })).toHaveAccessibleDescription('A, Z')
+      await expect(page.getByRole('radio', { name: 'Minimal set 2', exact: true })).toHaveAccessibleDescription('B, Z')
+      await expect(page.getByRole('radio', { name: 'Canonical set', exact: true })).toHaveAccessibleDescription('A, B, Z')
 
-      await page.getByRole('radio', { name: /^Minimal set 1\s*A, Z$/ }).check()
+      await page.getByRole('radio', { name: 'Minimal set 1', exact: true }).check()
       await page.getByRole('button', { name: 'Record this set' }).click()
       const canvas = page.getByTestId('canvas')
       await expect(canvas.getByText('Minimal adjustment set 1', { exact: false })).toBeVisible()
@@ -162,6 +163,7 @@ test('O-set is recorded as a supplied set and survives project reload', async ({
   await expect(
     page.getByText('Recommended adjustment set (O-set)', { exact: false }).first(),
   ).toBeVisible()
+  await chapter(page, /^Projects/)
   await page.goto('/app/projects')
   await page.getByRole('button', { name: 'Open dagitty · ' + fixture.label, exact: true }).click()
   const needs = page.getByRole('heading', { name: 'Choose the data file again', exact: true })

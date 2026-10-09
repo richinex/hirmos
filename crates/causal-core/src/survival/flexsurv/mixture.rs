@@ -1,5 +1,6 @@
 //! `flexsurvmix` competing-event mixture likelihood and direct BFGS fit.
 
+use super::adaptive_hessian::{self, HessianError};
 use super::covariance::{eigen_covariance_root, hessian_to_covariance, CovarianceError};
 use super::distribution::{DistributionError, FlexSurvDistribution};
 use super::fit::{
@@ -12,7 +13,6 @@ use super::model::{
 };
 use super::observation::SurvivalObservation;
 use super::r_optim::{r_optim_bfgs_numeric, ROptimControl, ROptimError};
-use super::richardson::{richardson_hessian, RichardsonError};
 use super::uncertainty::type_seven_quantile;
 use crate::survival::r_rng::RRng;
 
@@ -177,11 +177,18 @@ pub struct FlexSurvMixFit {
 pub enum MixtureUncertainty {
     AllParametersFixed,
     Hessian {
+        calculation: MixtureHessianCalculation,
         covariance: Vec<f64>,
         covariance_order: usize,
         smallest_unrepaired_eigenvalue: f64,
         positive_definite_repair: bool,
     },
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum MixtureHessianCalculation {
+    CompleteEventBlocks,
+    Adaptive { estimated_errors: Vec<f64> },
 }
 
 /// One prediction profile in the covariate order used to fit each mixture
@@ -275,7 +282,7 @@ pub enum MixtureError {
     Likelihood(LikelihoodError),
     Optimizer(ROptimError),
     Fit(FitError),
-    Richardson(RichardsonError),
+    Hessian(HessianError),
     Covariance(CovarianceError),
     NonFiniteLikelihood,
     InvalidEmRelativeTolerance,
@@ -728,9 +735,9 @@ impl From<FitError> for MixtureError {
     }
 }
 
-impl From<RichardsonError> for MixtureError {
-    fn from(value: RichardsonError) -> Self {
-        Self::Richardson(value)
+impl From<HessianError> for MixtureError {
+    fn from(value: HessianError) -> Self {
+        Self::Hessian(value)
     }
 }
 
@@ -941,27 +948,37 @@ fn probabilities_at(
     design: Option<&CovariateMatrix>,
     row: usize,
 ) -> Vec<f64> {
+    let mut values = vec![0.0; components];
+    probabilities_at_into(parameters, components, design, row, &mut values);
+    values
+}
+
+fn probabilities_at_into(
+    parameters: &[f64],
+    components: usize,
+    design: Option<&CovariateMatrix>,
+    row: usize,
+    values: &mut [f64],
+) {
     let columns = design.map(CovariateMatrix::columns).unwrap_or(0);
-    let mut logits = vec![0.0; components];
+    values.fill(0.0);
     for component in 1..components {
-        logits[component] = parameters[component - 1];
+        values[component] = parameters[component - 1];
         if let Some(design) = design {
             let offset = components - 1 + (component - 1) * columns;
             for column in 0..columns {
-                logits[component] += design.value(row, column) * parameters[offset + column];
+                values[component] += design.value(row, column) * parameters[offset + column];
             }
         }
     }
-    let largest = logits.iter().copied().fold(f64::NEG_INFINITY, f64::max);
-    let mut values = logits
-        .iter()
-        .map(|value| (value - largest).exp())
-        .collect::<Vec<_>>();
+    let largest = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    for value in values.iter_mut() {
+        *value = (*value - largest).exp();
+    }
     let total = values.iter().sum::<f64>();
-    for value in &mut values {
+    for value in values.iter_mut() {
         *value /= total;
     }
-    values
 }
 
 fn probability_parameter_count(plan: &FlexSurvMixPlan) -> usize {
@@ -997,29 +1014,41 @@ fn negative_log_likelihood(
         offset += model.parameter_count();
     }
     let mut total = 0.0;
+    let mut mixing = vec![0.0; models.len()];
+    let mut values = Vec::with_capacity(models.len());
     for (row, observation) in plan.observations.iter().enumerate() {
-        let mixing = probabilities_at(
+        probabilities_at_into(
             parameters,
             plan.components.len(),
             plan.probability_design.as_ref(),
             row,
+            &mut mixing,
         );
-        let allowed = match &observation.event {
-            EventKnowledge::Known(event) => vec![*event],
-            EventKnowledge::Unknown => (0..models.len()).collect(),
-            EventKnowledge::Possible(events) => events.clone(),
-        };
-        let values = allowed
-            .iter()
-            .map(|event| {
-                let start = component_offsets[*event];
-                let end = start + models[*event].parameter_count();
-                let distribution = models[*event].distribution_at(row, &parameters[start..end])?;
-                Ok(mixing[*event].ln()
+        values.clear();
+        let mut append = |event: usize| -> Result<(), MixtureError> {
+            let start = component_offsets[event];
+            let end = start + models[event].parameter_count();
+            let distribution = models[event].distribution_at(row, &parameters[start..end])?;
+            values.push(
+                mixing[event].ln()
                     + LikelihoodRow::new(observation.survival, distribution, 1.0)?
-                        .contribution()?)
-            })
-            .collect::<Result<Vec<_>, MixtureError>>()?;
+                        .contribution()?,
+            );
+            Ok(())
+        };
+        match &observation.event {
+            EventKnowledge::Known(event) => append(*event)?,
+            EventKnowledge::Unknown => {
+                for event in 0..models.len() {
+                    append(event)?;
+                }
+            }
+            EventKnowledge::Possible(events) => {
+                for event in events {
+                    append(*event)?;
+                }
+            }
+        }
         total += if matches!(observation.event, EventKnowledge::Known(_)) {
             values[0]
         } else {
@@ -1329,18 +1358,28 @@ pub fn fit_mixture(plan: FlexSurvMixPlan) -> Result<FlexSurvMixFit, MixtureError
         return Err(MixtureError::NonFiniteLikelihood);
     }
     let uncertainty = if !matches!(plan.kind, MixtureFitKind::Fixed) {
-        let hessian = if matches!(plan.kind, MixtureFitKind::Em(_))
+        let (hessian, calculation) = if matches!(plan.kind, MixtureFitKind::Em(_))
             && plan
                 .observations
                 .iter()
                 .all(|row| matches!(row.event, EventKnowledge::Known(_)))
         {
-            complete_event_hessian(&plan, &models, &result.parameters)?
+            (
+                complete_event_hessian(&plan, &models, &result.parameters)?,
+                MixtureHessianCalculation::CompleteEventBlocks,
+            )
         } else {
-            richardson_hessian(&result.parameters, 6, objective)?
+            let estimate = adaptive_hessian::hessian(&result.parameters, objective)?;
+            (
+                estimate.values,
+                MixtureHessianCalculation::Adaptive {
+                    estimated_errors: estimate.errors,
+                },
+            )
         };
         let covariance = hessian_to_covariance(&hessian, result.parameters.len())?;
         MixtureUncertainty::Hessian {
+            calculation,
             covariance: covariance.values,
             covariance_order: covariance.order,
             smallest_unrepaired_eigenvalue: covariance.smallest_unrepaired_eigenvalue,

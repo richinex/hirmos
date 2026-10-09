@@ -43,7 +43,7 @@ test('dashboard cards, responsive navigation and prepared data remain usable', a
   await expect(page.getByRole('heading', { name: 'Projects', exact: true })).toBeVisible()
   await page.evaluate(() => document.fonts.ready)
   await expect(page.locator('.example-card')).toHaveCount(16)
-  expect(await page.locator('.chapter-heading').evaluate(el => getComputedStyle(el).fontFamily)).toContain('Roboto Slab')
+  expect(await page.locator('.chapter-heading').evaluate(el => getComputedStyle(el).fontFamily)).toContain('Asta Sans')
   await page.getByRole('searchbox', { name: 'Search examples' }).fill('company-wide')
   await expect(page.locator('.example-card')).toHaveCount(1)
   await page.getByRole('button', { name: 'Open AI adoption, company-wide', exact: true }).click()

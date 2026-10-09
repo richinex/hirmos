@@ -111,7 +111,7 @@ test('composed impact through controls, component plot, cancellation and restora
   await page.getByRole('button',{name:'Cancel run',exact:true}).click()
   await expect(page.getByRole('button',{name:'Cancel run',exact:true})).toHaveCount(0)
   await page.reload()
-  await page.getByRole('button',{name:/^Open Structural impact walkthrough/}).click()
+  await expect(page.getByRole('heading',{name:'Choose the data file again'})).toBeVisible()
   await page.locator('input[type=file]').setInputFiles(fixture('chapter-impact.csv'))
   await chapter(page,/Estimation/)
   await expect(page.getByTestId('structural-impact-components').first()).toBeVisible()

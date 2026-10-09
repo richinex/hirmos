@@ -137,10 +137,6 @@ pub fn direct_mixture_search_matches_flexsurvmix() {
         .iter()
         .zip(numbers(&fixture["direct"]["covariance"]))
     {
-        // The Richardson Hessian follows flexsurv's finite-difference recipe.
-        // libm evaluation on wasm32 moves the smallest covariance entry by
-        // 3.16e-9 relative to the R fixture while leaving the fitted optimum
-        // and every transformed estimate inside their source tolerances.
         close(*actual, target, 4e-9, "flexsurvmix covariance");
     }
 }

@@ -11,7 +11,7 @@ pub mod multistate;
 pub mod observation;
 pub mod predict;
 pub mod r_optim;
-mod richardson;
+pub mod adaptive_hessian;
 pub mod spline;
 pub mod standardize;
 mod survreg;

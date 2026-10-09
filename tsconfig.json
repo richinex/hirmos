@@ -17,6 +17,6 @@
     "baseUrl": ".",
     "paths": { "@/*": ["./src/*"] }
   },
-  "include": ["src", "tests", "playwright.config.ts"],
+  "include": ["src", "tests", "playwright.config.ts", "vite.config.ts", "vite-plugins", "scripts/*.d.mts"],
   "exclude": ["src/generated/analysis-wasm/package.json"]
 }
