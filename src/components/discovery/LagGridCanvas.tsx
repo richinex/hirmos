@@ -4,6 +4,7 @@ import { ReactFlow, type Node, type NodeProps } from '@xyflow/react'
 import type { EChartsCoreOption, EChartsType } from 'echarts/core'
 import { EChart } from '@/charts/EChart'
 import { FlowControls } from '@/components/flow/FlowControls'
+import { FLOW_DEFAULTS } from '@/components/flow/defaults'
 
 type GridNode = Node<
   {
@@ -53,6 +54,7 @@ export function LagGridCanvas(props: GridNode['data']) {
 
   return (
     <ReactFlow<GridNode>
+      {...FLOW_DEFAULTS}
       nodes={nodes}
       nodeTypes={NODE_TYPES}
       nodesDraggable={false}

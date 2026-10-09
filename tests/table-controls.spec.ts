@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 test('table controls align on touch and desktop, including after search and wrapping', async ({ page }, info) => {
-  await page.goto('/')
+  await page.goto('/app')
   await page.evaluate(async () => {
     const load = (path: string): Promise<any> => import(/* @vite-ignore */ path)
     const [{ React, createRoot }, ui] = await Promise.all([

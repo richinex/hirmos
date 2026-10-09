@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 test('expanding a dense scatter matrix does not redraw unchanged charts', async ({ page }, info) => {
   test.setTimeout(90_000)
-  await page.goto('/')
+  await page.goto('/app')
   await page.evaluate(async () => {
     const load = (path: string): Promise<any> => import(/* @vite-ignore */ path)
     const [{ React, createRoot }, { ExpandableChart }, { scatterMatrixOption }, { readChartTheme }] = await Promise.all([

@@ -38,7 +38,7 @@ test('survival shares select-all and clear actions without selecting reserved co
 })
 
 test('scatter labels use shared rounding without changing plotted coordinates', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/app')
   const result = await page.evaluate(async () => {
     const load = (path: string): Promise<any> => import(/* @vite-ignore */ path)
     const [{ scatterMatrixOption }, { readChartTheme }, { formatStatistic }] = await Promise.all([

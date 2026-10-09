@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 test('preprocessing uses consistent variable colours without changing data or diagnostic marks', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/app')
   const result = await page.evaluate(async () => {
     const load = (path: string): Promise<any> => import(/* @vite-ignore */ path)
     const [theme, changes, overview, histogram, scatter, decomposition] = await Promise.all([
@@ -43,7 +43,7 @@ test('preprocessing uses consistent variable colours without changing data or di
 })
 
 test('categorical chart colours follow the theme and retain term identity', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/app')
   const result = await page.evaluate(async () => {
     const load = (path: string): Promise<any> => import(/* @vite-ignore */ path)
     const [theme, regression, curves, intervention] = await Promise.all([

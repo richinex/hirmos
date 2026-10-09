@@ -60,7 +60,7 @@ test('reports weekly panel gaps independently and retains the balance gate', asy
   await page.getByRole('button', { name: 'Create project' }).click()
   await page.locator('input[type="file"]').setInputFiles({ name: 'panel.csv', mimeType: 'text/csv', buffer: Buffer.from('unit,date,x\nA,2026-01-05,1\nA,2026-01-12,2\nA,2026-01-26,3\nB,2026-01-12,4\nB,2026-01-19,5\nB,2026-01-26,6\n') })
   await page.getByRole('button', { name: /Inspect data/ }).click()
-  await page.getByRole('radio', { name: /Panel Several/ }).click()
+  await page.getByRole('radio', { name: 'Panel', exact: true }).click()
   await choose(page.getByLabel('Unit column'), 'unit')
   await choose(page.getByLabel('Time column'), 'date')
   await choose(page.getByLabel('Source frequency'), 'Weekly')

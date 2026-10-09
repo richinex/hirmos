@@ -11,6 +11,7 @@ import {
 import { Alert } from '@/components/ui/Alert'
 import { FloatingWindow } from '@/components/ui/FloatingWindow'
 import { button } from '@/components/ui/recipes'
+import { FLOW_DEFAULTS } from '@/components/flow/defaults'
 
 const NODE_TYPES = { dagVariable: DagVariableCard }
 const EDGE_TYPES = { dagEdge: DagEdgePath }
@@ -80,6 +81,7 @@ export function ReadOnlyCanvas<E extends Edge>({
       )}
       {drawing !== undefined && (
         <ReactFlow
+          {...FLOW_DEFAULTS}
           nodes={drawing.nodes}
           edges={drawing.edges}
           nodeTypes={NODE_TYPES}

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 test('coefficient grid handles many terms without creating every chart', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/app')
   await page.evaluate(async () => {
     const load = (path: string): Promise<any> => import(/* @vite-ignore */ path)
     const [{ createElement, createRoot }, { AalenCoefficients }] = await Promise.all([

@@ -52,6 +52,7 @@ import {
   inputPorts,
   type ConnectionRefusal,
 } from './pipelineWorkspaceModel'
+import { FLOW_DEFAULTS } from '@/components/flow/defaults'
 
 interface CardData extends Record<string, unknown> {
   readonly node: PipelineNode
@@ -452,6 +453,7 @@ function Flow({
   return (
     <div className="h-full w-full" onDragOver={allowDrop} onDrop={dropBlock}>
       <ReactFlow<CanvasNode, CanvasEdge>
+        {...FLOW_DEFAULTS}
         nodes={nodes}
         edges={edges}
         nodeTypes={NODE_TYPES}

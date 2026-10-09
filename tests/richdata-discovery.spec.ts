@@ -31,7 +31,9 @@ test('real weekly data distinguishes empty columns from partial missingness in d
   await expect(page.getByRole('radio', { name: /^RPCMCI/ })).toBeDisabled()
   await page.getByRole('radiogroup', { name: 'Discovery method family' }).getByRole('radio', { name: /^Nonstationary/ }).check()
   for (const method of ['CD-NOTS', 'CD-NOTS+']) {
-    await page.getByRole('radio', { name: new RegExp(`^${method.replace('+', '\\+')} Review`) }).check()
+    const radio = page.getByRole('radio', { name: method, exact: true })
+    await expect(radio).toHaveAccessibleDescription(/^Review/)
+    await radio.check()
     await expect(page.getByRole('alert').filter({ hasText: 'p = 1 and statistic = 0' })).toBeVisible()
     await expect(page.getByRole('button', { name: new RegExp(`^Run ${method.replace('+', '\\+')}(?: with|$)`) })).toBeEnabled()
     await choose(page, 'Missing observations', 'VAR-EM imputation')
@@ -47,7 +49,7 @@ test('real weekly data distinguishes empty columns from partial missingness in d
   const outcomes: Record<string, string[]> = {}
   for (const [method, family] of [['PCMCI+', 'PCMCI'], ['LPCMCI', 'PCMCI'], ['CD-NOTS', 'Nonstationary'], ['CD-NOTS+', 'Nonstationary'], ['GRACE', 'Neural']]) {
     await page.getByRole('radiogroup', { name: 'Discovery method family' }).getByRole('radio', { name: new RegExp(`^${family}`) }).check()
-    await page.getByRole('radio', { name: new RegExp(`^${method.replace('+', '\\+')} Review`) }).check()
+    await page.getByRole('radio', { name: method, exact: true }).check()
     await expect(page.getByRole('alert').filter({ hasText: 'No observed values in:' })).toHaveCount(0)
     const run = page.getByRole('button', { name: new RegExp(`^Run ${method.replace('+', '\\+')}(?: with|$)`) })
     await expect(run).toBeEnabled()

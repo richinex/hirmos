@@ -67,11 +67,11 @@ test('estimator chips use the prepared treatment and outcome before a run', asyn
   await expect(page.getByRole('button', { name: 'Checking treatment and outcome…' })).toBeHidden({ timeout: 30_000 })
   // The chapter opens on the family of the example's latest run; the chips under test are in the adjustment family.
   await page.getByRole('radiogroup', { name: 'Estimator family' }).getByRole('radio').first().click()
-  await expect(page.getByRole('radio', { name: /Bayesian negative binomial.*review/i })).toBeVisible()
-  await expect(page.getByRole('radio', { name: /Bayesian Gaussian regression.*unavailable/i })).toBeVisible()
+  await expect(page.getByRole('radio', { name: 'Bayesian negative binomial', exact: true })).toHaveAccessibleDescription(/review/i)
+  await expect(page.getByRole('radio', { name: 'Bayesian Gaussian regression', exact: true })).toHaveAccessibleDescription(/unavailable/i)
   // The do-query belongs to the identified-function family, and a family shows only its own methods.
   await page.getByRole('radiogroup', { name: 'Estimator family' }).getByRole('radio', { name: /^Identified/ }).click()
-  await expect(page.getByRole('radio', { name: /Discrete Bayesian network do-query.*unavailable/i })).toBeVisible()
+  await expect(page.getByRole('radio', { name: 'Discrete Bayesian network do-query', exact: true })).toHaveAccessibleDescription(/unavailable/i)
 })
 
 test('DirectLiNGAM is eligible only for complete independent cross-sectional observations', async ({ page }, testInfo) => {

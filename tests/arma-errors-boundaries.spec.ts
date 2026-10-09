@@ -9,7 +9,7 @@ const arma = { kind: 'arma', p: 1, q: 1, ar: [term('ar.L1')], ma: [term('ma.L1')
 
 test('the built WASM preserves a deficient covariance through interrupted-series evidence', async ({ page }) => {
   const fixture = JSON.parse(readFileSync(new URL('../crates/causal-core/oracle/fixtures/arma_regression.json', import.meta.url), 'utf8'))
-  await page.goto('/')
+  await page.goto('/app')
   const result = await page.evaluate(async (values: number[]) => {
     const modulePath = '/src/generated/analysis-wasm/hirmos_analysis.js'
     const wasm = await import(modulePath)

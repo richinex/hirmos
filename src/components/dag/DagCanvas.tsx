@@ -69,6 +69,7 @@ import { FlowControls, flowControl } from '@/components/flow/FlowControls'
 import { useMediaQuery } from '@/lib/useMediaQuery'
 import { dagPointerTarget, type ScreenTargetBox } from './dagPointerTarget'
 import { placeRouteLabels, routeLabelText, type RouteLabel } from './routeLabels'
+import { FLOW_DEFAULTS } from '@/components/flow/defaults'
 
 const SketchStroke = lazy(() => import('./SketchStroke'))
 export type DrawingStyle = 'clean' | 'sketch'
@@ -1523,6 +1524,7 @@ export function DagCanvas({
       <div className="relative min-h-0 flex-1">
         <div className="absolute inset-0">
           <ReactFlow<CanvasNode, CanvasEdge>
+            {...FLOW_DEFAULTS}
             nodes={displayedNodes}
             edges={model.edges.map((edge) =>
               edge.id === selectedEdge
