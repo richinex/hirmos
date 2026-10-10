@@ -120,7 +120,17 @@ async function configureOfflineEngine(db: duckdb.AsyncDuckDB, version: string): 
   }
 }
 
-const startEngine = async (): Promise<DuckDbEngine> => {
+export interface EngineOptions {
+  /**
+   * DuckDB's lossless Arrow export carries HUGEINT, booleans and other types as DuckDB extension
+   * types, which the Python pipeline needs to round-trip values exactly. The lossy export maps
+   * HUGEINT to decimal(38,0) instead; the SQL console's shell renders that and prints the
+   * extension type as raw bytes. Defaults to lossless.
+   */
+  readonly arrowLosslessConversion?: boolean
+}
+
+const startEngine = async ({ arrowLosslessConversion = true }: EngineOptions = {}): Promise<DuckDbEngine> => {
   const bundle = await duckdb.selectBundle(LOCAL_BUNDLES)
   if (!bundle.mainWorker) throw new Error('This browser did not select a DuckDB worker bundle.')
   const worker = new Worker(bundle.mainWorker)
@@ -129,7 +139,7 @@ const startEngine = async (): Promise<DuckDbEngine> => {
     await db.instantiate(bundle.mainModule, bundle.pthreadWorker)
     await db.open({
       allowUnsignedExtensions: false,
-      arrowLosslessConversion: true,
+      arrowLosslessConversion,
       maximumThreads: 1,
     })
     const version = await db.getVersion()
@@ -161,7 +171,8 @@ export const warmDuckDbEngine = (): void => {
 }
 
 /** A separate database for work whose catalog and registered files must end with that work. */
-export const isolatedDuckDbEngine = (): Promise<DuckDbEngine> => startEngine()
+export const isolatedDuckDbEngine = (options: EngineOptions = {}): Promise<DuckDbEngine> =>
+  startEngine(options)
 
 const sqlString = (value: string): string => `'${value.replaceAll("'", "''")}'`
 const sqlIdentifier = (value: string): string => `"${value.replaceAll('"', '""')}"`

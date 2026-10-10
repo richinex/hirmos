@@ -112,7 +112,22 @@ export function disposeTerminal(terminal: Terminal) {
   // WebGL restores the default renderer on disposal, before xterm tears it down.
   for (const addon of (addons.get(terminal) ?? []).reverse()) addon.dispose()
   addons.delete(terminal)
+  // Restoring the renderer resizes it. A detached terminal is paused and holds that resize for an
+  // idle callback, which would run after the disposal below and find no renderer; running it now
+  // sizes the restored renderer while it still exists. The task is private to xterm, and 5.3.0 is
+  // the last release under this package name.
+  pausedResizeTask(terminal)?.flush()
   terminal.dispose()
+}
+
+const pausedResizeTask = (terminal: Terminal): { flush(): void } | undefined => {
+  const core = (
+    terminal as unknown as {
+      _core?: { _renderService?: { _pausedResizeTask?: { flush?: unknown } } }
+    }
+  )._core
+  const task = core?._renderService?._pausedResizeTask
+  return typeof task?.flush === 'function' ? (task as { flush(): void }) : undefined
 }
 
 // The upstream shell installs process-wide WASM bindings and xterm handlers.

@@ -271,14 +271,20 @@ export async function replayDefinitionsInShell(
  * The shell creates its own connection through `connectInternal`. The proxy records that public
  * connection handle so Hirmos can route a visible cancel action to DuckDB without implementing a
  * second query runner.
+ *
+ * The shell keeps that connection until the next console opens and only then disconnects it. By
+ * then a closed session has terminated its worker, and a call reaching it logs an error, so the
+ * proxy answers the late disconnect itself.
  */
 const shellDatabase = (
   database: duckdb.AsyncDuckDB,
   connection: { current: number | null },
+  lifecycle: { current: 'open' | 'closed' },
   onQuery: (running: boolean) => void,
 ): duckdb.AsyncDuckDB =>
   new Proxy(database, {
     get(target, property) {
+      if (property === 'disconnect' && lifecycle.current === 'closed') return async () => {}
       if (property === 'runQuery') {
         return async (id: number, sql: string) => {
           onQuery(true)
@@ -313,7 +319,10 @@ export async function openSqlPreparation(
 ): Promise<Result<SqlPreparationSession, SqlPreparationProblem>> {
   let engine: DuckDbEngine
   try {
-    engine = await isolatedDuckDbEngine()
+    // This engine only feeds the console and its previews; the chosen view is materialised by
+    // verifyAndMaterialize on a lossless engine. The lossy export gives the shell a decimal it
+    // can print for HUGEINT, which every sum over an integer column returns.
+    engine = await isolatedDuckDbEngine({ arrowLosslessConversion: false })
   } catch (cause) {
     return err({ kind: 'engine-unavailable', detail: detailOf(cause) })
   }
@@ -323,12 +332,13 @@ export async function openSqlPreparation(
     return registered
   }
   const shellConnection = { current: null as number | null }
+  const lifecycle: SqlPreparationSession['lifecycle'] = { current: 'open' }
   return ok({
-    shellDatabase: shellDatabase(engine.db, shellConnection, onQuery),
+    shellDatabase: shellDatabase(engine.db, shellConnection, lifecycle, onQuery),
     database: engine.db,
     inputs,
     shellConnection,
-    lifecycle: { current: 'open' },
+    lifecycle,
   })
 }
 

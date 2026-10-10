@@ -38,6 +38,27 @@ test('opening SQL is inert; reviewed multiline SQL runs in the official console'
   await expect(page.getByRole('heading', { name: 'Source selected' })).toBeVisible({ timeout: 30_000 })
 })
 
+test('a sum over an integer column prints as a number in the console result', async ({ page }) => {
+  test.setTimeout(90_000)
+  await page.goto('/app')
+  await page.getByRole('textbox', { name: 'Project name' }).fill('SQL console numbers')
+  await page.getByRole('button', { name: 'Create project', exact: true }).click()
+  await page.getByRole('radio', { name: 'Prepare with SQL' }).click({ force: true })
+  await page.getByRole('button', { name: 'Open empty SQL editor' }).click()
+  await showSqlSource(page)
+  await expect(page.getByRole('button', { name: 'Open SQL file' })).toBeEnabled({ timeout: 30_000 })
+  await hideSqlSource(page)
+  // DuckDB returns HUGEINT for these sums. The console's engine exports it as a decimal, so the
+  // result carries the number; the lossless export would carry sixteen raw bytes instead.
+  const text = 'SELECT sum(value) AS total, sum(-value) AS negative, 12345678901234567890::HUGEINT AS wide FROM (VALUES (1), (2), (3)) rows(value);\n'
+  await page.getByLabel('SQL script file').setInputFiles({ name: 'sums.sql', mimeType: 'application/sql', buffer: Buffer.from(text) })
+  await page.getByRole('button', { name: 'Run SQL', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'SQL file', exact: true })
+  await expect(dialog.getByRole('cell', { name: '6', exact: true })).toBeVisible()
+  await expect(dialog.getByRole('cell', { name: '-6', exact: true })).toBeVisible()
+  await expect(dialog.getByRole('cell', { name: '12345678901234567890', exact: true })).toBeVisible()
+})
+
 test('SQL files expose errors and allow cancelling a batch without running later statements', async ({ page }) => {
   test.setTimeout(90_000)
   await page.goto('/app')
