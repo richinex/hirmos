@@ -220,3 +220,4 @@ pub mod power;
 pub mod power_simulation;
 
 pub mod covariate_balance;
+pub mod fe_weights;

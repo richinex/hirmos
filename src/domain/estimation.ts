@@ -1,4 +1,5 @@
 import { covariateBalanceSchema } from './covariateBalance'
+import { feWeightDiagnosticSchema } from './feWeights'
 import { z } from 'zod'
 import { ridgeConfigurationSchema, ridgeMatches, type RidgeConfiguration } from './ridgeAugmented'
 import type { RidgeAugmentedEvidence } from './remixExtensions'
@@ -1066,6 +1067,7 @@ export const defaultConfiguration = (
 export const backdoorLinearEvidenceSchema = z
   .object({
     kind: z.literal('backdoorLinear'),
+    weightDiagnostic: feWeightDiagnosticSchema.default({ kind: 'notRecorded' }),
     observations: z.number().int().positive(),
     /** The fitted coefficients: at least the intercept and the treatment, or the treatment alone with fixed effects. */
     parameters: z.number().int().min(1),

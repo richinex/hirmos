@@ -41,3 +41,6 @@ design/
 bend/
 LAWS.bend
 PROOF.bend
+
+# Performance measurements, local only
+perf/

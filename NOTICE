@@ -14,6 +14,14 @@ Corresponding Source: the Hirmos repository that contains this file. Anyone who
 receives Hirmos, including the hirmos_analysis wasm binary served by the app,
 is entitled to that source under the terms of the GPL.
 
+R stats 4.5.1 — GPL version 2 or version 3 (version 3 selected)
+  Copyright by members of or all of the R Core Team.
+  https://www.R-project.org/
+  Density and bandwidth conventions: crates/causal-core/src/fe_weights/density.rs,
+  adapted from stats::density and bw.nrd0; modified 2026-10.
+  R's COPYRIGHTS and licence() grant were inspected in the pinned R 4.5.1 oracle.
+  This code is distributed without warranty; see LICENSE for GPL version 3.
+
 TIGRAMITE — GPL-3.0-or-later
   Copyright (C) 2014-2025 Jakob Runge and contributors (LPCMCI: Andreas Gerhardus;
   RPCMCI: Elena Saggioro). https://github.com/jakobrunge/tigramite
@@ -94,6 +102,8 @@ Rust crates linked into the wasm binary (licences as declared on crates.io):
   matrixmultiply, rawpointer — MIT OR Apache-2.0
   bytemuck, safe_arch, wide — Zlib OR Apache-2.0 OR MIT
   memchr — Unlicense OR MIT
+  rustfft, strength_reduce, transpose, primal-check — MIT OR Apache-2.0
+
 Structural time-series components
 --------------------------------
 crates/structural-timeseries preserves Rust ports of R bsts 0.9.11 and

@@ -1,5 +1,6 @@
 import { NumberInput } from '@/components/ui/NumberInput'
 import {CovariateBalanceResult} from './CovariateBalanceResult'
+import { FeWeightDiagnosticResult } from './FeWeightDiagnosticResult'
 import {DagRevisionNotice} from '@/components/study/DagRevisionNotice'
 import { RunActions } from '@/components/ui/RunActions'
 import { PredictorSyntheticControls } from './PredictorSyntheticControls'
@@ -2599,6 +2600,12 @@ export const ResultCard = memo(function ResultCard({
         className="mt-3"
       />
       <Diagnostics run={run} />
+      {run.kind === 'backdoor-linear-run' && run.configuration.fixedEffects.kind !== 'none' && (
+        <FeWeightDiagnosticResult
+          evidence={run.evidence.weightDiagnostic}
+          grouping={run.configuration.fixedEffects.name}
+        />
+      )}
       {run.kind === 'causal-impact-run' && (
         <ImpactEffectPanel evidence={run.evidence} stepLabel={stepLabel} />
       )}
@@ -3368,6 +3375,7 @@ export function EstimationPanel({
           let values = design.value.values
           let columnCount = design.value.columnCount
           const columnOf = new Map<ColumnId, number>()
+          let weightLabels: ReadonlyMap<number, string> | null = null
           for (const [at, grouping] of extras.entries()) {
             const index = design.value.expanded[columns.length + at]?.[0]
             if (index === undefined) {
@@ -3416,13 +3424,18 @@ export function EstimationPanel({
             }
             if (groupings.some((grouping) => grouping.column === panel.sampling.unitColumn)) {
               const labels = [...new Set(keys.value.units)].sort()
+              if (unit?.column === panel.sampling.unitColumn)
+                weightLabels = new Map(labels.map((label, index) => [index, label]))
               columnOf.set(
                 panel.sampling.unitColumn,
                 append(keys.value.units.map((label: string) => labels.indexOf(label))),
               )
             }
-            if (groupings.some((grouping) => grouping.column === panel.sampling.timeColumn))
+            if (groupings.some((grouping) => grouping.column === panel.sampling.timeColumn)) {
               columnOf.set(panel.sampling.timeColumn, append(keys.value.periodCodes))
+              if (unit?.column === panel.sampling.timeColumn)
+                weightLabels = new Map(keys.value.periods.map(period => [period.code, period.label]))
+            }
           }
           const plan = adjustedRegressionPlan(configuration, columnOf)
           if (!plan.ok) {
@@ -3448,7 +3461,19 @@ export function EstimationPanel({
           const run = {
             kind: 'backdoor-linear-run',
             configuration,
-            evidence: evidence.value,
+            evidence: {
+              ...evidence.value,
+              weightDiagnostic: evidence.value.weightDiagnostic.kind === 'available' && weightLabels !== null
+                ? {
+                    ...evidence.value.weightDiagnostic,
+                    groups: evidence.value.weightDiagnostic.groups.map(group => {
+                      const label = typeof group.label === 'number' ? weightLabels.get(group.label) : undefined
+                      if (label === undefined) throw new Error('A fixed-effects group label is missing from the fitted panel.')
+                      return { ...group, label }
+                    }),
+                  }
+                : evidence.value.weightDiagnostic,
+            },
           } as const
           const estimate = causalEstimateFrom(study, identification, run)
           finish(

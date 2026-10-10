@@ -166,6 +166,7 @@ pub(crate) fn backdoor_linear(
         durbin_watson: durbin_watson(&hac.resid),
         error_model,
         fixed_effects: FixedEffectsEvidence::None,
+        weight_diagnostic: FeWeightEvidence::NotApplicable,
     })
 }
 
@@ -244,6 +245,20 @@ fn backdoor_linear_within(
         _ => LinearErrorEvidence::NeweyWest,
     };
     let hac = ols_hac(&classical.within_outcome, &classical.within_design, max_lags);
+    let weight_diagnostic = if time.is_some() {
+        FeWeightEvidence::Unavailable { reason: "Weight diagnostics cover one grouping, not separate unit and time effects.".to_owned() }
+    } else if !adjustment.is_empty() {
+        FeWeightEvidence::Unavailable { reason: "Weight diagnostics cover a single treatment regressor without other covariates.".to_owned() }
+    } else if units > 10_000 {
+        FeWeightEvidence::Unavailable { reason: "Weight diagnostics cover up to 10,000 groups.".to_owned() }
+    } else {
+        let x = (0..rows).map(|row| data[(row, treatment)]).collect::<Vec<_>>();
+        let mut labels = vec![0.0; units];
+        for (row, &group) in groups.iter().enumerate() {
+            labels[group as usize] = data[(row, unit)];
+        }
+        super::fe_weights::calculate(&x, y, &groups, &labels)
+    };
     Ok(AnalysisResult::BackdoorLinear {
         observations: rows,
         parameters: classical.kept.len(),
@@ -263,6 +278,7 @@ fn backdoor_linear_within(
         hac_p_value: hac.pvalues[0],
         durbin_watson: durbin_watson(&classical.resid),
         error_model,
+        weight_diagnostic,
         fixed_effects: {
             let absorbed = classical.dropped.iter().map(|&column| adjustment[column - 1]).collect();
             match time {

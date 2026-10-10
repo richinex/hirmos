@@ -2005,6 +2005,10 @@ const BACKDOOR_LINEAR_REGRESSION: MethodDefinition = {
         'Remaining confounding can bias the coefficient. If the fixed effects absorb the treatment, its coefficient cannot be estimated.',
       sources: [
         WOOLDRIDGE_2010,
+        paper(
+          'Fixed Effects and Collider Bias: When Absorbing Group Heterogeneity Creates Endogeneity (Jung, Burkhardt and Hünermund, 2026)',
+          'SSRN 7268258, §6 and Appendix C: identifying-weight diagnostics for one regressor and one grouping',
+        ),
         linearmodels('linearmodels/panel/model.py#PanelOLS'),
         linearmodels('linearmodels/panel/covariance.py#ClusteredCovariance'),
       ],

@@ -3,6 +3,56 @@
 use super::*;
 
 #[derive(Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub(crate) enum FeWeightEvidence {
+    NotApplicable,
+    Unavailable { reason: String },
+    Available {
+        observations: usize,
+        groups: Vec<FeWeightGroup>,
+        gini_variance: f64,
+        maximum_weight: f64,
+        effective_groups: f64,
+        top_five_share: f64,
+        top_ten_share: f64,
+        top_decile_share: f64,
+        bandwidth: f64,
+        density: Vec<[f64; 2]>,
+        dropout: Vec<FeDropoutPoint>,
+    },
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct FeWeightGroup {
+    pub group: u64,
+    pub label: f64,
+    pub observations: usize,
+    pub variance: f64,
+    pub sum_squares: f64,
+    pub weight: f64,
+    pub relative_weight: f64,
+    pub rank_share: f64,
+    pub cumulative_weight: f64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct FeDropoutPoint {
+    pub removed_groups: Vec<u64>,
+    pub original_weight_removed: f64,
+    pub remaining_observations: usize,
+    pub fit: FeDropoutFit,
+}
+
+#[derive(Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub(crate) enum FeDropoutFit {
+    Estimated { coefficient: f64 },
+    Unavailable { reason: String },
+}
+
+#[derive(Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub(crate) enum AdjustmentRecommendation {
     Available { nodes: Vec<usize>, guarantee: OptimalityGuarantee },
@@ -3130,6 +3180,7 @@ pub(crate) enum AnalysisResult {
         durbin_watson: f64,
         error_model: LinearErrorEvidence,
         fixed_effects: FixedEffectsEvidence,
+        weight_diagnostic: FeWeightEvidence,
     },
     PropensityWeighting {
         balance: CovariateBalanceEvidence,

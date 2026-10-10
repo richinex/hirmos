@@ -331,9 +331,9 @@ export function EvidenceTable<Row>({
             <FilterField
               value={query}
               onChange={setQuery}
-              placeholder="Search variables"
+              placeholder={`Search ${noun}s`}
               label={`Search ${title.toLowerCase()}`}
-              className="w-44"
+              className="min-w-0 flex-1 sm:w-44"
             />
           )}
           <DensityToggle density={density} onChange={setDensity} />

@@ -13,6 +13,7 @@ pub(crate) use hirmos_causal_core::{
 };
 
 mod adjusted_outcome;
+mod fe_weights;
 mod propensity_score;
 mod identified_functional;
 mod graph_adjusted_temporal;
