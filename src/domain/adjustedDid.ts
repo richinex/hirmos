@@ -113,7 +113,7 @@ export function describeDidCovariateRole(role: DidCovariateRole): string {
     case 'baseline-group-indicator':
       return 'Baseline values identify the treated and control groups exactly, leaving no treatment overlap.'
     case 'cohort-indicator':
-      return 'Identifies an adoption cohort exactly against the never-treated units; it is not an adjustment covariate.'
+      return 'Identifies an adoption cohort exactly; it is not an adjustment covariate.'
     default:
       return assertNever(role)
   }

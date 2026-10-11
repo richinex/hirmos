@@ -386,7 +386,7 @@ export function resultScaleLine(
       return run.evidence.kind === 'sunAbraham'
         ? 'Average of supported post-treatment cohort-by-event-time effects, weighted by treated observations.'
         : run.evidence.kind === 'staggeredDid'
-          ? 'Average of supported post-adoption event-time ATT estimates.'
+          ? staggeredHeadlineSentence[staggeredRunHeadline(run)]
           : `Average difference over treated units and post-adoption periods.`
     case 'discrete-bn-run':
       return `Difference in expected ${outcome} in the high rather than low ${treatment} state.`
@@ -903,7 +903,7 @@ export function interpretEstimationResult(
           statements: [
             {
               kind: 'magnitude',
-              text: `${staggeredHeadlineSentence[staggeredRunHeadline(run)]} Each post-adoption effect compares the outcome in that period with ${staggeredBaseline(run.evidence.specification.anticipation)}, for the treated cohort against the comparison group. The other averages and the group-time ATT are reported separately.`,
+              text: `Each post-adoption effect compares the outcome in that period with ${staggeredBaseline(run.evidence.specification.anticipation)}, for the treated cohort against the comparison group. The other averages and the group-time ATT are reported separately.`,
             },
             estimate.interval.kind === 'none'
               ? noInterval(estimate.interval.reason)

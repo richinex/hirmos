@@ -1,50 +1,27 @@
 import { NumberInput } from '@/components/ui/NumberInput'
-import { useMemo } from 'react'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { SelectionActions } from '@/components/ui/SelectionActions'
 import { ParameterLabel } from '@/components/ui/ParameterLabel'
 import { field, fieldLabel, fieldRow, settingsStack } from '@/components/ui/recipes'
-import type { ColumnId, DatasetProfile } from '@/domain/dataset'
-import type { PanelBinding } from '@/domain/estimationDraft'
+import type { ColumnId } from '@/domain/dataset'
 import type { PanelInterventionConfiguration } from '@/domain/estimation'
-import {
-  didNormalizationLabels,
-  didCovariateRestrictions,
-  describeDidCovariateRole,
-} from '@/domain/adjustedDid'
-import { useDidCovariates } from './useDidCovariates'
-import { DidCovariateChecklist } from './DidCovariateChecklist'
+import { didNormalizationLabels } from '@/domain/adjustedDid'
+import { DidCovariateChecklist, type DidCovariateCheck } from './DidCovariateChecklist'
 type Configuration = Extract<PanelInterventionConfiguration, { primary: 'adjusted' }>
 export function AdjustedDidControls({
   configuration,
   candidates,
   onChange,
-  file,
-  profile,
-  binding,
+  restrictions,
+  check,
 }: {
   readonly configuration: Configuration
   readonly candidates: readonly { readonly id: ColumnId; readonly name: string }[]
   readonly onChange: (value: Configuration) => void
-  readonly file: File
-  readonly profile: DatasetProfile
-  readonly binding: PanelBinding | null
+  readonly restrictions: ReadonlyMap<ColumnId, string>
+  readonly check: DidCovariateCheck
 }) {
   const spec = configuration.specification
-  const inspection = useDidCovariates({ file, profile, binding }, candidates)
-  // A scan of the whole panel: once per read and specification, not on every keystroke.
-  const restrictions = useMemo(
-    () =>
-      new Map(
-        inspection.kind === 'ready' && inspection.layout !== null
-          ? didCovariateRestrictions(inspection.matrix, inspection.layout, spec).map((item) => [
-              item.column,
-              describeDidCovariateRole(item.role),
-            ])
-          : [],
-      ),
-    [inspection, spec],
-  )
   return (
     <div className={settingsStack}>
       <div className="max-w-3xl">
@@ -75,13 +52,7 @@ export function AdjustedDidControls({
           candidates={candidates}
           selected={configuration.covariates}
           restrictions={restrictions}
-          check={
-            inspection.kind === 'pending'
-              ? 'pending'
-              : inspection.kind === 'ready' && inspection.layout !== null
-                ? 'checked'
-                : 'unchecked'
-          }
+          check={check}
           onChange={(covariates) => onChange({ ...configuration, covariates: [...covariates] })}
         />
       </div>

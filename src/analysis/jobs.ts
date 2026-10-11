@@ -91,6 +91,10 @@ export function createJobs(stop: () => void) {
       set(key, { kind: 'failed', action: job.action, detail })
     },
     cancel,
+    clearNotice(key: string) {
+      const job = store.getState().jobs[key]
+      if (job?.kind === 'failed' || job?.kind === 'cancelled') set(key, IDLE)
+    },
     activate() {
       held.clear()
       if (!available) store.setState({ jobs: {} })

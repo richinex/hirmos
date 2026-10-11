@@ -6,7 +6,14 @@ import { baseOption, gridAuto, tooltip, valueAxis } from '@/charts/grammar'
 import { useChartTheme } from '@/charts/theme'
 import { EvidenceTable } from '@/components/table/EvidenceTable'
 import { MetricGrid, MetricTile } from '@/components/ui/figures'
-import { formatStatistic, formatWords, formatP } from '@/lib/format/number'
+import { Metadata } from '@/components/ui/Metadata'
+import {
+  formatCount,
+  formatPercent,
+  formatStatistic,
+  formatWords,
+  formatP,
+} from '@/lib/format/number'
 import { resultSurface, resultTitle } from '@/components/ui/recipes'
 import type { BaconEvidence } from '@/domain/panelRegression'
 import { periodLabel } from '@/domain/periodLabels'
@@ -208,17 +215,22 @@ export function PanelRegressionResult({
         {s.kind === 'eventStudy' ? 'Regression event study' : 'Interaction regression'} for{' '}
         {run.outcome.name}
       </h3>
-      <MetricGrid label="Regression summary">
-        <MetricTile label="Observations" value={formatWords(String(e.observations))} />
-        <MetricTile label="Clusters" value={formatWords(String(e.clusters))} />
-        <MetricTile label="Retained coefficients" value={formatWords(String(e.terms.length))} />
-      </MetricGrid>
+      {s.kind === 'eventStudy' && (
+        <ExpandableChart label="Regression event study" option={option} className="h-[300px]" />
+      )}
+      <p className="m-0 text-label text-faint" aria-label="Regression sample">
+        <Metadata>
+          <span>{formatCount(e.observations).text} observations</span>
+          <span>{formatCount(e.clusters).text} clusters</span>
+          <span>{formatCount(e.terms.length).text} retained coefficients</span>
+        </Metadata>
+      </p>
       <p className="text-body text-muted">
         {s.kind === 'eventStudy'
           ? 'Unit and period fixed effects with one-way clustered covariance and a finite-sample correction. These pooled regression coefficients are not cohort-specific ATT estimates.'
           : 'Hierarchical interactions with CR2 clustered covariance and coefficient-specific Satterthwaite degrees of freedom. Lower-order terms are included with each interaction.'}{' '}
-        Intervals use a {number(e.request.confidence * 100)}% confidence level and are pointwise,
-        not simultaneous.
+        Intervals use a {formatPercent(e.request.confidence, { precision: 0 }).text} confidence
+        level and are pointwise, not simultaneous.
       </p>
       {s.kind === 'eventStudy' && (
         <>
@@ -228,7 +240,6 @@ export function PanelRegressionResult({
               ? 'The endpoint indicators include observations beyond the event window.'
               : 'Observations outside the event window share the omitted category.'}
           </p>
-          <ExpandableChart label="Regression event study" option={option} className="h-[300px]" />
           <p className="text-body text-muted">
             {e.leadTest.kind === 'recorded'
               ? `Joint test of zero lead coefficients: F = ${number(e.leadTest.statistic)}, p ${formatP(e.leadTest.pValue, { withLabel: false }).text}. This compares leads with the recorded omitted category; non-rejection does not establish parallel trends.`

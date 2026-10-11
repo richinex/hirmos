@@ -73,8 +73,11 @@ import { AdjustedDidControls } from './AdjustedDidControls'
 import {
   didCovariateRestrictions,
   describeDidCovariateRestrictions,
+  describeDidCovariateRole,
   staggeredCovariateRestrictions,
 } from '@/domain/adjustedDid'
+import { useDidCovariates } from './useDidCovariates'
+import type { DidCovariateCheck } from './DidCovariateChecklist'
 import { AdjustedDidResult, AdjustedDidConvergenceWarning } from './AdjustedDidResult'
 import { describePanelDataProblem } from '@/domain/panel'
 import { TLearnerIntervals } from './TLearnerIntervals'
@@ -115,7 +118,7 @@ import { EstimateHeadline, headlineFigure, scaleOf } from '@/components/results/
 import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
 import { RadioList } from '@/components/ui/RadioList'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
-import { ParameterLabel } from '@/components/ui/ParameterLabel'
+import { ParameterHelp, ParameterLabel } from '@/components/ui/ParameterLabel'
 import {
   actionGap,
   button,
@@ -3002,8 +3005,10 @@ export function EstimationPanel({
     sunComparison,
   ])
   const eligibility = eligibilityByEstimator.get(state.estimator) ?? null
-  const configure = (next: EstimatorConfiguration) =>
+  const configure = (next: EstimatorConfiguration) => {
+    session.clearNotice()
     dispatch({ type: 'configured', configuration: next })
+  }
   const adjustmentDraftOpen =
     configuration.kind === 'causal-effects-total' &&
     configuration.estimator.kind !== 'wrightParents' &&
@@ -5188,6 +5193,34 @@ export function EstimationPanel({
       ),
     [controlCandidates, prepared],
   )
+  const didCovariateMethod =
+    configuration.kind === 'panel-intervention' &&
+    (configuration.primary === 'staggered' || configuration.primary === 'adjusted')
+      ? configuration
+      : null
+  const didInspection = useDidCovariates(
+    didCovariateMethod !== null && prepared.kind === 'prepared-panel'
+      ? { file: source.file, profile, binding: panelBinding }
+      : null,
+    didCandidates,
+  )
+  const didRestrictions = useMemo<ReadonlyMap<ColumnId, string>>(() => {
+    if (didInspection.kind !== 'ready' || didCovariateMethod === null) return new Map()
+    const restricted =
+      didCovariateMethod.primary === 'staggered'
+        ? staggeredCovariateRestrictions(didInspection.matrix)
+        : didCovariateMethod.primary === 'adjusted' && didInspection.layout !== null
+          ? didCovariateRestrictions(didInspection.matrix, didInspection.layout, didCovariateMethod.specification)
+          : []
+    return new Map(restricted.map((item) => [item.column, describeDidCovariateRole(item.role)]))
+  }, [didInspection, didCovariateMethod])
+  const didCheck: DidCovariateCheck =
+    didInspection.kind === 'pending'
+      ? 'pending'
+      : didInspection.kind === 'ready' &&
+          (didCovariateMethod?.primary !== 'adjusted' || didInspection.layout !== null)
+        ? 'checked'
+        : 'unchecked'
   // A unit or cluster column identifies groups of rows; it cannot also be a regressor. A panel's own unit key comes first.
   const designColumns = new Set(
     identification !== null && 'adjustment' in identification.result
@@ -6752,7 +6785,8 @@ export function EstimationPanel({
                   section="comparison"
                   configuration={configuration}
                   candidates={didCandidates}
-                  inspect={{ file: source.file, profile, binding: panelBinding }}
+                  restrictions={didRestrictions}
+                  check={didCheck}
                   clusterCandidates={profile.columns.filter(
                     (c) =>
                       c.id !== study?.treatment.column &&
@@ -6787,9 +6821,8 @@ export function EstimationPanel({
                   configuration={configuration}
                   candidates={didCandidates}
                   onChange={configure}
-                  file={source.file}
-                  profile={profile}
-                  binding={panelBinding}
+                  restrictions={didRestrictions}
+                  check={didCheck}
                 />
               </SettingsStep>
             )}
@@ -7960,9 +7993,15 @@ export function EstimationPanel({
   const stage = (
     <section aria-labelledby="estimation-title" className="@container/panel flex flex-col gap-5">
       <div>
-        <ChapterHeading id="estimation-title" className="mb-2">
-          Estimation
-        </ChapterHeading>
+        <div className="mb-2 flex items-center gap-1.5">
+          <ChapterHeading id="estimation-title" className="mb-0">
+            Estimation
+          </ChapterHeading>
+          <ParameterHelp
+            label="Estimation"
+            help="Choose an estimator for the identified effect and run the analysis."
+          />
+        </div>
         <p className={chapterIntro}>
           Identification determines how to express the causal question using observed data.
           Estimation applies a statistical method to that expression. In this section, you choose a
@@ -7991,7 +8030,8 @@ export function EstimationPanel({
                 <Select
                   className={field('text', 'mt-1')}
                   value={state.identification ?? ''}
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    session.clearNotice()
                     dispatch({
                       type: 'identification-chosen',
                       selection: estimationSelection(
@@ -8000,7 +8040,7 @@ export function EstimationPanel({
                         prepared,
                       ),
                     })
-                  }
+                  }}
                 >
                   {identified.map((candidate) => {
                     const bound = studies.find((item) => item.id === candidate.study)
@@ -8032,7 +8072,10 @@ export function EstimationPanel({
                     legend={visibleGroup.name}
                     legendHidden
                     value={state.estimator}
-                    onChange={(estimator) => dispatch({ type: 'estimator-chosen', estimator })}
+                    onChange={(estimator) => {
+                      session.clearNotice()
+                      dispatch({ type: 'estimator-chosen', estimator })
+                    }}
                     options={visibleGroup.estimators.flatMap((id) => {
                       const definition = methodDefinition(methodIdOf(id))
                       const candidateEligibility = eligibilityByEstimator.get(id)
@@ -8178,9 +8221,6 @@ export function EstimationPanel({
             )
           })()}
         </section>
-      )}
-      {runs.length === 0 && identified.length > 0 && (
-        <EmptyState>Choose an estimator and run it against the identified study.</EmptyState>
       )}
     </section>
   )
@@ -8354,6 +8394,20 @@ export function EstimationPanel({
                 </MetricGrid>
               </section>
             )}
+          {didRestrictions.size > 0 && (
+            <section aria-label="Covariates not available" className="space-y-2">
+              <h4 className="m-0 text-body font-medium text-ink">Covariates not available</h4>
+              <ul className="m-0 list-none space-y-1 p-0 text-body text-muted">
+                {didCandidates
+                  .filter((c) => didRestrictions.has(c.id))
+                  .map((c) => (
+                    <li key={c.id}>
+                      {c.name}: {didRestrictions.get(c.id)}
+                    </li>
+                  ))}
+              </ul>
+            </section>
+          )}
           <MethodCaveats
             methods={
               method.ok
@@ -8423,7 +8477,7 @@ export function EstimationPanel({
       )}
       <ul className="m-0 list-none divide-y divide-hair p-0 text-body" aria-label="Estimation runs">
         {runs.length === 0 && (
-          <li className="px-3 py-2 text-faint">Choose an estimator and run it.</li>
+          <li className="px-3 py-2 text-faint">No saved runs.</li>
         )}
         {[...runs].reverse().map((run) => {
           const bound = studies.find((candidate) => candidate.id === run.study)

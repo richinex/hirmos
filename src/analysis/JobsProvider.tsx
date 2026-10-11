@@ -62,5 +62,6 @@ export function useJob(key: string) {
     finish: (id: string) => jobs.finish(key, id),
     fail: (id: string, detail: string) => jobs.fail(key, id, detail),
     cancel: () => jobs.cancel(key),
+    clearNotice: () => jobs.clearNotice(key),
   }
 }

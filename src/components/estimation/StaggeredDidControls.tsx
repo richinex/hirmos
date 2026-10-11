@@ -1,16 +1,12 @@
 import { NumberInput } from '@/components/ui/NumberInput'
-import { useMemo } from 'react'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { SelectionActions } from '@/components/ui/SelectionActions'
 import { ParameterLabel } from '@/components/ui/ParameterLabel'
 import { SettingsDisclosure } from '@/components/ui/SettingsDisclosure'
 import { Select } from '@/components/ui/Select'
 import { field, fieldLabel, fieldRow, settingsStack } from '@/components/ui/recipes'
-import type { ColumnId, DatasetProfile } from '@/domain/dataset'
-import type { PanelBinding } from '@/domain/estimationDraft'
-import { describeDidCovariateRole, staggeredCovariateRestrictions } from '@/domain/adjustedDid'
-import { useDidCovariates } from './useDidCovariates'
-import { DidCovariateChecklist } from './DidCovariateChecklist'
+import type { ColumnId } from '@/domain/dataset'
+import { DidCovariateChecklist, type DidCovariateCheck } from './DidCovariateChecklist'
 import {
   recordedStaggeredAdjustment,
   recordedStaggeredHeadline,
@@ -25,34 +21,17 @@ export function StaggeredDidControls({
   candidates,
   clusterCandidates,
   onChange,
-  inspect,
+  restrictions = new Map(),
+  check = 'pending',
 }: {
   readonly configuration: StaggeredConfiguration
   readonly candidates: readonly { readonly id: ColumnId; readonly name: string }[]
   readonly clusterCandidates: readonly { readonly id: ColumnId; readonly name: string }[]
   readonly onChange: (value: StaggeredConfiguration) => void
   readonly section: 'comparison' | 'reporting'
-  /** Given only where the covariate list is shown, so the panel is read once. */
-  readonly inspect?: {
-    readonly file: File
-    readonly profile: DatasetProfile
-    readonly binding: PanelBinding | null
-  }
+  readonly restrictions?: ReadonlyMap<ColumnId, string>
+  readonly check?: DidCovariateCheck
 }) {
-  const inspection = useDidCovariates(inspect ?? null, candidates)
-  // A scan of the whole panel: once per read, not on every keystroke.
-  const restrictions = useMemo(
-    () =>
-      new Map(
-        inspection.kind === 'ready'
-          ? staggeredCovariateRestrictions(inspection.matrix).map((item) => [
-              item.column,
-              describeDidCovariateRole(item.role),
-            ])
-          : [],
-      ),
-    [inspection],
-  )
   const spec = configuration.specification
   const adjustment = recordedStaggeredAdjustment(spec)
   const headline = recordedStaggeredHeadline(configuration)
@@ -138,13 +117,7 @@ export function StaggeredDidControls({
             candidates={candidates}
             selected={configuration.covariates}
             restrictions={restrictions}
-            check={
-              inspection.kind === 'pending'
-                ? 'pending'
-                : inspection.kind === 'ready'
-                  ? 'checked'
-                  : 'unchecked'
-            }
+            check={check}
             onChange={(covariates) => onChange({ ...configuration, covariates: [...covariates] })}
           />
         </div>

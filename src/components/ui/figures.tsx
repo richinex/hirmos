@@ -205,7 +205,7 @@ export function IntervalFigure({
         title={figure.exact}
       >
         <span className="sr-only">
-          {pointFigure.srText}; {figure.typeLabel}: {figure.bounds.lower} to {figure.bounds.upper}
+          {pointFigure.srText}; {figure.srInterval}
         </span>
         <span aria-hidden className={num()}>
           {point.map((part, index) =>

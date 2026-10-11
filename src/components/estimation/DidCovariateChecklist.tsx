@@ -26,25 +26,30 @@ export function DidCovariateChecklist({
   return (
     <>
       <div role="group" aria-label={label} className="mt-1 flex flex-wrap gap-2">
-        {candidates.map((c) => (
-          <label key={c.id} className="flex items-center gap-1.5 text-body text-ink">
-            <input
-              type="checkbox"
-              aria-label={c.name}
-              disabled={restrictions.has(c.id) && !chosen.has(c.id)}
-              checked={chosen.has(c.id)}
-              onChange={(e) =>
-                onChange(
-                  e.target.checked ? [...selected, c.id] : selected.filter((id) => id !== c.id),
-                )
-              }
-            />
-            {c.name}
-            {restrictions.has(c.id) ? (
-              <span className="text-muted">{restrictions.get(c.id)}</span>
-            ) : null}
-          </label>
-        ))}
+        {candidates.map((c) => {
+          const reason = restrictions.get(c.id)
+          const disabled = reason !== undefined && !chosen.has(c.id)
+          return (
+            <label
+              key={c.id}
+              title={reason}
+              className={`flex items-center gap-1.5 text-body ${disabled ? 'text-faint' : 'text-ink'}`}
+            >
+              <input
+                type="checkbox"
+                aria-label={c.name}
+                disabled={disabled}
+                checked={chosen.has(c.id)}
+                onChange={(e) =>
+                  onChange(
+                    e.target.checked ? [...selected, c.id] : selected.filter((id) => id !== c.id),
+                  )
+                }
+              />
+              {c.name}
+            </label>
+          )
+        })}
       </div>
       {check === 'pending' ? (
         <p className="mb-0 mt-2 text-body text-muted" role="status">

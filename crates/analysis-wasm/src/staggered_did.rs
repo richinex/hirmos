@@ -267,7 +267,7 @@ fn problem(error: did::Error) -> String {
         NumericalOverflow => "The calculation produced a non-finite value. Check outcome and covariate scales.".into(),
         InvalidWeights => "Sampling weights must cover each unit exactly once and have positive total weight.".into(),
         InvalidWindow => "The first event time must not exceed the last event time.".into(),
-        SmallControlGroup { count,required } => format!("The comparison group has {count} units; this specification requires at least {required}."),
+        SmallControlGroup { count,required } => format!("The never-treated comparison group has {count} {}, but this specification requires at least {required}. Consider not-yet-treated comparisons if they suit the study. They include units that remain untreated through the comparison and anticipation window.", if count == 1 { "unit" } else { "units" }),
     }
 }
 

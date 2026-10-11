@@ -202,6 +202,7 @@ export function formatInterval(
 ): Formatted & {
   readonly bounds: { readonly lower: string; readonly upper: string }
   readonly typeLabel: string
+  readonly srInterval: string
 } {
   const locale = opts.locale ?? defaultLocale()
   const shown = displayValue(estimate, scale)
@@ -238,15 +239,17 @@ export function formatInterval(
       : `${level} ${type.summary === 'HDI' ? 'highest density interval' : 'credible interval'}`
   const srBound = (value: number) =>
     `${srSign(settled(displayValue(value, scale), decimals))}${digits(displayValue(value, scale), decimals, 'en-GB')}`
+  const srInterval = `${srType} ${srBound(lower)} to ${srBound(upper)}`
   const srUnit = unit.sr.length > 0 ? ` ${unit.sr}` : ''
   return {
     ...assemble(
       parts,
       `${exactText(estimate)} [${exactText(lower)}, ${exactText(upper)}]`,
-      `${scalePrefix(scale)}${srSign(signed)}${digits(shown, decimals, 'en-GB')}${srUnit}, ${srType} ${srBound(lower)} to ${srBound(upper)}`.trim(),
+      `${scalePrefix(scale)}${srSign(signed)}${digits(shown, decimals, 'en-GB')}${srUnit}, ${srInterval}`.trim(),
     ),
     bounds,
     typeLabel,
+    srInterval,
   }
 }
 
