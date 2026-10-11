@@ -831,6 +831,7 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
         placeboReplications: command.placeboReplications,
         seed: command.seed,
         primary: command.primary ?? 'syntheticDid',
+        inference: command.inference,
       }
     case 'count-regression':
       return { kind: 'countRegression', request: command.model }

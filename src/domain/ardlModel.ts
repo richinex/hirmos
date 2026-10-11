@@ -20,7 +20,7 @@ export const ardlOrdersSchema = z.discriminatedUnion('kind', [
     .object({
       kind: z.literal('fixed'),
       outcomeLag: lag,
-      predictorLags: z.array(lag.nullable()).min(1),
+      predictorLags: z.array(lag.nullable()),
     })
     .strict(),
   z
@@ -63,17 +63,33 @@ export const ardlFutureSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('none') }).strict(),
   z
     .object({
+      kind: z.literal('autoregressive'),
+      horizon: index.min(1).max(200),
+      confidence: level,
+    })
+    .strict(),
+  z
+    .object({
       kind: z.literal('scenario'),
-      predictors: z.array(series).min(1),
+      predictors: z.array(series),
       fixed: z.array(series),
       confidence: level,
     })
     .strict(),
 ])
+export function ardlPredictorRequirement(
+  kind: z.infer<typeof ardlOrdersSchema>['kind'],
+  count: number,
+): string | null {
+  if (count > 0 || kind === 'fixed') return null
+  return kind === 'search'
+    ? 'Automatic lag selection is unavailable without lagged predictors. Choose “Specify lags” to fit this model.'
+    : 'This diagnostic specification requires a lagged predictor. Choose “Specify lags” to fit a model with only outcome lags and fixed regressors.'
+}
 export const ardlModelRequestSchema = z
   .object({
     outcome: index,
-    predictors: z.tuple([index]).rest(index),
+    predictors: z.array(index),
     fixed: z.array(index),
     terms: z.enum(['restricted-constant', 'constant', 'restricted-trend', 'trend']),
     orders: ardlOrdersSchema,
@@ -85,6 +101,8 @@ export const ardlModelRequestSchema = z
   .superRefine((request, ctx) => {
     const columns = [request.outcome, ...request.predictors, ...request.fixed]
     const selection = request.orders
+    const requirement = ardlPredictorRequirement(selection.kind, request.predictors.length)
+    if (requirement !== null) ctx.addIssue({ code: 'custom', message: requirement })
     const orders =
       selection.kind === 'rHorizontal'
         ? selection.maximum.slice(1)
@@ -175,9 +193,16 @@ export const ardlModelRequestSchema = z
     switch (request.future.kind) {
       case 'none':
         return
+      case 'autoregressive':
+        if (request.predictors.length > 0 || request.fixed.length > 0)
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Supply future values for the selected predictor and fixed columns.',
+          })
+        return
       case 'scenario': {
         const future = request.future
-        const horizon = future.predictors[0]?.length ?? 0
+        const horizon = (future.predictors[0] ?? future.fixed[0])?.length ?? 0
         const valid =
           horizon > 0 &&
           horizon <= 200 &&
@@ -402,7 +427,7 @@ export const ardlModelEvidenceSchema = z
     startRow: index,
     fittedRows: index.positive(),
     outcomeLag: lag,
-    predictorLags: z.array(lag.nullable()).min(1),
+    predictorLags: z.array(lag.nullable()),
     coefficients: z.array(ardlCoefficientSchema).min(1),
     params: series,
     covariance: z.array(series).min(1),

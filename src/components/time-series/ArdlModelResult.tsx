@@ -19,7 +19,7 @@ type Run = Extract<TimeSeriesRun, { kind: 'ardl-model' }>
 const number = (n: number) => formatStatistic('raw', n).text
 const reasons = {
   noPredictors:
-    'AIC selection retained no predictors, so there is no predictor level relationship to test.',
+    'The fitted model contains no distributed-lag predictors, so there is no predictor level relationship to test.',
   zeroOrder:
     'This error-correction specification requires lagged values for every predictor. To include a zero-order predictor, choose “Specify lags with diagnostics”.',
   tooManyPredictors: 'Bounds critical values are unavailable for this number of predictors.',

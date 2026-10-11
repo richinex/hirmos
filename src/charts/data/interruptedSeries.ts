@@ -7,6 +7,7 @@ import {
   gridAuto,
   legend,
   rangeSelection,
+  timeAxisLabelStyle,
   tooltip,
   valueAxis,
 } from '../grammar'
@@ -23,7 +24,7 @@ const timeAxis = (theme: ChartTheme, axis: PlotTime) => ({
   type: axis.kind === 'calendar' ? ('time' as const) : ('value' as const),
   min: axis.values[0],
   max: axis.values[axis.values.length - 1],
-  axisLabel: axisLabelStyle(theme),
+  axisLabel: axis.kind === 'calendar' ? timeAxisLabelStyle(theme) : axisLabelStyle(theme),
   axisTick: { show: false },
   axisLine: { lineStyle: { color: theme.hair } },
   splitLine: { show: false },

@@ -941,9 +941,11 @@ export function interpretEstimationResult(
         statements: [
           {
             kind: 'magnitude',
-            text: `After adoption, ${plainName(study.outcome.name)} for the units that adopted averaged ${gap(primary)} the value estimated for them without adoption per ${stepLabel}.`,
+            text: `After adoption, ${plainName(study.outcome.name)} in the treated units averaged ${gap(primary)} the value estimated for them without adoption. The average covers every treated unit in every post-adoption period.`,
           },
-          noInterval('No confidence interval is shown for this result.'),
+          estimate.interval.kind === 'none'
+            ? noInterval(estimate.interval.reason)
+            : intervalStatement(estimate.interval, { kind: 'additive' }),
           {
             kind: 'qualification',
             text: 'This can be interpreted as an adoption effect only if the comparison units show what would have happened to the treated units without adoption, no effect began early, and treatment of one unit did not affect another. The estimates do not establish those conditions.',

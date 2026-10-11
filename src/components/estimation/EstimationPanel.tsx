@@ -42,6 +42,12 @@ import { SharpRdResult } from './SharpRdResult'
 import { BayesianImpactResult } from './BayesianImpactResult'
 import { ImpactEffectPanel } from './ImpactEffectPanel'
 import { StaggeredDidControls } from './StaggeredDidControls'
+import { ConventionalDidControls } from './ConventionalDidControls'
+import {
+  defaultConventionalDidInference,
+  conventionalDidInferenceLabels,
+  conventionalDidPlaceboUnavailable,
+} from '@/domain/conventionalDid'
 import { StaggeredDidResult } from './StaggeredDidResult'
 import {
   ridgeConfigurationForPanel,
@@ -164,6 +170,7 @@ import {
   selectFixedEffects,
   describeDiscreteStatePreparations,
   describeEstimator,
+  describeRun,
   describeInstrumentalVariableRoute,
   dmlNuisanceInputs,
   boostedCommand,
@@ -2235,7 +2242,7 @@ export const ResultCard = memo(function ResultCard({
               ghost:
                 ghostRun !== null && ghostRun.estimate.effect.kind === 'path'
                   ? {
-                      name: `${describeEstimator(ghostRun.configuration.kind)}, ${formatTime(ghostRun.createdAt)}`,
+                      name: `${describeRun(ghostRun.configuration)}, ${formatTime(ghostRun.createdAt)}`,
                       points: ghostRun.estimate.effect.values,
                     }
                   : undefined,
@@ -2320,7 +2327,7 @@ export const ResultCard = memo(function ResultCard({
   const stamp = (
     <RunMeta>
       {[
-        describeEstimator(run.configuration.kind),
+        describeRun(run.configuration),
         ...(run.kind === 'backdoor-linear-run'
           ? [
               describeFixedEffects(run.configuration.fixedEffects),
@@ -2399,6 +2406,18 @@ export const ResultCard = memo(function ResultCard({
             testId="effect-estimate"
           />
         )}
+        {run.kind === 'panel-intervention-run' &&
+          run.configuration.primary === 'syntheticDid' &&
+          estimate.interval.kind === 'confidence' && (
+            <p className="mt-2 text-sm text-muted">
+              Approximate 95% confidence interval using the placebo standard error.
+            </p>
+          )}
+        {run.kind === 'panel-intervention-run' && run.evidence.kind === 'panelDid' && run.evidence.uncertainty?.kind === 'available' && (
+          <p className="mt-2 text-sm text-muted">
+            Approximate 95% confidence interval using {conventionalDidInferenceLabels[run.evidence.uncertainty.method].toLowerCase()} uncertainty.
+          </p>
+        )}
       </div>
       {groupChart !== null && estimate.effect.kind === 'byGroup' && (
         <div className="mt-3">
@@ -2462,7 +2481,7 @@ export const ResultCard = memo(function ResultCard({
                 <option value="">No other run</option>
                 {ghosts.map((other) => (
                   <option key={other.id} value={String(other.id)}>
-                    {describeEstimator(other.configuration.kind)}, {formatTime(other.createdAt)}
+                    {describeRun(other.configuration)}, {formatTime(other.createdAt)}
                   </option>
                 ))}
               </Select>
@@ -3003,6 +3022,11 @@ export function EstimationPanel({
 
   const session = useJob('estimation')
   const { job } = session
+  const [pointwiseRetry, setPointwiseRetry] = useState<{
+    configuration: EstimatorConfiguration
+    study: string
+    prepared: string
+  } | null>(null)
   useRunActivity(
     onActivity,
     job.kind === 'running'
@@ -3013,7 +3037,10 @@ export function EstimationPanel({
         }
       : null,
   )
-  const execute = async () => {
+  const execute = async (requested: EstimatorConfiguration = state.configurations[state.estimator]) => {
+    const configuration = requested.kind === 'panel-intervention' && requested.primary === 'did'
+      ? { ...requested, inference: requested.inference ?? defaultConventionalDidInference }
+      : requested
     if (
       identification === null ||
       study === null ||
@@ -3026,6 +3053,7 @@ export function EstimationPanel({
     if (!estimableIdentification(identification.result)) return
     const current = session.start('analysis', describeEstimator(state.estimator))
     if (current === null) return
+    setPointwiseRetry(null)
     const dispatch = (event: RunEvent) => {
       switch (event.type) {
         case 'run-progressed':
@@ -4188,6 +4216,14 @@ export function EstimationPanel({
             }
             const evidence = await analysis.runStaggeredDid(input.value.values, input.value.model)
             if (!evidence.ok) {
+              if (
+                session.current(current) &&
+                configuration.specification.inference.kind === 'bootstrapSimultaneous' &&
+                evidence.error.kind === 'kernel-refused' &&
+                evidence.error.detail === 'The estimated simultaneous critical value is below the pointwise critical value. No interval was substituted.'
+              ) {
+                setPointwiseRetry({ configuration, study: study.id, prepared: prepared.id })
+              }
               dispatch({
                 type: 'run-failed',
                 detail: describeAnalysisWorkerProblem(evidence.error),
@@ -4333,6 +4369,7 @@ export function EstimationPanel({
               placeboReplications: configuration.placeboReplications,
               seed: configuration.seed,
               primary: configuration.primary,
+              inference: configuration.primary === 'did' ? configuration.inference : undefined,
             },
             (progress) => dispatch({ type: 'run-progressed', progress }),
           )
@@ -6621,7 +6658,7 @@ export function EstimationPanel({
         return (
           <div className={stepsStack}>
             <SettingsStep
-              number={configuration.primary === 'did' ? undefined : 1}
+              number={1}
               title="Choose the method"
               className="[column-span:all]"
             >
@@ -6753,6 +6790,22 @@ export function EstimationPanel({
                   file={source.file}
                   profile={profile}
                   binding={panelBinding}
+                />
+              </SettingsStep>
+            )}
+            {configuration.primary === 'did' && (
+              <SettingsStep number={2} title="Report uncertainty">
+                <ConventionalDidControls
+                  inference={configuration.inference}
+                  placeboUnavailable={
+                    panelPreflight.kind === 'ready'
+                      ? conventionalDidPlaceboUnavailable({
+                          treatedUnits: panelPreflight.layout.treated.length,
+                          controlUnits: panelPreflight.layout.controls.length,
+                        })
+                      : null
+                  }
+                  onChange={(inference) => configure({ ...configuration, inference })}
                 />
               </SettingsStep>
             )}
@@ -8028,6 +8081,37 @@ export function EstimationPanel({
                 </Alert>
               )}
               <JobNotice job={job} />
+              {job.kind === 'failed' &&
+                pointwiseRetry !== null &&
+                pointwiseRetry.configuration === configuration &&
+                pointwiseRetry.study === study?.id &&
+                pointwiseRetry.prepared === prepared.id &&
+                configuration.kind === 'panel-intervention' &&
+                configuration.primary === 'staggered' &&
+                configuration.specification.inference.kind === 'bootstrapSimultaneous' && (
+                  <button
+                    type="button"
+                    className={button('quiet')}
+                    disabled={session.blocked || eligibility === null || eligibility.kind === 'refused' || studyDataPending || studyDataError !== null}
+                    onClick={() => {
+                      if (configuration.specification.inference.kind !== 'bootstrapSimultaneous') return
+                      const next = {
+                        ...configuration,
+                        specification: {
+                          ...configuration.specification,
+                          inference: {
+                            ...configuration.specification.inference,
+                            kind: 'bootstrapPointwise' as const,
+                          },
+                        },
+                      }
+                      configure(next)
+                      void execute(next)
+                    }}
+                  >
+                    Run with pointwise bootstrap
+                  </button>
+                )}
               <RunActions
                 className="min-h-10"
                 testId="estimation-run-row"
@@ -8299,8 +8383,8 @@ export function EstimationPanel({
       (run) => run.study === identification?.study && run.estimate.effect.kind === 'additive',
     )
     if (comparable.length < 2) return null
-    const rows: RunComparisonRow[] = comparable.map((run, index) => ({
-      label: `${describeEstimator(run.configuration.kind)}${
+    const rows: RunComparisonRow[] = comparable.map((run, index) => {
+      const method = `${describeRun(run.configuration)}${
         run.kind === 'backdoor-linear-run'
           ? `${[
               describeFixedEffects(run.configuration.fixedEffects),
@@ -8310,13 +8394,18 @@ export function EstimationPanel({
               .map((part) => `, ${part}`)
               .join('')}`
           : ''
-      }, ${formatTime(run.createdAt)}`,
-      estimate: run.estimate.effect.kind === 'additive' ? run.estimate.effect.value : 0,
-      lower: run.estimate.interval.kind === 'none' ? null : run.estimate.interval.lower,
-      upper: run.estimate.interval.kind === 'none' ? null : run.estimate.interval.upper,
-      current: index === comparable.length - 1,
-    }))
-    return { option: runComparisonOption(rows, chartTheme), height: rows.length * 30 + 56 }
+      }`
+      const time = formatTime(run.createdAt)
+      return {
+        label: `${method}, ${time}`,
+        axisLabel: `${method}\n${time}`,
+        estimate: run.estimate.effect.kind === 'additive' ? run.estimate.effect.value : 0,
+        lower: run.estimate.interval.kind === 'none' ? null : run.estimate.interval.lower,
+        upper: run.estimate.interval.kind === 'none' ? null : run.estimate.interval.upper,
+        current: index === comparable.length - 1,
+      }
+    })
+    return { option: runComparisonOption(rows, chartTheme), height: rows.length * 88 + 56 }
   }, [runs, identification, chartTheme])
 
   const ledger = (

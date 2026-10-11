@@ -5,6 +5,7 @@ import { variableColour, type ChartTheme } from '../theme'
 
 export interface RunComparisonRow {
   readonly label: string
+  readonly axisLabel?: string
   readonly estimate: number
   readonly lower: number | null
   readonly upper: number | null
@@ -65,6 +66,15 @@ export function runComparisonOption(
         fontSize: theme.labelSize,
         width: 240,
         overflow: 'truncate',
+        ...(rows.some((row) => row.axisLabel !== undefined)
+          ? {
+              width: 180,
+              overflow: 'break' as const,
+              lineHeight: 16,
+              interval: 0,
+              formatter: (value: string, index: number) => rows[index]?.axisLabel ?? value,
+            }
+          : {}),
       },
     },
     series: [

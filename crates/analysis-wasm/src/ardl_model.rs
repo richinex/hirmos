@@ -80,6 +80,10 @@ pub(crate) enum Orders {
 )]
 pub(crate) enum Future {
     None,
+    Autoregressive {
+        horizon: usize,
+        confidence: f64,
+    },
     Scenario {
         predictors: Vec<Vec<f64>>,
         fixed: Vec<Vec<f64>>,
@@ -381,8 +385,7 @@ pub(crate) fn fit(
         .chain(request.predictors.iter().copied())
         .chain(request.fixed.iter().copied())
         .collect();
-    if request.predictors.is_empty()
-        || indices.iter().any(|i| *i >= columns)
+    if indices.iter().any(|i| *i >= columns)
         || indices
             .iter()
             .collect::<std::collections::BTreeSet<_>>()
@@ -390,6 +393,9 @@ pub(crate) fn fit(
             != indices.len()
     {
         return Err("Choose distinct outcome, predictor and fixed columns.".to_owned());
+    }
+    if request.predictors.is_empty() && !matches!(&request.orders, Orders::Fixed { .. }) {
+        return Err("Choose explicit lag orders to fit a model without lagged predictors.".to_owned());
     }
     if request.multiplier_horizon > 200 {
         return Err("Choose at most 200 multiplier periods.".to_owned());
@@ -515,12 +521,27 @@ pub(crate) fn fit(
     };
     let forecast = match request.future {
         Future::None => Forecast::NotRequested,
+        Future::Autoregressive { horizon, confidence } => {
+            if !request.predictors.is_empty() || !request.fixed.is_empty() {
+                return Err("Supply future values for the selected predictor and fixed columns.".to_owned());
+            }
+            if horizon == 0 || horizon > 200 {
+                return Err("Choose between 1 and 200 forecast periods.".to_owned());
+            }
+            let predictions = fitted.forecast(horizon, &[], &[], confidence).map_err(problem)?;
+            Forecast::Recorded {
+                confidence,
+                mean: predictions.iter().map(|p| p.mean).collect(),
+                variance: predictions.iter().map(|p| p.variance).collect(),
+                interval: predictions.iter().map(|p| (p.lower, p.upper)).collect(),
+            }
+        }
         Future::Scenario {
             predictors,
             fixed,
             confidence,
         } => {
-            let horizon = predictors.first().map_or(0, Vec::len);
+            let horizon = predictors.first().or_else(|| fixed.first()).map_or(0, Vec::len);
             if horizon == 0 || horizon > 200 {
                 return Err(
                     "Supply between 1 and 200 periods of future predictor values.".to_owned(),

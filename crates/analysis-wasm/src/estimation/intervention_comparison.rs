@@ -449,10 +449,13 @@ fn panel_problem(error: hirmos_causal_core::panel::PanelError) -> String {
         PanelError::NonSimultaneousAdoption => "treated units do not adopt simultaneously and remain treated".to_owned(),
         PanelError::InvalidMatrixBoundary => "the panel boundary does not contain controls, treated units, pre-periods, and post-periods".to_owned(),
         PanelError::DegenerateNoise => "the control pre-period has no usable first-difference variation for synthetic weighting".to_owned(),
-        PanelError::TooFewControlsForPlacebo => "placebo variance needs more control units than treated units".to_owned(),
+        PanelError::TooFewControlsForPlacebo => "Placebo uncertainty requires more control units than treated units.".to_owned(),
         PanelError::InsufficientPlaceboReplications => "placebo variance needs at least two replications".to_owned(),
         PanelError::InvalidPlaceboPermutation { replication } => format!("placebo replication {} is not a permutation of the control units", replication + 1),
         PanelError::InvalidTreatedFraction => "the pre-treatment period is too short for an in-time placebo".to_owned(),
+        PanelError::TooFewUnitsForJackknife => "Jackknife uncertainty requires at least two treated and two control units.".to_owned(),
+        PanelError::TooFewTreatedForBootstrap => "Bootstrap uncertainty requires at least two treated units. Placebo uncertainty may be available.".to_owned(),
+        PanelError::InvalidBootstrapSample { replication } => format!("Bootstrap sample {} must include treated and control units.", replication + 1),
     }
 }
 
@@ -592,12 +595,16 @@ pub(crate) fn panel_intervention(
 
 pub(crate) fn panel_intervention_selected(
     primary: PanelPrimary,
+    inference: Option<crate::protocol::ConventionalDidInference>,
     values: &[f64], rows: usize, units: &[String], times: &[i64],
     placebo_replications: usize, seed: u64,
     progress: impl Fn(&'static str, usize, usize),
 ) -> Result<AnalysisResult, String> {
     match primary {
-        PanelPrimary::SyntheticDid => panel_intervention(values, rows, units, times, placebo_replications, seed, progress),
+        PanelPrimary::SyntheticDid => {
+            if inference.is_some() { return Err("These uncertainty settings apply only to conventional DiD.".into()); }
+            panel_intervention(values, rows, units, times, placebo_replications, seed, progress)
+        }
         PanelPrimary::Did => {
             validate_dense_matrix("panel DiD", values, rows, 2)?;
             if units.len() != rows || times.len() != rows { return Err("Panel DiD needs one unit and time key per row".to_owned()); }
@@ -608,10 +615,46 @@ pub(crate) fn panel_intervention_selected(
             progress("validated-panel", 1, 2);
             let did = hirmos_causal_core::panel::did_estimate(&panel.y, panel.n0, panel.t0).map_err(panel_problem)?;
             progress("difference-in-differences", 2, 2);
+            let uncertainty = conventional_did_uncertainty(&panel, inference)?;
             Ok(AnalysisResult::PanelDid { observations: rows, treated_units: panel.y.nrows()-panel.n0, control_units: panel.n0,
-                n_pre: panel.t0, n_post: panel.y.ncols()-panel.t0, units: panel.units, times: panel.times, did: panel_method_evidence(did) })
+                n_pre: panel.t0, n_post: panel.y.ncols()-panel.t0, units: panel.units, times: panel.times, did: panel_method_evidence(did), uncertainty })
         }
     }
+}
+
+fn conventional_did_uncertainty(
+    panel: &hirmos_causal_core::panel::PanelMatrices,
+    inference: Option<crate::protocol::ConventionalDidInference>,
+) -> Result<crate::protocol::ConventionalDidUncertainty, String> {
+    use crate::protocol::{ConventionalDidInference as Request, ConventionalDidUncertainty as Evidence};
+    use hirmos_causal_core::panel::*;
+    let Some(inference) = inference else { return Ok(Evidence::NotRequested) };
+    let (method, result) = match inference {
+        Request::Jackknife => ("jackknife", did_jackknife_standard_error(&panel.y, panel.n0, panel.t0)),
+        Request::Bootstrap { replications, seed } | Request::Placebo { replications, seed } => {
+            if !(2..=2000).contains(&replications) { return Err("Choose between 2 and 2,000 replications.".into()); }
+            let mut rng = NpRng::seeded(seed);
+            if matches!(inference, Request::Placebo { .. }) {
+                let permutations = (0..replications).map(|_| rng.permutation(panel.n0)).collect::<Vec<_>>();
+                ("placebo", panel_placebo_standard_error(&panel.y, panel.n0, panel.t0, PanelEstimatorKind::DifferenceInDifferences, &permutations))
+            } else if panel.y.nrows() - panel.n0 < 2 {
+                ("bootstrap", Err(PanelError::TooFewTreatedForBootstrap))
+            } else {
+                let n = panel.y.nrows();
+                let mut samples = Vec::with_capacity(replications);
+                while samples.len() < replications {
+                    let sample = (0..n).map(|_| rng.randint(n as u32) as usize).collect::<Vec<_>>();
+                    if sample.iter().any(|&i| i < panel.n0) && sample.iter().any(|&i| i >= panel.n0) { samples.push(sample); }
+                }
+                ("bootstrap", did_bootstrap_standard_error(&panel.y, panel.n0, panel.t0, &samples))
+            }
+        }
+    };
+    Ok(match result {
+        Ok(value) if value.standard_error.is_finite() => Evidence::Available { method: method.into(), standard_error: value.standard_error },
+        Ok(_) => return Err("The uncertainty calculation returned a non-finite standard error.".into()),
+        Err(error) => Evidence::Unavailable { reason: panel_problem(error) },
+    })
 }
 
 pub(crate) fn adjusted_panel(values: &[f64], rows: usize, columns: usize, units: &[String], times: &[i64]) -> Result<(hirmos_causal_core::panel::PanelMatrices, DMatrix<f64>), String> {

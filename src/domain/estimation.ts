@@ -116,6 +116,7 @@ import {
 } from './study'
 import { formatSetPercent, formatSetting, formatStatistic } from '@/lib/format/number'
 import { namesFigure } from '@/lib/format/names'
+import { lowerFirst } from '@/lib/text'
 
 /**
  * An estimate carries its meaning in the type: the estimand it answers, the scale, a named interval
@@ -465,6 +466,8 @@ import {
   type StaggeredSpecification,
 } from './staggeredDid'
 
+import { conventionalDidUncertaintySchema, defaultConventionalDidInference, conventionalDidInferenceLabels, conventionalDidInferenceHelp, type ConventionalDidInference } from './conventionalDid'
+
 export type PanelInterventionConfiguration =
   | SunAbrahamConfiguration
   | StaggeredConfiguration
@@ -476,8 +479,15 @@ export type PanelInterventionConfiguration =
     }
   | {
       readonly kind: 'panel-intervention'
+      readonly primary: 'did'
+      readonly inference?: ConventionalDidInference
+      readonly placeboReplications: number
+      readonly seed: number
+    }
+  | {
+      readonly kind: 'panel-intervention'
       /** Absent in older saved runs, whose primary result is synthetic DiD. */
-      readonly primary?: 'did' | 'syntheticDid'
+      readonly primary?: 'syntheticDid'
       readonly placeboReplications: number
       readonly seed: number
     }
@@ -1016,7 +1026,7 @@ export const defaultConfiguration = (
     case 'sharp-rd':
       return { kind: estimator }
     case 'panel-intervention':
-      return { kind: estimator, primary: 'did', placeboReplications: 100, seed: 0 }
+      return { kind: estimator, primary: 'did', placeboReplications: 100, seed: 0, inference: defaultConventionalDidInference }
     case 'negbin-nuts':
       return { kind: estimator, warmup: 500, samples: 1000, seed: 0 }
     case 'bayesian-gaussian':
@@ -2076,6 +2086,7 @@ const syntheticPanelEvidenceSchema = z
 const conventionalPanelEvidenceSchema = z
   .object({
     kind: z.literal('panelDid'),
+    uncertainty: conventionalDidUncertaintySchema.optional(),
     observations: z.number().int().positive(),
     units: z.array(z.string().min(1)).min(2),
     times: z.array(z.number().int().nonnegative()).min(2),
@@ -4336,7 +4347,7 @@ export function evaluateEstimatorEligibility(
       } else if (configuration.primary === 'did') {
         leave(
           'panel-no-interval',
-          'This conventional DiD fit reports a point estimate without a confidence interval.',
+          conventionalDidInferenceHelp[(configuration.inference ?? defaultConventionalDidInference).kind],
         )
       } else if (
         context.panelPreflight.kind === 'ready' &&
@@ -6211,11 +6222,10 @@ export function causalEstimateFrom(
           kind: 'causal-estimate',
           estimand: study.estimand,
           effect: { kind: 'additive', value: evidence.did.estimate, unit: '' },
-          interval: {
-            kind: 'none',
-            reason: 'This conventional DiD result does not yet report an uncertainty interval.',
-          },
-          standardError: null,
+          interval: evidence.uncertainty?.kind === 'available'
+            ? { kind: 'confidence', level: 0.95, lower: evidence.did.estimate - 1.96 * evidence.uncertainty.standardError, upper: evidence.did.estimate + 1.96 * evidence.uncertainty.standardError }
+            : { kind: 'none', reason: evidence.uncertainty?.kind === 'unavailable' ? evidence.uncertainty.reason : 'No uncertainty calculation was recorded for this run.' },
+          standardError: evidence.uncertainty?.kind === 'available' ? evidence.uncertainty.standardError : null,
           adjustment: { kind: 'none' },
           sample: { observations: evidence.observations, parameters: 4, degreesOfFreedom: null },
         }
@@ -6227,7 +6237,14 @@ export function causalEstimateFrom(
         kind: 'causal-estimate',
         estimand: study.estimand,
         effect: { kind: 'additive', value: evidence.syntheticDid.estimate, unit: '' },
-        interval: { kind: 'none', reason: 'No confidence interval is shown for this result.' },
+        interval: placeboStandardError === null
+          ? { kind: 'none', reason: 'A placebo standard error is unavailable for this result.' }
+          : {
+              kind: 'confidence',
+              level: 0.95,
+              lower: evidence.syntheticDid.estimate - 1.96 * placeboStandardError,
+              upper: evidence.syntheticDid.estimate + 1.96 * placeboStandardError,
+            },
         standardError: placeboStandardError,
         adjustment: { kind: 'none' },
         sample: {
@@ -7279,7 +7296,14 @@ const panelInterventionSettings = (
     case 'adjusted':
       return adjustedDidSettings(configuration.covariates, configuration.specification)
     case 'did':
-      return [setting('primary', 'Panel estimator', 'Difference-in-differences')]
+      return [
+        setting('primary', 'Panel estimator', 'Difference-in-differences'),
+        setting('uncertainty', 'Uncertainty', configuration.inference === undefined ? 'Not recorded' : conventionalDidInferenceLabels[configuration.inference.kind]),
+        ...(configuration.inference !== undefined && configuration.inference.kind !== 'jackknife' ? [
+          setting('replications', 'Replications', settingNumber(configuration.inference.replications)),
+          setting('seed', 'Seed', settingNumber(configuration.inference.seed)),
+        ] : []),
+      ]
     case 'syntheticDid':
     case undefined:
       return [
@@ -7864,6 +7888,16 @@ export function describeEstimator(estimator: EstimatorId): string {
     default:
       return assertNever(estimator)
   }
+}
+
+export function describeRun(configuration: EstimatorConfiguration): string {
+  if (configuration.kind !== 'panel-intervention') return describeEstimator(configuration.kind)
+  const method =
+    panelInterventionSettings(configuration).find((s) => s.key === 'primary')?.value ??
+    describeEstimator(configuration.kind)
+  return configuration.primary === 'did' && configuration.inference !== undefined
+    ? `${method}, ${lowerFirst(conventionalDidInferenceLabels[configuration.inference.kind])}`
+    : method
 }
 
 /** Tigramite marks for a DAG document: `graph[i][j][tau]` is the arrow from i at t−tau to j at t. */

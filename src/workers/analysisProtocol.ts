@@ -1,3 +1,4 @@
+import { conventionalDidInferenceSchema } from '@/domain/conventionalDid'
 import {rawBalanceSchema,type RawBalance} from '@/domain/covariateBalance'
 import {powerRequestSchema,powerEvidenceSchema,type PowerRequest,type PowerEvidence} from '@/domain/powerPlanning'
 import {
@@ -1429,6 +1430,7 @@ export type AnalysisWorkerCommand =
     }
   | {
       readonly kind: 'panel-intervention'
+      readonly inference?: import('@/domain/conventionalDid').ConventionalDidInference
       readonly primary?: 'did' | 'syntheticDid'
       readonly request: WorkerRequestId
       readonly values: Float64Array
@@ -3116,7 +3118,7 @@ const commandSchema = z.discriminatedUnion('kind', [
       lag: z.number().int().nonnegative(),
       impact: interruptedImpactSchema,
       seasonal: interruptedSeasonalSchema,
-      ljungBoxLags: z.number().int().positive().max(48),
+      ljungBoxLags: z.number().int().positive(),
     })
     .strict()
     .superRefine((value, context) => {
@@ -3132,6 +3134,12 @@ const commandSchema = z.discriminatedUnion('kind', [
         })
       if (value.interventionRow + value.lag >= value.rows)
         context.addIssue({ code: 'custom', message: 'The change must start inside the series.' })
+      if (value.ljungBoxLags >= value.rows)
+        context.addIssue({
+          code: 'custom',
+          path: ['ljungBoxLags'],
+          message: 'Residual diagnostic lags must be fewer than the observations.',
+        })
       if (
         value.impact.kind === 'temporaryLevel' &&
         (value.impact.until <= value.interventionRow + value.lag || value.impact.until > value.rows)
@@ -3377,7 +3385,7 @@ const commandSchema = z.discriminatedUnion('kind', [
       request: requestSchema,
       values: z.instanceof(Float64Array),
       rows: z.number().int().positive(),
-      columns: z.number().int().min(2).max(64),
+      columns: z.number().int().min(1).max(64),
       model: ardlModelRequestSchema,
     })
     .strict(),
@@ -3539,6 +3547,7 @@ const commandSchema = z.discriminatedUnion('kind', [
   z
     .object({
       kind: z.literal('panel-intervention'),
+      inference: conventionalDidInferenceSchema.optional(),
       primary: z.enum(['did', 'syntheticDid']).optional(),
       request: requestSchema,
       values: z.instanceof(Float64Array),
@@ -4389,6 +4398,8 @@ export function parseAnalysisWorkerCommand(
   if (!parsed.success)
     return err({ kind: 'invalid-command', detail: z.prettifyError(parsed.error) })
   const request = workerRequestId(parsed.data.request)
+  if (parsed.data.kind === 'panel-intervention' && parsed.data.primary !== 'did' && parsed.data.inference !== undefined)
+    return err({ kind: 'invalid-command', detail: 'These uncertainty settings apply only to conventional DiD.' })
   if (!request.ok)
     return err({ kind: 'invalid-command', detail: 'The worker request identity is invalid.' })
   if (parsed.data.kind === 'pandas-resample-daily') {

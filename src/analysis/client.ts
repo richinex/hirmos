@@ -2060,6 +2060,7 @@ export function runPanelIntervention(
     readonly placeboReplications: number
     readonly seed: number
     readonly primary?: 'did' | 'syntheticDid'
+    readonly inference?: import('@/domain/conventionalDid').ConventionalDidInference
   },
   onProgress?: (progress: AnalysisProgress) => void,
 ): Promise<PanelInterventionOutcome> {

@@ -189,6 +189,22 @@ pub(crate) struct ImpactSummary {
 #[serde(rename_all = "camelCase")]
 pub(crate) enum PanelPrimary { Did, #[default] SyntheticDid }
 
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) enum ConventionalDidInference {
+    Bootstrap { replications: usize, seed: u64 },
+    Jackknife,
+    Placebo { replications: usize, seed: u64 },
+}
+
+#[derive(Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub(crate) enum ConventionalDidUncertainty {
+    NotRequested,
+    Unavailable { reason: String },
+    Available { method: String, #[serde(rename = "standardError")] standard_error: f64 },
+}
+
 
 #[derive(Clone, Copy, serde::Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -1689,6 +1705,8 @@ pub(crate) enum AnalysisCommand {
     PanelIntervention {
         #[serde(default)]
         primary: PanelPrimary,
+        #[serde(default)]
+        inference: Option<ConventionalDidInference>,
         rows: usize,
         /// One unit label and ordered time code per long-form observation.
         units: Vec<String>,
@@ -3567,6 +3585,7 @@ pub(crate) enum AnalysisResult {
         estimate: f64, standard_error: f64, interval: [f64; 2], group_means: [[f64; 2]; 2], inference: AdjustedDidInference,
     },
     PanelDid {
+        uncertainty: ConventionalDidUncertainty,
         observations: usize,
         units: Vec<String>,
         times: Vec<i64>,

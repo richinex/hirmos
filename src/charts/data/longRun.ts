@@ -6,6 +6,7 @@ import {
   gridAuto,
   legend,
   rangeSelection,
+  timeAxisLabelStyle,
   tooltip,
   valueAxis,
 } from '../grammar'
@@ -39,7 +40,7 @@ export function longRunOption(
       type: view.axis.kind === 'calendar' ? 'time' : 'value',
       min: times[0],
       max: times[times.length - 1],
-      axisLabel: axisLabelStyle(theme),
+      axisLabel: view.axis.kind === 'calendar' ? timeAxisLabelStyle(theme) : axisLabelStyle(theme),
       axisTick: { show: false },
       axisLine: { lineStyle: { color: theme.hair } },
       splitLine: { show: false },

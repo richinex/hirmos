@@ -15,6 +15,16 @@ export const axisLabelStyle = (theme: ChartTheme) => ({
 })
 
 /**
+ * Tick labels for a calendar axis. ECharts labels the first tick of a year with the year alone, in
+ * bold, so a monthly axis reads "Nov, 2023, Mar". The year template names the month as well, and
+ * giving any template turns the bold off.
+ */
+export const timeAxisLabelStyle = (theme: ChartTheme) => ({
+  ...axisLabelStyle(theme),
+  formatter: { year: '{MMM} {yyyy}' },
+})
+
+/**
  * A small uniform margin. ECharts 6 grows the grid's outer bounds to fit axis labels and names, so
  * the plot adapts to the pane instead of sitting inside a fixed gutter; the clamp keeps a long label
  * from squeezing the plot below 60 per cent of the width or height.

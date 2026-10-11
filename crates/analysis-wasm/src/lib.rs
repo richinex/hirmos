@@ -1111,6 +1111,7 @@ pub fn run_analysis(
         AnalysisCommand::PanelRegression { request } => panel_regression::run(values, request).map(|evidence| AnalysisResult::PanelRegression { evidence }),
         AnalysisCommand::PanelIntervention {
             primary,
+            inference,
             rows,
             units,
             times,
@@ -1118,6 +1119,7 @@ pub fn run_analysis(
             seed,
         } => panel_intervention_selected(
             primary,
+            inference,
             values,
             rows,
             &units,

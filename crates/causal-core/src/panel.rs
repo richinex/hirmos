@@ -44,6 +44,9 @@ pub enum PanelError {
     InsufficientPlaceboReplications,
     InvalidPlaceboPermutation { replication: usize },
     InvalidTreatedFraction,
+    TooFewUnitsForJackknife,
+    TooFewTreatedForBootstrap,
+    InvalidBootstrapSample { replication: usize },
 }
 
 #[derive(Debug, Clone)]
@@ -638,6 +641,78 @@ pub fn panel_placebo_standard_error(
         .sum::<f64>()
         / estimates.len() as f64)
         .sqrt();
+    Ok(PanelPlaceboInference {
+        estimates,
+        standard_error,
+    })
+}
+
+/// Unit bootstrap with accepted resamples supplied at the RNG boundary.
+pub fn did_bootstrap_standard_error(
+    y: &DMatrix<f64>,
+    n0: usize,
+    t0: usize,
+    samples: &[Vec<usize>],
+) -> Result<PanelPlaceboInference, PanelError> {
+    validate_boundary(y, n0, t0)?;
+    if y.nrows() - n0 < 2 {
+        return Err(PanelError::TooFewTreatedForBootstrap);
+    }
+    if samples.len() < 2 {
+        return Err(PanelError::InsufficientPlaceboReplications);
+    }
+    let mut estimates = Vec::with_capacity(samples.len());
+    for (replication, sample) in samples.iter().enumerate() {
+        let controls = sample.iter().filter(|&&row| row < n0).count();
+        if sample.len() != y.nrows()
+            || sample.iter().any(|&row| row >= y.nrows())
+            || controls == 0
+            || controls == sample.len()
+        {
+            return Err(PanelError::InvalidBootstrapSample { replication });
+        }
+        let mut rows = sample.clone();
+        rows.sort_unstable();
+        let resampled = DMatrix::from_fn(rows.len(), y.ncols(), |i, j| y[(rows[i], j)]);
+        estimates.push(did_estimate(&resampled, controls, t0)?.estimate);
+    }
+    let mean = estimates.iter().sum::<f64>() / estimates.len() as f64;
+    let standard_error = (estimates
+        .iter()
+        .map(|value| (value - mean).powi(2))
+        .sum::<f64>()
+        / estimates.len() as f64)
+        .sqrt();
+    Ok(PanelPlaceboInference {
+        estimates,
+        standard_error,
+    })
+}
+
+pub fn did_jackknife_standard_error(
+    y: &DMatrix<f64>,
+    n0: usize,
+    t0: usize,
+) -> Result<PanelPlaceboInference, PanelError> {
+    validate_boundary(y, n0, t0)?;
+    if n0 < 2 || y.nrows() - n0 < 2 {
+        return Err(PanelError::TooFewUnitsForJackknife);
+    }
+    let mut estimates = Vec::with_capacity(y.nrows());
+    for omitted in 0..y.nrows() {
+        let reduced = DMatrix::from_fn(y.nrows() - 1, y.ncols(), |i, j| {
+            y[(if i < omitted { i } else { i + 1 }, j)]
+        });
+        estimates.push(did_estimate(&reduced, n0 - usize::from(omitted < n0), t0)?.estimate);
+    }
+    let n = estimates.len() as f64;
+    let mean = estimates.iter().sum::<f64>() / n;
+    let standard_error = ((n - 1.0) / n
+        * estimates
+            .iter()
+            .map(|value| (value - mean).powi(2))
+            .sum::<f64>())
+    .sqrt();
     Ok(PanelPlaceboInference {
         estimates,
         standard_error,

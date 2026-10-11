@@ -3265,7 +3265,7 @@ const PANEL_INTERVENTION: MethodDefinition = {
       id: caveatId('panel-no-interval'),
       category: 'finite-sample',
       requirement:
-        'Use the uncertainty for the selected method: regression uses classical independent-error Student-t intervals; DR DiD uses cross-fitted scores with independent units; synthetic placebo inference needs more comparison units than treated units.',
+        'Use the uncertainty for the selected method: conventional DiD offers unit bootstrap, jackknife and placebo inference; regression uses classical independent-error Student-t intervals; DR DiD uses cross-fitted scores with independent units. Placebo inference needs more comparison units than treated units.',
       consequenceIfUnmet:
         'The point estimate remains available, but this uncertainty calculation is not.',
       sources: [ARKHANGELSKY_2021],

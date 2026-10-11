@@ -43,7 +43,7 @@ import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import { assertNever, type NonEmptyArray } from '@/domain/dop'
 import {
   contemporaneousAdjustmentVariables,
-  describeEstimator,
+  describeRun,
   type EstimationRunArtifact,
   type EstimationRunId,
 } from '@/domain/estimation'
@@ -147,7 +147,7 @@ function DmlRefutationCard({
   const stamp = (
     <RunMeta>
       {[
-        describeEstimator(estimation.configuration.kind),
+        describeRun(estimation.configuration),
         `Seed ${evidence.seed}`,
         `Order ${evidence.order.join(' → ')}`,
         formatTime(run.createdAt),
@@ -295,7 +295,7 @@ function RefutationCard({
   const stamp = (
     <RunMeta>
       {[
-        describeEstimator(estimation.configuration.kind),
+        describeRun(estimation.configuration),
         `Seed ${evidence.seed}`,
         `${formatCount(evidence.simulations).text} simulations`,
         formatTime(run.createdAt),
@@ -464,7 +464,7 @@ function UnobservedCard({
   const stamp = (
     <RunMeta>
       {[
-        describeEstimator(estimation.configuration.kind),
+        describeRun(estimation.configuration),
         `Seed ${evidence.seed}`,
         formatTime(run.createdAt),
       ]}
@@ -881,7 +881,7 @@ function LegacySensitivityPanel({
                         <option key={run.id} value={run.id}>
                           {bound === undefined
                             ? run.id
-                            : `${estimandSentence(bound)}, ${describeEstimator(run.configuration.kind)}, ${formatTime(run.createdAt)}`}
+                            : `${estimandSentence(bound)}, ${describeRun(run.configuration)}, ${formatTime(run.createdAt)}`}
                         </option>
                       )
                     })}
@@ -1221,7 +1221,7 @@ function LegacySensitivityPanel({
             aria-label="Estimate under test"
           >
             <dt className="text-faint">Estimator</dt>
-            <dd className="m-0 text-ink">{describeEstimator(estimation.configuration.kind)}</dd>
+            <dd className="m-0 text-ink">{describeRun(estimation.configuration)}</dd>
             <SensitivityAdjustment run={estimation} />
             <dt className="text-faint">Rows</dt>
             <dd className={num('m-0 text-ink')}>

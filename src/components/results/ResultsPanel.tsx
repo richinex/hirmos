@@ -43,6 +43,7 @@ import type { DatasetProfile } from '@/domain/dataset'
 import {
   adjustmentLabels,
   describeEstimator,
+  describeRun,
   headlineValue,
   intervalTypeOf,
   type AppliedAdjustment,
@@ -248,7 +249,7 @@ function Manifest({
             <span className={label('text-signal-text')}>Estimate and uncertainty</span>
             <p className="mb-0 mt-1 text-body text-muted">
               <Metadata>
-                <span>{describeEstimator(run.configuration.kind)}</span>
+                <span>{describeRun(run.configuration)}</span>
                 <span>
                   {run.eligibility.kind === 'eligible'
                     ? 'All pre-run checks completed'
@@ -818,7 +819,7 @@ export function ResultsPanel({
                       {studyOf(candidate) === undefined
                         ? candidate.method
                         : estimandSentence(studyOf(candidate) as StudySpecification)}
-                      , {describeEstimator(candidate.configuration.kind)},{' '}
+                      , {describeRun(candidate.configuration)},{' '}
                       {formatTime(candidate.createdAt)}
                     </option>
                   ))}
@@ -846,7 +847,7 @@ export function ResultsPanel({
                         {studyOf(candidate) === undefined
                           ? candidate.method
                           : estimandSentence(studyOf(candidate) as StudySpecification)}
-                        , {describeEstimator(candidate.configuration.kind)},{' '}
+                        , {describeRun(candidate.configuration)},{' '}
                         {formatTime(candidate.createdAt)}
                       </option>
                     ))}
@@ -1002,7 +1003,7 @@ export function ResultsPanel({
                           {study === undefined ? candidate.method : estimandSentence(study)}
                         </td>
                         <td className={td('text-muted')}>
-                          {describeEstimator(candidate.configuration.kind)}
+                          {describeRun(candidate.configuration)}
                         </td>
                         <td className={td(num('whitespace-nowrap text-right text-ink'))}>
                           {

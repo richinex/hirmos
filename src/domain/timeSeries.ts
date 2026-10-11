@@ -104,7 +104,7 @@ export const timeSeriesRunSchema = z
         ...identity,
         kind: z.literal('ardl-model'),
         outcome: column,
-        predictors: z.tuple([column]).rest(column),
+        predictors: z.array(column),
         fixed: z.array(column),
         specification: ardlModelRequestSchema,
         evidence: ardlModelEvidenceSchema,
@@ -358,10 +358,18 @@ export const timeSeriesRunSchema = z
           case 'scenario':
             if (
               e.forecast.kind !== 'recorded' ||
-              e.forecast.mean.length !== s.future.predictors[0]?.length ||
+              e.forecast.mean.length !== (s.future.predictors[0] ?? s.future.fixed[0])?.length ||
               e.forecast.confidence !== s.future.confidence
             )
               fail('The forecast must match its recorded scenario and confidence level.')
+            break
+          case 'autoregressive':
+            if (
+              e.forecast.kind !== 'recorded' ||
+              e.forecast.mean.length !== s.future.horizon ||
+              e.forecast.confidence !== s.future.confidence
+            )
+              fail('The forecast must match its recorded horizon and confidence level.')
             break
           default:
             assertNever(s.future)

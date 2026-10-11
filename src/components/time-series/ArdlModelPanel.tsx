@@ -7,7 +7,7 @@ import type { ArdlDraft, Mode } from '@/domain/timeSeriesDraft'
 import { useJob } from '@/analysis/JobsProvider'
 import { JobNotice } from '@/components/ui/JobNotice'
 import { z } from 'zod'
-import { ardlModelRequestSchema } from '@/domain/ardlModel'
+import { ardlModelRequestSchema, ardlPredictorRequirement } from '@/domain/ardlModel'
 import { ARDL_TERMS, newTimeSeriesRunId, parseTimeSeriesRun } from '@/domain/timeSeries'
 import { assertNever, isNonEmpty } from '@/domain/dop'
 import { isNumericDuckDbType } from '@/domain/dataset'
@@ -89,6 +89,7 @@ export function ArdlModelPanel(props: TimeSeriesPanelProps & { readonly selector
     holdBack,
     terms,
     horizon,
+    forecastSteps,
     future,
     omitted,
   } = useTimeSeriesDraft(props.prepared.id, (state) => state.ardl)
@@ -126,6 +127,7 @@ export function ArdlModelPanel(props: TimeSeriesPanelProps & { readonly selector
   const predictors = columns.filter((c) => c.id !== outcome && roles[c.id]?.kind === 'predictor')
   const fixed = columns.filter((c) => c.id !== outcome && roles[c.id]?.kind === 'fixed')
   const futureColumns = [...predictors, ...fixed]
+  const predictorRequirement = ardlPredictorRequirement(mode, predictors.length)
   const changes = [
     ...(outcome === null
       ? []
@@ -156,7 +158,7 @@ export function ArdlModelPanel(props: TimeSeriesPanelProps & { readonly selector
     })
   const runs = props.runs.filter((run) => run.kind === 'ardl' || run.kind === 'ardl-model')
   const fit = async () => {
-    if (staleOmissions) return
+    if (staleOmissions || predictorRequirement !== null) return
     const y = columns.find((c) => c.id === outcome)
     if (y === undefined) return
     const current = session.start('analysis', 'Preparing ARDL')
@@ -202,12 +204,14 @@ export function ArdlModelPanel(props: TimeSeriesPanelProps & { readonly selector
       future:
         future.kind === 'none'
           ? future
-          : {
-              kind: 'scenario',
-              confidence: 0.95,
-              predictors: predictors.map((c) => futureValues(future.columns[c.id] ?? '')),
-              fixed: fixed.map((c) => futureValues(future.columns[c.id] ?? '')),
-            },
+          : futureColumns.length === 0
+            ? { kind: 'autoregressive', horizon: numeric(forecastSteps), confidence: 0.95 }
+            : {
+                kind: 'scenario',
+                confidence: 0.95,
+                predictors: predictors.map((c) => futureValues(future.columns[c.id] ?? '')),
+                fixed: fixed.map((c) => futureValues(future.columns[c.id] ?? '')),
+              },
     })
     if (!parsed.success) {
       fail(z.prettifyError(parsed.error))
@@ -565,15 +569,36 @@ export function ArdlModelPanel(props: TimeSeriesPanelProps & { readonly selector
                         )
                       }
                     />
-                    Forecast with supplied future values
+                    {futureColumns.length === 0
+                      ? 'Forecast'
+                      : 'Forecast with supplied future values'}
                   </label>
                   {future.kind === 'scenario' && (
                     <div className={settingsStack}>
-                      <p className={cn(fieldHint, 'm-0 max-w-[65ch]')}>
-                        Enter one value per future period, separated by spaces or commas. Supply the
-                        same number of periods for every included column. No future values are
-                        filled in automatically.
-                      </p>
+                      {futureColumns.length === 0 ? (
+                        <label>
+                          <span className={fieldLabel}>Forecast periods</span>
+                          <NumberInput
+                            className={field('text', 'mt-1')}
+                            min={1}
+                            max={200}
+                            value={forecastSteps}
+                            onChange={(e) =>
+                              change(props.prepared.id, {
+                                type: 'ardl',
+                                field: 'forecastSteps',
+                                value: e.target.value,
+                              })
+                            }
+                          />
+                        </label>
+                      ) : (
+                        <p className={cn(fieldHint, 'm-0 max-w-[65ch]')}>
+                          Enter one value per future period, separated by spaces or commas. Supply
+                          the same number of periods for every included column. No future values are
+                          filled in automatically.
+                        </p>
+                      )}
                       {futureColumns.map((c) => (
                         <label key={c.id} className="block">
                           <span className={fieldLabel}>Future {c.name}</span>
@@ -624,7 +649,10 @@ export function ArdlModelPanel(props: TimeSeriesPanelProps & { readonly selector
               <button
                 className={button('signal')}
                 disabled={
-                  session.blocked || outcome === null || predictors.length === 0 || staleOmissions
+                  session.blocked ||
+                  outcome === null ||
+                  predictorRequirement !== null ||
+                  staleOmissions
                 }
                 aria-busy={job.kind === 'running'}
                 onClick={job.kind === 'running' ? undefined : () => void fit()}
@@ -632,6 +660,7 @@ export function ArdlModelPanel(props: TimeSeriesPanelProps & { readonly selector
                 Fit ARDL
               </button>
             </RunActions>
+            {predictorRequirement !== null && <p className={fieldHint}>{predictorRequirement}</p>}
             <JobNotice job={job} />
           </section>
           {runs.slice(-1).map((run) => (

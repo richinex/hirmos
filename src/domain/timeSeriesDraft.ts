@@ -26,6 +26,7 @@ export interface ArdlDraft {
   readonly holdBack: string
   readonly terms: ArdlTerms
   readonly horizon: string
+  readonly forecastSteps: string
   readonly future: Future
   readonly omitted: readonly { readonly column: ColumnId; readonly lag: number }[]
 }
@@ -170,6 +171,7 @@ export function retainTimeSeriesDraft(
       holdBack: '',
       terms: 'constant',
       horizon: '12',
+      forecastSteps: '12',
       future: { kind: 'none' },
       omitted: [],
     },
