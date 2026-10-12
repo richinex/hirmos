@@ -1,10 +1,10 @@
 import { z } from 'zod'
 import { absorbingAdoption } from './absorbingAdoption'
-import type { PanelLongMatrix, PanelPeriod } from './panel'
 import { err, ok, type Result } from './dop'
+import type { PanelLongMatrix, PanelPeriod } from './panel'
 import {
-  sunAbrahamRequestSchema,
   sunAbrahamEvidenceSchema,
+  sunAbrahamRequestSchema,
   type SunAbrahamRequest,
 } from './remixExtensions'
 
@@ -197,3 +197,12 @@ export function sunAbrahamRecordMatches(raw: unknown, rawStudy: unknown): boolea
     )
   )
 }
+
+export type SunAbrahamPanelJob =
+  | { readonly kind: 'loading' }
+  | { readonly kind: 'failed'; readonly detail: string }
+  | {
+      readonly kind: 'ready'
+      readonly matrix: PanelLongMatrix
+      readonly catalog: SunAbrahamCatalog
+    }

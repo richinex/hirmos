@@ -1,17 +1,10 @@
-import { useMemo } from 'react'
 import type { PanelBinding, PanelPreflightJob } from '@/domain/estimationDraft'
 import { samePanelBinding } from '@/domain/estimationDraft'
-import { describePanelDataProblem, type PanelLongMatrix } from '@/domain/panel'
-import { sunAbrahamCatalog, type SunAbrahamCatalog } from '@/domain/sunAbraham'
+import { describePanelDataProblem } from '@/domain/panel'
+import { sunAbrahamCatalog } from '@/domain/sunAbraham'
+import { useMemo } from 'react'
 
-export type SunAbrahamPanelJob =
-  | { readonly kind: 'loading' }
-  | { readonly kind: 'failed'; readonly detail: string }
-  | {
-      readonly kind: 'ready'
-      readonly matrix: PanelLongMatrix
-      readonly catalog: SunAbrahamCatalog
-    }
+import type { SunAbrahamPanelJob } from '@/domain/sunAbraham'
 
 /** Reuse the panel preflight's keyed data even when simultaneous DiD is unavailable. */
 export function useSunAbrahamPanel(

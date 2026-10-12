@@ -185,6 +185,7 @@ test('an eligible panel fits and restores placebo uncertainty through the contro
   await page.getByTestId('effect-estimate').first().scrollIntoViewIfNeeded()
   await page.screenshot({ path: info.outputPath('eligible-placebo.png') })
   await page.reload()
+  await expect(page.getByRole('heading', { name: 'Choose the data file again' })).toBeVisible()
   await page.locator('input[type="file"]').setInputFiles({
     name: 'placebo.csv',
     mimeType: 'text/csv',

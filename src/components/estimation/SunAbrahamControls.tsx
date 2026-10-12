@@ -1,10 +1,9 @@
-import { SettingsStep } from '@/components/ui/SettingsStep'
+import { ColumnChecklist } from '@/components/ui/ColumnChecklist'
 import { ParameterLabel } from '@/components/ui/ParameterLabel'
 import { Select } from '@/components/ui/Select'
-import { field, fieldLabel, fieldHint, fieldRow } from '@/components/ui/recipes'
-import type { SunAbrahamConfiguration } from '@/domain/sunAbraham'
-import { ColumnChecklist } from '@/components/ui/ColumnChecklist'
-import type { SunAbrahamPanelJob } from './useSunAbrahamPanel'
+import { SettingsStep } from '@/components/ui/SettingsStep'
+import { field, fieldHint, fieldLabel, fieldRow } from '@/components/ui/recipes'
+import type { SunAbrahamConfiguration, SunAbrahamPanelJob } from '@/domain/sunAbraham'
 
 export function SunAbrahamControls({
   configuration,
