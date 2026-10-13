@@ -299,11 +299,11 @@ function Session({ context, project }: { readonly context: string; readonly proj
       ]
       savedTurn = { ...savedTurn, drafts }
       update(id, (turn) => ({ ...turn, drafts }))
+      const checkpoint: Turn = { ...savedTurn, outcome: { kind: 'cancelled' } }
       draftWrites.push(
-        saveDisplayTurn(project, memory.session, startedAt, {
-          ...savedTurn,
-          outcome: { kind: 'cancelled' },
-        }).catch(() => setMemoryWarning('The proposal could not be saved for reload recovery.')),
+        (draftWrites.at(-1) ?? Promise.resolve())
+          .then(() => saveDisplayTurn(project, memory.session, startedAt, checkpoint))
+          .catch(() => setMemoryWarning('The proposal could not be saved for reload recovery.')),
       )
     }
     setTurns((previous) => [...previous, initialTurn])

@@ -8,9 +8,9 @@ import {
   useAssistantPlacement,
 } from '@/assistant/assistantStore'
 import { useIsMobile } from '@/lib/useMediaQuery'
-import { cn } from '@/lib/utils'
 
 const AssistantDock = lazy(() => import('./AssistantDock'))
+const AssistantSheet = lazy(() => import('./AssistantSheet'))
 
 const hostElement = (className: string) => {
   const element = document.createElement('div')
@@ -31,8 +31,7 @@ export function Slot({ host }: { readonly host: HTMLElement }) {
 /**
  * The chapter and the assistant, so the screen the user asks about stays in view. The chapter and the
  * assistant each render once into a host node that moves between layouts, so opening, docking,
- * floating and the first load of the docked layout never reset either. On a phone the assistant takes
- * the lower part of the screen until expanded.
+ * floating and the first load of the docked layout never reset either.
  */
 export function AssistantSplit({ chapter }: { readonly chapter: ReactNode }) {
   const open = useAssistantOpen()
@@ -52,21 +51,13 @@ export function AssistantSplit({ chapter }: { readonly chapter: ReactNode }) {
   return (
     <>
       {phone ? (
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <div className={cn('min-h-0 min-w-0 flex-1', open && expanded ? 'hidden' : 'flex')}>
-            <Slot host={chapterHost} />
-          </div>
-          {open ? (
-            <div
-              className={cn(
-                'flex min-h-0 flex-col border-t border-line shadow-[0_-8px_24px_rgb(0_0_0/0.08)]',
-                expanded ? 'flex-1' : 'h-[55%]',
-              )}
-            >
-              <Slot host={paneHost} />
-            </div>
-          ) : null}
-        </div>
+        open ? (
+          <Suspense fallback={plain}>
+            <AssistantSheet chapterHost={chapterHost} paneHost={paneHost} expanded={expanded} />
+          </Suspense>
+        ) : (
+          plain
+        )
       ) : (
         <>
           {dockLoaded ? (
