@@ -60,7 +60,7 @@ export function AssistantHeaderButton({ className }: { readonly className?: stri
       aria-pressed={open}
       aria-label={open ? 'Close the assistant' : 'Open the assistant'}
       onClick={toggleAssistant}
-      className={iconControl(open ? 'selected' : 'quiet', cn('text-ink', className))}
+      className={iconControl(open ? 'selected' : 'quiet', cn('border-transparent text-ink', className))}
     >
       <AssistantMark state={running ? 'working' : open ? 'open' : 'idle'} />
     </button>
