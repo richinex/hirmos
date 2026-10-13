@@ -4,6 +4,7 @@ import { field, fieldHint, fieldLabel, stepsStack } from '@/components/ui/recipe
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { SettingsStep } from '@/components/ui/SettingsStep'
 import { type EstimatorConfiguration } from '@/domain/estimation'
+import { PSS_CASES } from '@/domain/timeSeriesEstimatorSettings'
 import { ESTIMATION_PARAMETER_HELP } from '@/domain/parameterHelp'
 import { cn } from '@/lib/utils'
 import { type ReactNode } from 'react'
@@ -14,8 +15,6 @@ type Props = {
   readonly configuration: Configuration
   readonly configure: (next: Configuration) => void
 }
-
-const PSS_CASES: Record<'c' | 'ct', readonly (2 | 3 | 4 | 5)[]> = { c: [2, 3], ct: [4, 5] }
 
 export function ArdlControls({ configuration, configure }: Props): ReactNode {
   return (

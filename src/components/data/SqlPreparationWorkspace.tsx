@@ -1,4 +1,5 @@
 import { RunActions } from '@/components/ui/RunActions'
+import { useSqlTools } from '@/assistant/applicationTools'
 import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { useCallback, useRef, useState } from 'react'
@@ -8,6 +9,8 @@ import { Tooltip } from '@/components/ui/Tooltip'
 import { useStore } from 'zustand'
 import { useSqlSession } from './PreparationProvider'
 import { createSqlSession, type SqlController } from './sqlSession'
+import { usePreparationTools } from '@/assistant/applicationTools'
+import { profileTable } from '@/assistant/preparation'
 import { Icon } from '@/components/Icon'
 import { Select } from '@/components/ui/Select'
 import { Dialog } from '@/components/ui/Dialog'
@@ -159,12 +162,54 @@ function SqlEditor({
     state.kind === 'failed-to-open' || state.kind === 'materialization-refused'
       ? state.problem
       : null
+  const tables = [
+    ...new Set([
+      ...inputs
+        .filter((input) => input.format !== 'duckdb-export-file')
+        .map((input) => input.alias),
+      ...(outputView.kind === 'available' ? outputView.views : []),
+    ]),
+  ]
+  usePreparationTools(
+    JSON.stringify({
+      script,
+      query,
+      shell: state.kind,
+      inputs: inputs.map((input) => input.fingerprint),
+    }),
+    !busy && session
+      ? {
+          kind: 'sql',
+          inspection: { kind: 'sql', tables },
+          profile: (request, signal) =>
+            profileTable(session.shellDatabase, tables, request, signal),
+        }
+      : null,
+  )
+  useSqlTools(
+    JSON.stringify({
+      inputs: inputs.map((input) => input.fingerprint),
+      script,
+      query,
+      shell: state.kind,
+    }),
+    !busy && session !== null
+      ? {
+          inputs: inputs.map((input) => ({ alias: input.alias, format: input.format })),
+          outputView: PREPARED_VIEW,
+        }
+      : null,
+    (statement) =>
+      controller.loadScript(
+        new File([statement], 'assistant-proposal.sql', { type: 'text/plain' }),
+      ),
+  )
   const stage = (
     <div className="flex h-[calc(100dvh-9rem)] min-h-80 min-w-0 flex-col md:h-full md:min-h-0">
       <ChapterHeading id="sql-workspace-title" className="sr-only">
         Prepare with SQL
       </ChapterHeading>
-      <div className="mac-terminal m-3 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[10px]">
+      <div className="mac-terminal mx-3 mb-3 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[10px]">
         <div className="mac-terminal-bar relative flex h-7 shrink-0 select-none items-center px-2">
           <span className="flex gap-2" aria-hidden>
             <i className="size-3 rounded-full bg-[#FF5F57]" />
@@ -200,6 +245,24 @@ function SqlEditor({
         </p>
       )}
       {cancellation.kind === 'reported' && <Alert tone="info">{cancellation.message}</Alert>}
+      {scriptResult.kind === 'complete' && (
+        <div className="mx-3 mb-3 shrink-0">
+          <EvidenceTable
+            title="Final statement result"
+            rows={scriptResult.rows}
+            columns={scriptResult.columns.map((name, index) => ({
+              id: String(index),
+              header: name,
+              value: (row: readonly string[]) => row[index] ?? '',
+            }))}
+            rowKey={(_, index) => String(index)}
+            noun="row"
+            empty="The script completed without result rows."
+            total={scriptResult.count}
+            maxHeight="max-h-48"
+          />
+        </div>
+      )}
     </div>
   )
   return (
@@ -260,22 +323,6 @@ function SqlEditor({
                 <p role="alert" className="text-danger">
                   {scriptResult.detail}
                 </p>
-              )}
-              {scriptResult.kind === 'complete' && (
-                <EvidenceTable
-                  title="Final statement result"
-                  rows={scriptResult.rows}
-                  columns={scriptResult.columns.map((name, index) => ({
-                    id: String(index),
-                    header: name,
-                    value: (row: readonly string[]) => row[index] ?? '',
-                  }))}
-                  rowKey={(_, index) => String(index)}
-                  noun="row"
-                  empty="The script completed without result rows."
-                  total={scriptResult.count}
-                  maxHeight="max-h-48"
-                />
               )}
             </>
           )}

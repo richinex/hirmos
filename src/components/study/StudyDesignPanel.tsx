@@ -1,8 +1,10 @@
 import { estimationSelection } from '@/domain/estimationDraft'
+import { useIdentificationTool } from '@/assistant/useIdentificationTool'
 import { NumberInput } from '@/components/ui/NumberInput'
 import { RawBalanceTable } from './RawBalanceTable'
 import { DagRevisionNotice } from './DagRevisionNotice'
 import { useAdjustmentAnalysis } from '@/analysis/useAdjustmentAnalysis'
+import { studyAdjustmentDesign } from '@/domain/studyAdjustment'
 import { validateAdjustmentSets } from '@/analysis/client'
 import { RunActions } from '@/components/ui/RunActions'
 import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
@@ -368,9 +370,11 @@ function IdentificationOutcome({
       const selectedLabel =
         result.adjustment.kind === 'canonical'
           ? 'Canonical adjustment set'
-          : result.adjustment.kind === 'supplied'
+          : result.adjustment.kind === 'o-set'
             ? 'Recommended adjustment set (O-set)'
-            : `Minimal adjustment set ${result.adjustment.ordinal + 1}`
+            : result.adjustment.kind === 'supplied'
+              ? 'Supplied adjustment set'
+              : `Minimal adjustment set ${result.adjustment.ordinal + 1}`
       return (
         <Alert tone="ok" icon="function" live={false} className="mt-3">
           <p className="m-0">Identified by back-door adjustment</p>
@@ -383,11 +387,11 @@ function IdentificationOutcome({
               </>
             )}
           </p>
-          {result.adjustment.kind === 'supplied' && (
+          {(result.adjustment.kind === 'supplied' || result.adjustment.kind === 'o-set') && (
             <p className="mb-0 mt-1 text-muted">
               {result.adjustment.guarantee === 'established'
                 ? 'Graphical optimality is established under the efficiency theorem’s assumptions; this does not guarantee the narrowest interval in this sample.'
-                : 'This is a valid O-set. Graphical optimality is not established.'}
+                : 'Graphical optimality is not established.'}
             </p>
           )}
           {result.adjustment.kind === 'minimal' && (
@@ -704,15 +708,7 @@ function AdjustmentSetChoicePanel({
   readonly evidence: BackdoorIdentificationEvidence
   readonly onChoose: (choice: AdjustmentSetChoice) => void
 }) {
-  const command = backdoorIdentificationCommand(study)
-  const design = {
-    nodes: command.nodes,
-    edges: command.edges.map(([a, b]) => [a, b] as [number, number]),
-    treatment: command.treatment,
-    outcome: command.outcome,
-    unobserved: [...command.unobserved],
-    sets: [],
-  }
+  const design = studyAdjustmentDesign(study)
   const analysis = useAdjustmentAnalysis(design)
   const [recording, setRecording] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
@@ -738,7 +734,7 @@ function AdjustmentSetChoicePanel({
       setProblem('The recommended set could not be validated. No study was recorded.')
       return
     }
-    onChoose({ kind: 'supplied', nodes: recommendation.nodes, guarantee: recommendation.guarantee })
+    onChoose({ kind: 'o-set', nodes: recommendation.nodes, guarantee: recommendation.guarantee })
   }
   if (evidence.result.kind === 'notIdentified') return null
   const result = evidence.result
@@ -990,6 +986,8 @@ export function StudyDesignPanel({
       session.fail(id, cause instanceof Error ? cause.message : String(cause))
     }
   }
+
+  useIdentificationTool({ prepared, documents, draft, studies, session, execute })
 
   const stage = (
     <section aria-labelledby="study-title" className="@container/panel flex flex-col gap-5">

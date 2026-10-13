@@ -955,6 +955,11 @@ export type AdjustmentSetChoice =
   | { readonly kind: 'canonical' }
   | { readonly kind: 'minimal'; readonly ordinal: number }
   | {
+      readonly kind: 'o-set'
+      readonly nodes: readonly number[]
+      readonly guarantee: 'established' | 'notEstablished'
+    }
+  | {
       readonly kind: 'supplied'
       readonly nodes: readonly number[]
       readonly guarantee: 'established' | 'notEstablished'
@@ -980,6 +985,11 @@ export const offersAdjustmentChoice = (result: IdentifiedBackdoor): boolean =>
   result.minimalSets.length > 1 || !sameIndexSet(result.minimalSets[0], result.canonicalSet)
 
 export type AdjustmentSetSelection =
+  | {
+      readonly kind: 'o-set'
+      readonly variables: readonly StudyVariable[]
+      readonly guarantee: 'established' | 'notEstablished'
+    }
   | {
       readonly kind: 'supplied'
       readonly variables: readonly StudyVariable[]
@@ -1455,6 +1465,7 @@ export function identificationFrom(
   const minimalSets = mapNonEmpty(evidence.result.minimalSets, variablesFrom)
   let adjustment: AdjustmentSetSelection
   switch (choice.kind) {
+    case 'o-set':
     case 'supplied':
       if (
         choice.nodes.some(
@@ -1468,7 +1479,7 @@ export function identificationFrom(
       )
         return err({ kind: 'invalid-supplied-adjustment' })
       adjustment = {
-        kind: 'supplied',
+        kind: choice.kind,
         variables: variablesFrom(choice.nodes),
         guarantee: choice.guarantee,
       }

@@ -1,6 +1,11 @@
 import { NumberInput } from '@/components/ui/NumberInput'
 import { RunActions } from '@/components/ui/RunActions'
 import { useMemo, useState } from 'react'
+import { z } from 'zod'
+import { ok, err } from '@/domain/dop'
+import { useWorkspaceConfiguration } from '@/assistant/workspaceConfiguration'
+import { useRecordedAnalysis } from '@/assistant/useRecordedAnalysis'
+import { useAnalysisRunTool } from '@/assistant/applicationTools'
 import { RunFold } from '@/components/ui/RunFold'
 import { formatTime } from '@/lib/format/date'
 import type { DagDocument, DagNodeId } from '@/domain/dag'
@@ -15,6 +20,13 @@ import {
   type ConditionalGaussianArtifact,
 } from '@/domain/conditionalGaussianQuery'
 import { isNonEmpty, assertNever } from '@/domain/dop'
+import {
+  conditionalGaussianSettings,
+  gaussianValueLabels,
+  gaussianVariableKindLabels,
+  queryRoleLabels,
+  type GaussianVariableKind,
+} from '@/domain/dagQuerySettings'
 import { useJob } from '@/analysis/JobsProvider'
 import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
 import { Select } from '@/components/ui/Select'
@@ -43,7 +55,6 @@ import { baseOption, gridAuto, legend, valueAxis, tooltip } from '@/charts/gramm
 type Role =
   | { readonly kind: 'observe'; readonly draft: string }
   | { readonly kind: 'intervene'; readonly draft: string }
-type VariableKind = 'continuous' | 'discrete'
 type Setup =
   { readonly kind: 'unreviewed' } | { readonly kind: 'reviewed'; readonly matrix: PreparedMatrix }
 const emptyRole: Role = { kind: 'observe', draft: '' }
@@ -196,7 +207,7 @@ function ConditionalGaussianForm({
   onDelete,
 }: PanelProps) {
   const nodes = document.current.graph.nodes
-  const [types, setTypes] = useState<ReadonlyMap<DagNodeId, VariableKind>>(new Map())
+  const [types, setTypes] = useState<ReadonlyMap<DagNodeId, GaussianVariableKind>>(new Map())
   const [roles, setRoles] = useState<ReadonlyMap<DagNodeId, Role>>(new Map())
   const [outcome, setOutcome] = useState<DagNodeId | null>(null)
   const [setup, setSetup] = useState<Setup>({ kind: 'unreviewed' })
@@ -266,10 +277,171 @@ function ConditionalGaussianForm({
       setSetup({ kind: 'reviewed', matrix: matrix.value })
       setTypesOpen(false)
       session.finish(current)
+      return matrix.value
     } catch (error) {
       session.fail(current, error instanceof Error ? error.message : String(error))
     }
   }
+  const configuration = {
+    variables: nodes.map((n) => typeOf(n.id)),
+    outcome: outcome === null ? null : nodes.findIndex((n) => n.id === outcome),
+    observations: parents.flatMap((n) => {
+      const r = roles.get(n.id) ?? emptyRole,
+        value = numericDraft(r.draft)
+      return r.kind === 'observe' && value !== null
+        ? [{ variable: nodes.findIndex((node) => node.id === n.id), value }]
+        : []
+    }),
+    interventions: parents.flatMap((n) => {
+      const r = roles.get(n.id) ?? emptyRole,
+        value = numericDraft(r.draft)
+      return r.kind === 'intervene' && value !== null
+        ? [{ variable: nodes.findIndex((node) => node.id === n.id), value }]
+        : []
+    }),
+  }
+  const queryBase = {
+    rows: prepared.observations,
+    columns: nodes.length,
+    names: nodes.map((n) => n.name),
+    edges: document.current.graph.edges.map((e) => [
+      nodes.findIndex((n) => n.id === e.cause),
+      nodes.findIndex((n) => n.id === e.effect),
+    ]),
+  }
+  const binding = JSON.stringify({
+    prepared: prepared.id,
+    graph: document.current,
+    configuration,
+  })
+  useWorkspaceConfiguration(
+    'gaussian-distribution',
+    binding,
+    busy
+      ? null
+      : {
+          title: 'Conditional-Gaussian distribution',
+          current: configuration,
+          columns: nodes.map((n, i) => ({ id: String(i), name: n.name })),
+          describe: (next) =>
+            conditionalGaussianSettings(
+              next,
+              nodes.map((n) => n.name),
+            ),
+          schema: z.strictObject({
+            variables: conditionalGaussianQuerySchema.shape.variables,
+            outcome: conditionalGaussianQuerySchema.shape.outcome.nullable(),
+            observations: conditionalGaussianQuerySchema.shape.observations,
+            interventions: conditionalGaussianQuerySchema.shape.interventions,
+          }),
+          validate: (next) => {
+            if (problem) return err(problem)
+            const checked = conditionalGaussianQuerySchema.safeParse({ ...queryBase, ...next })
+            if (!checked.success) return err(checked.error.issues.map((i) => i.message).join('; '))
+            const q = checked.data
+            if (
+              q.edges.some(
+                ([a, b]) => q.variables[a] === 'continuous' && q.variables[b] === 'discrete',
+              )
+            )
+              return err('A discrete variable cannot have a continuous parent in this model.')
+            const parents = new Set(q.edges.filter(([, b]) => b === q.outcome).map(([a]) => a))
+            const supplied = [...q.observations, ...q.interventions]
+            if (supplied.length !== parents.size || supplied.some((a) => !parents.has(a.variable)))
+              return err('Supply every direct parent of the outcome, and no other evidence nodes.')
+            return ok(next)
+          },
+          configure: (next) => {
+            setTypes(new Map(nodes.map((n, i) => [n.id, next.variables[i]!])))
+            setOutcome(next.outcome === null ? null : nodes[next.outcome]!.id)
+            const roles = new Map<DagNodeId, Role>()
+            next.observations.forEach((a) =>
+              roles.set(nodes[a.variable]!.id, { kind: 'observe', draft: String(a.value) }),
+            )
+            next.interventions.forEach((a) =>
+              roles.set(nodes[a.variable]!.id, { kind: 'intervene', draft: String(a.value) }),
+            )
+            setRoles(roles)
+            setSetup({ kind: 'unreviewed' })
+          },
+        },
+  )
+  useAnalysisRunTool(
+    'gaussian-review',
+    binding,
+    {
+      section: 'DAG distribution',
+      method: 'Review conditional-Gaussian values',
+      specification: JSON.stringify({ ...queryBase, ...configuration }),
+      sharedResult: 'Prepared row count and discrete category values; no fitted effect.',
+    },
+    async (signal) => {
+      if (signal.aborted) return { kind: 'cancelled' }
+      if (!session.canStart()) return { kind: 'refused', reason: 'Another analysis is running.' }
+      const pending = review()
+      const started = session.read()
+      const cancel = () => {
+        if (started.kind === 'running' && session.current(started.id)) session.cancel()
+      }
+      signal.addEventListener('abort', cancel, { once: true })
+      try {
+        const matrix = await pending
+        if (signal.aborted) return { kind: 'cancelled' }
+        const job = session.read()
+        if (!matrix)
+          return {
+            kind: 'refused',
+            reason:
+              job.kind === 'failed'
+                ? job.detail
+                : (problem ?? typeProblem ?? 'Review the graph and variable types.'),
+          }
+        return {
+          kind: 'review-required',
+          method: 'Conditional-Gaussian preparation',
+          reason: 'Values prepared. Request the distribution fit separately.',
+          summary: JSON.stringify({
+            rows: matrix.rowCount,
+            categories: nodes.flatMap((n, i) =>
+              typeOf(n.id) === 'discrete'
+                ? [
+                    {
+                      variable: n.name,
+                      values: [
+                        ...new Set(
+                          matrix.values.subarray(i * matrix.rowCount, (i + 1) * matrix.rowCount),
+                        ),
+                      ].sort((a, b) => a - b),
+                    },
+                  ]
+                : [],
+            ),
+          }),
+        }
+      } finally {
+        signal.removeEventListener('abort', cancel)
+      }
+    },
+  )
+  useRecordedAnalysis({
+    key: 'gaussian-distribution',
+    prepared: prepared.id,
+    binding,
+    inspection: {
+      section: 'DAG distribution',
+      method: 'Conditional-Gaussian query',
+      specification: JSON.stringify({ ...queryBase, ...configuration, preparation: setup.kind }),
+      sharedResult:
+        'Saved query, fitted mean and residual standard deviation. Not a confidence interval.',
+    },
+    session,
+    execute: () => run(),
+    records: (workflow) =>
+      workflow.interventionQueries.filter(
+        (q): q is ConditionalGaussianArtifact => q.kind === 'conditional-gaussian-query',
+      ),
+    summarise: (q) => JSON.stringify({ specification: q.specification, result: q.result }),
+  })
   const run = async () => {
     if (
       problem !== null ||
@@ -416,8 +588,8 @@ function ConditionalGaussianForm({
                     }
                   }}
                 >
-                  <option value="continuous">Continuous</option>
-                  <option value="discrete">Discrete</option>
+                  <option value="continuous">{gaussianVariableKindLabels.continuous}</option>
+                  <option value="discrete">{gaussianVariableKindLabels.discrete}</option>
                 </Select>
               </label>
             ))}
@@ -511,15 +683,13 @@ function ConditionalGaussianForm({
                       setRoles((old) => new Map(old).set(n.id, { kind, draft: r.draft }))
                     }
                     options={[
-                      { value: 'observe', label: 'Observe' },
-                      { value: 'intervene', label: 'Intervene' },
+                      { value: 'observe', label: queryRoleLabels.observe },
+                      { value: 'intervene', label: queryRoleLabels.intervene },
                     ]}
                     fill
                   />
                   <label className="block">
-                    <span className={fieldLabel}>
-                      {typeOf(n.id) === 'discrete' ? 'Category value' : 'Value'}
-                    </span>
+                    <span className={fieldLabel}>{gaussianValueLabels[typeOf(n.id)]}</span>
                     {typeOf(n.id) === 'discrete' ? (
                       <Select
                         aria-label={`${n.name} Gaussian value`}

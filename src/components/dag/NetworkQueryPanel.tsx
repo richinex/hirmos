@@ -1,4 +1,8 @@
 import { NumberInput, numberValue } from '@/components/ui/NumberInput'
+import { z } from 'zod'
+import { ok, err } from '@/domain/dop'
+import { useWorkspaceConfiguration } from '@/assistant/workspaceConfiguration'
+import { useRecordedAnalysis } from '@/assistant/useRecordedAnalysis'
 import { RunActions } from '@/components/ui/RunActions'
 import { useMemo, useState } from 'react'
 import { RunFold } from '@/components/ui/RunFold'
@@ -15,6 +19,11 @@ import {
   type NetworkQueryArtifact,
 } from '@/domain/networkQuery'
 import { assertNever, isNonEmpty } from '@/domain/dop'
+import {
+  networkQuerySettings,
+  parameterEstimationLabels,
+  queryRoleLabels,
+} from '@/domain/dagQuerySettings'
 import { useJob } from '@/analysis/JobsProvider'
 import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
 import { Select } from '@/components/ui/Select'
@@ -171,6 +180,78 @@ export function NetworkQueryPanel({
         assertNever(r)
     }
   })
+  const configuration = { outcomes, observations, interventions, bins, equivalentSampleSize: ess }
+  const queryBase = {
+    rows: prepared.observations,
+    columns: nodes.length,
+    names: nodes.map((n) => n.name),
+    edges: document.current.graph.edges.map((edge) => [
+      nodes.findIndex((n) => n.id === edge.cause),
+      nodes.findIndex((n) => n.id === edge.effect),
+    ]),
+  }
+  useWorkspaceConfiguration(
+    'distribution',
+    JSON.stringify({ prepared: prepared.id, graph: document.current }),
+    session.blocked || session.job.kind === 'running'
+      ? null
+      : {
+          title: 'Discrete distribution',
+          current: configuration,
+          schema: z.strictObject({
+            outcomes: networkQuerySchema.shape.outcomes,
+            observations: networkQuerySchema.shape.observations,
+            interventions: networkQuerySchema.shape.interventions,
+            bins: networkQuerySchema.shape.bins,
+            equivalentSampleSize: networkQuerySchema.shape.equivalentSampleSize,
+          }),
+          columns: nodes.map((n, i) => ({ id: String(i), name: n.name })),
+          describe: (next) =>
+            networkQuerySettings(
+              next,
+              nodes.map((n) => n.name),
+            ),
+          validate: (next) => {
+            if (problem) return err(problem)
+            const checked = networkQuerySchema.safeParse({ ...queryBase, ...next })
+            return checked.success
+              ? ok(next)
+              : err(checked.error.issues.map((i) => i.message).join('; '))
+          },
+          configure: (next) => {
+            const roles = new Map<DagNodeId, Role>()
+            next.outcomes.forEach((i) => roles.set(nodes[i]!.id, { kind: 'outcome' }))
+            next.observations.forEach((a) =>
+              roles.set(nodes[a.variable]!.id, { kind: 'observe', state: a.state }),
+            )
+            next.interventions.forEach((a) =>
+              roles.set(nodes[a.variable]!.id, { kind: 'intervene', state: a.state }),
+            )
+            setRoles(roles)
+            setBins(next.bins)
+            setEss(next.equivalentSampleSize)
+          },
+        },
+  )
+  useRecordedAnalysis({
+    key: 'distribution',
+    prepared: prepared.id,
+    binding: JSON.stringify({ graph: document.current, prepared: prepared.id, configuration }),
+    inspection: {
+      section: 'DAG distribution',
+      method: 'Discrete network query',
+      specification: JSON.stringify({ ...queryBase, ...configuration }),
+      sharedResult:
+        'Saved query, state definitions and fitted probabilities. No uncertainty interval.',
+    },
+    session,
+    execute: () => run(),
+    records: (workflow) =>
+      workflow.interventionQueries.filter(
+        (q): q is NetworkQueryArtifact => q.kind === 'network-query',
+      ),
+    summarise: (q) => JSON.stringify({ specification: q.specification, result: q.result }),
+  })
   const run = async () => {
     if (problem !== null || outcomes.length === 0) return
     const current = session.start('analysis', 'Probability query')
@@ -250,10 +331,10 @@ export function NetworkQueryPanel({
                   else if (k === 'observe' || k === 'intervene') change(n.id, { kind: k, state: 1 })
                 }}
               >
-                <option value="unused">Marginalise</option>
-                <option value="outcome">Read outcome</option>
-                <option value="observe">Observe</option>
-                <option value="intervene">Intervene</option>
+                <option value="unused">{queryRoleLabels.unused}</option>
+                <option value="outcome">{queryRoleLabels.outcome}</option>
+                <option value="observe">{queryRoleLabels.observe}</option>
+                <option value="intervene">{queryRoleLabels.intervene}</option>
               </Select>
             </label>
             {(r.kind === 'observe' || r.kind === 'intervene') && (
@@ -303,8 +384,8 @@ export function NetworkQueryPanel({
               setEss(e.target.value === 'mle' ? 0 : DEFAULT_BDEU_EQUIVALENT_SAMPLE_SIZE)
             }
           >
-            <option value="mle">Maximum likelihood</option>
-            <option value="bdeu">BDeu</option>
+            <option value="mle">{parameterEstimationLabels.mle}</option>
+            <option value="bdeu">{parameterEstimationLabels.bdeu}</option>
           </Select>
         </label>
       </div>

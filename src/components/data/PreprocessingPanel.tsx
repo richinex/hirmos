@@ -14,6 +14,9 @@ import { describePanelDataProblem } from '@/domain/panel'
 import { RadioList } from '@/components/ui/RadioList'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { useEffect, useState, type ReactNode } from 'react'
+import { useWorkspaceConfiguration } from '@/assistant/workspaceConfiguration'
+import { useRecordedAnalysis } from '@/assistant/useRecordedAnalysis'
+import { preprocessingSettingsSchema, preprocessingSettings, preprocessingDraftFromSettings, describePreprocessingSettings } from '@/domain/preprocessingSettings'
 import { previewTimeColumnInWorker } from '@/data/client'
 import { useJob } from '@/analysis/JobsProvider'
 import { useWorkflow } from '@/components/WorkflowProvider'
@@ -508,6 +511,32 @@ export function PreprocessingPanel({
     throw new Error('Preprocessing requires the current source profile.')
   const { draft, savedRecipe } = preprocessing
   const dispatch = (event: PreprocessingEvent) => changePreprocessing(profile.id, event)
+  useWorkspaceConfiguration('preprocessing', profile.id + ':' + profile.source.fingerprint, preparation.job.kind === 'running' || preparation.blocked ? null : {
+    title: 'Preprocessing', current: preprocessingSettings(draft), schema: preprocessingSettingsSchema,
+    columns: profile.columns.map(c => ({ id: c.id, name: c.name })),
+    describe: value => describePreprocessingSettings(value, profile),
+    validate: value => {
+      const checked = preprocessingDraftFromSettings(value, draft, profile)
+      return checked.ok ? ok(value) : checked
+    },
+    configure: value => {
+      const checked = preprocessingDraftFromSettings(value, draft, profile)
+      if (checked.ok) dispatch({ type: 'settings-applied', draft: checked.value })
+    },
+  })
+  useRecordedAnalysis({
+    key: 'preprocessing', profile: profile.id, binding: profile.id + JSON.stringify(draft),
+    inspection: { section: 'Preprocessing', method: 'Create prepared dataset', specification: JSON.stringify(preprocessingSettings(draft)), sharedResult: 'Creates and adopts a prepared dataset version. Existing downstream results remain tied to their recorded versions.' },
+    session: preparation,
+    unavailable: (() => {
+      const ready = readyPreprocessingRecipe(draft)
+      if (!ready.ok) return describeReadinessProblem(ready.error)
+      return JSON.stringify(ready.value) === savedRecipe ? 'These settings already have a prepared dataset version. Change the settings before preparing another version.' : null
+    })(),
+    execute: () => createPreparedVersion(),
+    records: workflow => workflow.prepared ? [workflow.prepared] : [],
+    summarise: version => JSON.stringify({ id: version.id, kind: version.kind, observations: version.observations, columns: version.columns }),
+  })
   const numericColumns = profile.columns.filter((column) => isNumericDuckDbType(column.duckdbType))
   const [density] = useTableDensity()
   const selectedIds: readonly ColumnId[] =

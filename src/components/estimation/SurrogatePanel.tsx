@@ -1,4 +1,8 @@
 import { SurrogateCategoryPicker } from './SurrogateCategoryPicker'
+import { z } from 'zod'
+import { err, ok } from '@/domain/dop'
+import { useWorkspaceConfiguration } from '@/assistant/workspaceConfiguration'
+import { surrogateSelectionColumns } from '@/domain/surrogateSamples'
 import {
   SurrogateHorizonControls,
   surrogateHorizonDraftProblem,
@@ -22,6 +26,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { formatStatistic } from '@/lib/format/number'
 import { formatTime } from '@/lib/format/date'
 import { useJob } from '@/analysis/JobsProvider'
+import { useRecordedAnalysis, runReceipt } from '@/assistant/useRecordedAnalysis'
 import { useRunActivity } from '@/lib/useRunActivity'
 import type { RunActivity } from '@/domain/activity'
 import { isNumericDuckDbType, type ColumnId, type DatasetProfile } from '@/domain/dataset'
@@ -90,7 +95,7 @@ const initial = (): Draft => ({
   seed: '1',
   rationale: '',
 })
-function restore(run: SurrogateRun): Draft {
+function restore(run: Pick<SurrogateRun, 'selection' | 'rationale'>): Draft {
   const s = run.selection
   return {
     experimentalCategories: s.sample.kind === 'categories' ? s.sample.experimental : [],
@@ -127,6 +132,9 @@ const biasOptions = [
   { value: 'boundedSampleDifference', label: 'Bounded difference between samples' },
 ] as const
 const numeric = (value: string) => (value.trim() === '' ? NaN : Number(value))
+const settingsSchema = z
+  .object({ selection: surrogateSelectionSchema, rationale: z.string().trim().min(1) })
+  .strict()
 
 export function SurrogatePanel(props: {
   readonly source: SelectedSource
@@ -152,7 +160,7 @@ export function SurrogatePanel(props: {
   const roles = [draft.sample, draft.treatment, draft.outcome].filter(
     (id): id is ColumnId => id !== null,
   )
-  const specification = surrogateSelectionSchema.safeParse({
+  const selection = {
     sample: categorical
       ? {
           kind: 'categories',
@@ -189,6 +197,112 @@ export function SurrogatePanel(props: {
       draft.uncertainty === 'none'
         ? { kind: 'none' }
         : { kind: 'bootstrap', repetitions: numeric(draft.repetitions), seed: numeric(draft.seed) },
+  }
+  const specification = surrogateSelectionSchema.safeParse(selection)
+  useWorkspaceConfiguration<z.infer<typeof settingsSchema> | null>('surrogate', props.profile.id, {
+    title: 'Two-sample surrogates',
+    schema: settingsSchema.nullable(),
+    current: specification.success
+      ? { selection: specification.data, rationale: draft.rationale }
+      : null,
+    columns: props.profile.columns,
+    validate: (value) => {
+      if (!value) return err('Choose the sample, treatment, outcome and surrogate columns.')
+      if (busy) return err('Wait for the current analysis to finish.')
+      const s = value.selection
+      for (const id of surrogateSelectionColumns(s)) {
+        const column = props.profile.columns.find((c) => c.id === id)
+        if (!column) return err('A selected column is not in this dataset.')
+        if (id !== s.sample.column && !isNumericDuckDbType(column.duckdbType))
+          return err(`${column.name} must be numeric for this analysis.`)
+      }
+      const membership = props.profile.columns.find((c) => c.id === s.sample.column)!
+      if (isNumericDuckDbType(membership.duckdbType) !== (s.sample.kind === 'numeric'))
+        return err(
+          'Use numeric sample values for a numeric column, or categories for a categorical column.',
+        )
+      return ok(value)
+    },
+    describe: (value) => {
+      if (!value) return [{ key: 'selection', label: 'Columns', value: 'Not selected' }]
+      const s = value.selection
+      const name = (id: ColumnId) =>
+        props.profile.columns.find((c) => c.id === id)?.name ?? 'Unavailable column'
+      return [
+        { key: 'sample', label: 'Sample membership', value: name(s.sample.column) },
+        {
+          key: 'experimental',
+          label: 'Experimental sample',
+          value:
+            s.sample.kind === 'numeric'
+              ? String(s.sample.experimental)
+              : s.sample.experimental.join(', '),
+        },
+        {
+          key: 'observational',
+          label: 'Observational sample',
+          value:
+            s.sample.kind === 'numeric'
+              ? String(s.sample.observational)
+              : s.sample.observational.join(', '),
+        },
+        { key: 'treatment', label: 'Treatment', value: name(s.treatment) },
+        { key: 'outcome', label: 'Long-term outcome', value: name(s.outcome) },
+        {
+          key: 'surrogates',
+          label: 'Short-term surrogates',
+          value: s.surrogates.map(name).join(', '),
+        },
+        {
+          key: 'baseline',
+          label: 'Baseline covariates',
+          value: s.adjustment.kind === 'none' ? 'None' : s.adjustment.columns.map(name).join(', '),
+        },
+        { key: 'method', label: 'Estimator', value: surrogateLabels[s.estimator] },
+        {
+          key: 'uncertainty',
+          label: 'Uncertainty',
+          value:
+            s.uncertainty.kind === 'none'
+              ? 'Point estimate only'
+              : `Bootstrap, ${s.uncertainty.repetitions} replications, seed ${s.uncertainty.seed}`,
+        },
+        {
+          key: 'validation',
+          label: 'Validation',
+          value: s.checks.validation === 'none' ? 'None' : 'Observed outcome',
+        },
+        {
+          key: 'bounds',
+          label: 'Bias bounds',
+          value:
+            (biasOptions.find((b) => b.value === s.checks.biasBounds.kind)?.label ?? '') +
+            ('maximum' in s.checks.biasBounds ? `, maximum ${s.checks.biasBounds.maximum}` : ''),
+        },
+        {
+          key: 'periods',
+          label: 'Outcome periods',
+          value:
+            s.horizons.observed.kind === 'none'
+              ? 'None'
+              : s.horizons.observed.periods.map((p) => `${p.label}: ${name(p.column)}`).join('; '),
+        },
+        {
+          key: 'windows',
+          label: 'Surrogate windows',
+          value:
+            s.horizons.windows.kind === 'none'
+              ? 'None'
+              : s.horizons.windows.groups
+                  .map((g) => `${g.label}: ${g.columns.map(name).join(', ')}`)
+                  .join('; '),
+        },
+        { key: 'rationale', label: 'Rationale', value: value.rationale },
+      ]
+    },
+    configure: (value) => {
+      if (value) setDraft(restore(value))
+    },
   })
   const problem =
     roles.length !== 3
@@ -252,6 +366,23 @@ export function SurrogatePanel(props: {
       />
     </label>
   )
+  useRecordedAnalysis({
+    key: 'surrogate',
+    unavailable: problem,
+    profile: props.profile.id,
+    binding: props.profile.id + JSON.stringify(draft),
+    inspection: {
+      section: 'Estimation',
+      method: 'Two-sample surrogates',
+      specification: JSON.stringify(draft),
+      sharedResult:
+        'Saved-run ID and completion receipt only. Estimates and diagnostic results remain in the result panel.',
+    },
+    session,
+    execute: () => execute(),
+    records: (workflow) => workflow.surrogateRuns,
+    summarise: runReceipt,
+  })
   const execute = async () => {
     if (!specification.success || problem !== null) return
     const current = session.start('analysis', 'Preparing the two samples')

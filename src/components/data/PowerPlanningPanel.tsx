@@ -1,4 +1,7 @@
 import { Alert } from '@/components/ui/Alert'
+import { useWorkspaceConfiguration } from '@/assistant/workspaceConfiguration'
+import { useAnalysisRunTool } from '@/assistant/applicationTools'
+import { err, ok } from '@/domain/dop'
 import { MetricGrid, MetricTile } from '@/components/ui/figures'
 import { NumberInput, numberValue } from '@/components/ui/NumberInput'
 import { ParameterHelp } from '@/components/ui/ParameterLabel'
@@ -249,7 +252,59 @@ export function PowerPlanningPanel() {
     setDraft(next)
     setProblem(null)
   }
-  async function run() {
+  useWorkspaceConfiguration('planning', 'power-planning', {
+    title: 'Sample size and power planning',
+    current: draft,
+    schema: powerRequestSchema,
+    columns: [],
+    describe: (value) =>
+      planningSettings(value).map(([label, value]) => ({ key: label, label, value })),
+    validate: (value) =>
+      running || session.blocked ? err('Wait for the current calculation to finish.') : ok(value),
+    configure: set,
+  })
+  useAnalysisRunTool(
+    'planning',
+    JSON.stringify(draft),
+    {
+      section: 'Sample size and power planning',
+      method: draft.kind === 'analytical' ? 'Analytical planning' : 'Simulated planning',
+      specification: JSON.stringify({ settings: planningSettings(draft), request: draft }),
+      sharedResult:
+        'The specified design and calculated power, sample size or minimum detectable effect. This replaces the saved planning calculation.',
+    },
+    async (signal) => {
+      if (signal.aborted) return { kind: 'cancelled' }
+      if (!powerRequestSchema.safeParse(draft).success)
+        return {
+          kind: 'refused',
+          reason: 'Review the design and numerical settings in Sample size and power planning.',
+        }
+      if (!session.canStart()) return { kind: 'refused', reason: 'Another calculation is running.' }
+      const cancel = () => session.cancel()
+      signal.addEventListener('abort', cancel, { once: true })
+      try {
+        const saved = await run()
+        if (signal.aborted) return { kind: 'cancelled' }
+        if (saved)
+          return {
+            kind: 'calculated',
+            method: 'Sample size and power planning',
+            summary: JSON.stringify(saved),
+          }
+        const job = session.read()
+        return job.kind === 'cancelled'
+          ? { kind: 'cancelled' }
+          : {
+              kind: 'failed',
+              reason: job.kind === 'failed' ? job.detail : 'No planning calculation was saved.',
+            }
+      } finally {
+        signal.removeEventListener('abort', cancel)
+      }
+    },
+  )
+  async function run(): Promise<PowerRecord | undefined> {
     const parsed = powerRequestSchema.safeParse(draft)
     if (!parsed.success) {
       setProblem(
@@ -274,6 +329,7 @@ export function PowerPlanningPanel() {
       }
       dispatch({ type: 'power-planning-recorded', record: saved })
       session.finish(id)
+      return saved
     } catch (error) {
       session.fail(
         id,

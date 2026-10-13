@@ -16,7 +16,9 @@ import { RunDetails } from '@/components/ui/RunDetails'
 import { RunFold } from '@/components/ui/RunFold'
 import { RunMeta } from '@/components/ui/RunMeta'
 import { Select } from '@/components/ui/Select'
-import { field, label, literal, num } from '@/components/ui/recipes'
+import { button, field, label, literal, num } from '@/components/ui/recipes'
+import { AssistantMark } from '@/assistant/AssistantMark'
+import { askAssistant } from '@/assistant/assistantStore'
 import { conventionalDidInferenceLabels } from '@/domain/conventionalDid'
 import {
   armaReading,
@@ -599,7 +601,23 @@ export const ResultCard = memo(function ResultCard({
     <article className="rounded-xl bg-panel lift p-4" aria-label={`${sentence} estimate`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <span className={label('text-signal-text')}>Current estimate</span>
-        <span className={num('text-micro text-faint')}>{stamp}</span>
+        <span className="flex items-center gap-2">
+          <span className={num('text-micro text-faint')}>{stamp}</span>
+          {run.eligibility.kind === 'caution' ? (
+            <button
+              type="button"
+              className={button('soft', undefined, 'sm')}
+              onClick={() =>
+                askAssistant(
+                  `Why is ${describeRun(run.configuration)} marked caution for this study, and what would resolve it?`,
+                )
+              }
+            >
+              <AssistantMark size={14} />
+              Ask why
+            </button>
+          ) : null}
+        </span>
       </div>
       {body}
     </article>

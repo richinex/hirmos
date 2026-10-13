@@ -184,7 +184,7 @@ const temporalPreview = (value: number, duckdbType: string): PreviewCell | null 
 }
 
 /** Arrow hands 128-bit integers and decimals over as sixteen little-endian bytes; this turns them back into a number. */
-const wideInteger = (view: ArrayBufferView, signed: boolean): bigint => {
+export const wideInteger = (view: ArrayBufferView, signed: boolean): bigint => {
   const bytes = new Uint8Array(view.buffer, view.byteOffset, view.byteLength)
   let value = 0n
   for (let index = bytes.length - 1; index >= 0; index -= 1)

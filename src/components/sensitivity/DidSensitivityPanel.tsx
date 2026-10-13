@@ -1,5 +1,9 @@
 import { useMemo, useState, type ReactNode } from 'react'
+import { useWorkspaceConfiguration } from '@/assistant/workspaceConfiguration'
+import { didSensitivitySettingsSchema } from '@/domain/didSensitivitySettings'
+import { err, ok } from '@/domain/dop'
 import { useJob } from '@/analysis/JobsProvider'
+import { useRecordedAnalysis, runReceipt } from '@/assistant/useRecordedAnalysis'
 import { useRunActivity } from '@/lib/useRunActivity'
 import type { RunActivity } from '@/domain/activity'
 import type { SelectedSource } from '@/domain/workflow'
@@ -383,10 +387,94 @@ export function DidSensitivityPanel({
             : null
   const session = useJob('sensitivity:did-omitted-variables'),
     { job } = session
+  useWorkspaceConfiguration('did-sensitivity', prepared.id + JSON.stringify(candidates), {
+    title: 'DiD omitted-variable sensitivity',
+    schema: didSensitivitySettingsSchema,
+    current: {
+      sourceRun: selected,
+      scenarios: ys.map((v, i): [number, number] => [v, ds[i] ?? NaN]),
+      rho: numeric(rho),
+      level: numeric(level) / 100,
+      null: numeric(nullValue),
+      outcomeMaximum: numeric(yMax) / 100,
+      rieszMaximum: numeric(dMax) / 100,
+      points: count,
+    },
+    columns: candidates.map((c) => ({ id: c.run.id, name: sourceName(c.run) })),
+    validate: (value) => {
+      if (job.kind === 'running') return err('Wait for the current analysis to finish.')
+      if (prepared.kind !== 'prepared-panel') return err('This analysis requires a prepared panel.')
+      const source = candidates.find((c) => c.run.id === value.sourceRun)
+      if (!source) return err('Choose a saved two-period doubly robust DiD run.')
+      if (
+        source.evidence.inference.kind !== 'crossFitted' ||
+        source.evidence.inference.propensityFit === undefined
+      )
+        return err('Refit the source DiD analysis before computing sensitivity.')
+      return ok(value)
+    },
+    describe: (value) => [
+      {
+        key: 'source',
+        label: 'DiD estimation run',
+        value: candidates.find((c) => c.run.id === value.sourceRun)
+          ? sourceName(candidates.find((c) => c.run.id === value.sourceRun)!.run)
+          : 'Not selected',
+      },
+      {
+        key: 'outcome',
+        label: 'Outcome shares (%)',
+        value: asSet(value.scenarios.map((s) => s[0])),
+      },
+      { key: 'riesz', label: 'Riesz shares (%)', value: asSet(value.scenarios.map((s) => s[1])) },
+      { key: 'rho', label: 'Correlation', value: String(value.rho) },
+      { key: 'level', label: 'Confidence level', value: formatSetPercent(value.level).text },
+      { key: 'null', label: 'Null effect', value: String(value.null) },
+      {
+        key: 'yMax',
+        label: 'Maximum outcome share',
+        value: formatSetPercent(value.outcomeMaximum).text,
+      },
+      {
+        key: 'dMax',
+        label: 'Maximum Riesz share',
+        value: formatSetPercent(value.rieszMaximum).text,
+      },
+      { key: 'points', label: 'Grid points', value: String(value.points) },
+    ],
+    configure: (value) => {
+      setSelected(value.sourceRun)
+      setY(asSet(value.scenarios.map((s) => s[0])))
+      setD(asSet(value.scenarios.map((s) => s[1])))
+      setRho(String(value.rho))
+      setLevel(String(percentAsSet(value.level)))
+      setNullValue(String(value.null))
+      setYMax(String(percentAsSet(value.outcomeMaximum)))
+      setDMax(String(percentAsSet(value.rieszMaximum)))
+      setPoints(String(value.points))
+    },
+  })
   useRunActivity(
     onActivity,
     job.kind === 'running' ? { label: 'DiD omitted-variable sensitivity', progress: null } : null,
   )
+  useRecordedAnalysis({
+    key: 'did-sensitivity',
+    unavailable: readiness,
+    prepared: prepared.id,
+    binding: prepared.id + JSON.stringify({ candidate, request, readiness }),
+    inspection: {
+      section: 'Sensitivity',
+      method: 'DiD omitted-variable sensitivity',
+      specification: JSON.stringify({ request: request?.success ? request.data : null, readiness }),
+      sharedResult:
+        'Saved-run ID and completion receipt only. Sensitivity bounds remain in the result panel.',
+    },
+    session,
+    execute: () => execute(),
+    records: (workflow) => workflow.sensitivityRuns,
+    summarise: runReceipt,
+  })
   const execute = async () => {
     if (
       readiness !== null ||

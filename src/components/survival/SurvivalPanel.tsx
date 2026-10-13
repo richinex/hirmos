@@ -22,6 +22,29 @@ import {
   draftFor,
 } from '@/domain/survivalDraft'
 import { useJob } from '@/analysis/JobsProvider'
+import { useRecordedAnalysis } from '@/assistant/useRecordedAnalysis'
+import { useWorkspaceConfiguration } from '@/assistant/workspaceConfiguration'
+import { survivalConfigurationSchema } from '@/assistant/survivalConfiguration'
+import {
+  coxEntryLabels,
+  coxFrailtyLabels,
+  coxObservationLabels,
+  coxPenaltyLabels,
+  coxStandardErrorLabels,
+  coxStrataLabels,
+  coxTiesLabels,
+  coxWeightLabels,
+  forestSettingLabels,
+  forestSplitRuleLabels,
+  multiStateInputLabels,
+  nelsonAalenTiesLabels,
+  penalizedAftFamilyLabels,
+  rowFrequencyLabels,
+  survivalAnalysisLabels,
+  survivalSettings,
+  wideEntryLabels,
+} from '@/domain/survivalSettings'
+import { survivalSummary, SURVIVAL_SUMMARY } from '@/assistant/analysisSummaries'
 import { JobNotice } from '@/components/ui/JobNotice'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import {
@@ -223,27 +246,27 @@ type DraftProblem = { readonly kind: 'invalid-survival-draft'; readonly detail: 
 const FOREST_PARAMETERS = [
   {
     key: 'trees',
-    title: 'Trees',
+    title: forestSettingLabels.trees,
     help: 'Number of trees. Each uses a bootstrap sample of the observations.',
   },
   {
     key: 'mtry',
-    title: 'Candidate covariates per split',
+    title: forestSettingLabels.mtry,
     help: 'Number of covariates considered at each split. Cannot exceed the number selected below.',
   },
   {
     key: 'seed',
-    title: 'Random seed',
+    title: forestSettingLabels.seed,
     help: 'A positive seed makes the same inputs and settings reproducible.',
   },
   {
     key: 'minNodeSize',
-    title: 'Minimum node size',
+    title: forestSettingLabels.minNodeSize,
     help: 'Do not split a node with fewer than this many observations.',
   },
   {
     key: 'minBucket',
-    title: 'Minimum terminal size',
+    title: forestSettingLabels.minBucket,
     help: 'Require at least this many observations in each child node.',
   },
 ] as const
@@ -277,15 +300,22 @@ const selectColumns = (
 const validateDraft = (
   draft: Draft,
   columns: readonly NumericColumnSelection[],
-  sourceColumns: readonly ColumnSelection[],
+  sourceColumns: readonly (ColumnSelection & { readonly duckdbType: string })[],
+  preparedColumns: readonly ColumnId[],
 ): Result<ReadyDraft, DraftProblem> => {
   const invalid = (detail: string): Result<never, DraftProblem> =>
     err({ kind: 'invalid-survival-draft', detail })
   const selectedOrProblem = (ids: readonly ColumnId[]) => {
     const selected = selectColumns(columns, ids)
-    return selected === null
-      ? invalid('A selected column is no longer in the prepared dataset.')
-      : ok(selected)
+    if (selected !== null) return ok(selected)
+    const unavailable = ids.find((id) => !columns.some((column) => column.id === id))
+    const source = sourceColumns.find((column) => column.id === unavailable)
+    if (!source) return invalid('A selected column is no longer in the source dataset.')
+    if (!isNumericDuckDbType(source.duckdbType))
+      return invalid(`“${source.name}” is not numeric. This survival input requires a numeric column.`)
+    if (!preparedColumns.includes(source.id))
+      return invalid(`“${source.name}” is not included in the prepared dataset. Include it during data preparation before using it here.`)
+    return invalid(`“${source.name}” is not numeric. This survival input requires a numeric column.`)
   }
   const transitionsOrProblem = (
     transitions: readonly TransitionDraft[],
@@ -1343,8 +1373,8 @@ function RowFrequencyControls({
         value={value.kind}
         onChange={selectKind}
         options={[
-          { value: 'one-observation-per-row', label: 'One observation' },
-          { value: 'frequency-column', label: 'Grouped count' },
+          { value: 'one-observation-per-row', label: rowFrequencyLabels['one-observation-per-row'] },
+          { value: 'frequency-column', label: rowFrequencyLabels['frequency-column'] },
         ]}
       />
       {value.kind === 'frequency-column' && (
@@ -1536,7 +1566,7 @@ export function SurvivalPanel({
     [prepared.columns, profile.columns],
   )
   const sourceColumns = useMemo(
-    () => profile.columns.map((column) => ({ id: column.id, name: column.name })),
+    () => profile.columns.map((column) => ({ id: column.id, name: column.name, duckdbType: column.duckdbType })),
     [profile.columns],
   )
   const draft = useWorkflow((state) =>
@@ -1554,6 +1584,32 @@ export function SurvivalPanel({
   )
   if (draft === null) throw new Error('Survival settings require the current prepared dataset.')
 
+  useWorkspaceConfiguration('survival', prepared.id, job.kind === 'running' || session.blocked ? null : {
+    title: 'Survival', current: draft, columns: sourceColumns,
+    describe: (next) => survivalSettings(next, sourceColumns),
+    schema: survivalConfigurationSchema(sourceColumns),
+    validate: (next) => {
+      const result = validateDraft(next, columns, sourceColumns, prepared.columns)
+      return result.ok ? ok(next) : err(result.error.detail)
+    },
+    configure,
+  })
+
+  useRecordedAnalysis({
+    key: 'survival',
+    prepared: prepared.id,
+    binding: prepared.id + JSON.stringify(draft),
+    inspection: {
+      section: 'Survival',
+      method: draft.kind,
+      specification: JSON.stringify({ draft, columns }),
+      sharedResult: SURVIVAL_SUMMARY,
+    },
+    session,
+    execute: () => execute(),
+    records: (workflow) => workflow.survivalRuns,
+    summarise: survivalSummary,
+  })
   const execute = async () => {
     const current = session.start('analysis', 'Survival analysis')
     if (current === null) return
@@ -1561,7 +1617,7 @@ export function SurvivalPanel({
     const onRun = (run: SurvivalRunArtifact) => {
       if (session.current(current)) recordRun(run)
     }
-    const validated = validateDraft(draft, columns, sourceColumns)
+    const validated = validateDraft(draft, columns, sourceColumns, prepared.columns)
     if (!validated.ok) {
       fail(validated.error.detail)
       return
@@ -2309,8 +2365,8 @@ export function SurvivalPanel({
                         configure({ ...draft, settings: { ...draft.settings, splitRule } })
                     }}
                   >
-                    <option value="logRank">Log-rank</option>
-                    <option value="extraTrees">Extra trees</option>
+                    <option value="logRank">{forestSplitRuleLabels.logRank}</option>
+                    <option value="extraTrees">{forestSplitRuleLabels.extraTrees}</option>
                   </Select>
                 </label>
                 {FOREST_PARAMETERS.map(({ key, title, help }) => (
@@ -2449,8 +2505,8 @@ export function SurvivalPanel({
                 value={draft.ties}
                 onChange={(ties) => configure({ ...draft, ties })}
                 options={[
-                  { value: 'discrete', label: 'Discrete' },
-                  { value: 'smoothed', label: 'Smoothed' },
+                  { value: 'discrete', label: nelsonAalenTiesLabels.discrete },
+                  { value: 'smoothed', label: nelsonAalenTiesLabels.smoothed },
                 ]}
               />
             </div>
@@ -2558,8 +2614,8 @@ export function SurvivalPanel({
                 value={draft.family}
                 onChange={(event) => changeFamily(event.target.value)}
               >
-                <option value="weibull">Weibull AFT</option>
-                <option value="logLogistic">Log-logistic AFT</option>
+                <option value="weibull">{penalizedAftFamilyLabels.weibull}</option>
+                <option value="logLogistic">{penalizedAftFamilyLabels.logLogistic}</option>
               </Select>
             </label>
             <label className="block">
@@ -2779,8 +2835,8 @@ export function SurvivalPanel({
                       value={observation.frailty.kind}
                       onChange={chooseFrailty}
                       options={[
-                        { value: 'none', label: 'None' },
-                        { value: 'gamma', label: 'Gamma by group' },
+                        { value: 'none', label: coxFrailtyLabels.none },
+                        { value: 'gamma', label: coxFrailtyLabels.gamma },
                       ]}
                     />
                   </div>
@@ -2828,8 +2884,8 @@ export function SurvivalPanel({
                           })
                         }
                         options={[
-                          { value: 'efron', label: 'Efron' },
-                          { value: 'breslow', label: 'Breslow' },
+                          { value: 'efron', label: coxTiesLabels.efron },
+                          { value: 'breslow', label: coxTiesLabels.breslow },
                         ]}
                       />
                     </div>
@@ -2847,10 +2903,10 @@ export function SurvivalPanel({
                           value={observation.entry.kind}
                           onChange={chooseEntry}
                           options={[
-                            { value: 'not-used', label: 'Not used' },
+                            { value: 'not-used', label: coxEntryLabels['not-used'] },
                             {
                               value: 'column',
-                              label: 'Entry column',
+                              label: coxEntryLabels.column,
                               disabled: clusteredBreslow,
                               title: breslowConstraint,
                             },
@@ -2882,9 +2938,9 @@ export function SurvivalPanel({
                           }
                           onChange={chooseStandardErrors}
                           options={[
-                            { value: 'model-based', label: 'Model-based' },
-                            { value: 'robust', label: 'Robust' },
-                            { value: 'clustered', label: 'Clustered' },
+                            { value: 'model-based', label: coxStandardErrorLabels['model-based'] },
+                            { value: 'robust', label: coxStandardErrorLabels.robust },
+                            { value: 'clustered', label: coxStandardErrorLabels.clustered },
                           ]}
                         />
                       </div>
@@ -2933,10 +2989,10 @@ export function SurvivalPanel({
                                 })
                               }
                               options={[
-                                { value: 'efron', label: 'Efron' },
+                                { value: 'efron', label: coxTiesLabels.efron },
                                 {
                                   value: 'breslow',
-                                  label: 'Breslow',
+                                  label: coxTiesLabels.breslow,
                                   disabled: !canUseBreslow,
                                   title: breslowConstraint,
                                 },
@@ -3012,8 +3068,8 @@ export function SurvivalPanel({
                 value={draft.observation.kind}
                 onChange={chooseObservation}
                 options={[
-                  { value: 'right-censored', label: 'Right-censored' },
-                  { value: 'start-stop', label: 'Start–stop' },
+                  { value: 'right-censored', label: coxObservationLabels['right-censored'] },
+                  { value: 'start-stop', label: coxObservationLabels['start-stop'] },
                 ]}
               />
             </div>
@@ -3035,10 +3091,10 @@ export function SurvivalPanel({
                   )
                 }
                 options={[
-                  { value: 'equal', label: 'Equal' },
+                  { value: 'equal', label: coxWeightLabels.equal },
                   {
                     value: 'column',
-                    label: 'Weight column',
+                    label: coxWeightLabels.column,
                     disabled: clusteredBreslow,
                     title: breslowConstraint,
                   },
@@ -3070,10 +3126,10 @@ export function SurvivalPanel({
                   )
                 }
                 options={[
-                  { value: 'unstratified', label: 'Unstratified' },
+                  { value: 'unstratified', label: coxStrataLabels.unstratified },
                   {
                     value: 'column',
-                    label: 'Stratum column',
+                    label: coxStrataLabels.column,
                     disabled: clusteredBreslow,
                     title: breslowConstraint,
                   },
@@ -3109,10 +3165,10 @@ export function SurvivalPanel({
                     })
                   }
                   options={[
-                    { value: 'unpenalized', label: 'Unpenalized' },
+                    { value: 'unpenalized', label: coxPenaltyLabels.unpenalized },
                     {
                       value: 'elastic-net',
-                      label: 'Elastic net',
+                      label: coxPenaltyLabels['elastic-net'],
                       disabled: clusteredBreslow,
                       title: breslowConstraint,
                     },
@@ -3485,8 +3541,8 @@ export function SurvivalPanel({
                         })
                       }
                       options={[
-                        { value: 'shared', label: 'Same entry' },
-                        { value: 'columns', label: 'Entry columns' },
+                        { value: 'shared', label: wideEntryLabels.shared },
+                        { value: 'columns', label: wideEntryLabels.columns },
                       ]}
                     />
                   </div>
@@ -3592,9 +3648,9 @@ export function SurvivalPanel({
                 value={input.kind}
                 onChange={chooseInput}
                 options={[
-                  { value: 'prepared-rows', label: 'Prepared rows' },
-                  { value: 'longitudinal-states', label: 'State observations' },
-                  { value: 'wide-events', label: 'Wide event history' },
+                  { value: 'prepared-rows', label: multiStateInputLabels['prepared-rows'] },
+                  { value: 'longitudinal-states', label: multiStateInputLabels['longitudinal-states'] },
+                  { value: 'wide-events', label: multiStateInputLabels['wide-events'] },
                 ]}
               />
             </div>
@@ -3744,15 +3800,15 @@ export function SurvivalPanel({
               value={draft.kind}
               onChange={selectDraft}
               options={[
-                { value: 'right-censored', label: 'Parametric' },
-                { value: 'nonparametric', label: 'Kaplan–Meier' },
-                { value: 'start-stop', label: 'Start–stop' },
-                { value: 'cox-regression', label: 'Cox regression' },
-                { value: 'aalen', label: 'Aalen regression' },
-                { value: 'survival-forest', label: 'Survival forest' },
-                { value: 'penalized-aft', label: 'Penalised AFT' },
-                { value: 'two-group', label: 'Compare groups' },
-                { value: 'multi-state', label: 'Multi-state' },
+                { value: 'right-censored', label: survivalAnalysisLabels['right-censored'] },
+                { value: 'nonparametric', label: survivalAnalysisLabels.nonparametric },
+                { value: 'start-stop', label: survivalAnalysisLabels['start-stop'] },
+                { value: 'cox-regression', label: survivalAnalysisLabels['cox-regression'] },
+                { value: 'aalen', label: survivalAnalysisLabels.aalen },
+                { value: 'survival-forest', label: survivalAnalysisLabels['survival-forest'] },
+                { value: 'penalized-aft', label: survivalAnalysisLabels['penalized-aft'] },
+                { value: 'two-group', label: survivalAnalysisLabels['two-group'] },
+                { value: 'multi-state', label: survivalAnalysisLabels['multi-state'] },
               ]}
             />
           </div>

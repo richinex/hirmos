@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { onFirstUse } from '@/lib/onFirstUse'
 import { categoricalMembershipSchema, type CategoricalMembership } from '@/domain/sampleMembership'
 import { columnDeclarationsSchema, type ColumnDeclarations } from '@/domain/fileReading'
 import {
@@ -210,110 +211,112 @@ export type DataProtocolProblem =
 
 const requestSchema = z.string().uuid()
 
-const commandSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('warm-engine') }).strict(),
-  z
-    .object({
-      kind: z.literal('preview-time'),
-      request: requestSchema,
-      file: z.instanceof(File),
-      profile: z.unknown(),
-      timeColumn: z.string(),
-      interpretation: timeInterpretationSchema,
-      calendar: calendarRequestSchema.optional(),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal('profile-source'),
-      request: requestSchema,
-      file: z.instanceof(File),
-      declared: columnDeclarationsSchema,
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal('materialize-numeric'),
-      membership: categoricalMembershipSchema.optional(),
-      request: requestSchema,
-      file: z.instanceof(File),
-      profile: z.unknown(),
-      columnIds: z.array(z.string()).min(1),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal('materialize-time-series'),
-      interpretation: timeInterpretationSchema.default({ kind: 'source-type' }),
-      request: requestSchema,
-      file: z.instanceof(File),
-      profile: z.unknown(),
-      timeColumn: z.string(),
-      columnIds: z.array(z.string()).min(1),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal('profile-column'),
-      request: requestSchema,
-      file: z.instanceof(File),
-      profile: z.unknown(),
-      columnId: z.string(),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal('summarize-columns'),
-      categoryColumn: z.string().optional(),
-      request: requestSchema,
-      file: z.instanceof(File),
-      profile: z.unknown(),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal('preview-window'),
-      request: requestSchema,
-      file: z.instanceof(File),
-      profile: z.unknown(),
-      query: previewQuerySchema,
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal('inspect-panel'),
-      request: requestSchema,
-      file: z.instanceof(File),
-      profile: z.unknown(),
-      unitColumn: z.string(),
-      timeColumn: z.string(),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal('materialize-panel-keys'),
-      request: requestSchema,
-      file: z.instanceof(File),
-      profile: z.unknown(),
-      unitColumn: z.string(),
-      timeColumn: z.string(),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal('materialize-panel'),
-      request: requestSchema,
-      file: z.instanceof(File),
-      profile: z.unknown(),
-      unitColumn: z.string(),
-      timeColumn: z.string(),
-      outcomeColumn: z.string(),
-      treatmentColumn: z.string(),
-      covariates: z.array(z.string()).default([]),
-      clusterColumn: z.string().min(1).optional(),
-    })
-    .strict(),
-])
+const commandSchema = onFirstUse(() =>
+  z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('warm-engine') }).strict(),
+    z
+      .object({
+        kind: z.literal('preview-time'),
+        request: requestSchema,
+        file: z.instanceof(File),
+        profile: z.unknown(),
+        timeColumn: z.string(),
+        interpretation: timeInterpretationSchema,
+        calendar: calendarRequestSchema.optional(),
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('profile-source'),
+        request: requestSchema,
+        file: z.instanceof(File),
+        declared: columnDeclarationsSchema,
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('materialize-numeric'),
+        membership: categoricalMembershipSchema.optional(),
+        request: requestSchema,
+        file: z.instanceof(File),
+        profile: z.unknown(),
+        columnIds: z.array(z.string()).min(1),
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('materialize-time-series'),
+        interpretation: timeInterpretationSchema.default({ kind: 'source-type' }),
+        request: requestSchema,
+        file: z.instanceof(File),
+        profile: z.unknown(),
+        timeColumn: z.string(),
+        columnIds: z.array(z.string()).min(1),
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('profile-column'),
+        request: requestSchema,
+        file: z.instanceof(File),
+        profile: z.unknown(),
+        columnId: z.string(),
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('summarize-columns'),
+        categoryColumn: z.string().optional(),
+        request: requestSchema,
+        file: z.instanceof(File),
+        profile: z.unknown(),
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('preview-window'),
+        request: requestSchema,
+        file: z.instanceof(File),
+        profile: z.unknown(),
+        query: previewQuerySchema,
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('inspect-panel'),
+        request: requestSchema,
+        file: z.instanceof(File),
+        profile: z.unknown(),
+        unitColumn: z.string(),
+        timeColumn: z.string(),
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('materialize-panel-keys'),
+        request: requestSchema,
+        file: z.instanceof(File),
+        profile: z.unknown(),
+        unitColumn: z.string(),
+        timeColumn: z.string(),
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('materialize-panel'),
+        request: requestSchema,
+        file: z.instanceof(File),
+        profile: z.unknown(),
+        unitColumn: z.string(),
+        timeColumn: z.string(),
+        outcomeColumn: z.string(),
+        treatmentColumn: z.string(),
+        covariates: z.array(z.string()).default([]),
+        clusterColumn: z.string().min(1).optional(),
+      })
+      .strict(),
+  ]),
+)
 
 const columnProfileProblemSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('column-not-found'), id: z.string() }).strict(),
@@ -391,117 +394,123 @@ const previewWindowProblemSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('worker-protocol-failed'), detail: z.string() }).strict(),
 ])
 
-const eventSchema = z.discriminatedUnion('kind', [
-  z
-    .object({
-      kind: z.literal('time-preview-succeeded'),
-      request: requestSchema,
-      preview: timePreviewSchema,
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal('profile-succeeded'),
-      request: requestSchema,
-      profile: z.unknown(),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal('profile-failed'),
-      request: requestSchema,
-      problem: profileProblemSchema,
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal('materialization-succeeded'),
-      request: requestSchema,
-      matrix: z.unknown(),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal('time-series-materialization-succeeded'),
-      request: requestSchema,
-      matrix: z.unknown(),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal('materialization-failed'),
-      request: requestSchema,
-      problem: materializationProblemSchema,
-    })
-    .strict(),
-  z.object({ kind: z.literal('protocol-failed'), detail: z.string() }).strict(),
-  z
-    .object({
-      kind: z.literal('column-profile-succeeded'),
-      request: requestSchema,
-      profile: z.unknown(),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal('column-profile-failed'),
-      request: requestSchema,
-      problem: columnProfileProblemSchema,
-    })
-    .strict(),
-  z
-    .object({ kind: z.literal('summary-succeeded'), request: requestSchema, summary: z.unknown() })
-    .strict(),
-  z
-    .object({
-      kind: z.literal('summary-failed'),
-      request: requestSchema,
-      problem: summaryProblemSchema,
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal('preview-window-succeeded'),
-      request: requestSchema,
-      window: z.unknown(),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal('preview-window-failed'),
-      request: requestSchema,
-      problem: previewWindowProblemSchema,
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal('panel-inspection-succeeded'),
-      request: requestSchema,
-      structure: z.unknown(),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal('panel-keys-succeeded'),
-      request: requestSchema,
-      matrix: z.unknown(),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal('panel-materialization-succeeded'),
-      request: requestSchema,
-      matrix: z.unknown(),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal('panel-data-failed'),
-      request: requestSchema,
-      problem: panelDataProblemSchema,
-    })
-    .strict(),
-])
+const eventSchema = onFirstUse(() =>
+  z.discriminatedUnion('kind', [
+    z
+      .object({
+        kind: z.literal('time-preview-succeeded'),
+        request: requestSchema,
+        preview: timePreviewSchema,
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('profile-succeeded'),
+        request: requestSchema,
+        profile: z.unknown(),
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('profile-failed'),
+        request: requestSchema,
+        problem: profileProblemSchema,
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('materialization-succeeded'),
+        request: requestSchema,
+        matrix: z.unknown(),
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('time-series-materialization-succeeded'),
+        request: requestSchema,
+        matrix: z.unknown(),
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('materialization-failed'),
+        request: requestSchema,
+        problem: materializationProblemSchema,
+      })
+      .strict(),
+    z.object({ kind: z.literal('protocol-failed'), detail: z.string() }).strict(),
+    z
+      .object({
+        kind: z.literal('column-profile-succeeded'),
+        request: requestSchema,
+        profile: z.unknown(),
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('column-profile-failed'),
+        request: requestSchema,
+        problem: columnProfileProblemSchema,
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('summary-succeeded'),
+        request: requestSchema,
+        summary: z.unknown(),
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('summary-failed'),
+        request: requestSchema,
+        problem: summaryProblemSchema,
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('preview-window-succeeded'),
+        request: requestSchema,
+        window: z.unknown(),
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('preview-window-failed'),
+        request: requestSchema,
+        problem: previewWindowProblemSchema,
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('panel-inspection-succeeded'),
+        request: requestSchema,
+        structure: z.unknown(),
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('panel-keys-succeeded'),
+        request: requestSchema,
+        matrix: z.unknown(),
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('panel-materialization-succeeded'),
+        request: requestSchema,
+        matrix: z.unknown(),
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('panel-data-failed'),
+        request: requestSchema,
+        problem: panelDataProblemSchema,
+      })
+      .strict(),
+  ]),
+)
 
 function bindColumns(
   known: ReadonlyMap<string, ColumnId>,
@@ -525,7 +534,7 @@ function bindColumns(
 export function parseDataWorkerCommand(
   value: unknown,
 ): Result<DataWorkerCommand, DataProtocolProblem> {
-  const parsed = commandSchema.safeParse(value)
+  const parsed = commandSchema().safeParse(value)
   if (!parsed.success)
     return err({ kind: 'invalid-command', detail: z.prettifyError(parsed.error) })
   const data = parsed.data
@@ -737,7 +746,7 @@ export function parseDataWorkerCommand(
 }
 
 export function parseDataWorkerEvent(value: unknown): Result<DataWorkerEvent, DataProtocolProblem> {
-  const parsed = eventSchema.safeParse(value)
+  const parsed = eventSchema().safeParse(value)
   if (!parsed.success) return err({ kind: 'invalid-event', detail: z.prettifyError(parsed.error) })
   if (parsed.data.kind === 'protocol-failed') return ok(parsed.data)
 

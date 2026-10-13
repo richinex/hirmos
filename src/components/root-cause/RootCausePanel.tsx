@@ -1,4 +1,9 @@
 import { NumberInput } from '@/components/ui/NumberInput'
+import { z } from 'zod'
+import { useMemo } from 'react'
+import { useWorkspaceConfiguration } from '@/assistant/workspaceConfiguration'
+import { useRecordedAnalysis } from '@/assistant/useRecordedAnalysis'
+import { ok, err } from '@/domain/dop'
 import { RunPicker } from '@/components/ui/RunPicker'
 import { formatCount } from '@/lib/format/number'
 import { SettingsDisclosure } from '@/components/ui/SettingsDisclosure'
@@ -27,6 +32,14 @@ import { RootCauseSettings } from './RootCauseSettings'
 import { RootCauseData } from './RootCauseData'
 import { GraphDetails } from './GraphDetails'
 import { readObservation } from '@/domain/observation'
+import {
+  attributionSettings,
+  causalAnalysisLabels,
+  causalAnalysisSettings,
+  conditionalModelLabels,
+  observationInputLabels,
+  randomSequenceOptions,
+} from '@/domain/causalModelSettings'
 import {
   button,
   chapterIntro,
@@ -79,12 +92,12 @@ interface Props {
 }
 
 const analyses = [
-  { value: 'anomaly', label: 'Unusual observation' },
-  { value: 'change', label: 'Distribution change' },
-  { value: 'intervention', label: 'Shift intervention' },
-  { value: 'effects', label: 'Intervention effects' },
-  { value: 'intrinsic', label: 'Variance contributions' },
-  { value: 'arrows', label: 'Arrow strengths' },
+  { value: 'anomaly', label: causalAnalysisLabels.anomaly },
+  { value: 'change', label: causalAnalysisLabels.change },
+  { value: 'intervention', label: causalAnalysisLabels.intervention },
+  { value: 'effects', label: causalAnalysisLabels.effects },
+  { value: 'intrinsic', label: causalAnalysisLabels.intrinsic },
+  { value: 'arrows', label: causalAnalysisLabels.arrows },
 ] as const
 
 const descriptions: Record<
@@ -189,12 +202,189 @@ export function RootCausePanel(props: Props) {
   const document = props.documents.find(
     (entry) => entry.id === props.workspace.selection?.dagDocument,
   )
-  const savedRandom = [
-    ...checks,
-    ...props.workspace.runs.filter(
-      (record) => record.graph.dagRevision === props.workspace.selection?.dagRevision,
-    ),
-  ].find((record) => record.id === randomSource)?.evidence.random
+  const revisionRuns = props.workspace.runs.filter(
+    (record) => record.graph.dagRevision === props.workspace.selection?.dagRevision,
+  )
+  const savedRandom = [...checks, ...revisionRuns].find((record) => record.id === randomSource)
+    ?.evidence.random
+  const sequences = randomSequenceOptions(checks, revisionRuns)
+
+  const fileRevision = useMemo(() => (file === null ? null : crypto.randomUUID()), [file])
+  const binding = JSON.stringify({ graph: props.workspace.selection, draft, fileRevision })
+  useWorkspaceConfiguration(
+    'causal-model',
+    binding,
+    !graph.ok || job.kind === 'running'
+      ? null
+      : {
+          title: 'Causal model analysis',
+          current: { analysis },
+          schema: z
+            .object({
+              analysis: z.enum([
+                'anomaly',
+                'change',
+                'intervention',
+                'effects',
+                'intrinsic',
+                'arrows',
+              ]),
+            })
+            .strict(),
+          columns: [],
+          describe: causalAnalysisSettings,
+          validate: (next) => ok(next),
+          configure: (next) => setAnalysis(next.analysis),
+        },
+  )
+  useWorkspaceConfiguration(
+    'gcm-attribution',
+    binding,
+    !graph.ok ||
+      job.kind === 'running' ||
+      analysis === 'effects' ||
+      analysis === 'intrinsic' ||
+      analysis === 'arrows'
+      ? null
+      : {
+          title: description.title,
+          current: {
+            target,
+            repetitions,
+            samples,
+            changeFitting,
+            seed,
+            randomSource,
+            observationMode,
+            observationDraft,
+            shifts,
+          },
+          schema: z
+            .object({
+              target: z
+                .string()
+                .regex(/^\d+$/)
+                .describe(
+                  graph.value.nodes.map((node, index) => `${index}: ${node.name}`).join(', '),
+                ),
+              repetitions: rootCauseRequestSchema.shape.repetitions,
+              samples: z.number().int().positive(),
+              changeFitting: z.enum(['halfNormalLinear', 'automaticFull']),
+              seed: z.number().int().min(0).max(0xffffffff),
+              randomSource: z.string(),
+              observationMode: z.enum(['values', 'file']),
+              observationDraft: z.record(z.string(), z.string()),
+              shifts: z.record(z.string(), z.string()),
+            })
+            .strict(),
+          columns: graph.value.nodes.map((node) => ({ id: node.id, name: node.name })),
+          describe: (next) => attributionSettings(next, analysis, graph.value.nodes, sequences),
+          validate: (next) => {
+            if (!graph.ok) return err('Choose a causal model graph first.')
+            if (Number(next.target) >= graph.value.nodes.length)
+              return err('Choose a target in the selected graph.')
+            if (
+              next.randomSource !== 'seed' &&
+              ![...checks, ...props.workspace.runs].some(
+                (record) =>
+                  record.id === next.randomSource &&
+                  record.graph.dagRevision === graph.value.dagRevision,
+              )
+            )
+              return err('Choose a saved random state from this graph revision, or use a seed.')
+            const ids = new Set(graph.value.nodes.map((node) => node.id as string))
+            if (
+              [...Object.keys(next.observationDraft), ...Object.keys(next.shifts)].some(
+                (id) => !ids.has(id),
+              )
+            )
+              return err(
+                'Observation and shift keys must identify variables in the selected graph.',
+              )
+            if (analysis === 'anomaly' && next.observationMode === 'values') {
+              const observation = readObservation(graph.value, next.observationDraft)
+              if (!observation.ok)
+                return err('Enter a numeric observation for every graph variable.')
+            }
+            if (
+              Object.values(next.shifts).some(
+                (value) => value.trim() !== '' && !Number.isFinite(Number(value)),
+              )
+            )
+              return err('Enter finite numeric shifts.')
+            return ok(next)
+          },
+          configure: (next) => {
+            setTarget(next.target)
+            setRepetitions(next.repetitions)
+            setSamples(next.samples)
+            setChangeFitting(next.changeFitting)
+            setSeed(next.seed)
+            setRandomSource(next.randomSource)
+            setObservationMode(next.observationMode)
+            for (const node of graph.value.nodes) {
+              update({
+                type: 'observation',
+                node: node.id,
+                value: next.observationDraft[node.id] ?? '',
+              })
+              update({ type: 'shift', node: node.id, value: next.shifts[node.id] ?? '' })
+            }
+            setReplay(null)
+            setConfirmed(false)
+          },
+        },
+  )
+  useRecordedAnalysis({
+    key: 'gcm-checks',
+    prepared: props.prepared.id,
+    binding,
+    inspection: {
+      section: 'Causal model analysis',
+      method: 'Check fitted mechanisms',
+      specification: JSON.stringify({
+        graph: props.workspace.selection,
+        fitting: checkFitting,
+        seed,
+      }),
+      sharedResult: 'Saved model checks and their diagnostics.',
+    },
+    session,
+    execute: () => check(),
+    records: (workflow) => workflow.rootCause.checks,
+    summarise: (record) => {
+      const { random: _random, ...evidence } = record.evidence
+      return JSON.stringify({ model: record.model, evidence })
+    },
+  })
+  useRecordedAnalysis({
+    key: 'gcm-attribution',
+    prepared: props.prepared.id,
+    binding,
+    inspection: {
+      section: 'Causal model analysis',
+      method: description.title,
+      specification: JSON.stringify({
+        graph: props.workspace.selection,
+        analysis,
+        attribution: draft?.attribution,
+        observationMode,
+        observationDraft,
+        shifts,
+        confirmed,
+        file: file?.name ?? null,
+        replay,
+      }),
+      sharedResult: 'Saved attribution model, comparison data description and estimates.',
+    },
+    session,
+    execute: () => run(),
+    records: (workflow) => workflow.rootCause.runs,
+    summarise: (record) => {
+      const { random: _random, ...evidence } = record.evidence
+      return JSON.stringify({ model: record.model, evidence, comparison: record.comparison })
+    },
+  })
 
   const check = async () => {
     if (!graph.ok) return
@@ -509,7 +699,7 @@ export function RootCausePanel(props: Props) {
             empty="No root-cause runs yet."
             runs={props.workspace.runs.map((run) => ({
               id: run.id,
-              title: `${analyses.find((entry) => entry.value === run.model.query.kind)!.label}: ${run.comparison.name}`,
+              title: `${causalAnalysisLabels[run.model.query.kind]}: ${run.comparison.name}`,
               createdAt: run.createdAt,
               deleteLabel: `Delete ${run.comparison.name} run`,
             }))}
@@ -599,8 +789,12 @@ export function RootCausePanel(props: Props) {
                           setChangeFitting(event.target.value as typeof changeFitting)
                         }
                       >
-                        <option value="halfNormalLinear">Linear models</option>
-                        <option value="automaticFull">Automatic selection</option>
+                        <option value="halfNormalLinear">
+                          {conditionalModelLabels.halfNormalLinear}
+                        </option>
+                        <option value="automaticFull">
+                          {conditionalModelLabels.automaticFull}
+                        </option>
                       </Select>
                     </label>
                   )}
@@ -609,8 +803,8 @@ export function RootCausePanel(props: Props) {
                       ariaLabel="Observation input"
                       value={observationMode}
                       options={[
-                        { value: 'values', label: 'Enter values' },
-                        { value: 'file', label: 'Upload file' },
+                        { value: 'values', label: observationInputLabels.values },
+                        { value: 'file', label: observationInputLabels.file },
                       ]}
                       onChange={setObservationMode}
                       size="md"
@@ -787,22 +981,11 @@ export function RootCausePanel(props: Props) {
                           value={randomSource}
                           onChange={(event) => setRandomSource(event.target.value)}
                         >
-                          <option value="seed">Start from the random seed</option>
-                          {checks.map((record, index) => (
-                            <option key={record.id} value={record.id}>
-                              Continue after model check {index + 1}
+                          {sequences.map((sequence) => (
+                            <option key={sequence.value} value={sequence.value}>
+                              {sequence.label}
                             </option>
                           ))}
-                          {props.workspace.runs
-                            .filter(
-                              (record) =>
-                                record.graph.dagRevision === props.workspace.selection?.dagRevision,
-                            )
-                            .map((record, index) => (
-                              <option key={record.id} value={record.id}>
-                                Continue after analysis {index + 1}
-                              </option>
-                            ))}
                         </Select>
                       </div>
                       {analysis !== 'intervention' && (

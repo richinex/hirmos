@@ -92,6 +92,24 @@ export const DEFAULT_DYNAMIC_LINEAR_SCM: DynamicLinearScmConfiguration = {
 
 export type CounterfactualConfiguration = LinearScmConfiguration | DynamicLinearScmConfiguration
 
+export const counterfactualConfigurationSchema = z.discriminatedUnion('kind', [
+  z.strictObject({
+    kind: z.literal('linear-scm'),
+    interventions: z.tuple([z.number(), z.number()]),
+    observationNoise: z.number().positive().nullable(),
+  }),
+  z.strictObject({
+    kind: z.literal('dynamic-linear-scm'),
+    interventions: z.tuple([z.number(), z.number()]),
+    schedule: z.discriminatedUnion('kind', [
+      z.strictObject({ kind: z.literal('point'), row: z.number().int().positive() }),
+      z.strictObject({ kind: z.literal('persistent'), startRow: z.number().int().positive() }),
+    ]),
+    steps: z.number().int().positive(),
+    uncertainty: dynamicCounterfactualUncertaintySchema,
+  }),
+])
+
 export const linearScmEvidenceSchema = z
   .object({
     kind: z.literal('linearScmCounterfactual'),

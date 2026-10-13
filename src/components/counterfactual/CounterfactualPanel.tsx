@@ -79,6 +79,19 @@ import {
   type CounterfactualEvent,
 } from '@/domain/counterfactualDraft'
 import { useJob } from '@/analysis/JobsProvider'
+import { useRecordedAnalysis } from '@/assistant/useRecordedAnalysis'
+import { useWorkspaceConfiguration } from '@/assistant/workspaceConfiguration'
+import { counterfactualConfigurationSchema } from '@/domain/counterfactual'
+import {
+  blockLengthLabels,
+  counterfactualModelLabels,
+  counterfactualSettings,
+  counterfactualUncertaintyLabels,
+  disturbanceInferenceLabels,
+  firstInterventionLabel,
+  interventionScheduleLabels,
+} from '@/domain/counterfactualSettings'
+import { ok, err } from '@/domain/dop'
 import { JobNotice } from '@/components/ui/JobNotice'
 import { cn } from '@/lib/utils'
 
@@ -686,6 +699,98 @@ export function CounterfactualPanel({
         }
       : null,
   )
+  useWorkspaceConfiguration(
+    'counterfactual',
+    JSON.stringify({
+      prepared: prepared.id,
+      study,
+      identification,
+      revision: selectedRevision?.id,
+    }),
+    job.kind === 'running' || session.blocked
+      ? null
+      : {
+          title: 'Counterfactuals',
+          current: state.configuration,
+          schema: counterfactualConfigurationSchema,
+          columns: [],
+          describe: (next) => counterfactualSettings(next, study?.treatment.name ?? null),
+          validate: (next) => {
+            if (!study || !identification) return err('Select an identified study first.')
+            const method = methodDefinition(
+              next.kind === 'linear-scm' ? LINEAR_SCM_METHOD_ID : DYNAMIC_LINEAR_SCM_METHOD_ID,
+            )
+            if (!method.ok) return err('The method is unavailable.')
+            const result = evaluateCounterfactualEligibility(method.value, {
+              study,
+              identification: identification.result,
+              prepared,
+              configuration: next,
+            })
+            if (result.kind === 'refused')
+              return err(result.violations.map((v) => v.evidence).join(' '))
+            if (next.kind === 'dynamic-linear-scm') {
+              const start =
+                next.schedule.kind === 'point' ? next.schedule.row : next.schedule.startRow
+              if (start <= selectedMaxLag || start + next.steps - 1 > prepared.observations)
+                return err(
+                  'Choose an intervention row after the graph lags and a horizon within the prepared series.',
+                )
+            }
+            return ok(next)
+          },
+          configure,
+        },
+  )
+  useRecordedAnalysis({
+    key: 'counterfactual',
+    prepared: prepared.id,
+    binding:
+      prepared.id +
+      JSON.stringify({ state, study, identification, revision: selectedRevision?.id }),
+    inspection: {
+      section: 'Counterfactuals',
+      method: state.configuration.kind,
+      specification: JSON.stringify({
+        configuration: state.configuration,
+        study: study?.id,
+        revision: selectedRevision?.id,
+      }),
+      sharedResult:
+        'Saved model specification, average model-implied effect and uncertainty where calculated. Row-level predictions remain in the result panel.',
+    },
+    session,
+    execute: () => execute(),
+    records: (workflow) => workflow.counterfactualRuns,
+    summarise: (record) =>
+      JSON.stringify({
+        study: record.study,
+        identification: record.identification,
+        preparedDataset: record.preparedDataset,
+        configuration: record.configuration,
+        observations: record.evidence.observations,
+        averageEffect: record.evidence.averageEffect,
+        eligibility: record.eligibility,
+        ...(record.kind === 'linear-scm-run'
+          ? {
+              sharePositive: record.evidence.sharePositive,
+              uncertainty: 'No uncertainty interval calculated.',
+            }
+          : {
+              cumulativeEffect: record.evidence.cumulativeEffect,
+              uncertainty:
+                record.evidence.uncertainty.kind === 'none'
+                  ? { kind: 'none' }
+                  : {
+                      kind: 'blockBootstrap',
+                      confidenceLevel: record.evidence.uncertainty.confidenceLevel,
+                      samples: record.evidence.uncertainty.samples,
+                      averageInterval: record.evidence.uncertainty.averageInterval,
+                      cumulativeInterval: record.evidence.uncertainty.cumulativeInterval,
+                    },
+            }),
+      }),
+  })
   const execute = async () => {
     if (
       identification === null ||
@@ -905,10 +1010,10 @@ export function CounterfactualPanel({
                       }
                     }}
                     options={[
-                      { value: 'linear-scm', label: 'Row-wise SCM' },
+                      { value: 'linear-scm', label: counterfactualModelLabels['linear-scm'] },
                       {
                         value: 'dynamic-linear-scm',
-                        label: 'Dynamic SCM',
+                        label: counterfactualModelLabels['dynamic-linear-scm'],
                         disabled: prepared.kind !== 'prepared-time-series',
                         title:
                           prepared.kind === 'prepared-time-series'
@@ -923,7 +1028,7 @@ export function CounterfactualPanel({
                 <div className="grid max-w-4xl items-start gap-4 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
                   <label className="block">
                     <span className={fieldLabel}>
-                      Set {study?.treatment.name ?? 'treatment'} to
+                      {firstInterventionLabel(study?.treatment.name ?? null)}
                     </span>
                     <NumberInput
                       step="any"
@@ -969,8 +1074,8 @@ export function CounterfactualPanel({
                           value={state.configuration.schedule.kind}
                           onChange={configureDynamicSchedule}
                           options={[
-                            { value: 'point', label: 'One time' },
-                            { value: 'persistent', label: 'Persistent' },
+                            { value: 'point', label: interventionScheduleLabels.point },
+                            { value: 'persistent', label: interventionScheduleLabels.persistent },
                           ]}
                         />
                       </div>
@@ -1057,12 +1162,12 @@ export function CounterfactualPanel({
                     options={[
                       {
                         value: 'exact',
-                        label: 'Exactly',
+                        label: disturbanceInferenceLabels.exact,
                         hint: 'Each disturbance term is recovered exactly from the fitted equations.',
                       },
                       {
                         value: 'noise',
-                        label: 'Allow observation noise',
+                        label: disturbanceInferenceLabels.noise,
                         hint: 'Disturbance terms are inferred, allowing for observation noise at the chosen scale.',
                       },
                     ]}
@@ -1100,12 +1205,12 @@ export function CounterfactualPanel({
                     options={[
                       {
                         value: 'blockBootstrap',
-                        label: 'Block-bootstrap interval',
+                        label: counterfactualUncertaintyLabels.blockBootstrap,
                         hint: 'The dynamic equations are refitted to samples drawn using circular blocks. Confidence intervals are reported for individual time points and aggregate effects.',
                       },
                       {
                         value: 'none',
-                        label: 'Point estimate only',
+                        label: counterfactualUncertaintyLabels.none,
                         hint: 'The fitted counterfactual path is reported without a sampling interval.',
                       },
                     ]}
@@ -1156,8 +1261,8 @@ export function CounterfactualPanel({
                             })
                           }
                           options={[
-                            { value: 'cubeRoot', label: 'Automatic' },
-                            { value: 'fixed', label: 'Fixed' },
+                            { value: 'cubeRoot', label: blockLengthLabels.cubeRoot },
+                            { value: 'fixed', label: blockLengthLabels.fixed },
                           ]}
                         />
                       </div>

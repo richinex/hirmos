@@ -30,6 +30,7 @@ import { MetricGrid, MetricTile } from '@/components/ui/figures'
 import { SegmentedControl, type SegmentOption } from '@/components/ui/SegmentedControl'
 import { caption, iconControl, label, num } from '@/components/ui/recipes'
 import { assertNever } from '@/domain/dop'
+import { penalizedAftFamilyLabels, survivalFamilyLabels } from '@/domain/survivalSettings'
 import type {
   ComparisonSurvivalEvidence,
   ConversionDifference,
@@ -52,17 +53,7 @@ import { SurvivalInterpretation as Interpretation } from './SurvivalInterpretati
 import { AalenResult, ForestResult } from './SurvivalRegressionResult'
 
 export const survivalFamilyLabel = (family: ParametricSurvivalFamily): string =>
-  ({
-    exponential: 'Exponential',
-    weibull: 'Weibull AFT',
-    weibullPh: 'Weibull PH',
-    logNormal: 'Log-normal',
-    gamma: 'Gamma',
-    gompertz: 'Gompertz',
-    logLogistic: 'Log-logistic',
-    generalizedGamma: 'Generalized gamma',
-    generalizedF: 'Generalized F',
-  })[family]
+  survivalFamilyLabels[family]
 
 export const survivalRunLabel = (run: SurvivalRunArtifact): string => {
   switch (run.kind) {
@@ -90,7 +81,7 @@ export const survivalRunLabel = (run: SurvivalRunArtifact): string => {
 }
 
 export const penalizedAftFamilyLabel = (family: 'weibull' | 'logLogistic'): string =>
-  family === 'weibull' ? 'Weibull AFT' : 'Log-logistic AFT'
+  penalizedAftFamilyLabels[family]
 
 /** The method and the headline figure of a run, for the ledger row. */
 export const survivalRunSummary = (

@@ -352,7 +352,10 @@ export function createSqlSession(inputs: readonly SqlPreparationInput[], resume:
           return value === null || value === undefined ? 'NULL' : String(value)
         }),
       )
-      store.setState({ scriptResult: { kind: 'complete', count: result.numRows, columns, rows } })
+      store.setState({
+        script: { kind: 'closed' },
+        scriptResult: { kind: 'complete', count: result.numRows, columns, rows },
+      })
     } catch (cause) {
       if (valid(generation))
         store.setState({ scriptResult: { kind: 'failed', detail: String(cause) } })

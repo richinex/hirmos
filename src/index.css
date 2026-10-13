@@ -56,9 +56,19 @@
 
    The two faces of the palette live in themes.css under :root[data-theme=...], with a pre-paint boot
    script in index.html. Light is the default. */
+
+/* Asta Sans draws the ellipsis at mid-height, like ⋯. This face supplies only U+2026, from the system
+   sans, so "Loading…" ends on the baseline; every other character stays Asta Sans. */
+@font-face {
+  font-family: 'Baseline Ellipsis';
+  src: local('Helvetica Neue'), local('HelveticaNeue'), local('Helvetica'), local('Arial'),
+    local('Liberation Sans');
+  unicode-range: U+2026;
+}
+
 @theme {
-  --font-sans: 'Asta Sans Variable', 'Asta Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  --font-heading: 'Asta Sans Variable', 'Asta Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-sans: 'Baseline Ellipsis', 'Asta Sans Variable', 'Asta Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-heading: 'Baseline Ellipsis', 'Asta Sans Variable', 'Asta Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
   --font-mono: 'Fira Code Variable', 'Fira Code', 'Courier New', Courier, monospace;
   /* Asta Sans is variable from 300 to 800, so medium and semibold are true weights. */
   --font-weight-medium: 500;
@@ -388,7 +398,19 @@ button:not([role='combobox']):not(:disabled):not([aria-disabled='true']):active,
   --motion-theme-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-skeleton: 1.4s;
   --motion-sweep: 1.8s;
+  /* The Kinetics gallery's elastic settle (Elastic Progress, Segment Loader): a slight overshoot past the target. */
+  --motion-kinetic-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-kinetic: 900ms;
 }
+
+@keyframes segment-live { 50% { opacity: 0.35; } }
+@keyframes segment-grow { from { transform: scaleY(0); } }
+.segment-live { animation: segment-live var(--motion-loop) ease-in-out infinite; }
+.segment-grow { animation: segment-grow var(--motion-kinetic) var(--motion-kinetic-ease) both; }
+.segment-grow.segment-live {
+  animation: segment-grow var(--motion-kinetic) var(--motion-kinetic-ease) both, segment-live var(--motion-loop) ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) { .segment-live, .segment-grow { animation: none; } }
 .rise { animation: rise var(--motion-slow) var(--default-transition-timing-function) both; }
 
 /* One entrance for every floating surface (Rnd panels, dialogs, drawer), using the same sharp easing as
@@ -477,6 +499,10 @@ button[aria-busy="true"]::after {
   animation: bar-sweep var(--motion-sweep) linear infinite;
 }
 @media (prefers-reduced-motion: reduce) { button[aria-busy="true"]::after { animation: none; left: 0; width: 100%; opacity: 0.5; } }
+
+.mark-flow { stroke-dasharray: 3 3; animation: mark-flow 0.9s linear infinite; }
+@keyframes mark-flow { to { stroke-dashoffset: -12; } }
+@media (prefers-reduced-motion: reduce) { .mark-flow { animation: none; } }
 
 /* Elevation, the texture chapter's way: light from above. `.lift` is a contact shadow for a block on the
    canvas (cards, panels), with no ring and no top line, so a card is a surface and not a frame; `.float`

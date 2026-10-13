@@ -1,4 +1,10 @@
 import type { EstimationRunEvent, PointwiseRetry } from '@/analysis/estimation/context'
+import { useEstimationTools, useAnalysisRunTool } from '@/assistant/applicationTools'
+import { useEncodingSettings } from '@/assistant/useEncodingSettings'
+import { canConfigureEstimator } from '@/assistant/estimatorConfiguration'
+import { estimateSummary, type AssistantRunOutcome } from '@/assistant/analysisRun'
+import { describeEstimand } from '@/domain/study'
+import { useStudySelectionTool } from '@/assistant/studySelection'
 import { useJob } from '@/analysis/JobsProvider'
 import { EChart } from '@/charts/EChart'
 import { runComparisonOption, type RunComparisonRow } from '@/charts/estimation/runComparison'
@@ -36,7 +42,7 @@ import { RunActions } from '@/components/ui/RunActions'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { Select } from '@/components/ui/Select'
 import { SettingsStep } from '@/components/ui/SettingsStep'
-import { useWorkflow } from '@/components/WorkflowProvider'
+import { useWorkflow, useWorkflowStore } from '@/components/WorkflowProvider'
 import type { RunActivity } from '@/domain/activity'
 import {
   describeDidCovariateRole,
@@ -52,6 +58,7 @@ import { expandsDesign } from '@/domain/designMatrix'
 import { assertNever, type NonEmptyArray } from '@/domain/dop'
 import {
   describeCovariance,
+  configurationSettings,
   describeEstimator,
   describeFixedEffects,
   describeRun,
@@ -501,25 +508,53 @@ export function EstimationPanel({
         }
       : null,
   )
+  const runBlocked =
+    job.kind === 'running' ||
+    session.blocked ||
+    sunBlocked ||
+    !selectedEstimatorIsVisible ||
+    identification === null ||
+    study === null ||
+    eligibility === null ||
+    eligibility.kind === 'refused' ||
+    studyDataPending ||
+    studyDataError !== null ||
+    adjustmentDraftOpen ||
+    !method.ok ||
+    (configuration.kind === 'panel-intervention' &&
+      configuration.primary !== 'staggered' &&
+      configuration.primary !== 'sunAbraham' &&
+      panelPreflight.kind !== 'ready')
   const execute = async (
     requested: EstimatorConfiguration = state.configurations[state.estimator],
-  ) => {
+    signal?: AbortSignal,
+  ): Promise<AssistantRunOutcome> => {
     const configuration =
       requested.kind === 'panel-intervention' && requested.primary === 'did'
         ? { ...requested, inference: requested.inference ?? defaultConventionalDidInference }
         : requested
     if (
+      signal?.aborted ||
+      runBlocked ||
       identification === null ||
       study === null ||
       eligibility === null ||
-      eligibility.kind === 'refused' ||
       adjustmentDraftOpen ||
       !method.ok
     )
-      return
-    if (!estimableIdentification(identification.result)) return
+      return {
+        kind: 'refused',
+        reason: 'The current specification is not ready to run. Review Estimation.',
+      }
+    if (!estimableIdentification(identification.result))
+      return { kind: 'refused', reason: 'The study is not identified for estimation.' }
     const current = session.start('analysis', describeEstimator(state.estimator))
-    if (current === null) return
+    if (current === null) return { kind: 'refused', reason: 'Another analysis is running.' }
+    let outcome: AssistantRunOutcome = { kind: 'cancelled' }
+    const cancel = () => {
+      if (session.current(current)) session.cancel()
+    }
+    signal?.addEventListener('abort', cancel, { once: true })
     setPointwiseRetry(null)
     const dispatch = (event: EstimationRunEvent) => {
       switch (event.type) {
@@ -527,6 +562,7 @@ export function EstimationPanel({
           session.progress(current, describeEstimator(state.estimator), event.progress)
           return
         case 'run-failed':
+          outcome = { kind: 'failed', reason: event.detail }
           session.fail(current, event.detail)
           return
         case 'run-finished':
@@ -538,7 +574,7 @@ export function EstimationPanel({
     }
     try {
       const { executeEstimation } = await import('@/analysis/estimation/execute')
-      if (!session.current(current)) return
+      if (!session.current(current)) return { kind: 'cancelled' }
       await executeEstimation(
         {
           configuration,
@@ -557,7 +593,27 @@ export function EstimationPanel({
         {
           isCurrent: () => session.current(current),
           emit: dispatch,
-          onRun,
+          onRun: (run) => {
+            if (!session.current(current) || signal?.aborted) return
+            onRun(run)
+            outcome = {
+              kind: 'completed',
+              runId: run.id,
+              method: describeRun(run.configuration),
+              subject: {
+                kind: 'saved-study',
+                study: run.study,
+                treatment: study.treatment.name,
+                outcome: study.outcome.name,
+              },
+              summary: estimateSummary(run.estimate, {
+                kind: 'saved-study',
+                study: run.study,
+                treatment: study.treatment.name,
+                outcome: study.outcome.name,
+              }),
+            }
+          },
           offerPointwiseRetry: setPointwiseRetry,
         },
       )
@@ -566,10 +622,193 @@ export function EstimationPanel({
         type: 'run-failed',
         detail: cause instanceof Error ? cause.message : String(cause),
       })
+    } finally {
+      signal?.removeEventListener('abort', cancel)
     }
+    return signal?.aborted ? { kind: 'cancelled' } : outcome
   }
 
   const latestRun = runs.at(-1) ?? null
+  const workflowStore = useWorkflowStore()
+  const selectStudy = (id: string) => {
+    session.clearNotice()
+    dispatch({
+      type: 'identification-chosen',
+      selection: estimationSelection(
+        identified.find((candidate) => candidate.id === id) ?? null,
+        studies,
+        prepared,
+      ),
+    })
+    return workflowStore.getState().estimationDraft?.draft.identification === id
+  }
+  useStudySelectionTool(
+    JSON.stringify({
+      prepared: prepared.id,
+      selected: state.identification,
+      studies,
+      identified,
+      configuration,
+      encodings: state.encodings,
+      revisions: documents.map((item) => item.current.id),
+    }),
+    session.blocked || job.kind === 'running'
+      ? null
+      : {
+          selected: state.identification,
+          choices: identified.flatMap((candidate) => {
+            const bound = studies.find((item) => item.id === candidate.study)
+            return bound
+              ? [
+                  {
+                    identification: candidate.id,
+                    study: bound.id,
+                    question: describeEstimand(bound),
+                    treatment: bound.treatment.name,
+                    outcome: bound.outcome.name,
+                    adjustment:
+                      'adjustment' in candidate.result
+                        ? candidate.result.adjustment.variables
+                            .map((variable) => variable.name)
+                            .join(', ') || 'None'
+                        : 'Not a back-door adjustment specification',
+                  },
+                ]
+              : []
+          }),
+        },
+    selectStudy,
+  )
+  useAnalysisRunTool(
+    'estimation',
+    JSON.stringify({
+      source: profile.id,
+      prepared: prepared.id,
+      study,
+      revision: document?.current.id,
+      identification,
+      configuration,
+      encodings: state.encodings,
+      selected: state.estimator,
+    }),
+    study && identification
+      ? {
+          section: 'Estimation',
+          method: describeEstimator(state.estimator),
+          study: {
+            subject: {
+              kind: 'saved-study',
+              study: study.id,
+              treatment: study.treatment.name,
+              outcome: study.outcome.name,
+            },
+            question: describeEstimand(study),
+            settings: [
+              {
+                label: 'Identified adjustment set',
+                value:
+                  'adjustment' in identification.result
+                    ? identification.result.adjustment.variables
+                        .map((variable) => variable.name)
+                        .join(', ') || 'None'
+                    : 'Not a back-door adjustment specification',
+              },
+              ...configurationSettings(configuration),
+            ],
+          },
+          specification: JSON.stringify({
+            study: study.id,
+            treatment: study.treatment.name,
+            outcome: study.outcome.name,
+            target: study.estimand,
+            configuration,
+            identification: identification.result,
+            encodings: state.encodings,
+          }),
+          sharedResult:
+            'Run ID, method, target, headline effect, interval, standard error, sample counts and adjustment variables. No row-level predictions.',
+        }
+      : null,
+    (signal) => execute(configuration, signal),
+  )
+  const temporalAdjustmentCandidates =
+    document === null || study === null
+      ? []
+      : document.current.graph.nodes.flatMap((node, index) =>
+          node.kind === 'observed' ? [{ index, name: node.name }] : [],
+        )
+  const temporalGraphLag = document === null ? 0 : stationaryMarksOf(document).statLag
+  const temporalAdjustmentMaxLag =
+    configuration.kind === 'causal-effects-total'
+      ? temporalGraphLag + configuration.treatmentLag
+      : 0
+  useEstimationTools(
+    JSON.stringify({
+      prepared: prepared.id,
+      study: study?.id,
+      revision: document?.current.id,
+      identification: identification?.id,
+      configuration: state.configurations,
+      encodings: state.encodings,
+    }),
+    study !== null &&
+      identification !== null &&
+      !session.blocked &&
+      job.kind !== 'running' &&
+      !adjustmentDraftOpen
+      ? {
+          study: {
+            treatment: study.treatment.name,
+            outcome: study.outcome.name,
+            target: study.estimand.kind,
+          },
+          selected: state.estimator,
+          ...(canConfigureEstimator(configuration)
+            ? {
+                configuration: {
+                  current: configuration,
+                  observations: prepared.observations,
+                  ...(configuration.kind === 'causal-effects-total'
+                    ? {
+                        temporal: {
+                          candidates: temporalAdjustmentCandidates,
+                          graphLag: temporalGraphLag,
+                        },
+                      }
+                    : {}),
+                  columns: profile.columns
+                    .filter((column) => prepared.columns.includes(column.id))
+                    .map(({ id, name }) => ({ id, name })),
+                },
+              }
+            : {}),
+          choices: [...eligibilityByEstimator].map(([id, eligibility]) => ({
+            id,
+            name: describeEstimator(id),
+            eligibility,
+          })),
+        }
+      : null,
+    (estimator) => dispatch({ type: 'estimator-chosen', estimator }),
+    canConfigureEstimator(configuration) && identification !== null && method.ok
+      ? {
+          configure,
+          evaluate: (next) =>
+            evaluateEstimatorEligibility(method.value, {
+              identification: identification.result,
+              prepared,
+              stationarity,
+              configuration: next,
+              outcomeIsCount: studyDataFacts.outcomeIsCount,
+              treatmentIsBinary: studyDataFacts.treatmentIsBinary,
+              observedGraphIsBinary: studyDataFacts.observedGraphIsBinary,
+              document,
+              study,
+              panelPreflight,
+            }),
+        }
+      : undefined,
+  )
   const controlCandidates = useMemo(
     () =>
       study === null
@@ -647,16 +886,6 @@ export function EstimationPanel({
     ...(panelTime === null ? [] : [panelTime]),
     ...groupingCandidates.filter((column) => column.id !== panelTime?.id),
   ]
-  const temporalAdjustmentCandidates =
-    document === null || study === null
-      ? []
-      : document.current.graph.nodes.flatMap((node, index) =>
-          node.kind === 'observed' ? [{ index, name: node.name }] : [],
-        )
-  const temporalAdjustmentMaxLag =
-    document === null || configuration.kind !== 'causal-effects-total'
-      ? 0
-      : stationaryMarksOf(document).statLag + configuration.treatmentLag
 
   const encodingVariables =
     identification?.result.kind !== 'identified'
@@ -666,6 +895,27 @@ export function EstimationPanel({
         : state.estimator === 't-learner'
           ? tLearnerInputs(identification.result.adjustment.variables, study?.estimand ?? null)
           : identification.result.adjustment.variables
+  const configureEncodings = (selected: readonly string[]) => {
+    for (const variable of encodingVariables) {
+      const kind = selected.includes(variable.column) ? 'categorical' : 'numeric'
+      if ((state.encodings[variable.column]?.kind ?? 'numeric') !== kind)
+        dispatch({ type: 'encoding-declared', column: variable.column, encoding: { kind } })
+    }
+  }
+  useEncodingSettings({
+    binding: JSON.stringify({
+      prepared: prepared.id,
+      study: study?.id,
+      identification,
+      estimator: state.estimator,
+    }),
+    available:
+      selectedEstimatorIsVisible && expandsDesign(state.estimator) && encodingVariables.length > 0,
+    blocked: session.job.kind === 'running' || session.blocked,
+    columns: encodingVariables.map((variable) => ({ id: variable.column, name: variable.name })),
+    encodings: state.encodings,
+    configure: configureEncodings,
+  })
   const categoricalChecklist =
     selectedEstimatorIsVisible && expandsDesign(state.estimator) && encodingVariables.length > 0 ? (
       <ColumnChecklist
@@ -678,20 +928,7 @@ export function EstimationPanel({
         selected={encodingVariables
           .filter((variable) => state.encodings[variable.column]?.kind === 'categorical')
           .map((variable) => variable.column)}
-        onChange={(selected) => {
-          for (const variable of encodingVariables) {
-            const encoding = selected.includes(variable.column)
-              ? ('categorical' as const)
-              : ('numeric' as const)
-            if ((state.encodings[variable.column]?.kind ?? 'numeric') !== encoding) {
-              dispatch({
-                type: 'encoding-declared',
-                column: variable.column,
-                encoding: { kind: encoding },
-              })
-            }
-          }
-        }}
+        onChange={configureEncodings}
       />
     ) : null
 
@@ -1136,15 +1373,7 @@ export function EstimationPanel({
                   className={field('text', 'mt-1')}
                   value={state.identification ?? ''}
                   onChange={(event) => {
-                    session.clearNotice()
-                    dispatch({
-                      type: 'identification-chosen',
-                      selection: estimationSelection(
-                        identified.find((candidate) => candidate.id === event.target.value) ?? null,
-                        studies,
-                        prepared,
-                      ),
-                    })
+                    selectStudy(event.target.value)
                   }}
                 >
                   {identified.map((candidate) => {
@@ -1277,22 +1506,7 @@ export function EstimationPanel({
                 <button
                   type="button"
                   className={button('signal', 'min-w-0')}
-                  disabled={
-                    job.kind === 'running' ||
-                    session.blocked ||
-                    sunBlocked ||
-                    !selectedEstimatorIsVisible ||
-                    identification === null ||
-                    eligibility === null ||
-                    eligibility.kind === 'refused' ||
-                    studyDataPending ||
-                    studyDataError !== null ||
-                    adjustmentDraftOpen ||
-                    (configuration.kind === 'panel-intervention' &&
-                      configuration.primary !== 'staggered' &&
-                      configuration.primary !== 'sunAbraham' &&
-                      panelPreflight.kind !== 'ready')
-                  }
+                  disabled={runBlocked}
                   aria-busy={job.kind === 'running'}
                   onClick={() => void execute()}
                 >

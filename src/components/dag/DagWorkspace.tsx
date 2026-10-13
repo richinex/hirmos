@@ -1148,6 +1148,12 @@ export function DagWorkspace({
   onDeleteInterventionQuery,
 }: DagWorkspaceProps) {
   const [state, dispatch] = useReducer(stepDagWorkspace, documents, initialState)
+  const [knownDocuments, setKnownDocuments] = useState(documents)
+  if (knownDocuments !== documents) {
+    setKnownDocuments(documents)
+    const added = documents.find(document => !knownDocuments.some(previous => previous.id === document.id))
+    if (added) dispatch({ type: 'document-created', document: added.id, latestRun: latestRunId(discoveryRuns) })
+  }
 
   // Deletion may remove the selected document while the workspace remains mounted.
   if (state.kind === 'editing' && !documents.some((document) => document.id === state.document)) {

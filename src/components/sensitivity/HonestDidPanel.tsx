@@ -1,6 +1,10 @@
 import { NumberInput } from '@/components/ui/NumberInput'
+import { useWorkspaceConfiguration } from '@/assistant/workspaceConfiguration'
+import { honestSettingsSchema, type HonestSettings } from '@/domain/honestDidSettings'
+import { err, ok } from '@/domain/dop'
 import { useMemo, useState, type ReactNode } from 'react'
 import { useJob } from '@/analysis/JobsProvider'
+import { useRecordedAnalysis, runReceipt } from '@/assistant/useRecordedAnalysis'
 import { useRunActivity } from '@/lib/useRunActivity'
 import type { RunActivity } from '@/domain/activity'
 import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
@@ -376,10 +380,183 @@ export function HonestDidPanel({
           : null
   const session = useJob('sensitivity:honest-did'),
     { job } = session
+  useWorkspaceConfiguration<HonestSettings>(
+    'honest-did',
+    prepared.id + JSON.stringify(candidates),
+    {
+      title: 'Parallel-trends sensitivity',
+      current: {
+        sourceRun: selected,
+        configuration: request?.success ? request.data.configuration : config,
+        target:
+          target === 'specified' ? { kind: target, weights: numbers(weights) } : { kind: target },
+      },
+      schema: honestSettingsSchema,
+      columns: candidates.map((c) => ({ id: c.source.run, name: c.label })),
+      validate: (value) => {
+        if (job.kind === 'running') return err('Wait for the current analysis to finish.')
+        const source = candidates.find((c) => c.source.run === value.sourceRun)
+        if (!source) return err('Choose an event-study run from this prepared dataset.')
+        if (!source.input.ok) return err(source.input.error)
+        const eventStudy = source.input.value
+        const contrast =
+          value.target.kind === 'specified'
+            ? value.target.weights
+            : value.target.kind === 'average'
+              ? Array.from({ length: eventStudy.post }, () => 1 / eventStudy.post)
+              : eventStudy.contrast
+        const checked = honestRequestSchema.safeParse({
+          eventStudy: { ...source.input.value, contrast },
+          configuration: value.configuration,
+        })
+        return checked.success
+          ? ok(value)
+          : err(checked.error.issues.map((issue) => issue.message).join(' '))
+      },
+      describe: (value) => [
+        {
+          key: 'source',
+          label: 'Event-study run',
+          value: candidates.find((c) => c.source.run === value.sourceRun)?.label ?? 'Not selected',
+        },
+        {
+          key: 'restriction',
+          label: 'Restriction',
+          value:
+            value.configuration.restriction.kind === 'smoothness'
+              ? 'Smoothness'
+              : 'Relative magnitude',
+        },
+        { key: 'bounds', label: 'Bounds', value: value.configuration.bounds.join(', ') },
+        {
+          key: 'confidence',
+          label: 'Confidence level',
+          value: formatPercent(value.configuration.confidence).text,
+        },
+        {
+          key: 'target',
+          label: 'Target',
+          value:
+            value.target.kind === 'first'
+              ? 'First post-treatment period'
+              : value.target.kind === 'average'
+                ? 'Average post-treatment effect'
+                : value.target.weights.join(', '),
+        },
+        { key: 'seed', label: 'Seed', value: String(value.configuration.seed) },
+        {
+          key: 'points',
+          label: 'Grid points',
+          value: String(
+            value.configuration.restriction.kind === 'smoothness'
+              ? value.configuration.restriction.points
+              : value.configuration.restriction.grid.points,
+          ),
+        },
+        ...(value.configuration.restriction.kind === 'relativeMagnitude'
+          ? [
+              {
+                key: 'method',
+                label: 'Method',
+                value:
+                  value.configuration.restriction.method.kind === 'conditional'
+                    ? 'Conditional'
+                    : 'Least-favourable hybrid',
+              },
+              {
+                key: 'moments',
+                label: 'Moments',
+                value:
+                  value.configuration.restriction.moments === 'postTreatment'
+                    ? 'Post-treatment periods'
+                    : 'All periods',
+              },
+              ...(value.configuration.restriction.method.kind === 'leastFavorableHybrid'
+                ? [
+                    {
+                      key: 'kappa',
+                      label: 'Kappa',
+                      value: String(value.configuration.restriction.method.kappa),
+                    },
+                  ]
+                : []),
+              {
+                key: 'grid',
+                label: 'Grid',
+                value:
+                  value.configuration.restriction.grid.kind === 'explicit'
+                    ? `${value.configuration.restriction.grid.lower} to ${value.configuration.restriction.grid.upper}`
+                    : 'Default grid',
+              },
+            ]
+          : []),
+      ],
+      configure: (value) => {
+        setSelected(value.sourceRun)
+        setTarget(value.target.kind)
+        if (value.target.kind === 'specified') setWeights(value.target.weights.join(', '))
+        const c = value.configuration,
+          r = c.restriction
+        setKind(r.kind)
+        setBoundText(c.bounds.join(', '))
+        setConfidence(String(c.confidence))
+        setSeed(String(c.seed))
+        setPoints(String(r.kind === 'smoothness' ? r.points : r.grid.points))
+        if (r.kind === 'relativeMagnitude') {
+          setMethod(r.method.kind)
+          if (r.method.kind === 'leastFavorableHybrid') setKappa(String(r.method.kappa))
+          setMoments(r.moments)
+          setGridKind(r.grid.kind)
+          if (r.grid.kind === 'explicit') {
+            setLower(String(r.grid.lower))
+            setUpper(String(r.grid.upper))
+          }
+        }
+      },
+    },
+  )
   useRunActivity(
     onActivity,
     job.kind === 'running' ? { label: 'Parallel-trends sensitivity', progress: null } : null,
   )
+  useRecordedAnalysis({
+    key: 'honest-did',
+    unavailable: readiness,
+    prepared: prepared.id,
+    binding:
+      prepared.id +
+      JSON.stringify({
+        selected,
+        kind,
+        method,
+        moments,
+        boundText,
+        confidence,
+        seed,
+        points,
+        kappa,
+        gridKind,
+        lower,
+        upper,
+        target,
+        request,
+      }),
+    inspection: {
+      section: 'Sensitivity',
+      method: 'Parallel-trends sensitivity',
+      specification: JSON.stringify({
+        sourceRun: selected,
+        configuration: request?.success ? request.data.configuration : null,
+        readiness,
+      }),
+      sharedResult:
+        'Saved-run ID and completion receipt only. Confidence sets remain in the result panel.',
+    },
+    session,
+    execute: () => execute(),
+    records: (workflow) => workflow.sensitivityRuns,
+    summarise: runReceipt,
+  })
   const execute = async () => {
     if (candidate === undefined || request === null || !request.success) return
     const current = session.start('analysis', 'Computing robust confidence sets')

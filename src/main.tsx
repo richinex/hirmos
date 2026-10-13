@@ -1,4 +1,4 @@
-import { StrictMode, Suspense, use, useLayoutEffect } from 'react'
+import { StrictMode, Suspense, use, useEffect, useLayoutEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { useLocation } from '@/lib/router'
 import { useDocTheme } from '@/components/ui/useDocTheme'
@@ -18,7 +18,15 @@ import '@/landing/landing.css'
 function Root() {
   useScrollActivity()
   const theme = useDocTheme()
-  useLayoutEffect(updateFavicon, [theme])
+  // The favicon reads computed styles, so it waits for idle time rather than delaying the first paint.
+  useEffect(() => {
+    if (typeof window.requestIdleCallback !== 'function') {
+      const handle = window.setTimeout(updateFavicon, 300)
+      return () => window.clearTimeout(handle)
+    }
+    const handle = window.requestIdleCallback(updateFavicon)
+    return () => window.cancelIdleCallback(handle)
+  }, [theme])
   const location = useLocation()
   const landing = location.pathname === '/'
 

@@ -6,6 +6,9 @@ import { useTimeSeriesDraft } from './useTimeSeriesDraft'
 import type { CountDraft } from '@/domain/timeSeriesDraft'
 import { Metadata } from '@/components/ui/Metadata'
 import { useJob } from '@/analysis/JobsProvider'
+import { useRecordedAnalysis } from '@/assistant/useRecordedAnalysis'
+import { useWorkspaceConfiguration } from '@/assistant/workspaceConfiguration'
+import { countDraftSchema, checkCountDraft, checkSettingsColumns, seriesDraftSettings } from '@/domain/timeSeriesWorkspaceSettings'
 import { JobNotice } from '@/components/ui/JobNotice'
 import { useMemo, useState, type ReactNode } from 'react'
 import { useRunActivity } from '@/lib/useRunActivity'
@@ -207,8 +210,8 @@ export function CountSeriesCard({
   const columns = profile.columns.filter(
     (column) => prepared.columns.includes(column.id) && isNumericDuckDbType(column.duckdbType),
   )
-  const { outcome, link, pastObservationLags, pastMeanLags, candidateStart, candidateEnd, delta } =
-    useTimeSeriesDraft(prepared.id, (state) => state.count)
+  const draft = useTimeSeriesDraft(prepared.id, (state) => state.count)
+  const { outcome, link, pastObservationLags, pastMeanLags, candidateStart, candidateEnd, delta } = draft
   const change = useWorkflow((state) => state.changeTimeSeries)
   const setOutcome = (value: CountDraft['outcome']) =>
     change(prepared.id, { type: 'count', field: 'outcome', value })
@@ -226,11 +229,50 @@ export function CountSeriesCard({
     change(prepared.id, { type: 'count', field: 'delta', value })
   const session = useJob('time-series:counts')
   const { job } = session
+  useWorkspaceConfiguration('count-series', prepared.id, job.kind === 'running' || session.blocked ? null : {
+    title: 'Count models', current: draft, schema: countDraftSchema, columns,
+    describe: next => seriesDraftSettings(next, columns),
+    validate: next => {
+      const checked = checkSettingsColumns(next, [next.outcome], columns)
+      return checked.ok ? checkCountDraft(next, prepared.observations) : checked
+    },
+    configure: value => change(prepared.id, { type: 'count-settings', value }),
+  })
   useRunActivity(
     onActivity,
     job.kind === 'running' ? { label: 'Count-series scan', progress: null } : null,
   )
 
+  const assistantSpecification = JSON.stringify({
+    outcome,
+    link,
+    pastObservationLags,
+    pastMeanLags,
+    candidateStart,
+    candidateEnd,
+    delta,
+  })
+  useRecordedAnalysis({
+    key: 'count-series',
+    prepared: prepared.id,
+    binding: prepared.id + assistantSpecification,
+    inspection: {
+      section: 'Time-series analysis',
+      method: 'Count-series scan',
+      specification: assistantSpecification,
+      sharedResult:
+        'Run ID, observation count, log likelihood and dispersion. No series values or residuals.',
+    },
+    session,
+    execute: () => run(),
+    records: (workflow) => workflow.countSeriesModels,
+    summarise: (run) =>
+      JSON.stringify({
+        observations: run.result.observations,
+        logLikelihood: run.result.logLikelihood,
+        dispersion: run.result.dispersion,
+      }),
+  })
   const run = async () => {
     const current = session.start('analysis', 'Preparing count series')
     if (current === null) return

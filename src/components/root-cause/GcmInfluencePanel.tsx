@@ -36,6 +36,11 @@ import {
   type GcmInfluenceRun,
 } from '@/domain/gcmInfluence'
 import type { RootCauseGraph } from '@/domain/rootCause'
+import {
+  arrowSampleLabels,
+  influenceSettings,
+  intrinsicSampleLabels,
+} from '@/domain/causalModelSettings'
 import type { DatasetProfile } from '@/domain/dataset'
 import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
 import type { SelectedSource } from '@/domain/workflow'
@@ -247,6 +252,66 @@ export function GcmInfluencePanel(props: Props) {
   const setSeed = (value: number) => update(target, query, value)
   const latest = props.runs.find((run) => run.id === selected) ?? previous
   const busy = job.kind === 'running'
+  const binding = JSON.stringify({ graph: props.graph, prepared: props.prepared.id, draft })
+  useWorkspaceConfiguration(
+    `gcm-${props.analysis}`,
+    binding,
+    busy
+      ? null
+      : {
+          title: 'Causal influence',
+          current: { target, query, seed },
+          schema: z
+            .object({
+              target: z.string().regex(/^\d+$/),
+              query: gcmInfluenceRequestSchema.shape.query,
+              seed: z.number().int().min(0).max(0xffffffff),
+            })
+            .strict(),
+          columns: props.graph.nodes.map((node, index) => ({ id: String(index), name: node.name })),
+          describe: (next) =>
+            influenceSettings(
+              next,
+              props.graph.nodes.map((node) => node.name),
+            ),
+          validate: (next) => {
+            if (next.query.kind !== props.analysis)
+              return err('Select the requested analysis before configuring it.')
+            const parsed = gcmInfluenceRequestSchema.safeParse({
+              names: props.graph.nodes.map((node) => node.name),
+              edges: props.graph.edges,
+              rows: props.prepared.observations,
+              target: Number(next.target),
+              random: { kind: 'seed', seed: next.seed },
+              query: next.query,
+            })
+            return parsed.success
+              ? ok(next)
+              : err(parsed.error.issues.map((issue) => issue.message).join(' '))
+          },
+          configure: (next) => update(next.target, next.query, next.seed),
+        },
+  )
+  useRecordedAnalysis({
+    key: `gcm-${props.analysis}`,
+    prepared: props.prepared.id,
+    binding,
+    inspection: {
+      section: 'Causal model analysis',
+      method: props.analysis === 'intrinsic' ? 'Intrinsic causal influence' : 'Arrow strength',
+      specification: JSON.stringify({ graph: props.graph, target, query, seed }),
+      sharedResult: 'Saved model, influence values and fitted mechanism descriptions.',
+    },
+    session,
+    execute: () => run(),
+    records: (workflow) => workflow.rootCause.influences,
+    summarise: (record) =>
+      JSON.stringify({
+        model: record.model,
+        outcome: record.evidence.outcome,
+        mechanisms: record.evidence.mechanisms,
+      }),
+  })
   const run = async () => {
     const current = session.start('analysis', 'Preparing causal influence')
     if (current === null) return
@@ -299,34 +364,34 @@ export function GcmInfluencePanel(props: Props) {
     query.kind === 'intrinsic'
       ? [
           {
-            label: 'Prediction training samples',
+            label: intrinsicSampleLabels.training,
             value: query.training,
             change: (training: number) => setQuery({ ...query, training }),
           },
           {
-            label: 'Randomization samples',
+            label: intrinsicSampleLabels.randomization,
             value: query.randomization,
             change: (randomization: number) => setQuery({ ...query, randomization }),
           },
           {
-            label: 'Baseline samples',
+            label: intrinsicSampleLabels.baseline,
             value: query.baseline,
             change: (baseline: number) => setQuery({ ...query, baseline }),
           },
         ]
       : [
           {
-            label: 'Conditional samples',
+            label: arrowSampleLabels.conditional,
             value: query.conditional,
             change: (conditional: number) => setQuery({ ...query, conditional }),
           },
           {
-            label: 'Maximum iterations',
+            label: arrowSampleLabels.maxRuns,
             value: query.maxRuns,
             change: (maxRuns: number) => setQuery({ ...query, maxRuns }),
           },
           {
-            label: 'Convergence tolerance',
+            label: arrowSampleLabels.tolerance,
             value: query.tolerance,
             change: (tolerance: number) => setQuery({ ...query, tolerance }),
           },
@@ -485,3 +550,7 @@ export function GcmInfluencePanel(props: Props) {
     />
   )
 }
+import { z } from 'zod'
+import { useWorkspaceConfiguration } from '@/assistant/workspaceConfiguration'
+import { useRecordedAnalysis } from '@/assistant/useRecordedAnalysis'
+import { ok, err } from '@/domain/dop'

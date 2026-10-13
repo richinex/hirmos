@@ -1,3 +1,4 @@
+import { AssistantRailButton } from '@/assistant/AssistantLauncher'
 import { Icon } from '@/components/Icon'
 import { HirmosMark } from '@/components/HirmosMark'
 import { InternalLink } from '@/components/ui/InternalLink'
@@ -301,7 +302,7 @@ export function ChapterNav({
         <nav
           aria-label="Workspace sections"
           className={cn(
-            'absolute left-0 top-[84px] flex max-h-[calc(100%-84px-72px)] flex-col overflow-hidden bg-rail text-rail-ink [--scroll-thumb:var(--color-rail-faint)] transition-[width] duration-(--motion-base) motion-reduce:transition-none',
+            'absolute left-0 top-[84px] flex max-h-[calc(100%-84px-124px)] flex-col overflow-hidden bg-rail text-rail-ink [--scroll-thumb:var(--color-rail-faint)] transition-[width] duration-(--motion-base) motion-reduce:transition-none',
             CORNER,
             lobeOpen ? LOBE_OPEN : RAIL,
           )}
@@ -393,12 +394,14 @@ export function ChapterNav({
           </div>
         </nav>
 
+        <AssistantRailButton className="absolute bottom-[68px] left-2" />
+
         {/* The open project, in the pill at the foot: its name and data file out with the lobe, and the export. */}
         {project !== null && (
           <div
             className={cn(
               'absolute bottom-3 left-2 flex h-10 items-center overflow-hidden rounded-full bg-rail text-rail-ink transition-[width] duration-(--motion-base) motion-reduce:transition-none',
-              lobeOpen ? 'w-[248px]' : 'w-10',
+              lobeOpen ? 'w-[224px]' : 'w-10',
             )}
           >
             <button

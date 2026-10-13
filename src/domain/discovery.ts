@@ -1463,6 +1463,7 @@ export type DiscoverySession =
     }
 
 export type DiscoveryEvent =
+  | { readonly type: 'settings-applied'; readonly configuration: DiscoveryConfiguration }
   | { readonly type: 'method-selected'; readonly method: DiscoveryMethodChoice }
   | { readonly type: 'tau-max-selected'; readonly value: DiscoveryLag }
   | { readonly type: 'pc-alpha-selected'; readonly value: PcmciAlpha }
@@ -1761,6 +1762,10 @@ export function stepDiscoverySession(
 
 export function stepDiscovery(state: DiscoveryDraft, event: DiscoveryEvent): DiscoveryDraft {
   switch (event.type) {
+    case 'settings-applied':
+      return state.configuration.kind === event.configuration.kind
+        ? { configuration: event.configuration }
+        : state
     case 'method-selected':
       return {
         configuration: initialConfigurationFor(event.method),

@@ -6,6 +6,8 @@
 .disclosure-summary > .disclosure-hide { display: none; }
 details[open] > .disclosure-summary > .disclosure-show { display: none; }
 details[open] > .disclosure-summary > .disclosure-hide { display: inline-flex; }
+.disclosure-summary > .disclosure-chevron { flex-shrink: 0; align-self: center; display: inline-flex; color: var(--color-faint); transition: transform var(--motion-fast); }
+details[open] > .disclosure-summary > .disclosure-chevron { transform: rotate(90deg); }
 :root[data-surface="workbench"] { font-size: 100%; }
 .workbench-bottom-content { --text-body: .8125rem; }
 .inspector-content :where(h3, h4) { font-size: 1rem; font-weight: 600; line-height: 1.5; color: var(--color-ink); }

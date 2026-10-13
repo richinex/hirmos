@@ -76,6 +76,13 @@ export function useTheme(): {
   // Layout, not passive: the palette must be set before the transition snapshots the page.
   useLayoutEffect(() => {
     const root = document.documentElement
+    try {
+      localStorage.setItem(KEY, choice)
+    } catch {
+      /* ignore */
+    }
+    // index.html applies the stored theme before the first paint, so a mount usually changes nothing.
+    if (root.dataset.theme === theme) return
     // Suppress colour transitions for one frame, or `transition-colors` eases the new palette in late.
     root.dataset.themeSwitching = ''
     root.dataset.theme = theme
@@ -83,11 +90,6 @@ export function useTheme(): {
     const frame = requestAnimationFrame(() => {
       delete root.dataset.themeSwitching
     })
-    try {
-      localStorage.setItem(KEY, choice)
-    } catch {
-      /* ignore */
-    }
     return () => cancelAnimationFrame(frame)
   }, [theme, choice])
 

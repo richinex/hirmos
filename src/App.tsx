@@ -1,4 +1,6 @@
 import { PowerPlanningPanel } from '@/components/data/PowerPlanningPanel'
+import { useSourceData } from '@/assistant/useSourceData'
+import { useDataEditor } from '@/assistant/useDataEditor'
 import { Metadata } from '@/components/ui/Metadata'
 import { declareColumn, declarationsOf, type DeclaredType } from '@/domain/fileReading'
 import { causalModelRunCount } from '@/domain/rootCauseAnalysis'
@@ -28,6 +30,7 @@ import { ChapterBoundary } from '@/components/shell/ChapterBoundary'
 import { ChapterSkeleton } from '@/components/shell/ChapterSkeleton'
 import { ChapterNav, type ChapterEntry, type ChapterStatus } from '@/components/shell/ChapterNav'
 import { RunActivityChip } from '@/components/shell/RunActivityChip'
+import { AssistantHeaderButton } from '@/assistant/AssistantLauncher'
 import { REPORT_ACTIVITY } from '@/lib/runActivityStore'
 import { useShellLayout } from '@/components/shell/useShellLayout'
 import {
@@ -246,6 +249,7 @@ function SourceSummary({ source }: { readonly source: SelectedSource }) {
 function App() {
   const [deletionTarget, setDeletionTarget] = useState<DeletionTarget | null>(null)
   const workflow = useWorkflow((state) => state.workflow)
+  useSourceData(workflow)
   const dispatch = useWorkflow((state) => state.dispatch)
   const sourceEditor = useWorkflow((state) => state.sourceEditor)
   const openSourceEditor = useWorkflow((state) => state.openSourceEditor)
@@ -375,6 +379,15 @@ function App() {
     }
     dispatch({ type: 'editor-reopened', recipe, inputs: offered.value })
   }
+
+  useDataEditor(workflow, sourceEditor.kind === 'closed', (editor) => {
+    if (workflow.kind === 'profiled') {
+      navigate(chapterPath('data', workflow.project.id))
+      openSourceEditor(editor)
+    } else if (workflow.kind === 'source-selected' && workflow.source.recipe.kind !== 'uploaded-file') {
+      void reopenEditor(workflow.source.recipe)
+    }
+  })
 
   // A source the SQL or pipeline step built is rebuilt from its input files; the result then passes the same fingerprint check.
   const restoreFromInputs = async (files: readonly File[]) => {
@@ -875,6 +888,7 @@ function App() {
   const requestedProject = route.ok && route.value.kind === 'chapter' ? route.value.project : null
   // A project URL reopens that project, once per visit; the requested chapter shows once its data is back.
   const restoringProject = useRef<string | null>(null)
+  const [reopening, setReopening] = useState(false)
   useEffect(() => {
     if (requestedProject === null) {
       restoringProject.current = null
@@ -889,7 +903,9 @@ function App() {
       example === undefined
         ? reopenProject(requestedProject)
         : openExample(example).then(() => true)
+    setReopening(true)
     void opening.then((found) => {
+      setReopening(false)
       if (!found) replace(chapterPath('projects'))
     })
     // reopenProject is recreated each render; the guard above keeps this to one attempt per project URL.
@@ -1027,6 +1043,7 @@ function App() {
           </span>
         )}
         <RunActivityChip onOpen={navigateToChapter} />
+        <AssistantHeaderButton className="md:hidden" />
         <ThemeControl />
       </div>
     </>
@@ -1108,7 +1125,11 @@ function App() {
                   {editorProblem}
                 </p>
               )}
-              {workflow.kind === 'awaiting-project' && (
+              {((workflow.kind === 'awaiting-project' && requestedProject !== null) ||
+                (workflow.kind === 'awaiting-data' && reopening)) && (
+                <ChapterSkeleton label="Opening the project…" />
+              )}
+              {workflow.kind === 'awaiting-project' && requestedProject === null && (
                 <section className="projects-dashboard w-full" aria-labelledby="new-analysis-title">
                   <ChapterHeading id="new-analysis-title" className="mb-6">
                     Projects
@@ -1258,7 +1279,7 @@ function App() {
                 </section>
               )}
 
-              {workflow.kind === 'awaiting-data' && (
+              {workflow.kind === 'awaiting-data' && !reopening && (
                 <section
                   className="rise my-auto w-full max-w-6xl"
                   aria-labelledby="load-data-title"
@@ -1594,7 +1615,9 @@ function App() {
                 <ChapterBoundary chapter="Source editor">
                   <Suspense fallback={null}>
                     <SourceEditor
+                      key={workflow.profile.id}
                       source={workflow.source}
+                      initialRoute={sourceEditor.route}
                       onView={showSourceEditor}
                       onCancel={closeSourceEditor}
                       onAccept={(source) =>
@@ -1612,7 +1635,7 @@ function App() {
                         source={workflow.source}
                         profile={workflow.profile}
                         prepared={workflow.prepared}
-                        onEditSource={openSourceEditor}
+                        onEditSource={() => openSourceEditor()}
                         onDeclare={declareColumnType}
                       >
                         <PowerPlanningPanel key={workflow.project.id} />

@@ -4,6 +4,12 @@ const resampling = {
   replications: z.number().int().min(2).max(2000),
   seed: z.number().int().min(0).max(0xffff_ffff),
 }
+export const panelResamplingSchema = z
+  .object({
+    placeboReplications: resampling.replications,
+    seed: resampling.seed,
+  })
+  .strict()
 export const conventionalDidInferenceSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('bootstrap'), ...resampling }).strict(),
   z.object({ kind: z.literal('jackknife') }).strict(),

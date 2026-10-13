@@ -1,4 +1,8 @@
 import { BlockToolbar } from './BlockToolbar'
+import { summariseBlock } from './blockSummary'
+import { usePreparationTools } from '@/assistant/applicationTools'
+import { profileTable } from '@/assistant/preparation'
+import { inputDescriptor } from '@/domain/sourceInputs'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '@/components/Icon'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
@@ -56,33 +60,6 @@ import {
   type GraphIndex,
 } from './pipelineWorkspaceModel'
 
-const testWord = (test: RowTest): string => {
-  switch (test) {
-    case 'eq':
-      return '='
-    case 'ne':
-      return '≠'
-    case 'lt':
-      return '<'
-    case 'le':
-      return '≤'
-    case 'gt':
-      return '>'
-    case 'ge':
-      return '≥'
-    case 'contains':
-      return 'contains'
-    case 'starts-with':
-      return 'starts with'
-    case 'is-null':
-      return 'is missing'
-    case 'not-null':
-      return 'is present'
-    default:
-      return assertNever(test)
-  }
-}
-
 interface PreviewRow {
   readonly index: number
   readonly cells: readonly PreviewCell[]
@@ -128,45 +105,6 @@ const sortableValue = (cell: PreviewCell | undefined): EvidenceValue => {
   }
 }
 
-const summarise = (block: PipelineBlock): string => {
-  switch (block.kind) {
-    case 'input':
-      return block.file.kind === 'chosen' ? block.file.alias : 'choose a file'
-    case 'filter-rows':
-      return block.conditions.length === 0
-        ? 'every row'
-        : block.conditions
-            .map((c) => `${c.column} ${testWord(c.test)}${'value' in c ? ` ${c.value}` : ''}`)
-            .join(block.match === 'all' ? ' and ' : ' or ')
-    case 'select-columns':
-      return block.columns.length === 0
-        ? 'every column'
-        : `${block.mode} ${block.columns.join(', ')}`
-    case 'derive-columns':
-      return block.columns.length === 0
-        ? 'no new columns yet'
-        : block.columns.map((c) => c.name || '?').join(', ')
-    case 'calendar-events':
-      return block.column === ''
-        ? 'choose the date column'
-        : `${block.name || '?'}: ${describeCalendarWindow(block.window)} over ${block.column}`
-    case 'join':
-      return `${block.how}${block.keys.length === 0 ? '' : ` on ${block.keys.map((k) => (k.left === k.right ? k.left : `${k.left} = ${k.right}`)).join(', ')}`}`
-    case 'union':
-      return `by ${block.by}${block.distinct ? ', distinct' : ''}`
-    case 'aggregate':
-      return `${block.groupBy.length === 0 ? 'all rows' : `by ${block.groupBy.join(', ')}`}, ${block.measures.map((m) => m.as || m.function).join(', ') || 'no measures yet'}`
-    case 'sort-limit':
-      return `${block.sort.map((s) => `${s.column} ${s.direction === 'ascending' ? '↑' : '↓'}`).join(', ') || 'unsorted'}${block.limit === null ? '' : `, first ${block.limit}`}`
-    case 'script':
-      return `${block.code.split('\n').filter((line) => line.trim().length > 0).length} lines`
-    case 'output':
-      return 'the source'
-    default:
-      return assertNever(block)
-  }
-}
-
 type Props = {
   /** A graph and its files to start from, when the canvas reopens on a source it made. */
   readonly resume: PipelineResume | null
@@ -197,6 +135,40 @@ function PipelineEditor({
   const choosing = useStore(controller.store, (state) => state.choosing)
   const materializing = useStore(controller.store, (state) => state.materializing)
   const setGraph = controller.setGraph
+  const outputs =
+    run.kind === 'ran'
+      ? [...run.result.views].flatMap(([block, table]) =>
+          run.result.outcomes.get(block)?.kind === 'ran' ? [{ block, table }] : [],
+        )
+      : []
+  const tables = [
+    ...new Set([
+      ...files.filter((input) => input.format !== 'duckdb-export-file').map((input) => input.alias),
+      ...outputs.map((output) => output.table),
+    ]),
+  ]
+  usePreparationTools(
+    JSON.stringify({
+      graph,
+      files: files.map((input) => input.fingerprint),
+      run: run.kind,
+      materializing,
+      choosing,
+    }),
+    session.kind === 'ready' &&
+      run.kind !== 'idle' &&
+      materializing.kind !== 'busy' &&
+      choosing.kind !== 'busy'
+      ? {
+          kind: 'pipeline',
+          inspection: { kind: 'pipeline', tables, graph, outputs },
+          inputs: files.map(inputDescriptor),
+          profile: (request, signal) =>
+            profileTable(session.live.engine.db, tables, request, signal),
+          apply: setGraph,
+        }
+      : null,
+  )
   const [selected, setSelected] = useState<PipelineBlockId | null>(null)
   const [shown, setShown] = useState<{
     readonly data: BlockPreview
@@ -255,7 +227,7 @@ function PipelineEditor({
 
   const selectedNode = selected === null ? null : (index.nodes.get(selected) ?? null)
   const summaries = useMemo(
-    () => new Map(graph.nodes.map((node) => [node.id, summarise(node.block)])),
+    () => new Map(graph.nodes.map((node) => [node.id, summariseBlock(node.block)])),
     [graph.nodes],
   )
 
@@ -686,7 +658,7 @@ function Inspector({
     ...(sql !== null ? ['sql' as const] : []),
   ]
   const shownTab = tabs.includes(tab) ? tab : (tabs[0] ?? 'settings')
-  const subtitle = node.block.kind === 'input' ? '' : summarise(node.block)
+  const subtitle = node.block.kind === 'input' ? '' : summariseBlock(node.block)
   return (
     <div className="flex flex-col gap-4">
       <section aria-labelledby="block-settings-title">

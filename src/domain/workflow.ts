@@ -1,4 +1,5 @@
 import {restoreMissingDagExploration} from './dagProvenance'
+import { existingStudyRecord } from './studyRecords'
 import type {PowerRecord} from './powerPlanning'
 import { surrogateRunMatchesProfile, type SurrogateRun, type SurrogateRunId } from './surrogateRun'
 import type { SwigAnalysis } from './swig'
@@ -806,6 +807,8 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
         ) &&
         !state.studies.some((study) => study.id === event.study.id)
       ) {
+        if (existingStudyRecord(state.studies, state.identifications, event.study, event.identification))
+          return state
         return {
           ...state,
           dagDocuments: state.dagDocuments.map(document=>restoreMissingDagExploration(document,[...state.studies,event.study])),

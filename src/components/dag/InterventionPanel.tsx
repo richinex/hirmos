@@ -1,4 +1,8 @@
 import { NumberInput, numberValue } from '@/components/ui/NumberInput'
+import { z } from 'zod'
+import { ok, err } from '@/domain/dop'
+import { useWorkspaceConfiguration } from '@/assistant/workspaceConfiguration'
+import { useRecordedAnalysis } from '@/assistant/useRecordedAnalysis'
 import { RunActions } from '@/components/ui/RunActions'
 import { Metadata } from '@/components/ui/Metadata'
 import { RunFold } from '@/components/ui/RunFold'
@@ -43,11 +47,17 @@ import {
   type InterventionQueryArtifact,
 } from '@/domain/intervention'
 import { describeDiscreteStatePreparations, type DiscreteBnEvidence } from '@/domain/estimation'
+import {
+  conditionStateLabels,
+  interventionContrastSettings,
+  noConditionLabel,
+} from '@/domain/dagQuerySettings'
 import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
 import type { SelectedSource } from '@/domain/workflow'
 import { formatStatistic } from '@/lib/format/number'
 import {
   describeAnalysisWorkerProblem,
+  discreteConditionStateSchema,
   type DiscreteConditionState,
 } from '@/workers/analysisProtocol'
 import { useJob } from '@/analysis/JobsProvider'
@@ -391,6 +401,87 @@ export function InterventionPanel({
     onOverlay(nextSet === null ? null : { set: nextSet, read: nextRead })
   }
 
+  const nodeSchema = z.string().transform((id, ctx) => {
+    const node = observed.find((node) => node.id === id)
+    if (node) return node.id
+    ctx.addIssue({ code: 'custom', message: 'Choose an observed graph variable.' })
+    return z.NEVER
+  })
+  const contrastConfiguration = { set, read, condition, bins, equivalentSampleSize }
+  useWorkspaceConfiguration(
+    'intervention',
+    JSON.stringify({ prepared: prepared.id, graph: document.current }),
+    mode !== 'contrast' || session.blocked || job.kind === 'running'
+      ? null
+      : {
+          title: 'Intervention contrast',
+          current: contrastConfiguration,
+          columns: observed.map((n) => ({ id: n.id, name: n.name })),
+          describe: (next) => interventionContrastSettings(next, observed, hasLatent),
+          schema: z.strictObject({
+            set: nodeSchema.nullable(),
+            read: nodeSchema.nullable(),
+            bins: z.number().int().min(2).max(5),
+            equivalentSampleSize: z.number().nonnegative(),
+            condition: z.discriminatedUnion('kind', [
+              z.strictObject({ kind: z.literal('none') }),
+              z.strictObject({
+                kind: z.literal('selected'),
+                node: nodeSchema,
+                state: discreteConditionStateSchema,
+              }),
+            ]),
+          }),
+          validate: (next) => {
+            const checked = readyInterventionQuery(document, next.set, next.read)
+            if (!checked.ok) return err(describeInterventionReadiness(checked.error))
+            if (
+              next.condition.kind === 'selected' &&
+              (next.condition.node === next.set || next.condition.node === next.read)
+            )
+              return err('Choose a separate variable for the observation.')
+            return ok(next)
+          },
+          configure: (next) => {
+            setSet(next.set)
+            setRead(next.read)
+            setCondition(next.condition)
+            setBins(next.bins)
+            setEquivalentSampleSize(next.equivalentSampleSize)
+            onOverlay(next.set === null ? null : { set: next.set, read: next.read })
+          },
+        },
+  )
+  useRecordedAnalysis({
+    key: 'intervention',
+    prepared: prepared.id,
+    binding: JSON.stringify({
+      graph: document.current,
+      prepared: prepared.id,
+      mode,
+      contrastConfiguration,
+    }),
+    inspection: {
+      section: 'DAG intervention',
+      method: 'Discrete intervention contrast',
+      specification: JSON.stringify({
+        graph: document.current.id,
+        variables: observed.map((n) => ({ id: n.id, name: n.name })),
+        ...contrastConfiguration,
+      }),
+      sharedResult:
+        'Saved contrast query and numerical evidence, including identification verdict.',
+    },
+    session,
+    execute: async () => {
+      if (mode === 'contrast') await run()
+    },
+    records: (workflow) =>
+      workflow.interventionQueries.filter(
+        (q): q is ContrastQueryArtifact => q.kind === 'intervention-query',
+      ),
+    summarise: (q) => JSON.stringify(q),
+  })
   const run = async () => {
     if (!readiness.ok) return
     const current = session.start('analysis', 'Intervention query')
@@ -609,7 +700,7 @@ export function InterventionPanel({
               )
             }
           >
-            <option value="">No condition</option>
+            <option value="">{noConditionLabel}</option>
             {observed.map((node) => (
               <option key={node.id} value={node.id} disabled={node.id === set || node.id === read}>
                 {node.name}
@@ -655,9 +746,9 @@ export function InterventionPanel({
                 )
               }}
             >
-              <option value="lowest">Lowest</option>
-              <option value="highest">Highest</option>
-              <option value="index">Specify state index</option>
+              <option value="lowest">{conditionStateLabels.lowest}</option>
+              <option value="highest">{conditionStateLabels.highest}</option>
+              <option value="index">{conditionStateLabels.index}</option>
             </Select>
           </label>
         )}

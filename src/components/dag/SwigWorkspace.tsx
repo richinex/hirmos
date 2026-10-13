@@ -1,4 +1,13 @@
 import { NumberInput } from '@/components/ui/NumberInput'
+import { z } from 'zod'
+import { err, ok } from '@/domain/dop'
+import { useWorkspaceConfiguration } from '@/assistant/workspaceConfiguration'
+import { useRecordedAnalysis } from '@/assistant/useRecordedAnalysis'
+import {
+  swigSettingsSchema,
+  prepareSwigSettings,
+  swigSettingsDescription,
+} from '@/domain/swigSettings'
 import { useMemo, useState } from 'react'
 import type { DagDocument } from '@/domain/dag'
 import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
@@ -24,7 +33,7 @@ import { initialSwigDidDraft } from '@/domain/swigDidDraft'
 import { SwigDidForm } from './SwigDidForm'
 import { SwigDidSpecification } from './SwigDidSpecification'
 import { SwigDidResult } from './SwigDidResult'
-import type { SwigProjection } from '@/domain/swigProjection'
+import { swigProjectionSchema, type SwigProjection } from '@/domain/swigProjection'
 import { SwigProjectionForm } from './SwigProjectionForm'
 import { SwigCanvas } from './SwigCanvas'
 import { Select } from '@/components/ui/Select'
@@ -49,6 +58,9 @@ type Construction =
   | { readonly kind: 'difference'; readonly earlier: Equation; readonly later: Equation }
 const emptyEquation = (): Equation => ({ outcome: '', terms: [] })
 const listClass = 'panel-scroll max-h-64 overflow-y-auto p-1'
+const separationSettingsSchema = z
+  .object({ left: z.string(), right: z.string(), given: z.array(z.string()) })
+  .strict()
 type Props = {
   readonly document: DagDocument
   readonly prepared: PreparedDatasetArtifact
@@ -208,8 +220,8 @@ export function SwigWorkspace({
   )
   const entry =
     selected === null
-      ? entries.at(-1) ?? null
-      : entries.find((item) => item.recordIds.some((id) => id === selected)) ?? null
+      ? (entries.at(-1) ?? null)
+      : (entries.find((item) => item.recordIds.some((id) => id === selected)) ?? null)
   const record = entry?.graph ?? null
   const running = session.job.kind === 'running'
   const locked = running || session.blocked
@@ -219,6 +231,252 @@ export function SwigWorkspace({
     setRight('')
     setGiven([])
   }
+
+  const settings =
+    purpose === 'did'
+      ? { purpose, draft: didDraft }
+      : { purpose, interventions, exogenous, construction, additionalPairs, rationale }
+  const ready = graph.ok
+    ? prepareSwigSettings(settings, graph.value)
+    : err(describeSwigGraphProblem(graph.error))
+  const binding = JSON.stringify({
+    document: document.id,
+    revision: document.current.id,
+    prepared: prepared.id,
+    projection,
+    historyConfirmed,
+  })
+  useWorkspaceConfiguration('swig-projection', binding, {
+    title: 'Intervention graph time expansion',
+    current: projection,
+    schema: swigProjectionSchema,
+    columns: document.current.graph.nodes.map((n) => ({ id: n.id, name: n.name })),
+    describe: (value) => [
+      {
+        key: 'kind',
+        label: 'Graph',
+        value:
+          value.kind === 'explicit'
+            ? 'Explicit period nodes'
+            : `Periods ${value.start} to ${value.end}`,
+      },
+      ...(value.kind === 'temporal'
+        ? [
+            {
+              key: 'invariant',
+              label: 'Time-invariant variables',
+              value:
+                value.invariant
+                  .map((id) => document.current.graph.nodes.find((n) => n.id === id)?.name ?? id)
+                  .join(', ') || 'None',
+            },
+            {
+              key: 'boundary',
+              label: 'History boundary',
+              value: 'Confirm the closed-history assumption on the page before running.',
+            },
+          ]
+        : []),
+    ],
+    validate: (value) => {
+      if (locked) return err('Wait for the current analysis to finish.')
+      const next = readySwigGraph(document, value)
+      return next.ok ? ok(value) : err(describeSwigGraphProblem(next.error))
+    },
+    configure: (value) => {
+      const next = readySwigGraph(document, value)
+      setProjection(value)
+      setHistoryConfirmed(false)
+      setDidDraft(initialSwigDidDraft(next.ok ? next.value.names.length : 0))
+      setInterventions([{ key: crypto.randomUUID(), variable: '', value: '' }])
+      setExogenous([])
+      setConstruction({ kind: 'swig' })
+      setAdditionalPairs([])
+      setPane('new')
+    },
+  })
+  useWorkspaceConfiguration<unknown>(
+    'swig-settings',
+    binding,
+    graph.ok
+      ? {
+          title: 'Intervention graph',
+          current: settings,
+          schema: swigSettingsSchema,
+          columns: graph.value.names.map((name, i) => ({ id: String(i), name })),
+          describe: (value) => {
+            const parsed = swigSettingsSchema.safeParse(value)
+            return parsed.success
+              ? swigSettingsDescription(parsed.data, graph.value.names)
+              : [
+                  {
+                    key: 'draft',
+                    label: 'Draft',
+                    value: 'Complete the intervention graph settings.',
+                  },
+                ]
+          },
+          validate: (value) => {
+            if (locked) return err('Wait for the current analysis to finish.')
+            const next = prepareSwigSettings(value, graph.value)
+            return next.ok ? ok(value) : next
+          },
+          configure: (value) => {
+            const next = swigSettingsSchema.parse(value)
+            setPurpose(next.purpose)
+            setPane('new')
+            if (next.purpose === 'did') setDidDraft(next.draft)
+            else {
+              setInterventions(next.interventions)
+              setExogenous(next.exogenous)
+              setConstruction(next.construction)
+              setAdditionalPairs(next.additionalPairs)
+              setRationale(next.rationale)
+            }
+          },
+        }
+      : null,
+  )
+  useRecordedAnalysis({
+    key: 'swig',
+    prepared: prepared.id,
+    binding: JSON.stringify({ binding, settings }),
+    session,
+    inspection: {
+      section: 'DAG workspace → Intervention graphs',
+      method: purpose === 'did' ? 'DiD adjustment assessment' : 'Intervention graph',
+      specification: JSON.stringify({
+        settings,
+        projection,
+        names: graph.ok ? graph.value.names : [],
+      }),
+      sharedResult:
+        'Saved graph and graphical conclusions. This is not an estimated treatment effect.',
+    },
+    unavailable: !boundaryReady
+      ? 'Confirm the closed-history assumption in Intervention graphs before running.'
+      : ready.ok
+        ? null
+        : ready.error,
+    execute: async () => {
+      if (ready.ok && graph.ok && boundaryReady)
+        await run(
+          ready.value,
+          graph.value.names,
+          purpose === 'did' ? didDraft.rationale.trim() : rationale.trim(),
+        )
+    },
+    records: (workflow) => workflow.swigAnalyses,
+    summarise: (value) =>
+      JSON.stringify({ id: value.id, names: value.names, conclusion: value.result.conclusion }),
+  })
+  const separationProblem = (value: {
+    readonly left: string
+    readonly right: string
+    readonly given: readonly string[]
+  }) => {
+    if (!record || record.result.conclusion.kind === 'did')
+      return 'Choose a saved intervention graph for a separation check.'
+    if (record.dagRevision !== document.current.id)
+      return 'The saved graph belongs to an earlier revision. Construct a graph from the current revision first.'
+    const ids = [value.left, value.right, ...value.given]
+    if (
+      new Set(ids).size !== ids.length ||
+      ids.some(
+        (id) =>
+          !/^(0|[1-9]\d*)$/.test(id) ||
+          !record.result.nodes[Number(id)] ||
+          record.result.nodes[Number(id)]?.kind === 'fixed',
+      )
+    )
+      return 'Choose two distinct random variables and separate conditioning variables from the saved graph.'
+    return null
+  }
+  useWorkspaceConfiguration(
+    'swig-separation',
+    JSON.stringify({ binding, record: record?.id }),
+    record && record.result.conclusion.kind !== 'did'
+      ? {
+          title: 'Separation check',
+          current: { left, right, given },
+          schema: separationSettingsSchema,
+          columns: record.result.nodes.flatMap((n, i) =>
+            n.kind === 'fixed' ? [] : [{ id: String(i), name: swigNodeName(record, i) }],
+          ),
+          describe: (value) => [
+            {
+              key: 'left',
+              label: 'First variable',
+              value: value.left === '' ? 'Not selected' : swigNodeName(record, Number(value.left)),
+            },
+            {
+              key: 'right',
+              label: 'Second variable',
+              value:
+                value.right === '' ? 'Not selected' : swigNodeName(record, Number(value.right)),
+            },
+            {
+              key: 'given',
+              label: 'Conditioning variables',
+              value: value.given.map((id) => swigNodeName(record, Number(id))).join(', ') || 'None',
+            },
+          ],
+          validate: (value) => {
+            const problem = separationProblem(value)
+            return locked
+              ? err('Wait for the current analysis to finish.')
+              : problem
+                ? err(problem)
+                : ok(value)
+          },
+          configure: (value) => {
+            setLeft(value.left)
+            setRight(value.right)
+            setGiven(value.given)
+            setPane('saved')
+          },
+        }
+      : null,
+  )
+  useRecordedAnalysis({
+    key: 'swig-separation',
+    prepared: prepared.id,
+    binding: JSON.stringify({ binding, record: record?.id, left, right, given }),
+    session,
+    inspection: {
+      section: 'DAG workspace → Intervention graphs',
+      method: 'Separation check',
+      specification: JSON.stringify({
+        record: record?.id,
+        left,
+        right,
+        given,
+        names: record?.names,
+      }),
+      sharedResult:
+        'Graphical separation, conditional on the recorded graph and assumptions; not a test against data.',
+    },
+    unavailable: separationProblem({ left, right, given }),
+    execute: async () => {
+      if (record && !separationProblem({ left, right, given }))
+        await run(
+          {
+            ...record.specification,
+            query: {
+              kind: 'separation',
+              left: Number(left),
+              right: Number(right),
+              given: given.map(Number),
+            },
+          },
+          record.names,
+          record.rationale,
+          record.projection,
+        )
+    },
+    records: (workflow) => workflow.swigAnalyses,
+    summarise: (value) => JSON.stringify({ id: value.id, conclusion: value.result.conclusion }),
+  })
 
   async function run(
     specification: SwigSpecification,
@@ -277,90 +535,11 @@ export function SwigWorkspace({
   }
   function build() {
     if (!graph.ok || !boundaryReady) return
-    if (rationale.trim() === '') {
-      setProblem('Record the assumptions supporting this intervention graph.')
+    if (!ready.ok) {
+      setProblem(ready.error)
       return
     }
-    const settings: [number, number][] = []
-    for (const row of interventions) {
-      if (row.variable === '' || row.value.trim() === '' || !Number.isFinite(Number(row.value))) {
-        setProblem('Choose each intervention variable and enter a finite value.')
-        return
-      }
-      if (settings.some(([variable]) => variable === Number(row.variable))) {
-        setProblem('Each variable can have only one intervention value.')
-        return
-      }
-      settings.push([Number(row.variable), Number(row.value)])
-    }
-    let design: SwigSpecification['construction'] = { kind: 'swig' }
-    if (construction.kind === 'difference') {
-      if (
-        construction.earlier.outcome === '' ||
-        construction.later.outcome === '' ||
-        construction.earlier.outcome === construction.later.outcome
-      ) {
-        setProblem('Choose two distinct outcome nodes, one for each period.')
-        return
-      }
-      if (
-        [construction.earlier, construction.later].some((e) =>
-          e.terms.some((t) => !t.identity.trim()),
-        )
-      ) {
-        setProblem(
-          'Name each additive term. Use the same name only for the same function with the same arguments.',
-        )
-        return
-      }
-      const equation = (e: Equation) => ({
-        outcome: Number(e.outcome),
-        terms: e.terms.map((t) => ({
-          identity: t.identity.trim(),
-          arguments: t.arguments.map(Number).sort((a, b) => a - b),
-        })),
-      })
-      const pairs = [
-        { earlier: construction.earlier, later: construction.later },
-        ...additionalPairs,
-      ]
-      if (
-        pairs.some(
-          (p) =>
-            p.earlier.outcome === '' ||
-            p.later.outcome === '' ||
-            p.earlier.outcome === p.later.outcome ||
-            [p.earlier, p.later].some((e) => e.terms.some((t) => !t.identity.trim())),
-        )
-      ) {
-        setProblem('Choose distinct outcomes and name every additive term for each difference.')
-        return
-      }
-      design =
-        additionalPairs.length === 0
-          ? {
-              kind: 'difference',
-              earlier: equation(construction.earlier),
-              later: equation(construction.later),
-            }
-          : {
-              kind: 'differences',
-              pairs: pairs.map((p) => ({ earlier: equation(p.earlier), later: equation(p.later) })),
-            }
-    }
-    void run(
-      {
-        roles: graph.value.names.map((_, index) =>
-          exogenous.includes(String(index)) ? 'exogenous' : 'endogenous',
-        ),
-        edges: graph.value.edges,
-        interventions: settings,
-        construction: design,
-        query: { kind: 'graph' },
-      },
-      graph.value.names,
-      rationale.trim(),
-    )
+    void run(ready.value, graph.value.names, rationale.trim())
   }
   const newAnalysis = (
     <div className="space-y-4">

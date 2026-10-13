@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react'
-import { SourceNotice } from '@/components/SourceNotice'
+import { useEffect, type ReactNode } from 'react'
+import { toggleAssistant } from '@/assistant/assistantStore'
+import { AssistantSplit } from './AssistantSplit'
 
 interface AppShellProps {
   /** Id of the stage element the skip link jumps to. */
@@ -14,6 +15,21 @@ interface AppShellProps {
 
 /** Header, chapter rail, and the stage as flex siblings. The header sits on the stage with no seam so the rail below it reads as one shape rising from the page edge; the row is the shell container the rail queries. */
 export function AppShell({ skipTarget, mode, header, nav, stage, footer }: AppShellProps) {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        !event.altKey &&
+        !event.shiftKey &&
+        event.key.toLowerCase() === 'i'
+      ) {
+        event.preventDefault()
+        toggleAssistant()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
   return (
     // Vaul scales this element back while a bottom sheet is open, which is how the sheet reads as a
     // layer on the dark themes, where a scrim over a near-black page dims almost nothing.
@@ -33,22 +49,23 @@ export function AppShell({ skipTarget, mode, header, nav, stage, footer }: AppSh
 
       <div className="@container/shell relative flex min-h-0 flex-1">
         {nav}
-        <main id={skipTarget} className="flex min-h-0 min-w-0 flex-1">
-          {mode === 'reading' ? (
-            <div className="panel-scroll min-w-0 flex-1 overflow-y-auto [container-type:size]">
-              <div className="dashboard-reading @container/panel mx-auto flex min-h-full w-full max-w-[1440px] flex-col px-5 pt-0 pb-8 sm:px-8 lg:px-10">
-                {stage}
-              </div>
-            </div>
-          ) : (
-            stage
-          )}
-        </main>
+        <AssistantSplit
+          chapter={
+            <main id={skipTarget} className="flex min-h-0 min-w-0 flex-1">
+              {mode === 'reading' ? (
+                <div className="panel-scroll min-w-0 flex-1 overflow-y-auto [container-type:size]">
+                  <div className="dashboard-reading @container/panel mx-auto flex min-h-full w-full max-w-[1440px] flex-col px-5 pt-0 pb-8 sm:px-8 lg:px-10">
+                    {stage}
+                  </div>
+                </div>
+              ) : (
+                stage
+              )}
+            </main>
+          }
+        />
       </div>
       {footer}
-      <footer className="shrink-0 border-t border-line px-4 py-2 text-label">
-        <SourceNotice />
-      </footer>
     </div>
   )
 }

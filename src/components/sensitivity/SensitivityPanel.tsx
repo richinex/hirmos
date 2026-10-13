@@ -1,4 +1,7 @@
 import { NumberInput } from '@/components/ui/NumberInput'
+import { useWorkspaceConfiguration } from '@/assistant/workspaceConfiguration'
+import { sensitivitySettingsSchema, sensitivitySettings } from '@/domain/sensitivitySettings'
+import { ok, err } from '@/domain/dop'
 import { RunActions } from '@/components/ui/RunActions'
 import { RunDetails } from '@/components/ui/RunDetails'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
@@ -8,10 +11,12 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { RunFold } from '@/components/ui/RunFold'
 import { RunMeta } from '@/components/ui/RunMeta'
 import { Select } from '@/components/ui/Select'
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
+import { z } from 'zod'
 import { useWorkflow } from '@/components/WorkflowProvider'
 import { emptySensitivityDraft, type SensitivityEvent } from '@/domain/sensitivityDraft'
 import { useJob } from '@/analysis/JobsProvider'
+import { useRecordedAnalysis, runReceipt } from '@/assistant/useRecordedAnalysis'
 import { JobNotice } from '@/components/ui/JobNotice'
 import { EChart } from '@/charts/EChart'
 import { matrixHeatmapOption } from '@/charts/discovery/matrixHeatmap'
@@ -463,11 +468,7 @@ function UnobservedCard({
   )
   const stamp = (
     <RunMeta>
-      {[
-        describeRun(estimation.configuration),
-        `Seed ${evidence.seed}`,
-        formatTime(run.createdAt),
-      ]}
+      {[describeRun(estimation.configuration), `Seed ${evidence.seed}`, formatTime(run.createdAt)]}
     </RunMeta>
   )
   const record = (
@@ -597,10 +598,50 @@ function LegacySensitivityPanel({
 
   const session = useJob('sensitivity')
   const { job } = session
+  useWorkspaceConfiguration('sensitivity-probe', prepared.id + JSON.stringify(estimationRuns.map(run => run.id)), job.kind === 'running' || session.blocked ? null : {
+    title: 'Estimator probes',
+    current: { estimationRun: state.estimationRun, configuration },
+    schema: sensitivitySettingsSchema,
+    columns: [],
+    describe: value => {
+      const run = estimationRuns.find(candidate => candidate.id === value.estimationRun)
+      const bound = studies.find(candidate => candidate.id === run?.study)
+      return [
+        ...(bound ? [{ key: 'study', label: 'Study', value: estimandSentence(bound) }] : []),
+        ...sensitivitySettings(value),
+      ]
+    },
+    validate: next => {
+      const run = estimationRuns.find(candidate => candidate.id === next.estimationRun)
+      if (!run || run.preparedDataset !== prepared.id) return err('Choose a saved estimation run for this prepared dataset.')
+      if (!studies.some(candidate => candidate.id === run.study)) return err('The source run’s study is unavailable.')
+      const checked = probeEligibility(next.configuration.kind, run, null)
+      return checked.kind === 'refused' ? err(checked.reason) : ok(next)
+    },
+    configure: next => {
+      if (next.estimationRun !== null) dispatch({ type: 'settings-applied', run: next.estimationRun, configuration: next.configuration })
+    },
+  })
   useRunActivity(
     onActivity,
     job.kind === 'running' ? { label: describeProbe(state.probe), progress: null } : null,
   )
+  useRecordedAnalysis({
+    key: 'sensitivity',
+    prepared: prepared.id,
+    binding: prepared.id + JSON.stringify({ state, study, estimation: estimation?.id }),
+    inspection: {
+      section: 'Sensitivity',
+      method: describeProbe(state.probe),
+      specification: JSON.stringify({ sourceRun: estimation?.id, configuration }),
+      sharedResult:
+        'Saved-run ID and completion receipt only. Numerical diagnostics remain in the result panel.',
+    },
+    session,
+    execute: () => execute(),
+    records: (workflow) => workflow.sensitivityRuns,
+    summarise: runReceipt,
+  })
   const execute = async () => {
     if (estimation === null || study === null || eligibility.kind === 'refused') return
     const current = session.start('analysis', describeProbe(state.probe))
@@ -1398,6 +1439,13 @@ function openingTrack(
   return 'estimation'
 }
 
+const sensitivityTracks = [
+  { value: 'estimation', label: 'Estimator probes' },
+  { value: 'parallelTrends', label: 'Parallel trends' },
+  { value: 'didOmitted', label: 'DiD omitted variables' },
+] as const
+const sensitivityTrackSchema = z.object({ track: z.enum(['estimation', 'parallelTrends', 'didOmitted']) }).strict()
+
 export function SensitivityPanel(
   props: Omit<React.ComponentProps<typeof LegacySensitivityPanel>, 'runs' | 'selector'> & {
     readonly runs: readonly SensitivityRunArtifact[]
@@ -1405,18 +1453,26 @@ export function SensitivityPanel(
   },
 ) {
   const [track, setTrack] = useState(() => openingTrack(props.runs, props.estimationRuns))
+  const [busy, setBusy] = useState(false)
+  const report = props.onActivity
+  const onActivity = useCallback((activity: RunActivity | null) => {
+    setBusy(activity !== null)
+    report?.(activity)
+  }, [report])
+  useWorkspaceConfiguration('sensitivity-analysis', props.prepared.id, busy ? null : {
+    title: 'Sensitivity analysis', current: { track }, schema: sensitivityTrackSchema, columns: [],
+    describe: value => [{ key: 'track', label: 'Analysis', value: sensitivityTracks.find(item => item.value === value.track)!.label }],
+    validate: ok, configure: value => setTrack(value.track),
+  })
   const selector = (
     <SegmentedControl
       variant="line"
       size="sm"
       ariaLabel="Sensitivity analysis"
+      disabled={busy}
       value={track}
       onChange={setTrack}
-      options={[
-        { value: 'estimation', label: 'Estimator probes' },
-        { value: 'parallelTrends', label: 'Parallel trends' },
-        { value: 'didOmitted', label: 'DiD omitted variables' },
-      ]}
+      options={sensitivityTracks}
     />
   )
   switch (track) {
@@ -1430,7 +1486,7 @@ export function SensitivityPanel(
           runs={props.runs.filter((run) => run.kind === 'did-sensitivity-run')}
           onRun={props.onRun}
           onDelete={props.onDeleteRun}
-          onActivity={props.onActivity}
+          onActivity={onActivity}
           selector={selector}
         />
       )
@@ -1443,7 +1499,7 @@ export function SensitivityPanel(
           runs={props.runs.filter((run) => run.kind === 'honest-did-run')}
           onRun={props.onRun}
           onDelete={props.onDeleteRun}
-          onActivity={props.onActivity}
+          onActivity={onActivity}
           selector={selector}
         />
       )
@@ -1451,6 +1507,7 @@ export function SensitivityPanel(
       return (
         <LegacySensitivityPanel
           {...props}
+          onActivity={onActivity}
           runs={props.runs.filter(
             (run) => run.kind !== 'honest-did-run' && run.kind !== 'did-sensitivity-run',
           )}

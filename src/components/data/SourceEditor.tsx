@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense, useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { createStore } from 'zustand/vanilla'
 import { useStore } from 'zustand'
 import type { SelectedSource, SqlResume, PipelineResume } from '@/domain/workflow'
@@ -61,11 +61,13 @@ function editorFor(
 /** Editing owns a proposal, never the accepted source or its results. */
 export function SourceEditor({
   source,
+  initialRoute,
   onView,
   onCancel,
   onAccept,
 }: {
   readonly source: SelectedSource
+  readonly initialRoute?: 'sql' | 'pipeline'
   readonly onView: (kind: 'choosing' | 'editing') => void
   readonly onCancel: () => void
   readonly onAccept: (source: SelectedSource) => void
@@ -111,6 +113,17 @@ export function SourceEditor({
     store.setState((state) =>
       state.stage.kind === 'editing' ? { stage: { ...state.stage, proposed } } : state,
     )
+
+  const openLatest = useRef(open)
+  const started = useRef(false)
+  useLayoutEffect(() => {
+    openLatest.current = open
+  })
+  useEffect(() => {
+    if (!initialRoute || started.current) return
+    started.current = true
+    void openLatest.current(initialRoute)
+  }, [initialRoute])
 
   if (stage.kind !== 'editing')
     return (

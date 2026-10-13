@@ -4,6 +4,7 @@ import { RunDetails } from '@/components/ui/RunDetails'
 import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { Metadata } from '@/components/ui/Metadata'
 import { useJob } from '@/analysis/JobsProvider'
+import { useRecordedAnalysis, runReceipt } from '@/assistant/useRecordedAnalysis'
 import { JobNotice } from '@/components/ui/JobNotice'
 import { useRunActivity } from '@/lib/useRunActivity'
 import type { RunActivity } from '@/domain/activity'
@@ -89,7 +90,15 @@ import {
   type DiscoveryMethodGroupId,
   type JpcmciObservedRole,
 } from '@/domain/discovery'
-import { assertNever, isNonEmpty } from '@/domain/dop'
+import { assertNever, isNonEmpty, err, ok } from '@/domain/dop'
+import { useWorkspaceConfiguration } from '@/assistant/workspaceConfiguration'
+import {
+  discoveryMethodSchema,
+  discoverySettingsSchema,
+  discoverySettings,
+  discoveryBackgroundProblem,
+} from '@/domain/discoverySettings'
+import { initialConfigurationFor } from '@/domain/discovery'
 import {
   assessDiscoveryRunDeletion,
   type DeletableDiscoveryRun,
@@ -2920,6 +2929,66 @@ export function DiscoveryPanel({
   const eligibility = evaluateDiscoveryEligibility(method, prepared, stationarity)
   const readiness = readyDiscoverySpecification(configuration, prepared)
   const sampleReview = reviewDiscoverySamples(configuration, prepared, profile)
+  const checkConfiguration = (value: DiscoveryConfiguration) => {
+    if (job.kind === 'running' || session.blocked) return 'Wait for the current analysis to finish.'
+    const backgroundProblem = discoveryBackgroundProblem(value, preparedColumns.length)
+    if (backgroundProblem) return backgroundProblem
+    const definition = methodDefinition(methodIdOf(value))
+    if (!definition.ok) return 'This discovery method is not registered.'
+    const eligible = evaluateDiscoveryEligibility(definition.value, prepared, stationarity)
+    if (eligible.kind === 'refused') return eligible.violations.map((v) => v.evidence).join(' ')
+    const ready = readyDiscoverySpecification(value, prepared)
+    if (!ready.ok) return describeDiscoveryReadiness(ready.error)
+    const samples = reviewDiscoverySamples(value, prepared, profile)
+    return samples.kind === 'blocked' ? samples.detail : null
+  }
+  useWorkspaceConfiguration(
+    'discovery-method',
+    prepared.id + JSON.stringify({ configuration, stationarity }),
+    {
+      title: 'Discovery method',
+      current: { method: configuration.kind },
+      schema: discoveryMethodSchema,
+      columns: [],
+      validate: (value) => {
+        const problem = checkConfiguration(initialConfigurationFor(value.method))
+        return problem ? err(problem) : ok(value)
+      },
+      describe: (value) => {
+        const definition = methodDefinition(methodIdForChoice(value.method))
+        return [
+          {
+            key: 'method',
+            label: 'Method',
+            value: definition.ok ? definition.value.name : value.method,
+          },
+          { key: 'settings', label: 'Settings', value: 'Apply this method’s defaults' },
+        ]
+      },
+      configure: (value) => dispatch({ type: 'method-selected', method: value.method }),
+    },
+  )
+  const editable = discoverySettingsSchema.safeParse(configuration)
+  useWorkspaceConfiguration(
+    'discovery-settings',
+    prepared.id + JSON.stringify({ kind: configuration.kind, stationarity }),
+    editable.success
+      ? {
+          title: 'Discovery settings',
+          current: editable.data,
+          schema: discoverySettingsSchema,
+          columns: preparedColumns,
+          validate: (value) => {
+            if (value.kind !== configuration.kind)
+              return err('Select the discovery method before changing its settings.')
+            const problem = checkConfiguration(value)
+            return problem ? err(problem) : ok(value)
+          },
+          describe: (value) => discoverySettings(value, selectedMethod.value.name, preparedColumns),
+          configure: (value) => dispatch({ type: 'settings-applied', configuration: value }),
+        }
+      : null,
+  )
   const methodOptions = visibleGroup.methods.flatMap((value) => {
     const definition = methodDefinition(methodIdForChoice(value))
     if (!definition.ok) return []
@@ -2964,6 +3033,25 @@ export function DiscoveryPanel({
     }
   }
 
+  useRecordedAnalysis({
+    key: 'discovery',
+    unavailable: !selectedMethodIsVisible
+      ? 'Select the method’s group in Discovery before running it.'
+      : checkConfiguration(configuration),
+    prepared: prepared.id,
+    binding: prepared.id + JSON.stringify(draft),
+    inspection: {
+      section: 'Discovery',
+      method: method.name,
+      specification: JSON.stringify(draft),
+      sharedResult:
+        'Saved-run ID and completion receipt only. Candidate graph relations remain in the result panel and are not confirmed causal relations.',
+    },
+    session,
+    execute: () => execute(),
+    records: (workflow) => workflow.discoveryRuns,
+    summarise: runReceipt,
+  })
   const execute = async () => {
     const specification = readyDiscoverySpecification(configuration, prepared)
     if (

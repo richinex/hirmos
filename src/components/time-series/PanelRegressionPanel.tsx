@@ -3,6 +3,13 @@ import { useState, type ReactNode } from 'react'
 import { useWorkflow } from '@/components/WorkflowProvider'
 import { useTimeSeriesDraft } from './useTimeSeriesDraft'
 import { useJob } from '@/analysis/JobsProvider'
+import { useRecordedAnalysis } from '@/assistant/useRecordedAnalysis'
+import { useWorkspaceConfiguration } from '@/assistant/workspaceConfiguration'
+import { panelRegressionDraftSchema } from '@/domain/panelRegression'
+import { panelRegressionColumns, checkPanelRegressionDraft } from '@/domain/regressionWorkspaceSettings'
+import { checkSettingsColumns, seriesDraftSettings } from '@/domain/timeSeriesWorkspaceSettings'
+import { err } from '@/domain/dop'
+import { timeSeriesSummary, TIME_SERIES_SUMMARY } from '@/assistant/analysisSummaries'
 import { useRunActivity } from '@/lib/useRunActivity'
 import { JobNotice } from '@/components/ui/JobNotice'
 import { Alert } from '@/components/ui/Alert'
@@ -59,6 +66,16 @@ export function PanelRegressionPanel(props: PanelRegressionPanelProps) {
   )
   const model = draft.model,
     isPanel = props.prepared.kind === 'prepared-panel'
+  useWorkspaceConfiguration('regression-design', props.prepared.id, busy || session.blocked ? null : {
+    title: 'Regression design', current: draft, schema: panelRegressionDraftSchema, columns,
+    describe: next => seriesDraftSettings(next, columns),
+    validate: next => {
+      if (next.model.kind !== draft.model.kind) return err('Choose the regression analysis before configuring it.')
+      const checked = checkSettingsColumns(next, panelRegressionColumns(next), columns)
+      return checked.ok ? checkPanelRegressionDraft(next, isPanel) : checked
+    },
+    configure: set,
+  })
   const runs = props.runs
     .filter(isRegressionDesignRun)
     .filter((run) => run.kind === 'panel-regression' || run.kind === 'bacon')
@@ -109,6 +126,21 @@ export function PanelRegressionPanel(props: PanelRegressionPanelProps) {
             : model.kind !== 'bacon' && draft.cluster === null && !isPanel
               ? 'Choose a cluster column.'
               : null
+  useRecordedAnalysis({
+    key: 'regression-design',
+    prepared: props.prepared.id,
+    binding: props.prepared.id + JSON.stringify(draft),
+    inspection: {
+      section: 'Estimation',
+      method: 'Regression design',
+      specification: JSON.stringify(draft),
+      sharedResult: TIME_SERIES_SUMMARY,
+    },
+    session,
+    execute: () => execute(),
+    records: (workflow) => workflow.timeSeriesRuns,
+    summarise: timeSeriesSummary,
+  })
   const execute = async () => {
     if (problem !== null) return
     const current = session.start('analysis', 'Preparing regression design')

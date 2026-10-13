@@ -83,6 +83,10 @@ type FieldEvent<T, Kind extends string> = {
   [K in keyof T]: { readonly type: Kind; readonly field: K; readonly value: T[K] }
 }[keyof T]
 export type TimeSeriesEvent =
+  | { readonly type: 'ardl-settings'; readonly value: ArdlDraft }
+  | { readonly type: 'count-settings'; readonly value: CountDraft }
+  | { readonly type: 'interrupted-settings'; readonly value: InterruptedDraft }
+  | { readonly type: 'long-run-settings'; readonly model: 'ardl' | 'vecm'; readonly value: LongRunDraft }
   | { readonly type: 'panel-regression'; readonly value: PanelRegressionDraft }
   | { readonly type: 'regression'; readonly value: CountRegressionDraft }
   | { readonly type: 'cohort-regression'; readonly value: CountRegressionDraft }
@@ -204,6 +208,10 @@ export function stepTimeSeriesDraft(
   event: TimeSeriesEvent,
 ): TimeSeriesDraft {
   switch (event.type) {
+    case 'ardl-settings': return { ...state, ardl: event.value }
+    case 'count-settings': return { ...state, count: event.value }
+    case 'interrupted-settings': return { ...state, interrupted: event.value }
+    case 'long-run-settings': return { ...state, longRun: { ...state.longRun, [event.model]: event.value } }
     case 'panel-regression':
       return { ...state, panelRegression: event.value }
     case 'regression':

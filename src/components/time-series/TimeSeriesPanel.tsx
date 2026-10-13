@@ -6,6 +6,11 @@ import { useTimeSeriesDraft } from './useTimeSeriesDraft'
 import type { LongRunDraft, TimeSeriesDraft } from '@/domain/timeSeriesDraft'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { useJob } from '@/analysis/JobsProvider'
+import { useRecordedAnalysis } from '@/assistant/useRecordedAnalysis'
+import { useWorkspaceConfiguration } from '@/assistant/workspaceConfiguration'
+import { longRunDraftSchema, timeSeriesAnalysisSchema, timeSeriesAnalysisLabels, checkSettingsColumns, seriesDraftSettings } from '@/domain/timeSeriesWorkspaceSettings'
+import { err, ok } from '@/domain/dop'
+import { timeSeriesSummary, TIME_SERIES_SUMMARY } from '@/assistant/analysisSummaries'
 import { JobNotice } from '@/components/ui/JobNotice'
 import { useCallback, useState, type ReactNode } from 'react'
 import { COUNT_SERIES_DIAGNOSTIC_METHODS, TIME_SERIES_METHODS } from '@/domain/methods'
@@ -86,8 +91,8 @@ function LongRunModel({
   const columns = props.profile.columns.filter(
     (c) => props.prepared.columns.includes(c.id) && isNumericDuckDbType(c.duckdbType),
   )
-  const { selected, maxLag, terms, deterministic, significance, forecastSteps } =
-    useTimeSeriesDraft(props.prepared.id, (state) => state.longRun[model])
+  const draft = useTimeSeriesDraft(props.prepared.id, (state) => state.longRun[model])
+  const { selected, maxLag, terms, deterministic, significance, forecastSteps } = draft
   const change = useWorkflow((state) => state.changeTimeSeries)
   const setSelected = (value: LongRunDraft['selected']) =>
     change(props.prepared.id, { type: 'long-run', field: 'selected', value, model })
@@ -103,6 +108,14 @@ function LongRunModel({
     change(props.prepared.id, { type: 'long-run', field: 'forecastSteps', value, model })
   const session = useJob(`time-series:${model}`)
   const { job } = session
+  useWorkspaceConfiguration(`series-${model}`, props.prepared.id, job.kind === 'running' || session.blocked ? null : {
+    title: model.toUpperCase(), current: draft, schema: longRunDraftSchema, columns,
+    describe: next => seriesDraftSettings(model === 'vecm' ? { selected: next.selected, maxLag: next.maxLag, deterministic: next.deterministic, significance: next.significance, forecastSteps: next.forecastSteps } : { selected: next.selected, maxLag: next.maxLag, terms: next.terms }, columns),
+    validate: next => next.selected.length < 2 || (model === 'ardl' && next.selected.length !== 2)
+      ? err(model === 'ardl' ? 'Choose one outcome and one predictor.' : 'Choose at least two series.')
+      : checkSettingsColumns(next, next.selected, columns),
+    configure: value => change(props.prepared.id, { type: 'long-run-settings', model, value }),
+  })
   useRunActivity(
     props.onActivity,
     job.kind === 'running' ? { label: model.toUpperCase(), progress: null } : null,
@@ -214,6 +227,30 @@ function LongRunModel({
     }
   }
 
+  const assistantSpecification = JSON.stringify({
+    selected,
+    maxLag,
+    terms,
+    deterministic,
+    significance,
+    forecastSteps,
+    columns: columns.map(({ id, name }) => ({ id, name })),
+  })
+  useRecordedAnalysis({
+    key: model,
+    prepared: props.prepared.id,
+    binding: props.prepared.id + assistantSpecification,
+    inspection: {
+      section: 'Time-series analysis',
+      method: model.toUpperCase(),
+      specification: assistantSpecification,
+      sharedResult: TIME_SERIES_SUMMARY,
+    },
+    session,
+    execute: run,
+    records: (workflow) => workflow.timeSeriesRuns,
+    summarise: timeSeriesSummary,
+  })
   const controls = (
     <>
       <fieldset disabled={job.kind === 'running'} className="m-0 mt-8 min-w-0 border-0 p-0">
@@ -452,6 +489,12 @@ function RegularTimeSeriesPanel(props: Props) {
   const setAnalysis = (analysis: TimeSeriesDraft['analysis']) =>
     change(props.prepared.id, { type: 'analysis', analysis })
   const [busy, setBusy] = useState(false)
+  useWorkspaceConfiguration('time-series-analysis', props.prepared.id, busy ? null : {
+    title: 'Time-series analysis', current: { analysis: analysis === 'panel-regression' ? 'regression' as const : analysis },
+    schema: timeSeriesAnalysisSchema, columns: [], validate: ok,
+    describe: next => [{ key: 'analysis', label: 'Analysis', value: timeSeriesAnalysisLabels[next.analysis] }],
+    configure: next => setAnalysis(next.analysis),
+  })
   const report = props.onActivity
   const onActivity = useCallback(
     (activity: RunActivity | null) => {

@@ -1,4 +1,8 @@
 import { SurrogatePanel } from './SurrogatePanel'
+import { useWorkspaceConfiguration } from '@/assistant/workspaceConfiguration'
+import { z } from 'zod'
+import { ok, err } from '@/domain/dop'
+import { regressionDesignSchema, regressionAnalyses } from '@/domain/regressionDesigns'
 import type { SurrogateRun, SurrogateRunId } from '@/domain/surrogateRun'
 import { useCallback, useEffect, useState, type ComponentProps } from 'react'
 import { EstimationPanel } from './EstimationPanel'
@@ -30,6 +34,13 @@ type Props = ComponentProps<typeof EstimationPanel> & {
   readonly onDesignRun: (run: TimeSeriesRun) => void
   readonly onDeleteDesignRun: (id: TimeSeriesRunId) => void
 }
+
+const workspaceSchema = z.object({ view: z.enum(['effects', 'designs', 'surrogates']) }).strict()
+const workspaceOptions = [
+  { value: 'effects', label: 'Effect estimation' },
+  { value: 'designs', label: 'Regression designs' },
+  { value: 'surrogates', label: 'Two-sample surrogates' },
+] as const
 
 /** Selection is a supported specification; the numerical routes keep their existing contracts. */
 export function EstimationWorkspace({
@@ -118,6 +129,34 @@ export function EstimationWorkspace({
     change(props.prepared.id, { type: 'regression-design', value: { kind: 'bacon' } })
     setView('designs')
   }
+  useWorkspaceConfiguration('estimation-workspace', props.prepared.id, busy ? null : {
+    title: 'Estimation workspace',
+    current: { view }, schema: workspaceSchema, columns: [],
+    describe: (value) => [{ key: 'view', label: 'Section', value: workspaceOptions.find((item) => item.value === value.view)!.label }],
+    validate: ok,
+    configure: (value) => setView(value.view),
+  })
+  useWorkspaceConfiguration('regression-analysis', `${props.prepared.id}:${JSON.stringify(countReadiness)}`, view !== 'designs' || busy ? null : {
+    title: 'Regression analysis', current: design, schema: regressionDesignSchema, columns: [],
+    describe: (value) => {
+      const next = regressionDesignInfo(value)
+      return [
+        { key: 'analysis', label: 'Analysis', value: regressionAnalyses.find((item) => item.value === next.analysis)!.label },
+        ...(next.model === null ? [] : [{ key: 'model', label: 'Outcome model', value: next.model === 'count' ? 'Count (negative binomial)' : 'Linear' }]),
+      ]
+    },
+    validate: (value) => {
+      const next = regressionDesignInfo(value)
+      if (next.analysis !== 'interactions' && props.prepared.kind !== 'prepared-panel')
+        return err('This analysis requires prepared panel data.')
+      if (next.model === 'count') {
+        if (countReadiness.kind === 'checking') return err('The count outcome is still being checked.')
+        if (countReadiness.kind === 'refused') return err(countReadiness.reason)
+      }
+      return ok(value)
+    },
+    configure: selectDesign,
+  })
   const restoreDesign = (controls: PanelRegressionDraft) => {
     const kind = controls.model.kind === 'eventStudy' ? 'linear-event-study' : controls.model.kind
     change(props.prepared.id, { type: 'regression-design', value: { kind } })
@@ -138,11 +177,7 @@ export function EstimationWorkspace({
       value={view}
       disabled={busy}
       onChange={setView}
-      options={[
-        { value: 'effects', label: 'Effect estimation' },
-        { value: 'designs', label: 'Regression designs' },
-        { value: 'surrogates', label: 'Two-sample surrogates' },
-      ]}
+      options={workspaceOptions}
     />
   )
   const analysisSelector = (

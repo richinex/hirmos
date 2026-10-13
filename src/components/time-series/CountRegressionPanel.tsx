@@ -6,6 +6,12 @@ import type { ReactNode } from 'react'
 import { useWorkflow } from '@/components/WorkflowProvider'
 import { useTimeSeriesDraft } from './useTimeSeriesDraft'
 import { useJob } from '@/analysis/JobsProvider'
+import { useRecordedAnalysis } from '@/assistant/useRecordedAnalysis'
+import { useWorkspaceConfiguration } from '@/assistant/workspaceConfiguration'
+import { countRegressionDraftSchema, countRegressionColumns, checkCountRegressionDraft } from '@/domain/regressionWorkspaceSettings'
+import { checkSettingsColumns, seriesDraftSettings } from '@/domain/timeSeriesWorkspaceSettings'
+import { err } from '@/domain/dop'
+import { timeSeriesSummary, TIME_SERIES_SUMMARY } from '@/assistant/analysisSummaries'
 import { JobNotice } from '@/components/ui/JobNotice'
 import { Orb } from '@/components/ui/Orb'
 import { Alert } from '@/components/ui/Alert'
@@ -67,6 +73,16 @@ export function CountRegressionPanel(
     (c) => props.prepared.columns.includes(c.id) && isNumericDuckDbType(c.duckdbType),
   )
   const panelData = props.prepared.kind === 'prepared-panel'
+  useWorkspaceConfiguration(cohorts ? 'cohort-regression' : 'count-regression', props.prepared.id, job.kind === 'running' || session.blocked ? null : {
+    title: cohorts ? 'Cohort count model' : 'Count regression', current: draft, schema: countRegressionDraftSchema, columns,
+    describe: next => seriesDraftSettings(next, columns),
+    validate: next => {
+      if (cohorts ? next.model.kind !== draft.model.kind : next.model.kind !== 'lags' && next.model.kind !== 'interrupted') return err('Choose the analysis through the workspace selector before configuring it.')
+      const checked = checkSettingsColumns(next, countRegressionColumns(next), columns)
+      return checked.ok ? checkCountRegressionDraft(next, panelData) : checked
+    },
+    configure: set,
+  })
   const runs = props.runs.filter(
     (r): r is Extract<typeof r, { kind: 'count-regression' }> =>
       r.kind === 'count-regression' &&
@@ -186,6 +202,21 @@ export function CountRegressionPanel(
       />
     </label>
   )
+  useRecordedAnalysis({
+    key: cohorts ? 'cohort-regression' : 'count-regression',
+    prepared: props.prepared.id,
+    binding: props.prepared.id + JSON.stringify(draft),
+    inspection: {
+      section: cohorts ? 'Estimation' : 'Time-series analysis',
+      method: 'Count regression',
+      specification: JSON.stringify(draft),
+      sharedResult: TIME_SERIES_SUMMARY,
+    },
+    session,
+    execute: () => execute(),
+    records: (workflow) => workflow.timeSeriesRuns,
+    summarise: timeSeriesSummary,
+  })
   const execute = async () => {
     if (problem !== null || draft.outcome === null) return
     const current = session.start('analysis', 'Preparing count regression')

@@ -1,4 +1,7 @@
 import { NumberInput } from '@/components/ui/NumberInput'
+import { useWorkspaceConfiguration } from '@/assistant/workspaceConfiguration'
+import { useRecordedAnalysis } from '@/assistant/useRecordedAnalysis'
+import { ok, err } from '@/domain/dop'
 import { RunPicker } from '@/components/ui/RunPicker'
 import { SettingsDisclosure } from '@/components/ui/SettingsDisclosure'
 import { useMemo, useState, type ReactNode } from 'react'
@@ -36,6 +39,14 @@ import {
   type GcmEffectsRun,
 } from '@/domain/gcmEffects'
 import type { RootCauseGraph } from '@/domain/rootCause'
+import {
+  effectRoleLabels,
+  effectsSamplingLabels,
+  effectsSettings,
+  gcmMechanismLabels,
+  groupInclusionLabels,
+  ungroupedEffectsLabel,
+} from '@/domain/causalModelSettings'
 import type { DatasetProfile } from '@/domain/dataset'
 import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
 import type { SelectedSource } from '@/domain/workflow'
@@ -213,8 +224,8 @@ function QuantileGroups({
           ariaLabel="Group inclusion"
           value={value.scope.kind}
           options={[
-            { value: 'all', label: 'All rows' },
-            { value: 'lowerBound', label: 'Lower bound' },
+            { value: 'all', label: groupInclusionLabels.all },
+            { value: 'lowerBound', label: groupInclusionLabels.lowerBound },
           ]}
           onChange={(kind) =>
             onChange({ ...value, scope: kind === 'all' ? { kind } : { kind, minimum: 0 } })
@@ -263,6 +274,52 @@ export function GcmEffectsPanel(props: Props) {
     throw new Error('Intervention effects require settings for the selected graph revision.')
   const latest = props.runs.find((run) => run.id === selected) ?? previous
   const busy = job.kind === 'running'
+  const binding = JSON.stringify({ graph: props.graph, prepared: props.prepared.id, model })
+  useWorkspaceConfiguration(
+    'gcm-effects',
+    binding,
+    busy
+      ? null
+      : {
+          title: 'Causal model intervention effects',
+          current: model,
+          schema: gcmEffectsRequestSchema,
+          columns: props.graph.nodes.map((node, index) => ({ id: String(index), name: node.name })),
+          describe: effectsSettings,
+          validate: (next) =>
+            JSON.stringify([next.names, next.edges, next.rows]) ===
+            JSON.stringify([model.names, model.edges, model.rows])
+              ? ok(next)
+              : err(
+                  'Keep the selected graph and prepared row count unchanged. Edit the graph in the DAG workspace.',
+                ),
+          configure: setModel,
+        },
+  )
+  useRecordedAnalysis({
+    key: 'gcm-effects',
+    prepared: props.prepared.id,
+    binding,
+    inspection: {
+      section: 'Causal model analysis',
+      method: 'Intervention effects',
+      specification: JSON.stringify(model),
+      sharedResult:
+        'Saved model, effect estimates and simulation percentile ranges; these are not confidence intervals from refitting.',
+    },
+    session,
+    execute: () => run(),
+    records: (workflow) => workflow.rootCause.effects,
+    summarise: (record) =>
+      JSON.stringify({
+        model: record.model,
+        estimates: record.evidence.estimates,
+        bounds: record.evidence.bounds,
+        quantiles: record.evidence.quantiles,
+        grouping: record.evidence.grouping,
+        optimizer: record.evidence.optimizer,
+      }),
+  })
   const run = async () => {
     const current = session.start('analysis', 'Preparing intervention effects')
     if (current === null) return
@@ -397,9 +454,7 @@ export function GcmEffectsPanel(props: Props) {
               <div className="grid min-w-0 gap-4 @lg/panel:grid-cols-2">
                 {(['treatment', 'outcome'] as const).map((role) => (
                   <label key={role}>
-                    <span className={fieldLabel}>
-                      {role === 'treatment' ? 'Treatment' : 'Outcome'}
-                    </span>
+                    <span className={fieldLabel}>{effectRoleLabels[role]}</span>
                     <Select
                       aria-label={role === 'treatment' ? 'GCM treatment' : 'GCM outcome'}
                       className={field('text', 'mt-1')}
@@ -437,7 +492,7 @@ export function GcmEffectsPanel(props: Props) {
                       })
                     }
                   >
-                    <option value="">All rows</option>
+                    <option value="">{ungroupedEffectsLabel}</option>
                     {model.names.map((name, i) =>
                       !model.edges.some(([, child]) => child === i) &&
                       i !== model.treatment &&
@@ -478,7 +533,7 @@ export function GcmEffectsPanel(props: Props) {
                     <div key={model.names[i]}>
                       <span className={fieldLabel}>{model.names[i]}</span>
                       {mechanism.kind === 'empirical' ? (
-                        <p className={fieldHint}>Observed distribution</p>
+                        <p className={fieldHint}>{gcmMechanismLabels.empirical}</p>
                       ) : (
                         <>
                           <SegmentedControl
@@ -487,8 +542,8 @@ export function GcmEffectsPanel(props: Props) {
                             ariaLabel={`Model for ${model.names[i]}`}
                             value={mechanism.kind}
                             options={[
-                              { value: 'regression', label: 'Continuous' },
-                              { value: 'classifier', label: 'Categorical' },
+                              { value: 'regression', label: gcmMechanismLabels.regression },
+                              { value: 'classifier', label: gcmMechanismLabels.classifier },
                             ]}
                             onChange={(kind) =>
                               setModel({
@@ -545,17 +600,17 @@ export function GcmEffectsPanel(props: Props) {
                 <div className="grid gap-4 @lg/panel:grid-cols-2">
                   {(
                     [
-                      { key: 'trees', label: 'Trees per model', min: 1 },
-                      { key: 'minLeaf', label: 'Minimum leaf size', min: 1 },
-                      { key: 'fitSeed', label: 'Fitting seed', min: 0 },
-                      { key: 'simulationSeed', label: 'Simulation seed', min: 0 },
-                      { key: 'repetitions', label: 'Simulations', min: 1 },
+                      { key: 'trees', min: 1 },
+                      { key: 'minLeaf', min: 1 },
+                      { key: 'fitSeed', min: 0 },
+                      { key: 'simulationSeed', min: 0 },
+                      { key: 'repetitions', min: 1 },
                     ] as const
                   ).map((item) => (
                     <label key={item.key}>
-                      <span className={fieldLabel}>{item.label}</span>
+                      <span className={fieldLabel}>{effectsSamplingLabels[item.key]}</span>
                       <NumberInput
-                        aria-label={item.label}
+                        aria-label={effectsSamplingLabels[item.key]}
                         min={item.min}
                         value={model[item.key]}
                         className={field('text', 'mt-1')}
@@ -566,9 +621,9 @@ export function GcmEffectsPanel(props: Props) {
                     </label>
                   ))}
                   <label>
-                    <span className={fieldLabel}>Upper percentile</span>
+                    <span className={fieldLabel}>{effectsSamplingLabels.upperQuantile}</span>
                     <NumberInput
-                      aria-label="Upper percentile"
+                      aria-label={effectsSamplingLabels.upperQuantile}
                       min={51}
                       max={99.9}
                       step={0.1}

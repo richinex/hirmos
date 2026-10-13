@@ -9,6 +9,10 @@ import type {
   TimeSeriesEvent,
 } from '@/domain/timeSeriesDraft'
 import { useJob } from '@/analysis/JobsProvider'
+import { useRecordedAnalysis } from '@/assistant/useRecordedAnalysis'
+import { useWorkspaceConfiguration } from '@/assistant/workspaceConfiguration'
+import { interruptedDraftSchema, checkInterruptedDraft, checkSettingsColumns, seriesDraftSettings } from '@/domain/timeSeriesWorkspaceSettings'
+import { timeSeriesSummary, TIME_SERIES_SUMMARY } from '@/assistant/analysisSummaries'
 import { JobNotice } from '@/components/ui/JobNotice'
 import { newTimeSeriesRunId, parseTimeSeriesRun } from '@/domain/timeSeries'
 import {
@@ -111,6 +115,15 @@ export function InterruptedSeriesPanel(
     change(props.prepared.id, { type: 'interrupted', field, value } as TimeSeriesEvent)
   const session = useJob('time-series:interrupted')
   const { job } = session
+  useWorkspaceConfiguration('interrupted-series', props.prepared.id, job.kind === 'running' || session.blocked ? null : {
+    title: 'Interrupted series', current: draft, schema: interruptedDraftSchema, columns,
+    describe: next => seriesDraftSettings(next, columns),
+    validate: next => {
+      const checked = checkSettingsColumns(next, [next.outcome, ...(next.model.kind === 'count' ? [next.model.exposure] : [])], columns)
+      return checked.ok ? checkInterruptedDraft(next, props.prepared.observations) : checked
+    },
+    configure: value => change(props.prepared.id, { type: 'interrupted-settings', value }),
+  })
   useRunActivity(
     props.onActivity,
     job.kind === 'running' ? { label: 'Interrupted series', progress: null } : null,
@@ -163,6 +176,21 @@ export function InterruptedSeriesPanel(
                   : null
   const ready = problem === null && job.kind !== 'running'
 
+  useRecordedAnalysis({
+    key: 'interrupted-series',
+    prepared: props.prepared.id,
+    binding: props.prepared.id + JSON.stringify(draft),
+    inspection: {
+      section: 'Time-series analysis',
+      method: 'Interrupted series',
+      specification: JSON.stringify(draft),
+      sharedResult: TIME_SERIES_SUMMARY,
+    },
+    session,
+    execute: () => fit(),
+    records: (workflow) => workflow.timeSeriesRuns,
+    summarise: timeSeriesSummary,
+  })
   const fit = async () => {
     if (!ready || draft.outcome === null || interventionRow === null || impact === null) return
     const current = session.start('analysis', 'Preparing the interrupted series')

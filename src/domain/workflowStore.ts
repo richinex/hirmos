@@ -78,8 +78,12 @@ function decisionApplies(decision: AdjustmentDecision, workflow: Workflow): bool
 interface State {
   readonly sourceEditor:
     | { readonly kind: 'closed' }
-    | { readonly kind: 'choosing' | 'editing'; readonly profile: DatasetProfileId }
-  readonly openSourceEditor: () => void
+    | {
+        readonly kind: 'choosing' | 'editing'
+        readonly profile: DatasetProfileId
+        readonly route?: 'sql' | 'pipeline'
+      }
+  readonly openSourceEditor: (route?: 'sql' | 'pipeline') => void
   readonly showSourceEditor: (kind: 'choosing' | 'editing') => void
   readonly closeSourceEditor: () => void
   readonly timeSeriesDraft: TimeSeriesDraft | null
@@ -118,10 +122,10 @@ interface State {
 export function createWorkflowStore(initial: Workflow = INITIAL_WORKFLOW) {
   return createStore<State>((set) => ({
     sourceEditor: { kind: 'closed' },
-    openSourceEditor: () =>
+    openSourceEditor: (route) =>
       set((state) =>
         state.workflow.kind === 'profiled'
-          ? { sourceEditor: { kind: 'choosing', profile: state.workflow.profile.id } }
+          ? { sourceEditor: { kind: 'choosing', profile: state.workflow.profile.id, route } }
           : state,
       ),
     showSourceEditor: (kind) =>

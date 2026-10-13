@@ -12,6 +12,8 @@ export async function onRequestGet({ env, params }) {
   const object = await env.DUCKDB.get(`pyodide/${key}`)
   if (object === null) return new Response('Not found', { status: 404 })
   const headers = new Headers()
+  headers.set('access-control-allow-origin', '*')
+  headers.set('cross-origin-resource-policy', 'cross-origin')
   object.writeHttpMetadata(headers)
   headers.set('content-type', TYPES[match[1]])
   headers.set('etag', object.httpEtag)

@@ -396,6 +396,17 @@ export interface DoubleMlConfiguration {
   readonly seed: number
 }
 
+export const doubleMlConfigurationSchema = z
+  .object({
+    kind: z.enum(['dml-plr', 'dml-irm']),
+    att: z.boolean(),
+    seed: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+  })
+  .strict()
+  .refine((value) => value.kind !== 'dml-plr' || !value.att, {
+    message: 'The partially linear model does not report ATT.',
+  })
+
 /** The outcome model fitted in each arm, and what each kind of model can report. */
 export type TLearnerOutcomeModel =
   | {
@@ -452,6 +463,23 @@ export interface OutcomeHistorySyntheticConfiguration {
   readonly crossFitFolds: number
   readonly alpha: number
 }
+
+export const syntheticInferenceFields = {
+  crossFitFolds: z.number().int().min(2).max(20),
+  alpha: z.number().gt(0).lt(1),
+}
+
+export const outcomeHistorySyntheticConfigurationSchema = z.object({
+  kind: z.literal('synthetic-control'),
+  specification: z.literal('outcome-history').optional(),
+  start: z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('from-treatment') }).strict(),
+    z.object({ kind: z.literal('row'), row: z.number().int().min(3) }).strict(),
+  ]),
+  donors: z.array(z.string().min(1).transform((id) => brand<string, 'ColumnId'>(id)))
+    .min(1).refine((ids) => new Set(ids).size === ids.length),
+  ...syntheticInferenceFields,
+}).strict()
 
 import {
   staggeredEvidenceSchema,
@@ -719,6 +747,39 @@ export interface ContinuousGpsConfiguration {
   readonly scale: 'inverseDensity' | 'stabilized'
   readonly uncertainty: PropensityUncertainty
 }
+
+export const boostedTreatmentChoiceSchema = z.object({
+  ...boostedGridAxisSchemas,
+  splits: z.number().int().min(2).max(20),
+  seed: z.number().int().nonnegative(),
+  scoring: z.enum(['one-model', 'cross-fitted']),
+}).strict()
+
+export const propensityBootstrapSchema = z.object({
+  rounds: z.number().int().min(2).max(2000),
+  seed: z.number().int().nonnegative(),
+  level: z.number().gt(0.5).lt(1),
+}).strict()
+
+const propensityUncertaintySchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('none') }).strict(),
+  propensityBootstrapSchema.extend({ kind: z.literal('bootstrap') }).strict(),
+])
+const propensityConfigurationFields = {
+  model: z.enum(['newton', 'lbfgsb', 'boosted']),
+  maxIter: z.number().int().positive(),
+  boosted: boostedTreatmentChoiceSchema,
+}
+export const propensityConfigurationSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('propensity-weighting'), ...propensityConfigurationFields,
+    scale: z.enum(['inverseProbability', 'stabilized']), uncertainty: propensityUncertaintySchema }).strict(),
+  z.object({ kind: z.literal('propensity-matching'), ...propensityConfigurationFields }).strict(),
+  z.object({ kind: z.literal('doubly-robust'), model: z.enum(['newton', 'lbfgsb']),
+    maxIter: z.number().int().positive(), uncertainty: propensityUncertaintySchema }).strict(),
+  z.object({ kind: z.literal('continuous-gps'), scale: z.enum(['inverseDensity', 'stabilized']),
+    uncertainty: propensityUncertaintySchema }).strict(),
+]).refine((value) => value.kind !== 'propensity-weighting' || value.model !== 'boosted' || value.uncertainty.kind === 'none',
+  'Boosted propensity weighting does not provide bootstrap intervals.')
 
 export type EstimatorConfiguration =
   | CausalForestConfiguration

@@ -292,6 +292,7 @@ export interface StationarityEvidenceArtifact {
 }
 
 export type PreprocessingEvent =
+  | { readonly type: 'settings-applied'; readonly draft: PreprocessingDraft }
   | { readonly type: 'time-interpretation-selected'; readonly interpretation: TimeInterpretation }
   | { readonly type: 'regular-series-selected' }
   | { readonly type: 'cross-section-selected' }
@@ -463,6 +464,7 @@ export function stepPreprocessing(
   event: PreprocessingEvent,
 ): PreprocessingDraft {
   switch (event.type) {
+    case 'settings-applied': return event.draft
     case 'time-interpretation-selected':
       return state.sampling.kind === 'regular-series'
         ? { ...state, sampling: { ...state.sampling, interpretation: event.interpretation } }

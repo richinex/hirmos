@@ -55,6 +55,9 @@ export function useJob(key: string) {
   return {
     job,
     blocked,
+    read: () => jobs.store.getState().jobs[key] ?? IDLE,
+    canStart: () =>
+      !Object.values(jobs.store.getState().jobs).some((job) => job.kind === 'running'),
     start: (action: 'analysis' | 'checks', stage: string) => jobs.start(key, action, stage),
     current: (id: string) => jobs.current(key, id),
     progress: (id: string, stage: string, progress: Progress | null = null) =>

@@ -23,6 +23,8 @@ export const pyodideRuntime = () => {
     const [, version, file, extension] = match
     const cached = join(cache, version, file)
     const send = (body: Uint8Array) => {
+      response.setHeader('access-control-allow-origin', '*')
+      response.setHeader('cross-origin-resource-policy', 'cross-origin')
       response.setHeader('content-type', TYPES[extension] ?? 'application/octet-stream')
       response.setHeader('cache-control', 'public, max-age=31536000, immutable')
       response.end(body)

@@ -5,6 +5,11 @@ import { useWorkflow } from '@/components/WorkflowProvider'
 import { useTimeSeriesDraft } from './useTimeSeriesDraft'
 import type { ArdlDraft, Mode } from '@/domain/timeSeriesDraft'
 import { useJob } from '@/analysis/JobsProvider'
+import { useRecordedAnalysis } from '@/assistant/useRecordedAnalysis'
+import { useWorkspaceConfiguration } from '@/assistant/workspaceConfiguration'
+import { ardlDraftSchema, checkSettingsColumns, seriesDraftSettings } from '@/domain/timeSeriesWorkspaceSettings'
+import { err } from '@/domain/dop'
+import { timeSeriesSummary, TIME_SERIES_SUMMARY } from '@/assistant/analysisSummaries'
 import { JobNotice } from '@/components/ui/JobNotice'
 import { z } from 'zod'
 import { ardlModelRequestSchema, ardlPredictorRequirement } from '@/domain/ardlModel'
@@ -78,6 +83,7 @@ export function ArdlModelPanel(props: TimeSeriesPanelProps & { readonly selector
   const columns = props.profile.columns.filter(
     (c) => props.prepared.columns.includes(c.id) && isNumericDuckDbType(c.duckdbType),
   )
+  const draft = useTimeSeriesDraft(props.prepared.id, (state) => state.ardl)
   const {
     outcome,
     roles,
@@ -92,7 +98,7 @@ export function ArdlModelPanel(props: TimeSeriesPanelProps & { readonly selector
     forecastSteps,
     future,
     omitted,
-  } = useTimeSeriesDraft(props.prepared.id, (state) => state.ardl)
+  } = draft
   const change = useWorkflow((state) => state.changeTimeSeries)
   const setOutcome = (value: ArdlDraft['outcome']) =>
     change(props.prepared.id, { type: 'ardl', field: 'outcome', value })
@@ -120,6 +126,19 @@ export function ArdlModelPanel(props: TimeSeriesPanelProps & { readonly selector
   const constrained = mode === 'rHorizontal' || mode === 'rGrid'
   const session = useJob('time-series:ardl-model')
   const { job } = session
+  useWorkspaceConfiguration('ardl-model', props.prepared.id, job.kind === 'running' || session.blocked ? null : {
+    title: 'ARDL', current: draft, schema: ardlDraftSchema, columns,
+    describe: next => seriesDraftSettings(next, columns),
+    validate: next => {
+      if (next.outcome === null) return err('Choose the outcome series.')
+      const checked = checkSettingsColumns(next, [next.outcome, ...Object.keys(next.roles), ...Object.keys(next.starting), ...Object.keys(next.fixedOrders), ...next.omitted.map(item => item.column), ...(next.future.kind === 'scenario' ? Object.keys(next.future.columns) : [])], columns)
+      if (!checked.ok) return checked
+      const count = Object.entries(next.roles).filter(([id, role]) => id !== next.outcome && role.kind === 'predictor').length
+      const problem = ardlPredictorRequirement(next.mode, count)
+      return problem === null ? checked : err(problem)
+    },
+    configure: value => change(props.prepared.id, { type: 'ardl-settings', value }),
+  })
   useRunActivity(
     props.onActivity,
     job.kind === 'running' ? { label: 'ARDL', progress: null } : null,
@@ -272,6 +291,37 @@ export function ArdlModelPanel(props: TimeSeriesPanelProps & { readonly selector
       fail(error instanceof Error ? error.message : String(error))
     }
   }
+  const assistantSpecification = JSON.stringify({
+    outcome,
+    roles,
+    mode,
+    starting,
+    fixedOrders,
+    minimum,
+    outcomeLag,
+    holdBack,
+    terms,
+    horizon,
+    forecastSteps,
+    future,
+    omitted,
+    columns,
+  })
+  useRecordedAnalysis({
+    key: 'ardl',
+    prepared: props.prepared.id,
+    binding: props.prepared.id + assistantSpecification,
+    inspection: {
+      section: 'Time-series analysis',
+      method: 'ARDL',
+      specification: assistantSpecification,
+      sharedResult: TIME_SERIES_SUMMARY,
+    },
+    session,
+    execute: fit,
+    records: (workflow) => workflow.timeSeriesRuns,
+    summarise: timeSeriesSummary,
+  })
   return (
     <WorkbenchLayout
       id="time-series-ardl"

@@ -82,6 +82,7 @@ export function createPipelineSession(resume: PipelineResume | null) {
   }
   const schedule = () => {
     if (closed) return
+    store.setState({ run: { kind: 'idle' } })
     clearTimeout(timer)
     const version = ++revision
     timer = setTimeout(() => {
