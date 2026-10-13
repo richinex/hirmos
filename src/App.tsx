@@ -1,6 +1,7 @@
 import { PowerPlanningPanel } from '@/components/data/PowerPlanningPanel'
 import { useSourceData } from '@/assistant/useSourceData'
 import { useDataEditor } from '@/assistant/useDataEditor'
+import { Alert } from '@/components/ui/Alert'
 import { Metadata } from '@/components/ui/Metadata'
 import { declareColumn, declarationsOf, type DeclaredType } from '@/domain/fileReading'
 import { causalModelRunCount } from '@/domain/rootCauseAnalysis'
@@ -1187,14 +1188,14 @@ function App() {
                       Your projects
                     </h3>
                     {reopenProblem !== null && (
-                      <p role="alert" className="mb-3 text-body text-danger">
+                      <Alert tone="danger" className="mb-3">
                         {reopenProblem}
-                      </p>
+                      </Alert>
                     )}
                     {importProblem !== null && (
-                      <p role="alert" className="mb-3 text-body text-danger">
+                      <Alert tone="danger" className="mb-3">
                         {importProblem}
-                      </p>
+                      </Alert>
                     )}
                     {yours.length === 0 ? (
                       <p className="m-0 text-body text-faint">
