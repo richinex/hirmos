@@ -61,6 +61,7 @@ const storedTurn = z.object({
     question: z.string(),
     context: z.string(),
     trace: z.array(trace),
+    drafts: z.array(z.object({ title: z.string(), content: z.string() })).optional(),
     limits: z
       .object({ maxSteps: z.number(), maxRequests: z.number(), deadlineMs: z.number() })
       .optional(),

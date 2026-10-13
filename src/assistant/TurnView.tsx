@@ -20,6 +20,7 @@ export interface Turn {
   readonly question: string
   readonly context: string
   readonly trace: readonly StampedTrace[]
+  readonly drafts?: readonly { readonly title: string; readonly content: string }[]
   readonly outcome: Outcome
   /** The limits the question started with; absent on turns restored from before they were recorded. */
   readonly limits?: TurnLimits

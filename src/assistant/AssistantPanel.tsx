@@ -21,6 +21,7 @@ import { ProposalActivity, ProposalActions, ProposalCard, ProposalSettings } fro
 import { appendTrace } from './traceCells'
 import { runAssistant } from './agent'
 import { assistantFailureMessage } from './failureMessage'
+import { CodeHighlight } from '@/components/ui/CodeHighlight'
 import {
   useStudySelection,
   proposeStudySelection,
@@ -134,6 +135,7 @@ function Starters({
 
 function Session({ context, project }: { readonly context: string; readonly project: string }) {
   const workflowStore = useWorkflowStore()
+  const [restoredTurns, setRestoredTurns] = useState<ReadonlySet<string>>(new Set())
   const [graphProposals, setGraphProposals] = useState<
     readonly (GraphProposal & { readonly turnId: string })[]
   >([])
@@ -218,6 +220,7 @@ function Session({ context, project }: { readonly context: string; readonly proj
         const saved = mergeTurnHistory(legacy, display)
         if (current) {
           setTurns(saved)
+          setRestoredTurns(new Set(saved.map((turn) => turn.id)))
           setMemory({ kind: 'ready', session })
         }
       } catch {
@@ -288,6 +291,21 @@ function Session({ context, project }: { readonly context: string; readonly proj
       },
     }
     const initialTurn = savedTurn
+    const draftWrites: Promise<void>[] = []
+    const rememberDraft = (title: string, value: unknown) => {
+      const drafts = [
+        ...(savedTurn.drafts ?? []),
+        { title, content: JSON.stringify(value, null, 2) },
+      ]
+      savedTurn = { ...savedTurn, drafts }
+      update(id, (turn) => ({ ...turn, drafts }))
+      draftWrites.push(
+        saveDisplayTurn(project, memory.session, startedAt, {
+          ...savedTurn,
+          outcome: { kind: 'cancelled' },
+        }).catch(() => setMemoryWarning('The proposal could not be saved for reload recovery.')),
+      )
+    }
     setTurns((previous) => [...previous, initialTurn])
     let finishPending!: () => void
     const pending = new Promise<void>((resolve) => {
@@ -322,6 +340,7 @@ function Session({ context, project }: { readonly context: string; readonly proj
               result.value.revision
           )
             return err('The workspace changed. Ask for a new proposal.')
+          if (result.ok) rememberDraft('Workspace settings', result.value)
           if (result.ok)
             setWorkspaceProposals((previous) => [...previous, { ...result.value, turnId: id }])
           return result
@@ -345,6 +364,7 @@ function Session({ context, project }: { readonly context: string; readonly proj
               )
                 return err('The available studies or settings changed. Ask for a new proposal.')
               const result = proposeStudySelection(current, raw)
+              if (result.ok) rememberDraft('Study selection', result.value)
               if (result.ok)
                 setStudySelections((previous) => [...previous, { ...result.value, turnId: id }])
               return result
@@ -358,6 +378,7 @@ function Session({ context, project }: { readonly context: string; readonly proj
                 if (controller.signal.aborted || studyBinding(workflow) !== studyRevision)
                   return err('The data, graph or study draft changed. Ask for a new proposal.')
                 const result = proposeStudy(workflow, raw)
+                if (result.ok) rememberDraft('Study draft', result.value)
                 if (result.ok)
                   setStudyProposals((previous) => [...previous, { ...result.value, turnId: id }])
                 return result
@@ -370,6 +391,7 @@ function Session({ context, project }: { readonly context: string; readonly proj
                 if (controller.signal.aborted || graphBinding(workflow) !== graphRevision)
                   return err('The data or graphs changed. Ask for a new proposal.')
                 const result = proposeGraph(workflow, raw)
+                if (result.ok) rememberDraft('Graph changes', result.value)
                 if (result.ok)
                   setGraphProposals((previous) => [...previous, { ...result.value, turnId: id }])
                 return result
@@ -386,6 +408,7 @@ function Session({ context, project }: { readonly context: string; readonly proj
                 )
                   return err('The workspace changed. Ask for a new proposal.')
                 const result = proposePipeline(preparation, raw)
+                if (result.ok) rememberDraft('Pipeline draft', result.value)
                 if (result.ok)
                   setPipelineProposals((previous) => [...previous, { ...result.value, turnId: id }])
                 return result
@@ -425,6 +448,7 @@ function Session({ context, project }: { readonly context: string; readonly proj
                 )
                   return err('stale' as const)
                 const result = proposeSql(sql, raw)
+                if (result.ok) rememberDraft('SQL draft', result.value)
                 if (result.ok)
                   setSqlProposals((previous) => [...previous, { ...result.value, turnId: id }])
                 return result
@@ -439,6 +463,7 @@ function Session({ context, project }: { readonly context: string; readonly proj
                 )
                   return err('stale' as const)
                 const result = proposeSelection(capability, raw)
+                if (result.ok) rememberDraft('Estimator settings', result.value)
                 if (result.ok)
                   setProposals((previous) => [
                     ...previous,
@@ -476,6 +501,7 @@ function Session({ context, project }: { readonly context: string; readonly proj
     } finally {
       try {
         await task?.flush()
+        await Promise.all(draftWrites)
         await saveDisplayTurn(project, memory.session, startedAt, savedTurn)
       } catch {
         setMemoryWarning(
@@ -628,6 +654,28 @@ function Session({ context, project }: { readonly context: string; readonly proj
               {turns.map((turn) => (
                 <section key={turn.id} aria-label="Conversation turn">
                   <TurnView turn={turn} />
+                  {restoredTurns.has(turn.id) &&
+                    turn.drafts?.map((draft, index) => (
+                      <ProposalCard key={index} name="Saved proposal" title={draft.title}>
+                        <p className="m-0 text-label">
+                          This proposal was saved with the conversation. Check current settings
+                          before asking the assistant to propose it again; no approval carries
+                          forward.
+                        </p>
+                        <details>
+                          <summary className="cursor-pointer text-label">
+                            Saved draft contents
+                          </summary>
+                          <CodeHighlight
+                            code={draft.content}
+                            lang="json"
+                            copyable
+                            copyLabel="Copy saved draft"
+                            className="max-h-64 overflow-auto text-label"
+                          />
+                        </details>
+                      </ProposalCard>
+                    ))}
                   {sqlProposals
                     .filter((proposal) => proposal.turnId === turn.id)
                     .map((proposal, index) => (

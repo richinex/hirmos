@@ -23,6 +23,7 @@ type Session =
   | { readonly kind: 'ready'; readonly live: PipelineSession }
   | { readonly kind: 'failed'; readonly detail: string }
 type Run =
+  | { readonly kind: 'restored' }
   | { readonly kind: 'idle' }
   | { readonly kind: 'ran'; readonly result: PipelineRun }
   | { readonly kind: 'refused'; readonly detail: string }
@@ -56,6 +57,7 @@ export function createPipelineSession(resume: PipelineResume | null) {
   let closed = true
   let epoch = 0
   let revision = 0
+  let paused = false
   let timer: ReturnType<typeof setTimeout> | undefined
   let ready: Promise<PipelineSession | null> = Promise.resolve(null)
   let queue: Promise<unknown> = Promise.resolve()
@@ -82,6 +84,10 @@ export function createPipelineSession(resume: PipelineResume | null) {
   }
   const schedule = () => {
     if (closed) return
+    if (paused) {
+      store.setState({ run: { kind: 'restored' } })
+      return
+    }
     store.setState({ run: { kind: 'idle' } })
     clearTimeout(timer)
     const version = ++revision
@@ -270,6 +276,16 @@ export function createPipelineSession(resume: PipelineResume | null) {
     declare,
     dropBlock,
     adopt,
+    restoreDraft: (draft: PipelineResume) => {
+      dispose()
+      paused = true
+      store.setState({ graph: draft.graph, files: draft.inputs })
+      open()
+    },
+    evaluateRestored: () => {
+      paused = false
+      schedule()
+    },
     active: () => !closed,
   }
 }

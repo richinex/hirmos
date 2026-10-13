@@ -30,6 +30,7 @@ import { previewBlock, type BlockOutcome, type BlockPreview } from '@/data/pipel
 import { PythonProvider } from './PythonProvider'
 import { useStore } from 'zustand'
 import { usePipelineSession } from '../PreparationProvider'
+import { usePreparationDraft } from '../usePreparationDraft'
 import { createPipelineSession, type PipelineController } from './pipelineSession'
 import { formatBytes, formatCount } from '@/lib/format/number'
 import { useIsMobile } from '@/lib/useMediaQuery'
@@ -124,12 +125,30 @@ export function PipelineWorkspace(props: Props) {
 }
 
 function PipelineEditor({
+  resume,
   onPrepared,
   onCancelEditing,
   controller,
 }: Props & { readonly controller: PipelineController }) {
   const graph = useStore(controller.store, (state) => state.graph)
   const files = useStore(controller.store, (state) => state.files)
+  const draft = useMemo(() => ({ kind: 'pipeline' as const, graph, inputs: files }), [graph, files])
+  const recovery = usePreparationDraft(
+    controller,
+    'pipeline',
+    JSON.stringify(
+      resume
+        ? {
+            graph: resume.graph,
+            inputs: resume.inputs.map((input) => [input.alias, input.fingerprint]),
+          }
+        : null,
+    ),
+    draft,
+    (saved) => {
+      if (saved.kind === 'pipeline') controller.restoreDraft(saved)
+    },
+  )
   const session = useStore(controller.store, (state) => state.session)
   const run = useStore(controller.store, (state) => state.run)
   const choosing = useStore(controller.store, (state) => state.choosing)
@@ -334,6 +353,14 @@ function PipelineEditor({
         <Alert tone="danger" className="mx-3 mt-2">
           <p className="m-0">{run.detail}</p>
         </Alert>
+      )}
+      {run.kind === 'restored' && (
+        <div className="m-3 flex items-center gap-3 text-label">
+          <span>Draft restored. Review its blocks before evaluating.</span>
+          <button className={button('outline')} type="button" onClick={controller.evaluateRestored}>
+            Evaluate restored draft
+          </button>
+        </div>
       )}
       <div className="relative min-h-[16rem] flex-1">
         <PipelineCanvas
@@ -543,6 +570,7 @@ function PipelineEditor({
 
   return (
     <section className="flex min-h-0 min-w-0 w-full flex-1 flex-col" aria-label="Build a pipeline">
+      {recovery}
       <WorkbenchLayout
         id="pipeline"
         stage={stage}

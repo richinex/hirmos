@@ -3,10 +3,18 @@
 // the main thread, so indexing a big ingest never janks the UI — a 664-node compile used to saturate the
 // main thread for tens of seconds in half-second slices. WebGPU when the browser has it, WASM otherwise.
 // Input: a batch of texts. Output: one flat Float32Array (batch × dim), transferred, not copied.
-import { pipeline } from '@huggingface/transformers'
+import { env, pipeline } from '@huggingface/transformers'
 import { embeddingBackend } from './embeddingBackend'
 
 const MODEL = 'Xenova/all-MiniLM-L6-v2'
+
+const onnx = env.backends.onnx
+const cdnPaths = onnx.wasm?.wasmPaths
+if (onnx.wasm && onnx.versions?.web && typeof cdnPaths === 'object') {
+  const local = (url: string | URL | undefined) =>
+    new URL(`/onnx/${onnx.versions!.web}/${String(url).split('/').at(-1)}`, self.location.origin).href
+  onnx.wasm.wasmPaths = { mjs: local(cdnPaths.mjs), wasm: local(cdnPaths.wasm) }
+}
 
 interface ExtractOutput {
   data: Float32Array

@@ -159,7 +159,7 @@ const PROFILE = `DATA PROFILES:
       Optional checks (up to eight) return aggregate verification in receipt.profile.checks:
       {"kind":"key","columns":["unit","period"]} reports duplicate complete keys and null-key rows
       separately. A row missing any key component contributes to nullRows, not duplicateRows.
-      groups includes incomplete groups; zero duplicates alone does not establish a valid key.
+      groups counts distinct complete keys; zero duplicates alone does not establish a valid key.
       {"kind":"time","column":"period","units":["unit"],"step":1} checks spacing within units.
       Step is in the numeric column's units, or seconds for dates/timestamps. Do not treat a month
       as a fixed number of seconds. Gaps count intervals longer than the expected step, not missing rows.

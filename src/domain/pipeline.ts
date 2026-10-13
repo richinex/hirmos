@@ -953,8 +953,24 @@ export function parsePipelineRecipe(
     return err({ kind: 'invalid-pipeline-recipe', detail: z.prettifyError(parsed.error) })
   const inputs = parseInputDescriptors(parsed.data.inputs)
   if (!inputs.ok) return err({ kind: 'invalid-pipeline-recipe', detail: inputs.error.detail })
-  const graph: PipelineGraph = {
-    nodes: parsed.data.graph.nodes.map((node) => ({
+  const graph = parsePipelineDraft(parsed.data.graph)
+  const compiled = compilePipeline(
+    graph,
+    new Set(inputs.value.map((input) => input.alias as string)),
+  )
+  if (!compiled.ok)
+    return err({
+      kind: 'invalid-pipeline-recipe',
+      detail: describePipelineProblem(compiled.error, (id) => id),
+    })
+  return ok({ kind: 'pipeline-derived', graph, inputs: inputs.value })
+}
+
+/** Drafts may be incomplete; compilation remains a separate execution check. */
+export function parsePipelineDraft(value: unknown): PipelineGraph {
+  const parsed = pipelineGraphSchema.parse(value)
+  return {
+    nodes: parsed.nodes.map((node) => ({
       id: pipelineBlockId(node.id),
       block:
         node.block.kind === 'input'
@@ -968,20 +984,10 @@ export function parsePipelineRecipe(
           : node.block,
       position: node.position,
     })),
-    edges: parsed.data.graph.edges.map((edge) => ({
+    edges: parsed.edges.map((edge) => ({
       from: pipelineBlockId(edge.from),
       to: pipelineBlockId(edge.to),
       port: edge.port,
     })),
   }
-  const compiled = compilePipeline(
-    graph,
-    new Set(inputs.value.map((input) => input.alias as string)),
-  )
-  if (!compiled.ok)
-    return err({
-      kind: 'invalid-pipeline-recipe',
-      detail: describePipelineProblem(compiled.error, (id) => id),
-    })
-  return ok({ kind: 'pipeline-derived', graph, inputs: inputs.value })
 }

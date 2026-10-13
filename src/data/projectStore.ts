@@ -10,6 +10,7 @@ import {
 } from '@/domain/persistence'
 import type { ProjectId } from '@/domain/workflow'
 import { reportStorageFailure, reportStorageRecovered } from './storageHealth'
+import { deletePreparationDrafts } from './preparationDraftStore'
 
 /** One IndexedDB database with one object store: project id → { header, body }. The body is the tagged JSON text. */
 
@@ -120,6 +121,7 @@ export async function loadProject(
 
 export async function deleteProject(id: ProjectId): Promise<Result<null, ProjectStoreProblem>> {
   try {
+    await deletePreparationDrafts(id)
     await transact('readwrite', (store) => store.delete(id))
     return ok(null)
   } catch (cause) {

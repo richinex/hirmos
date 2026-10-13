@@ -1,4 +1,5 @@
 import { RunActions } from '@/components/ui/RunActions'
+import { usePreparationDraft } from './usePreparationDraft'
 import { useSqlTools } from '@/assistant/applicationTools'
 import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
@@ -135,6 +136,16 @@ function SqlEditor({
   )
   const scriptPicker = useRef<HTMLInputElement>(null)
   const script = useStore(controller.store, (state) => state.script)
+  const draft = useStore(controller.store, (state) => state.draft)
+  const recovery = usePreparationDraft(
+    controller,
+    'sql',
+    JSON.stringify(inputs.map((input) => [input.alias, input.fingerprint])),
+    draft,
+    (saved) => {
+      if (saved.kind === 'sql') controller.restoreDraft(saved)
+    },
+  )
   const scriptResult = useStore(controller.store, (state) => state.scriptResult)
   const state = useStore(controller.store, (state) => state.shell)
   const cancellation = useStore(controller.store, (state) => state.cancellation)
@@ -209,6 +220,7 @@ function SqlEditor({
       <ChapterHeading id="sql-workspace-title" className="sr-only">
         Prepare with SQL
       </ChapterHeading>
+      {recovery}
       <div className="mac-terminal mx-3 mb-3 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[10px]">
         <div className="mac-terminal-bar relative flex h-7 shrink-0 select-none items-center px-2">
           <span className="flex gap-2" aria-hidden>

@@ -91,7 +91,7 @@ for (const lossless of [true, false])
       }
     }, lossless)
     expect(result.checks[0]).toMatchObject({
-      groups: 5,
+      groups: 4,
       duplicateGroups: 1,
       duplicateRows: 1,
       nullRows: 1,
@@ -117,7 +117,7 @@ for (const lossless of [true, false])
     })
     expect(result.empty[0]).toMatchObject({ groups: 0, duplicateRows: 0, nullRows: 0 })
     expect(result.missing[0]).toMatchObject({
-      groups: 4,
+      groups: 1,
       duplicateGroups: 1,
       duplicateRows: 1,
       nullRows: 6,

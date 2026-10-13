@@ -1,5 +1,5 @@
-import {restoreMissingDagExploration} from './dagProvenance'
-import {powerRecordSchema,type PowerRecord} from './powerPlanning'
+import { restoreMissingDagExploration } from './dagProvenance'
+import { powerRecordSchema, type PowerRecord } from './powerPlanning'
 import { surrogateRunSchema, surrogateRunMatchesProfile, type SurrogateRun } from './surrogateRun'
 import { swigAnalysisSchema, type SwigAnalysis } from './swig'
 import { z } from 'zod'
@@ -179,6 +179,16 @@ export function snapshotWorkflow(workflow: Workflow, savedAt: string): Persisted
       }
     case 'sql-inputs-chosen':
     case 'pipeline-opened':
+      return snapshotWorkflow(
+        {
+          kind: 'awaiting-data',
+          project: workflow.project,
+          origin: workflow.origin,
+          problem: null,
+          restore: null,
+        },
+        savedAt,
+      )
     case 'awaiting-editor-files':
     case 'source-selected':
     case 'profiling':
@@ -304,23 +314,35 @@ const envelopeSchema = z.object({
   grangerEvidence: z.array(artifact).default([]),
   countSeriesModels: z.array(artifact).default([]),
   discoveryRuns: z.array(artifact),
-  dagDocuments: z.array(artifact.superRefine((record, ctx) => {
-    if (record.exploration === undefined) return
-    const selection = z.object({
-      treatment: z.string().min(1).nullable(),
-      outcome: z.string().min(1).nullable(),
-    }).strict().safeParse(record.exploration)
-    if (!selection.success) {
-      ctx.addIssue({ code: 'custom', message: 'Invalid DAG exploration selection.' })
-      return
-    }
-    const current = record.current as DagDocument['current'] | undefined
-    const valid = (id: string | null) => id === null ||
-      current?.graph.nodes.some(node => node.id === id && node.kind === 'observed') === true
-    if (!valid(selection.data.treatment) || !valid(selection.data.outcome) ||
-        (selection.data.treatment !== null && selection.data.treatment === selection.data.outcome))
-      ctx.addIssue({ code: 'custom', message: 'DAG exploration must name distinct observed variables in its current revision.' })
-  })),
+  dagDocuments: z.array(
+    artifact.superRefine((record, ctx) => {
+      if (record.exploration === undefined) return
+      const selection = z
+        .object({
+          treatment: z.string().min(1).nullable(),
+          outcome: z.string().min(1).nullable(),
+        })
+        .strict()
+        .safeParse(record.exploration)
+      if (!selection.success) {
+        ctx.addIssue({ code: 'custom', message: 'Invalid DAG exploration selection.' })
+        return
+      }
+      const current = record.current as DagDocument['current'] | undefined
+      const valid = (id: string | null) =>
+        id === null ||
+        current?.graph.nodes.some((node) => node.id === id && node.kind === 'observed') === true
+      if (
+        !valid(selection.data.treatment) ||
+        !valid(selection.data.outcome) ||
+        (selection.data.treatment !== null && selection.data.treatment === selection.data.outcome)
+      )
+        ctx.addIssue({
+          code: 'custom',
+          message: 'DAG exploration must name distinct observed variables in its current revision.',
+        })
+    }),
+  ),
   dagChecks: z.array(artifact).default([]),
   swigAnalyses: z.array(swigAnalysisSchema).default([]),
   interventionQueries: z
@@ -1363,7 +1385,10 @@ export function parseSnapshotValue(value: unknown): Result<PersistedProject, Sna
     estimationRuns: estimationRuns as unknown as PersistedProject['estimationRuns'],
     survivalRuns: survivalRuns as unknown as PersistedProject['survivalRuns'],
     dagDocuments: parsed.data.dagDocuments.map((record) =>
-      restoreMissingDagExploration(upgradeDagDocumentRecord(record as Record<string, unknown>) as unknown as DagDocument, parsed.data.studies as unknown as readonly StudySpecification[]),
+      restoreMissingDagExploration(
+        upgradeDagDocumentRecord(record as Record<string, unknown>) as unknown as DagDocument,
+        parsed.data.studies as unknown as readonly StudySpecification[],
+      ),
     ) as unknown as PersistedProject['dagDocuments'],
   })
 }

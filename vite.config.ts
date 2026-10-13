@@ -8,6 +8,7 @@ import { appRoute } from './vite-plugins/appRoute'
 import { duckdbBinaries } from './vite-plugins/duckdbBinaries'
 import { iconFont } from './vite-plugins/iconFont'
 import { pyodideRuntime } from './vite-plugins/pyodideRuntime'
+import { onnxRuntime } from './vite-plugins/onnxRuntime'
 import { localOpenRouter } from './vite-plugins/localOpenRouter'
 
 export default defineConfig({
@@ -30,6 +31,7 @@ export default defineConfig({
     iconFont(),
     duckdbBinaries(),
     pyodideRuntime(),
+    onnxRuntime(),
   ],
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   // WebCola is CommonJS reached only through a lazily loaded module, so the dev server would otherwise find it mid-session and serve a stale copy.

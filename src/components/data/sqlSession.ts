@@ -1,4 +1,5 @@
 import { createStore } from 'zustand/vanilla'
+import type { PreparationDraft } from '@/data/preparationDraftStore'
 import type { Terminal } from 'xterm'
 import { tableFromIPC } from 'apache-arrow'
 import { isNonEmpty, type NonEmptyArray } from '@/domain/dop'
@@ -62,6 +63,7 @@ type ScriptResult =
       readonly rows: readonly (readonly string[])[]
     }
 interface State {
+  readonly draft: Extract<PreparationDraft, { kind: 'sql' }> | null
   readonly query: 'idle' | 'running'
   readonly script: Script
   readonly scriptResult: ScriptResult
@@ -74,6 +76,7 @@ interface State {
 /** Owns the database and terminal together; editor removal only detaches the host. */
 export function createSqlSession(inputs: readonly SqlPreparationInput[], resume: SqlResume | null) {
   const store = createStore<State>(() => ({
+    draft: null,
     query: 'idle',
     scriptResult: { kind: 'none' },
     script: { kind: 'closed' },
@@ -313,7 +316,10 @@ export function createSqlSession(inputs: readonly SqlPreparationInput[], resume:
     try {
       const text = await file.text()
       if (!valid(generation) || reading !== request) return
-      store.setState({ script: { kind: 'editing', name: file.name, text } })
+      store.setState({
+        script: { kind: 'editing', name: file.name, text },
+        draft: { kind: 'sql', name: file.name, text, inputs },
+      })
     } catch (cause) {
       if (valid(generation) && reading === request)
         store.setState({ script: { kind: 'failed', name: file.name, detail: String(cause) } })
@@ -321,7 +327,12 @@ export function createSqlSession(inputs: readonly SqlPreparationInput[], resume:
   }
   const editScript = (text: string) =>
     store.setState((state) =>
-      state.script.kind === 'editing' ? { script: { ...state.script, text } } : state,
+      state.script.kind === 'editing'
+        ? {
+            script: { ...state.script, text },
+            draft: { kind: 'sql', name: state.script.name, text, inputs },
+          }
+        : state,
     )
   const runScript = async () => {
     const { script, shell } = store.getState()
@@ -379,6 +390,17 @@ export function createSqlSession(inputs: readonly SqlPreparationInput[], resume:
     editScript,
     closeScript,
     runScript,
+    restoreDraft: (draft: Extract<PreparationDraft, { kind: 'sql' }>) => {
+      dispose()
+      inputs = draft.inputs
+      resume = null
+      store.setState({
+        draft,
+        script: { kind: 'editing', name: draft.name, text: draft.text },
+        scriptResult: { kind: 'none' },
+      })
+      open()
+    },
     active: () => !closed,
   }
 }

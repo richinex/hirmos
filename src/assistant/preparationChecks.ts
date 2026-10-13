@@ -82,7 +82,7 @@ export async function checkPreparation(
         valid(check.columns, available)
         const keys = check.columns.map(identifier)
         const complete = keys.map((k) => `${k} IS NOT NULL`).join(' AND ')
-        const query = `WITH groups AS (SELECT ${keys.join(', ')}, count(*) n FROM ${identifier(source)} GROUP BY ${keys.join(', ')}) SELECT count(*) AS groups, count(*) FILTER (WHERE n > 1 AND ${complete}) AS "duplicateGroups", coalesce(sum(n - 1) FILTER (WHERE n > 1 AND ${complete}), 0) AS "duplicateRows", coalesce(sum(n) FILTER (WHERE NOT (${complete})), 0) AS "nullRows" FROM groups`
+        const query = `WITH groups AS (SELECT ${keys.join(', ')}, count(*) n FROM ${identifier(source)} GROUP BY ${keys.join(', ')}) SELECT count(*) FILTER (WHERE ${complete}) AS groups, count(*) FILTER (WHERE n > 1 AND ${complete}) AS "duplicateGroups", coalesce(sum(n - 1) FILTER (WHERE n > 1 AND ${complete}), 0) AS "duplicateRows", coalesce(sum(n) FILTER (WHERE NOT (${complete})), 0) AS "nullRows" FROM groups`
         results.push({
           kind: 'key' as const,
           columns: check.columns,
