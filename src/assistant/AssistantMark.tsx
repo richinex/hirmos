@@ -2,7 +2,7 @@ import { cn } from '@/lib/utils'
 
 export type AssistantMarkState = 'idle' | 'open' | 'working' | 'offline'
 
-/** A helper whose antenna is a graph node. Inline SVG, not the icon font, so it never shows as a ligature name while the font loads. */
+/** The directed H in a speech bubble. Inline SVG, not the icon font, so it never shows as a ligature name while the font loads. */
 export function AssistantMark({
   state = 'idle',
   size = 20,
@@ -28,24 +28,21 @@ export function AssistantMark({
       strokeLinejoin="miter"
       className={cn('shrink-0', className)}
     >
-      <path className={state === 'working' ? 'mark-flow' : undefined} d="M12 5.25V8.25" />
-      <circle
-        cx="12"
-        cy="3.75"
-        r="1.5"
-        fill={lit ? accent : 'none'}
-        stroke={lit ? accent : undefined}
-      />
-      <rect
-        x="4.5"
-        y="8.25"
-        width="15"
-        height="11.25"
-        strokeDasharray={state === 'offline' ? '1.5 2' : undefined}
-      />
-      <circle cx="9" cy="12.75" r="1.125" fill="currentColor" stroke="none" />
-      <circle cx="15" cy="12.75" r="1.125" fill="currentColor" stroke="none" />
-      <path d="M9.75 16.125H14.25" stroke={lit ? accent : undefined} />
+      <g transform="translate(12 12) scale(1.1) translate(-12 -12)">
+        <path
+          d="M3.75 3.75H20.25V16.5H10.5L6.75 20.25V16.5H3.75Z"
+          strokeDasharray={state === 'offline' ? '1.5 2' : undefined}
+        />
+        <g transform="translate(3.75 2.125) scale(0.5)" stroke="none" fill="currentColor">
+          <path d="M7 7h5v18H7z" />
+          <path d="M21 7h4v5l-4-3zm0 16 4-3v5h-4z" />
+          <path
+            d="M12 14h6v-4l8 6-8 6v-4h-6z"
+            fill={lit ? accent : 'currentColor'}
+            className={state === 'working' ? 'mark-nudge' : undefined}
+          />
+        </g>
+      </g>
     </svg>
   )
 }

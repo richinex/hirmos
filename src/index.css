@@ -500,9 +500,9 @@ button[aria-busy="true"]::after {
 }
 @media (prefers-reduced-motion: reduce) { button[aria-busy="true"]::after { animation: none; left: 0; width: 100%; opacity: 0.5; } }
 
-.mark-flow { stroke-dasharray: 3 3; animation: mark-flow 0.9s linear infinite; }
-@keyframes mark-flow { to { stroke-dashoffset: -12; } }
-@media (prefers-reduced-motion: reduce) { .mark-flow { animation: none; } }
+.mark-nudge { animation: mark-nudge 1.4s ease-in-out infinite; }
+@keyframes mark-nudge { 0%, 65%, 100% { transform: translateX(0); } 28% { transform: translateX(-2px); } 45% { transform: translateX(1px); } }
+@media (prefers-reduced-motion: reduce) { .mark-nudge { animation: none; } }
 
 /* Elevation, the texture chapter's way: light from above. `.lift` is a contact shadow for a block on the
    canvas (cards, panels), with no ring and no top line, so a card is a surface and not a frame; `.float`

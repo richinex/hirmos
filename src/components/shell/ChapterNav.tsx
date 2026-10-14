@@ -394,7 +394,7 @@ export function ChapterNav({
           </div>
         </nav>
 
-        <AssistantRailButton className="absolute bottom-[68px] left-2" />
+        <AssistantRailButton expanded={lobeOpen} className="absolute bottom-[68px] left-2" />
 
         {/* The open project, in the pill at the foot: its name and data file out with the lobe, and the export. */}
         {project !== null && (

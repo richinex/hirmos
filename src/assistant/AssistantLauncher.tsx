@@ -8,10 +8,7 @@ const AssistantPanel = lazy(() => import('./AssistantPanel'))
 
 export function AssistantPane() {
   return (
-    <aside
-      aria-label="Assistant"
-      className="flex min-h-0 min-w-0 flex-1 flex-col bg-panel"
-    >
+    <aside aria-label="Assistant" className="flex min-h-0 min-w-0 flex-1 flex-col bg-panel">
       <Suspense
         fallback={
           <p role="status" className="p-4 text-body text-muted">
@@ -25,7 +22,13 @@ export function AssistantPane() {
   )
 }
 
-export function AssistantRailButton({ className }: { readonly className?: string }) {
+export function AssistantRailButton({
+  expanded = false,
+  className,
+}: {
+  readonly expanded?: boolean
+  readonly className?: string
+}) {
   const open = useAssistantOpen()
   const running = useAssistantRunning()
   return (
@@ -34,18 +37,30 @@ export function AssistantRailButton({ className }: { readonly className?: string
       aria-pressed={open}
       aria-label={open ? 'Close the assistant' : 'Open the assistant'}
       aria-keyshortcuts="Meta+I Control+I"
-      title="CausalBuddy (⌘I)"
+      title={expanded ? undefined : 'CausalBuddy (⌘I)'}
       onClick={toggleAssistant}
       className={cn(
-        'grid h-10 w-10 place-items-center transition-colors duration-(--motion-fast)',
+        'flex h-10 items-center overflow-hidden rounded-full bg-rail transition-[width,color] duration-(--motion-base) motion-reduce:transition-none',
+        expanded ? 'w-[224px]' : 'w-10',
         open || running ? 'text-rail-ink' : 'text-rail-faint hover:text-rail-ink',
         className,
       )}
     >
-      <AssistantMark
-        state={running ? 'working' : open ? 'open' : 'idle'}
-        accent="var(--color-rail-signal)"
-      />
+      <span className="grid h-10 w-10 shrink-0 place-items-center">
+        <AssistantMark
+          state={running ? 'working' : open ? 'open' : 'idle'}
+          accent="var(--color-rail-signal)"
+        />
+      </span>
+      <span
+        aria-hidden
+        className={cn(
+          'whitespace-nowrap pl-2 text-body transition-opacity duration-(--motion-base)',
+          expanded ? 'opacity-100' : 'opacity-0',
+        )}
+      >
+        CausalBuddy
+      </span>
     </button>
   )
 }
@@ -60,7 +75,10 @@ export function AssistantHeaderButton({ className }: { readonly className?: stri
       aria-pressed={open}
       aria-label={open ? 'Close the assistant' : 'Open the assistant'}
       onClick={toggleAssistant}
-      className={iconControl(open ? 'selected' : 'quiet', cn('border-transparent text-ink', className))}
+      className={iconControl(
+        open ? 'selected' : 'quiet',
+        cn('border-transparent text-ink', className),
+      )}
     >
       <AssistantMark state={running ? 'working' : open ? 'open' : 'idle'} />
     </button>
