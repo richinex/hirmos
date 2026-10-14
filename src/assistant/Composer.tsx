@@ -40,7 +40,7 @@ export function Composer({
 
   // The placeholder text. Named once because the autosize below has to measure it too.
   const shown = unavailable
-    ? 'Connect OpenRouter and approve the summary first'
+    ? 'Click the settings icon to connect'
     : (placeholder ?? 'Ask about your analysis…')
 
   const resize = useCallback(() => {
