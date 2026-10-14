@@ -188,6 +188,12 @@ function Session({ context, project }: { readonly context: string; readonly proj
   const approved = approvedContext !== null
   const credentials = apiKey.trim() !== '' && model.trim() !== '' && limits.success
   const connected = credentials && approvedContext !== null
+  const [settingsOpen, setSettingsOpen] = useState(!connected)
+  const [wasConnected, setWasConnected] = useState(connected)
+  if (connected !== wasConnected) {
+    setWasConnected(connected)
+    setSettingsOpen(!connected)
+  }
   const [turns, setTurns] = useState<readonly Turn[]>([])
   const settled = turns.filter((turn) => turn.outcome.kind !== 'running').length
   const [credit, setCredit] = useState<CreditStatus>({ kind: 'unchecked' })
@@ -539,10 +545,24 @@ function Session({ context, project }: { readonly context: string; readonly proj
       >
         <AssistantMark
           state={connected ? (running ? 'working' : 'open') : 'offline'}
-          size={16}
+          size={18}
           className="text-ink"
         />
         <h2 className={label('m-0 flex-1 text-ink')}>CausalBuddy</h2>
+        <button
+          type="button"
+          aria-label="CausalBuddy settings"
+          aria-expanded={settingsOpen}
+          aria-controls="causalbuddy-settings"
+          title={connected ? 'Settings: connected to OpenRouter' : 'Settings: not connected yet'}
+          className={iconControl(
+            settingsOpen ? 'selected' : 'quiet',
+            cn('h-7 w-7 border-transparent', settingsOpen ? 'text-ink' : 'text-faint'),
+          )}
+          onClick={() => setSettingsOpen((open) => !open)}
+        >
+          <Icon name="settings" size={15} />
+        </button>
         <button
           type="button"
           aria-pressed={expanded}
@@ -613,6 +633,7 @@ function Session({ context, project }: { readonly context: string; readonly proj
         </button>
       </header>
       <ConnectionBar
+        open={settingsOpen}
         context={context}
         apiKey={apiKey}
         model={model}

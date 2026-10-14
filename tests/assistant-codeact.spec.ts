@@ -198,11 +198,7 @@ test('the configured step limit controls execution through the UI', async ({ pag
     timeout: 30000,
   })
   expect(calls).toBe(2)
-  await page
-    .getByRole('region', { name: 'OpenRouter connection' })
-    .getByRole('button')
-    .first()
-    .click()
+  await page.getByRole('button', { name: 'CausalBuddy settings', exact: true }).click()
   await page.getByRole('spinbutton', { name: 'Maximum steps per agent', exact: true }).fill('3')
   calls = 0
   await page.getByLabel('Ask a question').fill('Use three steps.')
