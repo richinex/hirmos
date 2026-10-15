@@ -1403,7 +1403,7 @@ export function PreprocessingPanel({
                 </div>
               )}
               {draft.missingness.kind === 'imputation' && (
-                <div className="mt-2 grid gap-3 pl-6 @md/card:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+                <div className="mt-2 grid gap-3 pl-6 @md/card:grid-cols-[minmax(0,1fr)_auto] @md/card:items-start">
                   <div>
                     <span
                       className={`${fieldLabel} min-h-5 pointer-coarse:min-h-11 flex items-center`}

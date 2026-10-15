@@ -105,6 +105,9 @@ export function RunApprovalCards({ requests }: { readonly requests: readonly Req
     >
       <span className={label()}>{entry.capability.inspection.section}</span>
       <h3 className="m-0 text-body font-medium">Run {entry.capability.inspection.method}</h3>
+      {entry.capability.inspection.graph && (
+        <p className="m-0">Source DAG: {entry.capability.inspection.graph.name}</p>
+      )}
       {entry.capability.inspection.study ? (
         <>
           <p className="m-0">{entry.capability.inspection.study.question}</p>

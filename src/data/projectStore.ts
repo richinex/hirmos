@@ -16,6 +16,8 @@ import { deletePreparationDrafts } from './preparationDraftStore'
 
 const DB_NAME = 'hirmos'
 const STORE = 'projects'
+const recoveryProjects = new Set<string>()
+export const projectInRecovery = (id: string): boolean => recoveryProjects.has(id)
 
 interface StoredRecord {
   readonly header: SavedProjectHeader
@@ -66,6 +68,14 @@ const transact = <T>(
 export async function saveProject(
   snapshot: PersistedProject,
 ): Promise<Result<SavedProjectHeader, ProjectStoreProblem>> {
+  if (
+    projectInRecovery(snapshot.project.id) ||
+    snapshot.source?.recipe.kind === 'unreadable-recipe'
+  )
+    return err({
+      kind: 'invalid-snapshot',
+      detail: 'Recovery mode cannot overwrite the original saved project.',
+    })
   const record: StoredRecord = { header: headerOf(snapshot), body: serialiseSnapshot(snapshot) }
   try {
     await transact('readwrite', (store) => store.put(record, snapshot.project.id))
@@ -105,7 +115,19 @@ export async function listProjects(): Promise<readonly SavedProjectHeader[]> {
 
 export async function loadProject(
   id: ProjectId,
+  recoverRecipe = false,
 ): Promise<Result<PersistedProject, ProjectStoreProblem>> {
+  const raw = await readProjectRecord(id)
+  if (!raw.ok) return raw
+  const parsed = parseSnapshot(raw.value.body, recoverRecipe)
+  if (parsed.ok && parsed.value.source?.recipe.kind === 'unreadable-recipe')
+    recoveryProjects.add(id)
+  return parsed
+}
+
+export async function readProjectRecord(
+  id: ProjectId,
+): Promise<Result<StoredRecord, ProjectStoreProblem>> {
   let record: StoredRecord | undefined
   try {
     record = await transact<StoredRecord | undefined>(
@@ -116,13 +138,14 @@ export async function loadProject(
     return err({ kind: 'storage-unavailable', detail: detailOf(cause) })
   }
   if (record === undefined) return err({ kind: 'not-found', id })
-  return parseSnapshot(record.body)
+  return ok(record)
 }
 
 export async function deleteProject(id: ProjectId): Promise<Result<null, ProjectStoreProblem>> {
   try {
     await deletePreparationDrafts(id)
     await transact('readwrite', (store) => store.delete(id))
+    recoveryProjects.delete(id)
     return ok(null)
   } catch (cause) {
     return err({ kind: 'storage-unavailable', detail: detailOf(cause) })

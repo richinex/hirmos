@@ -1,15 +1,13 @@
 import { expect, test } from '@playwright/test'
 import { ask, approveRun, connectAssistant, snapshot } from './assistantTestFlow'
+import { chapter } from './examples/support'
 
 test('SWIG settings, construction and separation use separate approvals', async ({ page }) => {
   test.setTimeout(120000)
   const name = 'Severity, dose and recovery'
   await page.goto('/app/projects')
   await page.getByRole('button', { name: `Open ${name}`, exact: true }).click()
-  await page
-    .getByRole('navigation', { name: 'Workspace sections' })
-    .getByRole('button', { name: /DAG workspace/ })
-    .click()
+  await chapter(page, /DAG workspace/)
   await page.getByRole('radio', { name: 'SWIG', exact: true }).click()
   await connectAssistant(page, [
     `s = await tool("workspace_settings", {"key":"swig-settings"})
@@ -17,20 +15,22 @@ c = s["current"]
 dose = next(v["id"] for v in s["columns"] if v["name"] == "dose")
 c["interventions"] = [{"key":"dose", "variable":dose, "value":"0"}]
 c["rationale"] = "Severity causes both dose and recovery. Set dose to zero while retaining natural assignment."
-p = await tool("propose_workspace", {"key":"swig-settings", "configuration":c, "reason":"Review the intervention graph."})
+p = await tool("propose_workspace", {"key":"swig-settings", "graph":{"document":s["graph"]["document"],"revision":s["graph"]["revision"]}, "configuration":c, "reason":"Review the intervention graph."})
 assert p["kind"] == "awaiting-user-review", p
 await FINAL_VAR("Review the intervention settings.", ["user-question"])`,
-    `r = await tool("run_analysis", {"key":"swig", "reason":"Construct the reviewed graph."})
+    `g = (await tool("workspace_settings", {"key":"swig-settings"}))["graph"]
+r = await tool("run_analysis", {"key":"swig", "reason":"Construct the reviewed graph.", "subject":{"kind":"dag", "document":g["document"], "revision":g["revision"]}})
 assert r["kind"] == "completed", r
 await FINAL_VAR("Completed", ["approved-run"])`,
     `s = await tool("workspace_settings", {"key":"swig-separation"})
 a = next(v["id"] for v in s["columns"] if v["name"] == "dose")
 b = next(v["id"] for v in s["columns"] if v["name"] == "recovery (dose = 0)")
 c = {"left":a, "right":b, "given":[]}
-p = await tool("propose_workspace", {"key":"swig-separation", "configuration":c, "reason":"Check unconditional separation."})
+p = await tool("propose_workspace", {"key":"swig-separation", "graph":{"document":s["graph"]["document"],"revision":s["graph"]["revision"]}, "configuration":c, "reason":"Check unconditional separation."})
 assert p["kind"] == "awaiting-user-review", p
 await FINAL_VAR("Review the separation variables.", ["user-question"])`,
-    `r = await tool("run_analysis", {"key":"swig-separation", "reason":"Check the reviewed variables."})
+    `g = (await tool("workspace_settings", {"key":"swig-separation"}))["graph"]
+r = await tool("run_analysis", {"key":"swig-separation", "reason":"Check the reviewed variables.", "subject":{"kind":"dag", "document":g["document"], "revision":g["revision"]}})
 assert r["kind"] == "completed", r
 await FINAL_VAR("Completed", ["approved-run"])`,
   ])
@@ -62,10 +62,7 @@ test('covariate encoding proposals update only eligible covariates and do not fi
   const name = 'NSW job training and 1978 earnings'
   await page.goto('/app/projects')
   await page.getByRole('button', { name: `Open ${name}`, exact: true }).click()
-  await page
-    .getByRole('navigation', { name: 'Workspace sections' })
-    .getByRole('button', { name: /Estimation/ })
-    .click()
+  await chapter(page, /Estimation/)
   await connectAssistant(page, [
     `s = await tool("workspace_settings", {"key":"covariate-encoding"})
 c = s["current"]

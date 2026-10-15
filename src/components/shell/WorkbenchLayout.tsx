@@ -3,6 +3,7 @@ import { Group, Panel, Separator, useDefaultLayout, usePanelRef } from 'react-re
 import { Icon } from '@/components/Icon'
 import { Sheet } from '@/components/ui/Sheet'
 import { button, iconControl, label, panelTitle } from '@/components/ui/recipes'
+import { trackActivePane } from '@/lib/activePane'
 import { useIsMobile } from '@/lib/useMediaQuery'
 import { cn } from '@/lib/utils'
 import { useShellLayout } from './useShellLayout'
@@ -42,9 +43,12 @@ function PaneHeader({
           `text-nowrap` replaces the recipe's balanced wrapping, which would otherwise win over the clip,
           because `text-wrap: balance` also sets the wrap mode back to wrapping. The real text stays in the
           heading, so its accessible name and a test's text query both see it. */}
-      <h2 id={id} className={label('m-0 min-w-0 truncate text-nowrap text-ink')} title={title}>
-        {title}
-      </h2>
+      <div className="flex min-w-0 items-center gap-2">
+        <span aria-hidden className="pane-dot" />
+        <h2 id={id} className={label('m-0 min-w-0 truncate text-nowrap text-ink')} title={title}>
+          {title}
+        </h2>
+      </div>
       <div className="flex items-center gap-1.5">
         {!collapse?.collapsed && controls}
         {collapse && (
@@ -248,6 +252,7 @@ function DesktopWorkbench({
   // The group therefore waits for the host to report a width.
   const host = useRef<HTMLDivElement>(null)
   const [measured, setMeasured] = useState(false)
+  useEffect(trackActivePane, [])
   useEffect(() => {
     const element = host.current
     if (element === null) return
@@ -307,7 +312,8 @@ function DesktopWorkbench({
                       if (size.inPixels > 0)
                         setBottomCollapsed(size.inPixels <= PANE_HEADER_HEIGHT + 2)
                     }}
-                    className="flex flex-col border-t border-line bg-column [container-type:size] [container-name:layout_bottom]"
+                    data-pane
+                    className="workbench-bottom flex flex-col border-t border-line bg-column [container-type:size] [container-name:layout_bottom]"
                   >
                     <PaneHeader
                       title={bottom.title}
@@ -346,6 +352,7 @@ function DesktopWorkbench({
                 className="workbench-inspector flex flex-col border-l border-line bg-panel [container-type:size] [container-name:layout_inspector]"
               >
                 <aside
+                  data-pane
                   aria-labelledby={`${id}-inspector-title`}
                   className="flex min-h-0 flex-1 flex-col"
                 >

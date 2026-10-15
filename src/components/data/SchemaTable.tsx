@@ -299,13 +299,13 @@ export function SchemaTable({
       titleId={titleId}
       toolbar={
         <>
-          <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:flex-1">
+          <div className="flex w-full min-w-0 items-center gap-2 @lg/table:w-auto @lg/table:flex-1">
             <FilterField
               value={search}
               onChange={setSearch}
               placeholder="Find a column"
               label="Search columns"
-              className="min-w-0 flex-1 sm:w-40"
+              className="min-w-0 flex-1 @lg/table:w-40"
             />
             <DensityToggle density={density} onChange={setDensity} />
           </div>

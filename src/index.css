@@ -418,11 +418,8 @@ button:not([role='combobox']):not(:disabled):not([aria-disabled='true']):active,
 @keyframes pop { from { opacity: 0; transform: translateY(8px) scale(0.99); } to { opacity: 1; transform: none; } }
 .pop { animation: pop var(--motion-base) var(--default-transition-timing-function) both; }
 
-/* The segmented control's knob moves each edge on its own clock, set by the component in --segment-left and --segment-right. */
 .segment-knob {
-  transition-property: left, right, top, bottom, transform;
-  transition-duration: var(--segment-left), var(--segment-right), var(--motion-base), var(--motion-base), var(--motion-fast);
-  transition-timing-function: var(--default-transition-timing-function);
+  transition: transform var(--motion-fast) var(--default-transition-timing-function);
 }
 .segment-knob[data-motion="off"] { transition: none; }
 
@@ -604,9 +601,21 @@ button[aria-busy="true"]::after {
 .evidence-minimal table th { background: var(--table-surface, var(--color-panel)); }
 
 /* Match the block rail's 8px top inset and 40px height without moving the canvas. */
-.workbench-pane-header:has(> #pipeline-inspector-title) { height: 48px; }
+.pane-dot { flex: none; width: 7px; height: 7px; border: 1.5px solid var(--color-edge); border-radius: 50%; }
+:root [data-pane-active] .workbench-pane-header {
+  background: color-mix(in srgb, var(--color-signal) 7%, var(--color-panel));
+  border-bottom-color: color-mix(in srgb, var(--color-signal) 45%, var(--color-line));
+}
+:root [data-pane-active] .pane-dot { border-color: var(--color-signal); background: var(--color-signal); }
+:root :is(.workbench-inspector, .workbench-bottom) .numeric-surface {
+  border-block: 1px solid var(--color-line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.workbench-pane-header:has(#pipeline-inspector-title) { height: 48px; }
 @media (pointer: coarse) {
-  .workbench-pane-header:has(> #pipeline-inspector-title) { height: 60px; }
+  .workbench-pane-header:has(#pipeline-inspector-title) { height: 60px; }
 }
 
 .equation-columns { display: grid; min-width: 0; gap: 2rem 3rem; }

@@ -100,13 +100,13 @@ function AvailableDiagnostic({ evidence, grouping }: Props & { readonly evidence
   ] as const
   const labels = useMemo(() => new Map(evidence.groups.map((g) => [g.group, g.label])), [evidence])
   return (
-    <section className="mt-4 space-y-4" aria-label="Fixed-effects weight diagnostics">
+    <section className="@container mt-4 space-y-4" aria-label="Fixed-effects weight diagnostics">
       <h3 className={sectionTitle}>Fixed-effects weight diagnostics</h3>
       <p className={fieldHint}>
         These weights show how much each group contributes to the treatment coefficient.
         Concentrated weights do not establish collider bias.
       </p>
-      <dl className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <dl className="grid grid-cols-2 gap-4 @2xl:grid-cols-4">
         {metrics.map(([label, value]) => (
           <div key={label}>
             <dt className={fieldHint}>{label}</dt>
@@ -116,7 +116,7 @@ function AvailableDiagnostic({ evidence, grouping }: Props & { readonly evidence
           </div>
         ))}
       </dl>
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 @3xl:grid-cols-2">
         {plots.map((plot) => (
           <figure key={plot.id}>
             <figcaption className="mb-2 text-body font-medium text-ink">{plot.title}</figcaption>

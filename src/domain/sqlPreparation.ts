@@ -21,6 +21,7 @@ export type SqlViewName = Brand<string, 'SqlViewName'>
 
 export type SourceRecipe =
   | { readonly kind: 'uploaded-file' }
+  | { readonly kind: 'unreadable-recipe'; readonly original: unknown; readonly reason: string }
   | {
       readonly kind: 'sql-derived'
       readonly outputView: SqlViewName
@@ -28,6 +29,12 @@ export type SourceRecipe =
       readonly inputs: readonly SqlInputDescriptor[]
     }
   | PipelineRecipe
+
+export function isDerivedRecipe(
+  recipe: SourceRecipe,
+): recipe is Extract<SourceRecipe, { kind: 'sql-derived' | 'pipeline-derived' }> {
+  return recipe.kind === 'sql-derived' || recipe.kind === 'pipeline-derived'
+}
 
 export function sqlViewName(
   value: string,

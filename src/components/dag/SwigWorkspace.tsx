@@ -8,6 +8,7 @@ import {
   prepareSwigSettings,
   swigSettingsDescription,
 } from '@/domain/swigSettings'
+import type { AssistantRunOutcome } from '@/assistant/analysisRun'
 import { useMemo, useState } from 'react'
 import type { DagDocument } from '@/domain/dag'
 import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
@@ -62,6 +63,7 @@ const separationSettingsSchema = z
   .object({ left: z.string(), right: z.string(), given: z.array(z.string()) })
   .strict()
 type Props = {
+  readonly documentLabel: string
   readonly document: DagDocument
   readonly prepared: PreparedDatasetArtifact
   readonly records: readonly SwigAnalysis[]
@@ -177,6 +179,7 @@ function EquationEditor({
 
 export function SwigWorkspace({
   document,
+  documentLabel,
   prepared,
   records,
   onRecord,
@@ -246,12 +249,16 @@ export function SwigWorkspace({
     projection,
     historyConfirmed,
   })
+  const target = { document: document.id, revision: document.current.id, name: documentLabel }
+  const sourceSetting = { key: 'source-dag', label: 'Source DAG', value: documentLabel }
   useWorkspaceConfiguration('swig-projection', binding, {
+    graph: target,
     title: 'Intervention graph time expansion',
     current: projection,
     schema: swigProjectionSchema,
     columns: document.current.graph.nodes.map((n) => ({ id: n.id, name: n.name })),
     describe: (value) => [
+      sourceSetting,
       {
         key: 'kind',
         label: 'Graph',
@@ -301,13 +308,14 @@ export function SwigWorkspace({
     graph.ok
       ? {
           title: 'Intervention graph',
+          graph: target,
           current: settings,
           schema: swigSettingsSchema,
           columns: graph.value.names.map((name, i) => ({ id: String(i), name })),
           describe: (value) => {
             const parsed = swigSettingsSchema.safeParse(value)
             return parsed.success
-              ? swigSettingsDescription(parsed.data, graph.value.names)
+              ? [sourceSetting, ...swigSettingsDescription(parsed.data, graph.value.names)]
               : [
                   {
                     key: 'draft',
@@ -343,6 +351,7 @@ export function SwigWorkspace({
     binding: JSON.stringify({ binding, settings }),
     session,
     inspection: {
+      graph: target,
       section: 'DAG workspace → Intervention graphs',
       method: purpose === 'did' ? 'DiD adjustment assessment' : 'Intervention graph',
       specification: JSON.stringify({
@@ -360,7 +369,7 @@ export function SwigWorkspace({
         : ready.error,
     execute: async () => {
       if (ready.ok && graph.ok && boundaryReady)
-        await run(
+        return run(
           ready.value,
           graph.value.names,
           purpose === 'did' ? didDraft.rationale.trim() : rationale.trim(),
@@ -398,12 +407,14 @@ export function SwigWorkspace({
     record && record.result.conclusion.kind !== 'did'
       ? {
           title: 'Separation check',
+          graph: { ...target, revision: record.dagRevision },
           current: { left, right, given },
           schema: separationSettingsSchema,
           columns: record.result.nodes.flatMap((n, i) =>
             n.kind === 'fixed' ? [] : [{ id: String(i), name: swigNodeName(record, i) }],
           ),
           describe: (value) => [
+            sourceSetting,
             {
               key: 'left',
               label: 'First variable',
@@ -444,6 +455,7 @@ export function SwigWorkspace({
     binding: JSON.stringify({ binding, record: record?.id, left, right, given }),
     session,
     inspection: {
+      graph: { ...target, revision: record?.dagRevision ?? document.current.id },
       section: 'DAG workspace → Intervention graphs',
       method: 'Separation check',
       specification: JSON.stringify({
@@ -459,7 +471,7 @@ export function SwigWorkspace({
     unavailable: separationProblem({ left, right, given }),
     execute: async () => {
       if (record && !separationProblem({ left, right, given }))
-        await run(
+        return run(
           {
             ...record.specification,
             query: {
@@ -483,20 +495,21 @@ export function SwigWorkspace({
     names: readonly string[],
     assumptions: string,
     recordedProjection: SwigProjection = projection,
-  ) {
+  ): Promise<void | AssistantRunOutcome> {
     const current = session.start(
       'analysis',
       specification.query.kind === 'graph' ? 'Construct intervention graph' : 'Check separation',
     )
-    if (current === null) return
+    if (current === null) return { kind: 'refused', reason: 'Another analysis is running.' }
     setProblem(null)
     try {
       const { runSwigAnalysis } = await import('@/analysis/client')
       const answer = await runSwigAnalysis(specification, names)
-      if (!session.current(current)) return
+      if (!session.current(current)) return { kind: 'cancelled' }
       if (!answer.ok) {
-        session.fail(current, describeAnalysisWorkerProblem(answer.error))
-        return
+        const reason = describeAnalysisWorkerProblem(answer.error)
+        session.fail(current, reason)
+        return { kind: answer.error.kind === 'kernel-refused' ? 'refused' : 'failed', reason }
       }
       const parsed = swigAnalysisSchema.safeParse({
         kind: 'swig-analysis',
@@ -512,11 +525,10 @@ export function SwigWorkspace({
         result: answer.value,
       })
       if (!parsed.success) {
-        session.fail(
-          current,
-          'The derived graph does not match the recorded specification. No result was saved.',
-        )
-        return
+        const reason =
+          'The derived graph does not match the recorded specification. No result was saved.'
+        session.fail(current, reason)
+        return { kind: 'failed', reason }
       }
       // Separation is deterministic: a repeated query replaces the earlier record rather than adding one.
       const key = separationKey(parsed.data.specification.query)
@@ -529,8 +541,10 @@ export function SwigWorkspace({
       setPane('saved')
       session.finish(current)
     } catch (error) {
-      if (session.current(current))
-        session.fail(current, error instanceof Error ? error.message : String(error))
+      if (!session.current(current)) return { kind: 'cancelled' }
+      const reason = error instanceof Error ? error.message : String(error)
+      session.fail(current, reason)
+      return { kind: 'failed', reason }
     }
   }
   function build() {

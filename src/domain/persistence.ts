@@ -393,14 +393,17 @@ type ParsedEnvelope = z.output<typeof envelopeSchema>
  * artifact bodies are checked for their identity and otherwise trusted as the shapes this build wrote,
  * since the record only ever comes from this application's own store.
  */
-export function parseSnapshot(raw: string): Result<PersistedProject, SnapshotProblem> {
+export function parseSnapshot(
+  raw: string,
+  recoverRecipe = false,
+): Result<PersistedProject, SnapshotProblem> {
   let value: unknown
   try {
     value = JSON.parse(raw, revive)
   } catch (cause) {
     return err({ kind: 'not-json', detail: cause instanceof Error ? cause.message : String(cause) })
   }
-  return parseSnapshotValue(value)
+  return parseSnapshotValue(value, recoverRecipe)
 }
 
 /** Tagged-JSON helpers shared with the export bundle, so a bundle and a stored record read the same way. */
@@ -934,7 +937,10 @@ const upgradeSurvivalRunRecord = (value: Record<string, unknown>): Record<string
   return { ...value, configuration: preparedConfiguration, evidence: preparedEvidence }
 }
 
-export function parseSnapshotValue(value: unknown): Result<PersistedProject, SnapshotProblem> {
+export function parseSnapshotValue(
+  value: unknown,
+  recoverRecipe = false,
+): Result<PersistedProject, SnapshotProblem> {
   const parsed = envelopeSchema.safeParse(value)
   if (!parsed.success)
     return err({ kind: 'invalid-snapshot', detail: z.prettifyError(parsed.error) })
@@ -943,8 +949,18 @@ export function parseSnapshotValue(value: unknown): Result<PersistedProject, Sna
   let source: SourceDescriptor | null = null
   if (parsed.data.source !== null) {
     const recipe = parseSourceRecipe(parsed.data.source.recipe)
-    if (!recipe.ok) return err({ kind: 'invalid-snapshot', detail: recipe.error.detail })
-    source = { ...parsed.data.source, recipe: recipe.value }
+    if (!recipe.ok && !recoverRecipe)
+      return err({ kind: 'invalid-snapshot', detail: recipe.error.detail })
+    source = {
+      ...parsed.data.source,
+      recipe: recipe.ok
+        ? recipe.value
+        : {
+            kind: 'unreadable-recipe',
+            original: parsed.data.source.recipe,
+            reason: recipe.error.detail,
+          },
+    }
   }
   const prepared = upgradePreparedTransformRecord(parsed.data.prepared)
   if (!prepared.ok) return prepared
@@ -982,6 +998,11 @@ export function parseSnapshotValue(value: unknown): Result<PersistedProject, Sna
       return err({ kind: 'invalid-snapshot', detail: `profile: ${profileParsed.error.kind}` })
     profile = profileParsed.value
   }
+  if (source?.recipe.kind === 'unreadable-recipe' && profile === null)
+    return err({
+      kind: 'invalid-snapshot',
+      detail: 'Recipe recovery requires a saved data profile with its source fingerprint.',
+    })
   // Granger moved from the Discovery Lab to the data diagnostics; a run recorded there by an earlier build has no reader now.
   const discoveryRuns = parsed.data.discoveryRuns.filter(
     (run) => Reflect.get(run, 'kind') !== 'granger-ssr-f-run',

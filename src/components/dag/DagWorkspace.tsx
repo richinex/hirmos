@@ -1,4 +1,6 @@
 import { NumberInput } from '@/components/ui/NumberInput'
+import { useWorkspaceConfiguration } from '@/assistant/workspaceConfiguration'
+import { dagWorkspaceChoices, dagWorkspaceSettingsSchema, dagInspectorLabels } from '@/domain/dagWorkspaceSettings'
 import { RunActions } from '@/components/ui/RunActions'
 import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { Metadata } from '@/components/ui/Metadata'
@@ -1412,6 +1414,46 @@ export function DagWorkspace({
     discoveryRuns.length > 0 ? 'evidence' : 'selection',
   )
   const [interventionOverlay, setInterventionOverlay] = useState<InterventionOverlay | null>(null)
+  const workspaceChoices = dagWorkspaceChoices(documents)
+  useWorkspaceConfiguration(
+    'dag-workspace',
+    JSON.stringify(workspaceChoices),
+    documents.length === 0
+      ? null
+      : {
+          title: 'DAG workspace',
+          current: { document: selectedDocument?.id ?? '', inspector: inspectorTab },
+          schema: dagWorkspaceSettingsSchema.extend({
+            document: dagWorkspaceSettingsSchema.shape.document.describe(
+              JSON.stringify(workspaceChoices),
+            ),
+          }),
+          columns: [],
+          describe: (value) => [
+            {
+              key: 'document',
+              label: 'Source DAG',
+              value:
+                workspaceChoices.find((item) => item.id === value.document)?.label ?? 'Unknown DAG',
+            },
+            { key: 'inspector', label: 'Inspector', value: dagInspectorLabels[value.inspector] },
+          ],
+          validate: (value) =>
+            documents.some((document) => document.id === value.document)
+              ? { ok: true, value }
+              : { ok: false, error: 'Choose a source DAG from this project.' },
+          configure: (value) => {
+            const document = documents.find((item) => item.id === value.document)
+            if (!document) return
+            dispatch({
+              type: 'document-selected',
+              document: document.id,
+              latestRun: latestRunId(discoveryRuns),
+            })
+            setInspectorTab(value.inspector)
+          },
+        },
+  )
   const [bottomView, setBottomView] = useState<'arrows' | 'dags'>('arrows')
   useEffect(() => {
     if (selectedEdge !== null) setInspectorTab('selection')
@@ -2193,6 +2235,7 @@ export function DagWorkspace({
       <SwigWorkspace
         key={document.current.id}
         document={document}
+        documentLabel={workspaceChoices.find((item) => item.id === document.id)!.label}
         prepared={prepared}
         records={swigAnalyses}
         onRecord={onSwigAnalysis}
@@ -2243,7 +2286,7 @@ export function DagWorkspace({
               empty="Create a DAG to list it here."
               runs={documents.map((candidate) => ({
                 id: candidate.id,
-                title: candidate.name,
+                title: workspaceChoices.find((item) => item.id === candidate.id)!.label,
                 createdAt: candidate.current.createdAt,
                 deleteLabel: 'Delete DAG ' + candidate.name,
               }))}

@@ -819,8 +819,7 @@ export function ResultsPanel({
                       {studyOf(candidate) === undefined
                         ? candidate.method
                         : estimandSentence(studyOf(candidate) as StudySpecification)}
-                      , {describeRun(candidate.configuration)},{' '}
-                      {formatTime(candidate.createdAt)}
+                      , {describeRun(candidate.configuration)}, {formatTime(candidate.createdAt)}
                     </option>
                   ))}
                 </Select>
@@ -847,8 +846,7 @@ export function ResultsPanel({
                         {studyOf(candidate) === undefined
                           ? candidate.method
                           : estimandSentence(studyOf(candidate) as StudySpecification)}
-                        , {describeRun(candidate.configuration)},{' '}
-                        {formatTime(candidate.createdAt)}
+                        , {describeRun(candidate.configuration)}, {formatTime(candidate.createdAt)}
                       </option>
                     ))}
                 </Select>
@@ -1002,9 +1000,7 @@ export function ResultsPanel({
                         <td className={td('text-ink')}>
                           {study === undefined ? candidate.method : estimandSentence(study)}
                         </td>
-                        <td className={td('text-muted')}>
-                          {describeRun(candidate.configuration)}
-                        </td>
+                        <td className={td('text-muted')}>{describeRun(candidate.configuration)}</td>
                         <td className={td(num('whitespace-nowrap text-right text-ink'))}>
                           {
                             formatStatistic(

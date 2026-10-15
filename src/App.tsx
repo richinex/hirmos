@@ -63,6 +63,7 @@ import {
 } from '@/domain/navigation'
 import {
   describeSnapshotProblem,
+  parseSnapshot,
   snapshotWorkflow,
   type PersistedProject,
   type SavedProjectHeader,
@@ -80,6 +81,8 @@ import {
   deleteProject,
   listProjects,
   loadProject,
+  readProjectRecord,
+  projectInRecovery,
   saveProject,
   saveProjectIfChanged,
 } from '@/data/projectStore'
@@ -120,7 +123,7 @@ import { identificationAllowsEstimation } from '@/domain/study'
 import { isRegressionDesignRun } from '@/domain/timeSeries'
 import { type DiscoveryEvent } from '@/domain/discovery'
 import { assertNever, err, isNonEmpty, type Result } from '@/domain/dop'
-import type { SourceRecipe } from '@/domain/sqlPreparation'
+import { isDerivedRecipe, type SourceRecipe } from '@/domain/sqlPreparation'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { cn } from '@/lib/utils'
 import { preloadable } from '@/lib/preloadable'
@@ -224,6 +227,8 @@ function SourceSummary({ source }: { readonly source: SelectedSource }) {
     switch (source.recipe.kind) {
       case 'uploaded-file':
         return `${source.format}, ${formatBytes(source.bytes)}`
+      case 'unreadable-recipe':
+        return `original preparation steps unavailable, ${formatBytes(source.bytes)}`
       case 'sql-derived':
         return `prepared with SQL, ${source.recipe.outputView}, ${source.recipe.inputs.length} ${source.recipe.inputs.length === 1 ? 'input' : 'inputs'}, ${formatBytes(source.bytes)}`
       case 'pipeline-derived':
@@ -331,7 +336,7 @@ function App() {
   }
 
   const replayRecipe = async (
-    recipe: Exclude<SourceRecipe, { readonly kind: 'uploaded-file' }>,
+    recipe: Extract<SourceRecipe, { readonly kind: 'sql-derived' | 'pipeline-derived' }>,
     files: readonly File[],
   ): Promise<Result<File, string>> => {
     if (recipe.kind === 'sql-derived') {
@@ -385,7 +390,7 @@ function App() {
     if (workflow.kind === 'profiled') {
       navigate(chapterPath('data', workflow.project.id))
       openSourceEditor(editor)
-    } else if (workflow.kind === 'source-selected' && workflow.source.recipe.kind !== 'uploaded-file') {
+    } else if (workflow.kind === 'source-selected' && isDerivedRecipe(workflow.source.recipe)) {
       void reopenEditor(workflow.source.recipe)
     }
   })
@@ -394,7 +399,7 @@ function App() {
   const restoreFromInputs = async (files: readonly File[]) => {
     if (workflow.kind !== 'awaiting-data' || workflow.restore === null) return
     const recipe = workflow.restore.source?.recipe
-    if (recipe === undefined || recipe.kind === 'uploaded-file') return
+    if (recipe === undefined || !isDerivedRecipe(recipe)) return
     setSqlIntake({ kind: 'reading' })
     const replayed = await replayRecipe(recipe, files)
     setSqlIntake({ kind: 'idle' })
@@ -450,7 +455,7 @@ function App() {
     workflow.kind === 'awaiting-data' ? workflow.restore?.source?.recipe : undefined
   const generatedRestore =
     restoreRecipe !== undefined &&
-    restoreRecipe.kind !== 'uploaded-file' &&
+    isDerivedRecipe(restoreRecipe) &&
     restoreRecipe.inputs.length === 0
   useEffect(() => {
     setDataEntryMode('file')
@@ -526,7 +531,7 @@ function App() {
   // Every durable change is written after a short quiet period; opening an unchanged record is not a new save.
   useEffect(() => {
     const snapshot = snapshotWorkflow(workflow, new Date().toISOString())
-    if (snapshot === null) return
+    if (snapshot === null || projectInRecovery(snapshot.project.id)) return
     const handle = window.setTimeout(() => {
       void saveProjectIfChanged(snapshot).then((result) => {
         if (!result.ok) return
@@ -547,7 +552,7 @@ function App() {
   const reopenProject = async (id: SavedProjectHeader['id']): Promise<boolean> => {
     setReopenProblem(null)
     setExampleNotice(null)
-    const loaded = await loadProject(id)
+    const loaded = await loadProject(id, true)
     if (!loaded.ok) {
       setReopenProblem(
         loaded.error.kind === 'storage-unavailable'
@@ -592,6 +597,10 @@ function App() {
   const [importProblem, setImportProblem] = useState<string | null>(null)
   const bundleInput = useRef<HTMLInputElement>(null)
   const exportProject = async () => {
+    if (project && projectInRecovery(project.id)) {
+      await exportSaved(project.id)
+      return
+    }
     const snapshot = snapshotWorkflow(workflow, new Date().toISOString())
     if (snapshot === null || workflow.kind !== 'profiled') return
     const data = includeSource
@@ -601,15 +610,18 @@ function App() {
     downloadText(bundleFileName(bundle), serialiseBundle(bundle))
   }
   const exportSaved = async (id: SavedProjectHeader['id']) => {
-    const loaded = await loadProject(id)
-    if (!loaded.ok) {
+    const raw = await readProjectRecord(id)
+    if (!raw.ok) {
       setReopenProblem(
-        loaded.error.kind === 'storage-unavailable'
-          ? `The browser store could not be read: ${loaded.error.detail}`
-          : loaded.error.kind === 'not-found'
-            ? 'That project is no longer saved. Choose another project or import a bundle.'
-            : describeSnapshotProblem(loaded.error),
+        raw.error.kind === 'storage-unavailable'
+          ? `The browser store could not be read: ${raw.error.detail}`
+          : 'That project is no longer saved.',
       )
+      return
+    }
+    const loaded = parseSnapshot(raw.value.body)
+    if (!loaded.ok) {
+      downloadText(`hirmos-${id}-recovery.json`, raw.value.body)
       return
     }
     const bundle = buildBundle(loaded.value, { kind: 'not-included' }, new Date().toISOString())
@@ -1105,6 +1117,30 @@ function App() {
               onExport={workflow.kind === 'profiled' ? () => void exportProject() : null}
             />
           }
+          notice={
+            project && projectInRecovery(project.id) ? (
+              <div
+                role="alert"
+                className={well('mx-3 mb-2 shrink-0 px-3 py-2 text-body text-muted')}
+              >
+                <p className="m-0">
+                  Recovery mode: the original preparation steps could not be read.{' '}
+                  {workflow.kind === 'awaiting-data'
+                    ? 'Choose the original output data file; its fingerprint must match. '
+                    : ''}
+                  Recipe replay and editing are unavailable. Changes in this recovery session are
+                  not saved, and the original record is preserved.
+                </p>
+                <button
+                  type="button"
+                  className={button('quiet')}
+                  onClick={() => void exportSaved(project.id)}
+                >
+                  Download original record
+                </button>
+              </div>
+            ) : null
+          }
           stage={
             <>
               {!route.ok && (
@@ -1317,7 +1353,7 @@ function App() {
                           </p>
                         </>
                       ) : workflow.restore.source !== null &&
-                        workflow.restore.source.recipe.kind !== 'uploaded-file' ? (
+                        isDerivedRecipe(workflow.restore.source.recipe) ? (
                         <p className={cn(fieldHint, 'mt-0')}>
                           {generatedRestore
                             ? 'Run the saved recipe to recreate the data. No input files are needed. Hirmos checks that the recreated data matches the original before reopening your saved analysis.'
@@ -1341,7 +1377,7 @@ function App() {
                     </div>
                     {workflow.restore?.source !== null &&
                     workflow.restore?.source !== undefined &&
-                    workflow.restore.source.recipe.kind !== 'uploaded-file' ? (
+                    isDerivedRecipe(workflow.restore.source.recipe) ? (
                       workflow.restore.source.recipe.inputs.length === 0 ? (
                         <button
                           type="button"
@@ -1478,13 +1514,13 @@ function App() {
                     >
                       Inspect data
                     </button>
-                    {workflow.source.recipe.kind !== 'uploaded-file' && (
+                    {isDerivedRecipe(workflow.source.recipe) && (
                       <button
                         type="button"
                         className={button('outline')}
                         onClick={() => {
                           const recipe = workflow.source.recipe
-                          if (recipe.kind !== 'uploaded-file') void reopenEditor(recipe)
+                          if (isDerivedRecipe(recipe)) void reopenEditor(recipe)
                         }}
                       >
                         {workflow.source.recipe.kind === 'sql-derived'
@@ -1587,13 +1623,13 @@ function App() {
                     >
                       Try again
                     </button>
-                    {workflow.source.recipe.kind !== 'uploaded-file' && (
+                    {isDerivedRecipe(workflow.source.recipe) && (
                       <button
                         type="button"
                         className={button('outline')}
                         onClick={() => {
                           const recipe = workflow.source.recipe
-                          if (recipe.kind !== 'uploaded-file') void reopenEditor(recipe)
+                          if (isDerivedRecipe(recipe)) void reopenEditor(recipe)
                         }}
                       >
                         {workflow.source.recipe.kind === 'sql-derived'
@@ -1636,7 +1672,11 @@ function App() {
                         source={workflow.source}
                         profile={workflow.profile}
                         prepared={workflow.prepared}
-                        onEditSource={() => openSourceEditor()}
+                        onEditSource={
+                          workflow.source.recipe.kind === 'unreadable-recipe'
+                            ? null
+                            : () => openSourceEditor()
+                        }
                         onDeclare={declareColumnType}
                       >
                         <PowerPlanningPanel key={workflow.project.id} />

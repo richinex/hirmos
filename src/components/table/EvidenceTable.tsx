@@ -333,7 +333,7 @@ export function EvidenceTable<Row>({
               onChange={setQuery}
               placeholder={`Search ${noun}s`}
               label={`Search ${title.toLowerCase()}`}
-              className="min-w-0 flex-1 sm:w-44"
+              className="min-w-0 flex-1 @lg/table:w-44"
             />
           )}
           <DensityToggle density={density} onChange={setDensity} />

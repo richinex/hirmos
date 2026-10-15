@@ -14,7 +14,10 @@ export function useDataEditor(workflow: Workflow, closed: boolean, open: (editor
   const revision = useMemo(() => crypto.randomUUID(), [source])
   const editor: Editor = recipe?.kind === 'pipeline-derived' ? 'pipeline' : 'sql'
   const available =
-    closed && source !== null && (workflow.kind === 'profiled' || recipe?.kind !== 'uploaded-file')
+    closed &&
+    source !== null &&
+    recipe?.kind !== 'unreadable-recipe' &&
+    (workflow.kind === 'profiled' || recipe?.kind !== 'uploaded-file')
   useWorkspaceConfiguration<z.infer<typeof schema>>(
     'data-editor',
     JSON.stringify([

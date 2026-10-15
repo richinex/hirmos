@@ -1,6 +1,6 @@
-import {restoreMissingDagExploration} from './dagProvenance'
+import { restoreMissingDagExploration } from './dagProvenance'
 import { existingStudyRecord } from './studyRecords'
-import type {PowerRecord} from './powerPlanning'
+import type { PowerRecord } from './powerPlanning'
 import { surrogateRunMatchesProfile, type SurrogateRun, type SurrogateRunId } from './surrogateRun'
 import type { SwigAnalysis } from './swig'
 import { deleteArtifact, type DeletionTarget } from './artifactLifecycle'
@@ -166,7 +166,10 @@ export type Workflow =
       readonly rootCause: RootCauseWorkspace
     }
 
-export type DerivedRecipe = Exclude<SourceRecipe, { readonly kind: 'uploaded-file' }>
+export type DerivedRecipe = Extract<
+  SourceRecipe,
+  { readonly kind: 'sql-derived' | 'pipeline-derived' }
+>
 export interface SqlResume {
   readonly statement: string
   readonly outputView: SqlViewName
@@ -323,7 +326,7 @@ export function selectSource(file: File): Result<SelectedSource, SourceSelection
 
 export function selectDerivedSource(
   file: File,
-  recipe: Exclude<SourceRecipe, { readonly kind: 'uploaded-file' }>,
+  recipe: DerivedRecipe,
 ): Result<SelectedSource, SourceSelectionProblem> {
   const selected = selectSource(file)
   return selected.ok ? ok({ ...selected.value, recipe }) : selected
@@ -772,11 +775,13 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
           ),
         }
       }
-      if (event.type === 'power-planning-recorded') return {...state,powerPlanning:event.record}
+      if (event.type === 'power-planning-recorded') return { ...state, powerPlanning: event.record }
       if (event.type === 'study-draft-changed') {
-        const parent = state.studies.find(study => study.id === event.draft.biteOf)
-        const draft = parent !== undefined && matchesBiteDraft(event.draft, parent, state.dagDocuments)
-          ? event.draft : { ...event.draft, biteOf: undefined }
+        const parent = state.studies.find((study) => study.id === event.draft.biteOf)
+        const draft =
+          parent !== undefined && matchesBiteDraft(event.draft, parent, state.dagDocuments)
+            ? event.draft
+            : { ...event.draft, biteOf: undefined }
         return { ...state, studyDraft: draft }
       }
       if (
@@ -807,11 +812,20 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
         ) &&
         !state.studies.some((study) => study.id === event.study.id)
       ) {
-        if (existingStudyRecord(state.studies, state.identifications, event.study, event.identification))
+        if (
+          existingStudyRecord(
+            state.studies,
+            state.identifications,
+            event.study,
+            event.identification,
+          )
+        )
           return state
         return {
           ...state,
-          dagDocuments: state.dagDocuments.map(document=>restoreMissingDagExploration(document,[...state.studies,event.study])),
+          dagDocuments: state.dagDocuments.map((document) =>
+            restoreMissingDagExploration(document, [...state.studies, event.study]),
+          ),
           studies: [...state.studies, event.study],
           identifications: [...state.identifications, event.identification],
         }

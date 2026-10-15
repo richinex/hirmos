@@ -125,6 +125,10 @@ export function assistantContext(
               id: run.id,
               workspace: 'swig',
               model: run.specification.construction.kind,
+              query: run.specification.query.kind,
+              dagName:
+                workflow.dagDocuments.find((document) => document.id === run.dagDocument)?.name ??
+                null,
               createdAt: run.createdAt,
               dagDocument: run.dagDocument,
               dagRevision: run.dagRevision,

@@ -185,8 +185,11 @@ const NAV_LAYER = 'chapter-rail'
 
 /** The rail's width, which the column reserves; the lobe and the pill grow past it over the stage. */
 const RAIL = 'w-14'
-const LOBE_OPEN = 'w-[232px]'
 const CORNER = 'rounded-r-[26px]'
+const LOBE_CLOSED = '[clip-path:inset(0_176px_0_0_round_0_26px_26px_0)]'
+const LOBE_OPEN = '[clip-path:inset(0_0_0_0_round_0_26px_26px_0)]'
+const PILL_CLOSED = '[clip-path:inset(0_184px_0_0_round_20px)]'
+const PILL_OPEN = '[clip-path:inset(0_0_0_0_round_20px)]'
 
 /**
  * The chapter rail: a solid shape rising from the left edge under the round toggle, the mark at its
@@ -302,9 +305,9 @@ export function ChapterNav({
         <nav
           aria-label="Workspace sections"
           className={cn(
-            'absolute left-0 top-[84px] flex max-h-[calc(100%-84px-124px)] flex-col overflow-hidden bg-rail text-rail-ink [--scroll-thumb:var(--color-rail-faint)] transition-[width] duration-(--motion-base) motion-reduce:transition-none',
+            'absolute left-0 top-[84px] flex w-[232px] max-h-[calc(100%-84px-124px)] flex-col overflow-hidden bg-rail text-rail-ink [--scroll-thumb:var(--color-rail-faint)] transition-[clip-path] duration-(--motion-base) motion-reduce:transition-none',
             CORNER,
-            lobeOpen ? LOBE_OPEN : RAIL,
+            lobeOpen ? LOBE_OPEN : LOBE_CLOSED,
           )}
         >
           {/* The list scrolls inside a box inset by the corner radius, so the scrollbar stays on the straight edge. */}
@@ -360,22 +363,33 @@ export function ChapterNav({
                           <span
                             aria-hidden
                             className={cn(
-                              'flex min-w-0 items-baseline gap-2 overflow-hidden transition-[width,margin,opacity] duration-(--motion-base) motion-reduce:transition-none',
-                              lobeOpen ? 'ml-[18px] w-[150px] opacity-100' : 'ml-0 w-0 opacity-0',
+                              'ml-[18px] flex w-[150px] min-w-0 items-baseline gap-2 overflow-hidden transition-opacity duration-(--motion-base) motion-reduce:transition-none',
+                              lobeOpen ? 'opacity-100' : 'opacity-0',
                             )}
                           >
                             <span className="truncate">{chapter.name}</span>
                           </span>
                           {glyph && (
-                            <Icon
-                              name={glyph.icon}
-                              size={lobeOpen ? 12 : 10}
-                              className={cn(
-                                glyph.tone,
-                                'absolute transition-[top,right,left] duration-(--motion-base)',
-                                lobeOpen ? 'right-[22px] top-4' : 'left-[34px] top-2',
-                              )}
-                            />
+                            <>
+                              <Icon
+                                name={glyph.icon}
+                                size={10}
+                                className={cn(
+                                  glyph.tone,
+                                  'absolute left-[34px] top-2 transition-opacity duration-(--motion-base)',
+                                  lobeOpen ? 'opacity-0' : 'opacity-100',
+                                )}
+                              />
+                              <Icon
+                                name={glyph.icon}
+                                size={12}
+                                className={cn(
+                                  glyph.tone,
+                                  'absolute right-[22px] top-4 transition-opacity duration-(--motion-base)',
+                                  lobeOpen ? 'opacity-100' : 'opacity-0',
+                                )}
+                              />
+                            </>
                           )}
                           <BusyBar
                             chapter={chapter.id}
@@ -400,8 +414,8 @@ export function ChapterNav({
         {project !== null && (
           <div
             className={cn(
-              'absolute bottom-3 left-2 flex h-10 items-center overflow-hidden rounded-full bg-rail text-rail-ink transition-[width] duration-(--motion-base) motion-reduce:transition-none',
-              lobeOpen ? 'w-[224px]' : 'w-10',
+              'absolute bottom-3 left-2 flex h-10 w-[224px] items-center overflow-hidden rounded-full bg-rail text-rail-ink transition-[clip-path] duration-(--motion-base) motion-reduce:transition-none',
+              lobeOpen ? PILL_OPEN : PILL_CLOSED,
             )}
           >
             <button

@@ -53,6 +53,8 @@ function editorFor(
       }
     case 'pipeline-derived':
       return { kind: 'pipeline', resume: { graph: recipe.graph, inputs } }
+    case 'unreadable-recipe':
+      throw new Error('The original preparation steps could not be read. Editing is unavailable.')
     default:
       return assertNever(recipe)
   }
@@ -85,6 +87,13 @@ export function SourceEditor({
     setStage({ kind: 'reading' })
     try {
       const recipe = source.recipe
+      if (recipe.kind === 'unreadable-recipe') {
+        setStage({
+          kind: 'failed',
+          detail: 'The original preparation steps could not be read. Editing is unavailable.',
+        })
+        return
+      }
       const remembered = recipe.kind === 'uploaded-file' ? null : inputsFromMemory(recipe.inputs)
       if (recipe.kind !== 'uploaded-file' && files === undefined && remembered === null) {
         setStage({ kind: 'files', detail: null })
@@ -124,6 +133,15 @@ export function SourceEditor({
     started.current = true
     void openLatest.current(initialRoute)
   }, [initialRoute])
+
+  if (source.recipe.kind === 'unreadable-recipe')
+    return (
+      <Dialog open dismissible title="Edit data" onClose={onCancel}>
+        <p>
+          The original preparation steps could not be read. Editing is unavailable in recovery mode.
+        </p>
+      </Dialog>
+    )
 
   if (stage.kind !== 'editing')
     return (

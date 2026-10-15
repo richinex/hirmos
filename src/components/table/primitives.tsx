@@ -115,7 +115,7 @@ export function TableShell({
       )}
       aria-labelledby={titleId}
     >
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-hair px-3.5 py-2">
+      <div className="@container/table flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-hair px-3.5 py-2">
         <div className="flex min-w-0 items-center gap-1">
           {collapsible ? (
             <button
@@ -146,7 +146,7 @@ export function TableShell({
           {titleHelp}
         </div>
         {toolbar && !folded && (
-          <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto">
+          <div className="flex w-full min-w-0 flex-wrap items-center gap-2 @lg/table:w-auto">
             {toolbar}
           </div>
         )}

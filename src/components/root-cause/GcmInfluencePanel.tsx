@@ -124,7 +124,7 @@ export function GcmInfluenceResult({ run }: { readonly run: GcmInfluenceRun }) {
       : []),
   ]
   return (
-    <section className={resultSurface()} aria-label="Causal influence result">
+    <section className={resultSurface('@container')} aria-label="Causal influence result">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1 basis-64">
           <h3 className={`${resultTitle} m-0`}>{titles[outcome.kind]}</h3>
@@ -162,7 +162,7 @@ export function GcmInfluenceResult({ run }: { readonly run: GcmInfluenceRun }) {
                   label: (
                     <span title="Graph" className="flex items-center gap-1.5">
                       <Icon name="account_tree" size={18} />
-                      <span className="sr-only sm:not-sr-only">Graph</span>
+                      <span className="sr-only @lg:not-sr-only">Graph</span>
                     </span>
                   ),
                 },
@@ -171,7 +171,7 @@ export function GcmInfluenceResult({ run }: { readonly run: GcmInfluenceRun }) {
                   label: (
                     <span title="Bars" className="flex items-center gap-1.5">
                       <Icon name="bar_chart" size={18} />
-                      <span className="sr-only sm:not-sr-only">Bars</span>
+                      <span className="sr-only @lg:not-sr-only">Bars</span>
                     </span>
                   ),
                 },

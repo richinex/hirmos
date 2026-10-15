@@ -10,11 +10,12 @@ interface AppShellProps {
   readonly header: ReactNode
   readonly nav: ReactNode
   readonly stage: ReactNode
+  readonly notice?: ReactNode
   readonly footer?: ReactNode
 }
 
 /** Header, chapter rail, and the stage as flex siblings. The header sits on the stage with no seam so the rail below it reads as one shape rising from the page edge; the row is the shell container the rail queries. */
-export function AppShell({ skipTarget, mode, header, nav, stage, footer }: AppShellProps) {
+export function AppShell({ skipTarget, mode, header, nav, stage, notice, footer }: AppShellProps) {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (
@@ -51,7 +52,11 @@ export function AppShell({ skipTarget, mode, header, nav, stage, footer }: AppSh
         {nav}
         <AssistantSplit
           chapter={
-            <main id={skipTarget} className="flex min-h-0 min-w-0 flex-1">
+            <main
+              id={skipTarget}
+              className={`flex min-h-0 min-w-0 flex-1${notice ? ' flex-col' : ''}`}
+            >
+              {notice}
               {mode === 'reading' ? (
                 <div className="panel-scroll min-w-0 flex-1 overflow-y-auto [container-type:size]">
                   <div className="dashboard-reading @container/panel mx-auto flex min-h-full w-full max-w-[1440px] flex-col px-5 pt-0 pb-8 sm:px-8 lg:px-10">

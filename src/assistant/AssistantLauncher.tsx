@@ -1,5 +1,6 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { iconControl } from '@/components/ui/recipes'
+import { trackActivePane } from '@/lib/activePane'
 import { cn } from '@/lib/utils'
 import { AssistantMark } from './AssistantMark'
 import { toggleAssistant, useAssistantOpen, useAssistantRunning } from './assistantStore'
@@ -7,8 +8,9 @@ import { toggleAssistant, useAssistantOpen, useAssistantRunning } from './assist
 const AssistantPanel = lazy(() => import('./AssistantPanel'))
 
 export function AssistantPane() {
+  useEffect(trackActivePane, [])
   return (
-    <aside aria-label="Assistant" className="flex min-h-0 min-w-0 flex-1 flex-col bg-panel">
+    <aside data-pane aria-label="Assistant" className="flex min-h-0 min-w-0 flex-1 flex-col bg-panel">
       <Suspense
         fallback={
           <p role="status" className="p-4 text-body text-muted">
@@ -40,8 +42,10 @@ export function AssistantRailButton({
       title={expanded ? undefined : 'CausalBuddy (⌘I)'}
       onClick={toggleAssistant}
       className={cn(
-        'flex h-10 items-center overflow-hidden rounded-full bg-rail transition-[width,color] duration-(--motion-base) motion-reduce:transition-none',
-        expanded ? 'w-[224px]' : 'w-10',
+        'flex h-10 w-[224px] items-center overflow-hidden rounded-full bg-rail transition-[clip-path,color] duration-(--motion-base) motion-reduce:transition-none',
+        expanded
+          ? '[clip-path:inset(0_0_0_0_round_20px)]'
+          : '[clip-path:inset(0_184px_0_0_round_20px)]',
         open || running ? 'text-rail-ink' : 'text-rail-faint hover:text-rail-ink',
         className,
       )}

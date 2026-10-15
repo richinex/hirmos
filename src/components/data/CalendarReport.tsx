@@ -109,9 +109,9 @@ function Coverage({
   }, [file, profile, column, unitColumn, interpretation, schedule])
 
   return (
-    <div className="mt-3 space-y-3">
+    <div className="@container mt-3 space-y-3">
       {frequency !== 'daily' && (
-        <label className="block sm:max-w-xs">
+        <label className="block @md:max-w-xs">
           <span className={fieldLabel}>Calendar alignment</span>
           <Select
             aria-label="Calendar alignment"

@@ -2,7 +2,7 @@ import { useWorkflowStore } from '@/components/WorkflowProvider'
 import type { useJob } from '@/analysis/JobsProvider'
 import type { Workflow } from '@/domain/workflow'
 import { useAnalysisRunTool } from './applicationTools'
-import type { RunInspection } from './analysisRun'
+import type { AssistantRunOutcome, RunInspection } from './analysisRun'
 
 interface SavedRun {
   readonly id: string
@@ -15,7 +15,7 @@ export function useRecordedAnalysis<R extends SavedRun>(
     readonly inspection: RunInspection
     readonly session: ReturnType<typeof useJob>
     readonly unavailable?: string | null
-    readonly execute: () => Promise<void>
+    readonly execute: () => Promise<void | AssistantRunOutcome>
     readonly records: (workflow: Extract<Workflow, { kind: 'profiled' }>) => readonly R[]
     readonly summarise: (run: R) => string
   },
@@ -44,8 +44,9 @@ export function useRecordedAnalysis<R extends SavedRun>(
     }
     signal.addEventListener('abort', cancel, { once: true })
     try {
-      await pending
+      const outcome = await pending
       if (signal.aborted) return { kind: 'cancelled' }
+      if (outcome) return outcome
       const run = read().find((run) => !previous.has(run.id))
       if (run)
         return {

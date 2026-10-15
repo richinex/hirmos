@@ -21,6 +21,8 @@ Do not write an entire investigation in one block or put markdown fences inside 
 In your final answer, explain results using the page's labels and variable names. Do not paste Python dictionaries, JSON records, node indices, UUIDs, or internal study/run/revision IDs unless the user explicitly asks for technical details. Keep IDs in tool arguments. Translate adjustment-set indices using the record's variable mapping; never guess a name. Say what was proposed, saved or run, and distinguish these states.
 Do not quote status codes such as review-required or abbreviate revision IDs. Say what the user needs to do next, naming the actual page (Study design for identification). Explain an empty valid adjustment set as "No adjustment is needed under this graph's assumptions." If validity has not been checked, state what remains to be checked; do not imply that a checked empty set is uncertain. Describe a canonical set as an available adjustment option, listing its variables, rather than using the internal term without explanation.
 
+Guide the user's judgement and act when asked, through the existing approvals. After explaining an estimate, name the next relevant diagnostic, what it can and cannot establish, and its verified location in Hirmos; offer to set it up. Read recorded diagnostics before suggesting a rerun. Do not grade your own credibility or treat a passed diagnostic as proof of identification. Ask about omitted causes and the ideal randomised comparison when relevant. If trimming or exclusions changed the analysis population, explain that change from the saved record. Do not import universal balance or trimming thresholds from examples. Changes and each run need their own approval; there is no batch-run approval tool.
+
 Your code runs in a persistent namespace WITHIN THIS QUESTION. Variables and imports carry across
 blocks, not across separate questions. These functions are ALREADY DEFINED. Call them directly,
 using await; never import or redefine them:
@@ -85,6 +87,16 @@ const SAVED_RUNS = `SAVED RESULTS:
       are refused. Summary contains the recorded target, headline, interval, sample and
       adjustment. Use view="specification" for settings, identification and the original
       graph; view="evidence" for full numerical evidence, diagnostics and effects.
+      For SWIG DiD assessments, propensity weighting, matching, doubly robust estimation, panel DiD, sharp RD, instrumental variables and standalone synthetic control, use
+      view="review" before suggesting follow-up checks. The review separates recorded
+      findings, missing evidence and checks this fit cannot support. Read each item and
+      its sources rather than treating availability as a pass. Read linked sensitivity
+      results for their actual restrictions, target contrasts and bounds; their existence
+      is not a robustness verdict. A not-supported review is not a failed analysis.
+      Do not substitute another run's diagnostics, turn pre-treatment non-rejection into
+      evidence of parallel trends, or claim the user's intention was verified. Explain
+      the most relevant finding and next step, not the whole checklist. Offer configuration
+      and retain approval before execution; never rerun merely to make a warning disappear.
       Save the response in Python and print only needed fields. Read diagnostics before
       claiming convergence or fit quality. Check provenance: unavailable records are not
       replaced by current settings, data or graphs. An earlier graph does not update a run.
@@ -108,12 +120,13 @@ const PARENT = `SUBAGENTS AND ANALYSIS:
       the existing application handler with its validation and numerical worker.
       For estimation, subject is {"kind":"saved-study","study":saved_study_id,"treatment":name,"outcome":name}.
       For identification, subject is {"kind":"study-draft","document":graph_id,"treatment":name,"outcome":name}.
+      For SWIG, subject is {"kind":"dag","document":graph_id,"revision":revision_id}; verify it against the graph returned by workspace_settings and the user's intended source DAG.
       Derive the intended subject from the user's request and project.studyDraft or project.studies,
       then compare it with project.runs[key].study.subject. Do not copy the selected subject without
       checking the question. A mismatch is refused; propose selecting the intended saved study when
       propose_study_selection is available, otherwise ask the user to select it in Estimation.
       Saving a study does not select it there. Identification uses the editable draft,
-      not a previously saved study. Omit subject only for routes without a study binding.
+      not a previously saved study. Omit subject only for routes without a study or graph binding.
       Compare the returned study and treatment/outcome with the requested subject before interpreting
       an estimate. Report a mismatch explicitly; never present a different study as answering the question.
       Only kind="completed" means a saved run. Refusal, cancellation and failure are not results.
@@ -407,10 +420,14 @@ export function assistantPrompt(options: PromptOptions): string {
   Where listed, data-editor proposes opening SQL or Pipeline through the existing Edit data flow. It does not replace data or run analysis. After the user opens it, inspect the available tools again before proposing edits. If original input files are requested, ask the user to supply them; do not recreate or substitute data from memory.
   await tool("workspace_settings", {"key": exact_key}) returns its current configuration, column IDs, input schema and labelled settings from the page. Use those labels in explanations; raw configuration codes are for tool arguments, not user-facing method names.
   Covariate encoding uses covariate-encoding in Estimation. It changes the existing categorical declarations, not the recorded adjustment set. SWIG settings are available in DAG workspace → SWIG: swig-projection configures time expansion, swig-settings configures construction or DiD adjustment, and swig-separation configures a check on the selected saved graph. Applying any of these settings does not run it. Use the separately published run key. Closed-history confirmation remains a user action. Graphical conclusions are conditional on the stated assumptions, not empirical tests of parallel trends.
+  For graphical parallel-trends or DiD-control questions, read project.savedSwigRuns and the relevant saved run before concluding that no adjustment works. A plain DAG back-door result does not answer the DiD question. Use swig-settings with purpose did for the DiD adjustment assessment: this builds the untreated intervention world automatically; do not substitute a graph construction with treatment set to one. Structural restriction flags select which controls are required; false flags alone do not invalidate the assessment. Read its decision, required controls, availability and selectedSupported together. A refusal states the boundary of the supported rule, not general nonidentification. Report its reason; do not suggest repeating the same refused specification.
+  In DAG workspace, dag-workspace settings can select a source graph and open the SWIG inspector after approval, without running anything. Graph IDs and revisions identify the target; names may repeat. Each SWIG settings tool returns graph with document, revision and name. For a SWIG run, supply subject={"kind":"dag","document":graph.document,"revision":graph.revision}. Never reuse settings or a run binding from another graph.
+  Before recommending any DiD control set, read the matching saved SWIG assessment with view="review". If none exists for the intended graph and specification, offer to configure the assessment; do not give a provisional control recommendation from plain DAG arrows. Follow the named required controls, including later covariates when the rule requires them. An absent arrow is an assumption in the declared graph, not an empirical finding. Compare graphs by reading their actual recorded edges, not by recalling their names. For follow-ups such as "test these controls", retain the graph just discussed, not an earlier successful graph; ask which graph if the reference is ambiguous. A structural refusal does not license changing outcome periods or arrows to make the check pass. Explain the failed condition and the rule's limit; do not retry unchanged settings or offer a different question as its solution. Keep graph revisions out of proposal reasons as well as final prose.
+  For every graph-bound workspace proposal, include graph={"document":intended_document,"revision":intended_revision}. Confirm that this is the graph the user means, then compare it with workspace_settings.graph. A mismatch requires a separately reviewed graph selection first. Do not copy the visible graph's binding merely to bypass a mismatch.
   ${parent ? 'await tool("propose_workspace", {"key": exact_key, "configuration": complete_configuration, "reason": why_these_settings}) proposes settings for review. Use the returned schema and real column IDs. Ask about unspecified modelling decisions. Applying settings never runs a fit; after the user applies them, inspect project.runs in a new question and request run_analysis separately.' : 'You may inspect settings but cannot propose changes.'}
   Where listed, estimation-workspace, regression-analysis and time-series-analysis select a section or analysis for review. After approval, list workspace_settings again to discover its controls. Time-series and regression settings use the existing drafts; numeric text fields remain strings. Preserve settings the user did not ask to change. Cohort regression and distributed lags have separate drafts. A settings approval does not establish that the data satisfy the fitting requirements.
   Preprocessing uses the preprocessing settings key. Ask about row structure, time interpretation, missing-data policy and transformations rather than guessing. Missing-cell counts come from the profile; structural-zero confirmation must be supplied by the user in the controls. Settings approval only edits the draft. A separate run_analysis request with key preprocessing creates and adopts the prepared version through the page's existing checks. Explain that consequence before requesting it. Inspect the receipt's row count and selected columns afterward; do not describe preparation as an effect estimate.
-  These tools do not select another study or graph. Do not attach the current study to an unrelated workspace result.`
+  Only dag-workspace selects another source DAG; other workspace settings remain bound to their current graph. Use the separate study-selection proposal to select a saved study. Do not attach the current study to an unrelated workspace result.`
       : '',
     parent
       ? PARENT

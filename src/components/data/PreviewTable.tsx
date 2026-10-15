@@ -1,7 +1,6 @@
 import { NumberInput } from '@/components/ui/NumberInput'
 import { Select } from '@/components/ui/Select'
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import { useVirtualizer } from '@tanstack/react-virtual'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '@/components/Icon'
 import {
   cellPadding,
@@ -21,7 +20,6 @@ import {
   type ColumnSummary,
   type DatasetProfile,
   type PhysicalColumnProfile,
-  type PreviewCell,
   type PreviewFilter,
   type PreviewSort,
 } from '@/domain/dataset'
@@ -29,15 +27,10 @@ import { assertNever } from '@/domain/dop'
 import type { SelectedSource } from '@/domain/workflow'
 import { formatCount } from '@/lib/format/number'
 import { cn } from '@/lib/utils'
-import { columnDecimals, isNumericCell, PreviewCellText } from './previewCell'
+import { createPreviewBody, type PreviewBodyView } from './previewBody'
 import type { DatasetSummaryState } from './useDatasetSummary'
 import { usePreviewWindows } from './usePreviewWindows'
 import { fontFor, textWidth } from '@/lib/textMetrics'
-
-const isRightAligned = (cell: PreviewCell | undefined, column: PhysicalColumnProfile): boolean =>
-  cell === undefined || cell.kind === 'null'
-    ? isNumericDuckDbType(column.duckdbType)
-    : isNumericCell(cell)
 
 const describeFilter = (filter: PreviewFilter, name: string): string => {
   switch (filter.kind) {
@@ -272,6 +265,10 @@ export function PreviewTable({
   const [editing, setEditing] = useState<EditorDraft | null>(null)
   const [searchDraft, setSearchDraft] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
+  const bodyRef = useRef<HTMLTableSectionElement>(null)
+  const countRef = useRef<HTMLSpanElement>(null)
+  const viewRef = useRef<PreviewBodyView | null>(null)
+  const drawRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
     const handle = window.setTimeout(() => setSearch(searchDraft.trim()), 250)
@@ -282,32 +279,10 @@ export function PreviewTable({
   const windows = usePreviewWindows(source, profile, shape)
   const total = windows.total ?? 0
   const rowHeight = ROW_HEIGHT[density]
-  const virtualizer = useVirtualizer({
-    count: total,
-    getScrollElement: () => scrollRef.current,
-    estimateSize: () => rowHeight,
-    overscan: 12,
-  })
-  const items = virtualizer.getVirtualItems()
-  const first = items[0]?.index ?? 0
-  const last = items.at(-1)?.index ?? 0
-  useEffect(() => {
-    if (total > 0) windows.ensure(first, last)
-  }, [first, last, total, windows])
-  useEffect(() => {
-    virtualizer.measure()
-  }, [rowHeight, virtualizer])
 
   const visibleColumns = profile.columns.filter((column) => !hidden.has(column.id))
   const summaryOf = (column: ColumnId): ColumnSummary | null =>
     summary.kind === 'ready' ? (summary.byColumn.get(column) ?? null) : null
-  const onScreen = items.map((item) => windows.rowAt(item.index)?.cells ?? null)
-  const decimals = new Map(
-    visibleColumns.map((column) => [
-      column.id,
-      columnDecimals(onScreen, profile.columns.indexOf(column)),
-    ]),
-  )
   const padding = cellPadding(density)
 
   const replaceFilters = (column: ColumnId, next: readonly PreviewFilter[]) =>
@@ -356,8 +331,6 @@ export function PreviewTable({
 
   const nameOf = (id: ColumnId): string =>
     profile.columns.find((column) => column.id === id)?.name ?? String(id)
-  const shownFrom = total === 0 ? 0 : first + 1
-  const shownTo = total === 0 ? 0 : Math.min(total, last + 1)
   const clauses = [
     sort === null
       ? null
@@ -365,10 +338,35 @@ export function PreviewTable({
     filters.length === 0 ? null : `${filters.length} filter${filters.length === 1 ? '' : 's'}`,
     search.length === 0 ? null : `search “${search}”`,
   ].filter((clause): clause is string => clause !== null)
-  const count =
+  const describe = (first: number, last: number): string =>
     windows.total === null
       ? 'Loading rows…'
-      : `rows ${formatCount(shownFrom).text} to ${formatCount(shownTo).text} of ${formatCount(total).text}${total !== profile.rowCount ? ` (${formatCount(profile.rowCount).text} in the file)` : ''}${clauses.length > 0 ? `, ${clauses.join('; ')}` : ''}`
+      : `rows ${formatCount(total === 0 ? 0 : first + 1).text} to ${formatCount(total === 0 ? 0 : last + 1).text} of ${formatCount(total).text}${total !== profile.rowCount ? ` (${formatCount(profile.rowCount).text} in the file)` : ''}${clauses.length > 0 ? `, ${clauses.join('; ')}` : ''}`
+
+  viewRef.current = {
+    total,
+    rowHeight,
+    padding,
+    columns: visibleColumns,
+    cellIndex: visibleColumns.map((column) => profile.columns.indexOf(column)),
+    selected: selectedColumn,
+    rowAt: windows.rowAt,
+    onRange: windows.ensure,
+    describe,
+  }
+  useLayoutEffect(() => {
+    const body = bodyRef.current
+    const scroller = scrollRef.current
+    const count = countRef.current
+    if (body === null || scroller === null || count === null) return
+    const renderer = createPreviewBody(body, scroller, count, () => viewRef.current!)
+    drawRef.current = renderer.draw
+    return () => {
+      drawRef.current = null
+      renderer.dispose()
+    }
+  }, [])
+  useLayoutEffect(() => drawRef.current?.())
 
   // The column holds the grouped count in tabular figures, measured in the body face, inside 28px of padding.
   const rowNumberWidth = Math.max(
@@ -384,13 +382,13 @@ export function PreviewTable({
       scrollRef={scrollRef}
       toolbar={
         <>
-          <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:flex-1">
+          <div className="flex w-full min-w-0 items-center gap-2 @lg/table:w-auto @lg/table:flex-1">
             <FilterField
               value={searchDraft}
               onChange={setSearchDraft}
               placeholder="Search all columns"
               label="Search rows"
-              className="min-w-0 flex-1 sm:w-44"
+              className="min-w-0 flex-1 @lg/table:w-44"
             />
             <details className="relative shrink-0">
               <summary
@@ -455,7 +453,7 @@ export function PreviewTable({
           ))}
         </>
       }
-      count={count}
+      count={<span ref={countRef} />}
       lead={
         <>
           {editing !== null && (
@@ -554,92 +552,13 @@ export function PreviewTable({
             })}
           </tr>
         </thead>
-        <tbody>
-          {items.length > 0 && items[0].start > 0 && (
-            <tr role="presentation" aria-hidden>
-              <td
-                role="presentation"
-                colSpan={visibleColumns.length + 1}
-                style={{ height: items[0].start, padding: 0, border: 0 }}
-              />
-            </tr>
-          )}
-          {items.map((item) => {
-            const row = windows.rowAt(item.index)
-            return (
-              <tr
-                key={item.key}
-                aria-rowindex={item.index + 2}
-                className="border-b border-line"
-                style={{ height: rowHeight }}
-              >
-                <th
-                  scope="row"
-                  className={num(
-                    cn(
-                      'sticky left-0 z-10 border-r border-hair bg-panel px-3.5 text-right font-normal text-faint',
-                      padding,
-                    ),
-                  )}
-                >
-                  {row === null ? '' : formatCount(row.index).text}
-                </th>
-                {visibleColumns.map((column) => {
-                  const columnIndex = profile.columns.indexOf(column)
-                  const cell = row?.cells[columnIndex]
-                  const right = isRightAligned(cell, column)
-                  return (
-                    <td
-                      key={column.id}
-                      className={cn(
-                        'truncate whitespace-nowrap px-3.5',
-                        padding,
-                        right ? num('text-right') : 'text-left',
-                        cell?.kind === 'null' ? 'text-muted' : 'text-ink',
-                        column.id === selectedColumn && 'bg-raised',
-                      )}
-                      title={
-                        cell !== undefined && cell.kind !== 'null'
-                          ? String(cell.kind === 'boolean' ? cell.value : cell.value)
-                          : undefined
-                      }
-                    >
-                      {cell === undefined ? (
-                        <span className="text-faint">…</span>
-                      ) : (
-                        <PreviewCellText cell={cell} decimals={decimals.get(column.id) ?? 0} />
-                      )}
-                    </td>
-                  )
-                })}
-              </tr>
-            )
-          })}
-          {items.length > 0 && virtualizer.getTotalSize() - (items.at(-1)?.end ?? 0) > 0 && (
-            <tr role="presentation" aria-hidden>
-              <td
-                role="presentation"
-                colSpan={visibleColumns.length + 1}
-                style={{
-                  height: virtualizer.getTotalSize() - (items.at(-1)?.end ?? 0),
-                  padding: 0,
-                  border: 0,
-                }}
-              />
-            </tr>
-          )}
-          {windows.total === 0 && (
-            <tr>
-              <td
-                colSpan={visibleColumns.length + 1}
-                className="px-3.5 py-6 text-center text-body text-faint"
-              >
-                No rows match the criteria. Loosen a filter or broaden the search.
-              </td>
-            </tr>
-          )}
-        </tbody>
+        <tbody ref={bodyRef} />
       </table>
+      {windows.total === 0 && (
+        <p className="m-0 px-3.5 py-6 text-center text-body text-faint">
+          No rows match the criteria. Loosen a filter or broaden the search.
+        </p>
+      )}
     </TableShell>
   )
 }

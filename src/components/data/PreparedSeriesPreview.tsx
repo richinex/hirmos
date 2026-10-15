@@ -370,21 +370,16 @@ export function PreparedSeriesPreview({
               </Metadata>
             </span>
           </button>
-          <div
-            className="grid transition-[grid-template-rows] duration-(--motion-base)"
-            style={{ gridTemplateRows: open ? '1fr' : '0fr' }}
-          >
-            <div className="overflow-hidden">
-              <ul
-                className="m-0 grid list-none grid-cols-[repeat(auto-fit,minmax(min(28rem,100%),1fr))] gap-2 border-t border-hair p-2"
-                aria-label="Prepared series plots"
-              >
-                {job.series.map((series) => (
-                  <PreparedSeriesCell key={series.column} series={series} />
-                ))}
-              </ul>
-            </div>
-          </div>
+          {open ? (
+            <ul
+              className="rise m-0 grid list-none grid-cols-[repeat(auto-fit,minmax(min(28rem,100%),1fr))] gap-2 border-t border-hair p-2"
+              aria-label="Prepared series plots"
+            >
+              {job.series.map((series) => (
+                <PreparedSeriesCell key={series.column} series={series} />
+              ))}
+            </ul>
+          ) : null}
         </div>
       )}
     </section>

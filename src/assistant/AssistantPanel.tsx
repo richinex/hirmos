@@ -429,7 +429,9 @@ function Session({ context, project }: { readonly context: string; readonly proj
               reason:
                 key === 'identification'
                   ? 'Open Study design, choose the graph, treatment and outcome, then request identification again.'
-                  : 'This analysis is not available. Open its section and review the controls.',
+                  : key === 'swig' || key === 'swig-separation'
+                    ? 'Open DAG workspace. Use dag-workspace settings to select the source DAG and open SWIG, then review the check settings before running.'
+                    : 'This analysis is not available. Open its section and review the controls.',
             })
           return runApproval.request(
             key,

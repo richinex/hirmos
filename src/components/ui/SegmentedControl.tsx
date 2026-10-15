@@ -9,6 +9,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from 'react'
+import { motionDuration } from '@/lib/motion'
 import { scrollBehavior, useScrollOverflow, type ScrollOverflow } from '@/lib/useScrollOverflow'
 import { cn } from '@/lib/utils'
 import { well } from './recipes'
@@ -34,14 +35,6 @@ import { ScrollArrow } from './ScrollArrow'
  *
  * Disabled options are skipped by arrow, Home and End navigation. Their explanatory `title` remains
  * available from the visible option while the native input carries the disabled state.
- *
- * The knob, and in the line form the rule, is a measured overlay: it takes the frame of the displayed
- * option, so text and hit areas never move and the knob stays right when a track wraps onto a second line.
- * Its two edges move on separate clocks, the edge on the side of travel on the fast duration and the other
- * on the slow one, so the knob stretches toward the choice and settles without overshoot; reduced motion
- * drops it to a jump. A pointer can also press and slide along a track: a local preview follows the pointer
- * and commits only on release, and the knob presses in slightly while held. Cancelled gestures leave the
- * setting unchanged; vertical touch gestures can scroll the page.
  *
  * A line wider than its column stays on one line and scrolls; each end with more options fades and shows
  * an arrow.
@@ -101,7 +94,6 @@ interface Layout {
 
 interface Knob {
   readonly frame: Frame
-  readonly forward: boolean
 }
 
 interface Hover {
@@ -154,6 +146,73 @@ const CHIP_LAYERS = [
   "before:pointer-events-none before:absolute before:-inset-[3px] before:scale-110 before:rounded-lg before:border-2 before:border-signal before:opacity-0 before:transition-[opacity,transform] before:duration-(--motion-fast) before:content-['']",
   'has-[:focus-visible]:outline-none has-[:focus-visible]:before:scale-100 has-[:focus-visible]:before:opacity-100',
 ].join(' ')
+
+const drawnFrame = (element: HTMLElement, host: HTMLElement): Frame => {
+  const box = host.getBoundingClientRect()
+  const rect = element.getBoundingClientRect()
+  return {
+    left: rect.left - box.left - host.clientLeft,
+    top: rect.top - box.top - host.clientTop,
+    width: rect.width,
+    height: rect.height,
+  }
+}
+
+const drawnAt = (from: Frame, to: Frame): string =>
+  `translate(${from.left + from.width / 2 - to.left - to.width / 2}px, ${from.top + from.height / 2 - to.top - to.height / 2}px) scale(${from.width / to.width}, ${from.height / to.height})`
+
+const closeTo = (a: Frame, b: Frame): boolean =>
+  Math.abs(a.left - b.left) < 0.5 &&
+  Math.abs(a.top - b.top) < 0.5 &&
+  Math.abs(a.width - b.width) < 0.5 &&
+  Math.abs(a.height - b.height) < 0.5
+
+function place(
+  element: HTMLElement,
+  host: HTMLElement,
+  to: Frame,
+  motion: 'jump' | 'glide' | 'stretch',
+  running: { current: Animation | null },
+) {
+  const from = motion === 'jump' ? null : drawnFrame(element, host)
+  running.current?.cancel()
+  running.current = null
+  element.style.left = `${to.left}px`
+  element.style.top = `${to.top}px`
+  element.style.width = `${to.width}px`
+  element.style.height = `${to.height}px`
+  if (from === null || from.width <= 0 || from.height <= 0 || to.width <= 0 || to.height <= 0) return
+  if (closeTo(from, to)) return
+  const fast = motionDuration('fast')
+  if (fast === 0) return
+  const easing =
+    getComputedStyle(element).getPropertyValue('--default-transition-timing-function').trim() ||
+    'ease'
+  if (motion === 'glide') {
+    running.current = element.animate(
+      [{ transform: drawnAt(from, to) }, { transform: 'none' }],
+      { duration: fast, easing, composite: 'add' },
+    )
+    return
+  }
+  const slow = motionDuration('slow')
+  const forward = to.left + to.width / 2 >= from.left + from.width / 2
+  const fromRight = from.left + from.width
+  const toRight = to.left + to.width
+  const left = forward ? (from.left + to.left) / 2 : to.left
+  const right = forward ? toRight : (fromRight + toRight) / 2
+  const top = (from.top + to.top) / 2
+  const bottom = (from.top + from.height + to.top + to.height) / 2
+  const middle = { left, top, width: right - left, height: bottom - top }
+  running.current = element.animate(
+    [
+      { transform: drawnAt(from, to), easing },
+      { transform: drawnAt(middle, to), offset: fast / slow, easing },
+      { transform: 'none' },
+    ],
+    { duration: slow, composite: 'add' },
+  )
+}
 
 const optionsIn = (element: HTMLElement): HTMLLabelElement[] =>
   Array.from(element.querySelectorAll<HTMLLabelElement>(':scope > [data-segment-option]'))
@@ -245,10 +304,7 @@ export function SegmentedControl<V extends string>({
     setKnob((previous) => {
       if (target === undefined) return null
       if (previous !== null && sameFrame(previous.frame, target)) return previous
-      const forward =
-        previous === null ||
-        target.left + target.width / 2 >= previous.frame.left + previous.frame.width / 2
-      return { frame: target, forward }
+      return { frame: target }
     })
   }, [wrap, fill])
 
@@ -421,9 +477,33 @@ export function SegmentedControl<V extends string>({
   // at one end read as unfinished. A longer row of tabs keeps its natural width and scrolls.
   const narrowFill = !fill && (form === 'track' || (form === 'line' && options.length <= 3))
 
+  const knobFrame =
+    form === 'wrap' || knob === null || layout === null
+      ? null
+      : form === 'line'
+        ? { ...knob.frame, top: knob.frame.top + knob.frame.height - LINE_RULE / 2, height: LINE_RULE }
+        : knob.frame
+  const knobNode = useRef<HTMLSpanElement>(null)
+  const knobMotion = useRef<Animation | null>(null)
+  const [knobLeft, knobTop, knobWidth, knobHeight] =
+    knobFrame === null ? [] : [knobFrame.left, knobFrame.top, knobFrame.width, knobFrame.height]
+  useLayoutEffect(() => {
+    const element = knobNode.current
+    const root = host.current
+    if (element === null || root === null || knobLeft === undefined) return
+    place(
+      element,
+      root,
+      { left: knobLeft, top: knobTop!, width: knobWidth!, height: knobHeight! },
+      !motionReady ? 'jump' : dragging ? 'glide' : 'stretch',
+      knobMotion,
+    )
+  }, [knobLeft, knobTop, knobWidth, knobHeight, motionReady, dragging])
+
   const knobElement =
-    form === 'wrap' || knob === null || layout === null ? null : (
+    knobFrame === null ? null : (
       <span
+        ref={knobNode}
         aria-hidden
         data-motion={motionReady ? undefined : 'off'}
         className={cn(
@@ -432,43 +512,38 @@ export function SegmentedControl<V extends string>({
             ? 'rounded-md bg-knob [background-image:var(--gradient-knob)] shadow-(--shadow-knob)'
             : 'bg-ink',
         )}
-        style={
-          {
-            left: knob.frame.left,
-            right: layout.width - knob.frame.left - knob.frame.width,
-            top:
-              form === 'line' ? knob.frame.top + knob.frame.height - LINE_RULE / 2 : knob.frame.top,
-            bottom:
-              layout.height -
-              knob.frame.top -
-              knob.frame.height -
-              (form === 'line' ? LINE_RULE / 2 : 0),
-            '--segment-left':
-              dragging || !knob.forward ? 'var(--motion-fast)' : 'var(--motion-slow)',
-            '--segment-right':
-              dragging || knob.forward ? 'var(--motion-fast)' : 'var(--motion-slow)',
-            transform: dragging ? 'scale(0.96)' : undefined,
-          } as CSSProperties
-        }
+        style={dragging ? { transform: 'scale(0.96)' } : undefined}
       />
     )
 
   const hovered = form === 'line' && hover !== null ? layout?.frames[hover.index] : undefined
+  const washNode = useRef<HTMLSpanElement>(null)
+  const washMotion = useRef<Animation | null>(null)
+  const washPlaced = hover?.placed === true
+  const [washLeft, washTop, washWidth, washHeight] =
+    hovered === undefined
+      ? []
+      : [hovered.left, hovered.top + 3, hovered.width, Math.max(0, hovered.height - 7)]
+  useLayoutEffect(() => {
+    const element = washNode.current
+    const root = host.current
+    if (element === null || root === null || washLeft === undefined) return
+    place(
+      element,
+      root,
+      { left: washLeft, top: washTop!, width: washWidth!, height: washHeight! },
+      washPlaced && motionReady ? 'glide' : 'jump',
+      washMotion,
+    )
+  }, [washLeft, washTop, washWidth, washHeight, washPlaced, motionReady])
+
   const wash =
     hovered === undefined || hover === null ? null : (
       <span
+        ref={washNode}
         aria-hidden
-        className={cn(
-          'pointer-events-none absolute rounded-md bg-raised duration-(--motion-fast)',
-          hover.placed ? 'transition-[left,top,width,height,opacity]' : 'transition-opacity',
-        )}
-        style={{
-          left: hovered.left,
-          top: hovered.top + 3,
-          width: hovered.width,
-          height: Math.max(0, hovered.height - 7),
-          opacity: hover.shown && hover.index !== displayedIndex ? 1 : 0,
-        }}
+        className="pointer-events-none absolute rounded-md bg-raised transition-opacity duration-(--motion-fast)"
+        style={{ opacity: hover.shown && hover.index !== displayedIndex ? 1 : 0 }}
       />
     )
 

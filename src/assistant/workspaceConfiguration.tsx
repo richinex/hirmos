@@ -3,10 +3,12 @@ import { useStore } from 'zustand'
 import { z } from 'zod'
 import { err, ok, type Result } from '@/domain/dop'
 import type { ConfigurationSetting } from '@/domain/estimation'
+import type { GraphTarget } from '@/domain/dagWorkspaceSettings'
 import { useAssistantBridge } from './applicationTools'
 import { ProposalActions, ProposalCard, ProposalSettings } from './ProposalParts'
 
 export interface WorkspaceConfigurationCapability {
+  readonly graph?: GraphTarget
   readonly action?: 'settings' | 'open-editor'
   readonly revision: string
   readonly title: string
@@ -47,10 +49,11 @@ export function readWorkspaceSettings(
           : `Unknown workspace settings key. Available keys: ${available.map((entry) => entry.key).join(', ')}.`,
       available,
     }
-  const { title, current, columns, schema, describe, action } = capabilities[key]!
+  const { title, current, columns, schema, describe, action, graph } = capabilities[key]!
   return {
     key,
     title,
+    ...(graph ? { graph } : {}),
     action: action ?? 'settings',
     current,
     columns,
@@ -62,6 +65,7 @@ const requestSchema = z
   .object({
     key: z.string().min(1),
     configuration: z.unknown(),
+    graph: z.object({ document: z.string(), revision: z.string() }).strict().optional(),
     reason: z.string().trim().min(1).max(2000),
   })
   .strict()
@@ -99,6 +103,18 @@ export function proposeWorkspaceConfiguration(
   if (!parsed.success) return err('Supply the workspace key, complete configuration and reason.')
   const capability = capabilities[parsed.data.key]
   if (!capability) return err('Open the requested workspace before configuring it.')
+  if (/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i.test(parsed.data.reason))
+    return err(
+      'Use graph and variable names in the proposal reason. Keep internal IDs in the graph binding and configuration, not the explanation.',
+    )
+  if (
+    capability.graph &&
+    (parsed.data.graph?.document !== capability.graph.document ||
+      parsed.data.graph?.revision !== capability.graph.revision)
+  )
+    return err(
+      `These settings belong to ${capability.graph.name}. Read its workspace settings and supply the intended graph document and revision. If you meant another graph, select it first.`,
+    )
   const checked = capability.check(parsed.data.configuration)
   if (!checked.ok) return checked
   return ok({
@@ -117,6 +133,7 @@ export function useWorkspaceConfiguration<T>(
   binding: string,
   options: {
     readonly title: string
+    readonly graph?: GraphTarget
     readonly action?: 'settings' | 'open-editor'
     readonly current: T
     readonly schema: z.ZodType<T>
@@ -132,7 +149,7 @@ export function useWorkspaceConfiguration<T>(
     latest.current = options
   })
   const description = JSON.stringify(
-    options && { current: options.current, columns: options.columns },
+    options && { current: options.current, columns: options.columns, graph: options.graph },
   )
   useLayoutEffect(() => {
     const value = latest.current
@@ -153,6 +170,7 @@ export function useWorkspaceConfiguration<T>(
       revision: crypto.randomUUID(),
       action: value.action,
       title: value.title,
+      graph: value.graph,
       current: value.current,
       columns: value.columns,
       describe: value.describe

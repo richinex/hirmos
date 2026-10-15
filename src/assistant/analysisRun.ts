@@ -1,7 +1,11 @@
 import { headlineValue, type CausalEstimate } from '@/domain/estimation'
 import { z } from 'zod'
+import type { GraphTarget } from '@/domain/dagWorkspaceSettings'
 
 export const runSubjectSchema = z.discriminatedUnion('kind', [
+  z
+    .object({ kind: z.literal('dag'), document: z.string().min(1), revision: z.string().min(1) })
+    .strict(),
   z
     .object({
       kind: z.literal('saved-study'),
@@ -25,6 +29,15 @@ export function runSubjectProblem(
   inspection: RunInspection,
   requested?: RunSubject,
 ): string | null {
+  if (inspection.graph) {
+    if (requested?.kind !== 'dag')
+      return 'Name the intended source DAG and revision in run_analysis.subject. Read the SWIG workspace settings for its graph binding.'
+    return requested.document === inspection.graph.document &&
+      requested.revision === inspection.graph.revision
+      ? null
+      : `The selected source DAG is ${inspection.graph.name}, or its revision has changed. Select the intended graph and review its settings before running.`
+  }
+  if (requested?.kind === 'dag') return 'This analysis does not expose a graph binding.'
   const selected = inspection.study?.subject
   if (!selected) return requested ? 'This analysis does not expose a study binding.' : null
   if (!requested)
@@ -77,12 +90,13 @@ export type AssistantRunOutcome =
   | { readonly kind: 'cancelled' }
 
 export interface RunInspection {
+  readonly graph?: GraphTarget
   readonly section: string
   readonly method: string
   readonly specification: string
   readonly sharedResult: string
   readonly study?: {
-    readonly subject: RunSubject
+    readonly subject: Exclude<RunSubject, { kind: 'dag' }>
     readonly question: string
     readonly settings: readonly { readonly label: string; readonly value: string }[]
   }

@@ -365,7 +365,7 @@ export function PowerPlanningPanel() {
       ? (['independentT', 'oneSampleT', 'pairedT', 'independentNormal'] as const)
       : (['independent', 'equalClusters', 'twoPeriodDid'] as const)
   return (
-    <section aria-labelledby="power-planning-title" data-testid="power-planning">
+    <section className="@container" aria-labelledby="power-planning-title" data-testid="power-planning">
       <div className="mb-5 flex items-center gap-1.5">
         <h2 id="power-planning-title" className="m-0 text-heading text-ink">
           Sample size and power planning
@@ -400,7 +400,7 @@ export function PowerPlanningPanel() {
           />
           {draft.kind === 'analytical' ? (
             <>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 @3xl:grid-cols-2">
                 <div className="grid gap-1">
                   <span className={fieldLabel}>Solve for</span>
                   <SegmentedControl
@@ -433,7 +433,7 @@ export function PowerPlanningPanel() {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-1 gap-3 @md:grid-cols-2 @2xl:grid-cols-3">
                 <NumberField
                   label="Significance level"
                   value={draft.alpha}
@@ -488,7 +488,7 @@ export function PowerPlanningPanel() {
             </>
           ) : (
             <>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-1 gap-3 @md:grid-cols-2 @2xl:grid-cols-3">
                 <NumberField
                   label={
                     draft.scenario.kind === 'equalClusters' ? 'Treated clusters' : 'Treated units'

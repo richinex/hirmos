@@ -132,6 +132,7 @@ export async function runAssistant(options: Options): Promise<Answer> {
     let readProfile = false
     let readStudyRecord = false
     let readSavedRun = false
+    let analysisFeedback: AssistantRunOutcome | null = null
     const trace = (kind: TraceMessageKind, text: string) => options.trace({ agent, kind, text })
     if (child) trace('task', question)
     const runtime = await pythonSandbox(signal, async (name, args) => {
@@ -259,6 +260,7 @@ export async function runAssistant(options: Options): Promise<Answer> {
           result.kind === 'calculated' ||
           result.kind === 'review-required'
         latestAnalysisThisQuestion = result
+        analysisFeedback = result
         return result
       }
       if (name === 'propose_sql' && !child && options.proposeSql !== null) {
@@ -396,9 +398,17 @@ export async function runAssistant(options: Options): Promise<Answer> {
           },
           acquireExecutor: async () => ({
             execute: async (code) => {
+              analysisFeedback = null
               const executed = await runtime.executeReport(code)
               return {
-                stdout: executed.output,
+                stdout: [
+                  executed.output,
+                  analysisFeedback
+                    ? `Analysis outcome recorded by Hirmos: ${JSON.stringify(analysisFeedback)}`
+                    : '',
+                ]
+                  .filter(Boolean)
+                  .join('\n'),
                 stderr: executed.stderr,
                 exit_code: executed.exitCode,
                 answer: {

@@ -8,7 +8,7 @@ export async function connectAssistant(page: Page, blocks: readonly string[]) {
     const code = blocks[requests++] ?? 'raise RuntimeError("Unexpected model retry")'
     return route.fulfill(openRouterStream({ choices: [{ message: { content: '```python\n' + code + '\n```' } }] }))
   })
-  await page.getByRole('button', { name: 'Open the assistant', exact: true }).click()
+  await page.getByRole('button', { name: 'Open the assistant', exact: true }).click({ position: { x: 20, y: 20 } })
   await page.getByLabel('OpenRouter API key').fill('test-key')
   await page.getByLabel('OpenRouter model ID').fill('test/model')
   await page.getByRole('button', { name: 'Privacy', exact: true }).click()

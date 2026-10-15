@@ -10,6 +10,7 @@ import { readDiscoveryRun } from './discoveryRunRead'
 import { readCounterfactualRun } from './counterfactualRunRead'
 import { readGraphRun } from './graphRunRead'
 import { readPlanning } from './planningRead'
+import { reviewAnalysis } from '@/domain/analysisReview'
 
 const runReadArgs = z
   .object({
@@ -29,7 +30,7 @@ const runReadArgs = z
         'planning',
       ])
       .default('estimation'),
-    view: z.enum(['summary', 'specification', 'evidence']).default('summary'),
+    view: z.enum(['summary', 'specification', 'evidence', 'review']).default('summary'),
   })
   .strict()
 
@@ -39,10 +40,39 @@ export function readRun(workflow: Workflow, raw: unknown) {
     return {
       kind: 'refused' as const,
       reason:
-        'Supply a saved run ID and its workspace, or use workspace planning with id current to read the saved planning calculation. Views are summary, specification and evidence.',
+        'Supply a saved run ID and its workspace, or use workspace planning with id current to read the saved planning calculation. Views are summary, specification and evidence; Estimation and SWIG also support review.',
     }
   if (workflow.kind !== 'profiled')
     return { kind: 'refused' as const, reason: 'No project with saved results is open.' }
+  if (parsed.data.view === 'review') {
+    if (parsed.data.workspace === 'swig')
+      return readGraphRun(workflow, 'swig', parsed.data.id, 'review')
+    if (parsed.data.workspace !== 'estimation')
+      return {
+        kind: 'refused' as const,
+        reason:
+          'Design-specific review currently reads Estimation and SWIG runs. Use summary or evidence for this workspace.',
+      }
+    const run = workflow.estimationRuns.find((item) => item.id === parsed.data.id)
+    if (!run)
+      return {
+        kind: 'refused' as const,
+        reason: 'That Estimation run is not saved in this project.',
+      }
+    return {
+      kind: 'saved-run' as const,
+      workspace: 'estimation' as const,
+      run: run.id,
+      view: 'review' as const,
+      review: reviewAnalysis(run, {
+        studies: workflow.studies,
+        identifications: workflow.identifications,
+        documents: workflow.dagDocuments,
+        preparedDataset: workflow.prepared?.id ?? null,
+        sensitivityRuns: workflow.sensitivityRuns,
+      }),
+    }
+  }
   if (parsed.data.workspace === 'planning')
     return readPlanning(workflow, parsed.data.id, parsed.data.view)
   if (parsed.data.workspace === 'causal-model')
@@ -106,6 +136,8 @@ export function readRun(workflow: Workflow, raw: unknown) {
         sample: run.estimate.sample,
         adjustment: run.estimate.adjustment,
         eligibility: run.eligibility,
+        review:
+          'Use view="review" for a source-bound design review. Unsupported methods are named explicitly. A review describes evidence and limitations; it does not grade causal credibility.',
         details:
           'This is a saved result, not a new computation. Read specification for the saved settings and original graph, or evidence for numerical diagnostics and full effects. Diagnostics omitted from this summary have not been checked. Save the response in Python and print selected fields; output is limited to 3,000 characters.',
       }

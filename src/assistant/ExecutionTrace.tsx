@@ -93,7 +93,7 @@ function Step({
 }) {
   const verb = stepVerb(step)
   return (
-    <div className="flex items-start gap-2.5 py-1">
+    <div className="@container flex items-start gap-2.5 py-1">
       {live ? (
         <span className="mt-px grid size-3.5 shrink-0 place-items-center">
           <Orb state={step.code === null ? 'composing' : 'searching'} aria-label="Working" />
@@ -107,7 +107,7 @@ function Step({
       )}
       {live && step.code === null && step.draft === null ? null : (
         <>
-          <span className={label('mt-px hidden w-[62px] shrink-0 text-muted md:inline')}>
+          <span className={label('mt-px hidden w-[62px] shrink-0 text-muted @sm:inline')}>
             {verb.word}
           </span>
           {step.code === null && step.draft === null ? (

@@ -27,11 +27,11 @@ export function QuestionView({
         dispatch({ type: 'submitted' })
       }
       return (
-        <section className="rise my-auto w-full max-w-2xl" aria-labelledby="question-title">
+        <section className="@container rise my-auto w-full max-w-2xl" aria-labelledby="question-title">
           <ChapterHeading id="question-title" className="mb-6">
             Frame the causal question
           </ChapterHeading>
-          <form onSubmit={submit} className="grid gap-4 sm:grid-cols-2">
+          <form onSubmit={submit} className="grid gap-4 @md:grid-cols-2">
             <label className="block">
               <span className="mb-1.5 block text-body font-medium text-ink">Treatment</span>
               <Select
@@ -71,11 +71,11 @@ export function QuestionView({
               </Select>
             </label>
             {state.problem && (
-              <p role="alert" className="m-0 text-body text-danger sm:col-span-2">
+              <p role="alert" className="m-0 text-body text-danger @md:col-span-2">
                 {describeQuestionProblem(state.problem)}
               </p>
             )}
-            <div className="sm:col-span-2">
+            <div className="@md:col-span-2">
               <button type="submit" className={button('signal')}>
                 Set question
               </button>
