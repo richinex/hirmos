@@ -1,4 +1,5 @@
 import { SurrogateCategoryPicker } from './SurrogateCategoryPicker'
+import { PutOnDesk } from '@/components/results/desk/PutOnDesk'
 import { z } from 'zod'
 import { err, ok } from '@/domain/dop'
 import { useWorkspaceConfiguration } from '@/assistant/workspaceConfiguration'
@@ -533,6 +534,7 @@ export function SurrogatePanel(props: {
               {[...props.runs].reverse().map((run) => (
                 <RunFold
                   key={run.id}
+                  actions={<PutOnDesk iconSize={13} deskRef={{ kind: 'surrogate', id: String(run.id) }} />}
                   title={surrogateLabels[run.evidence.estimator]}
                   figure={formatStatistic('raw', run.evidence.estimate).text}
                   stamp={formatTime(run.createdAt)}

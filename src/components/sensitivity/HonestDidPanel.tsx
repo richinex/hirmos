@@ -1,4 +1,5 @@
 import { NumberInput } from '@/components/ui/NumberInput'
+import { PutOnDesk } from '@/components/results/desk/PutOnDesk'
 import { useWorkspaceConfiguration } from '@/assistant/workspaceConfiguration'
 import { honestSettingsSchema, type HonestSettings } from '@/domain/honestDidSettings'
 import { err, ok } from '@/domain/dop'
@@ -863,6 +864,7 @@ export function HonestDidPanel({
             {[...runs].reverse().map((run) => (
               <RunFold
                 key={run.id}
+                actions={<PutOnDesk iconSize={13} deskRef={{ kind: 'sensitivity', id: String(run.id) }} />}
                 title="Parallel-trends sensitivity"
                 figure={
                   <RunMeta>

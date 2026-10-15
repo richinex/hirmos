@@ -70,7 +70,7 @@ test('bite variables are the measured mediators the treatment points at directly
 
 test('a bite check is recorded against its study, estimated, and paired in Results', async ({
   page,
-}) => {
+}, info) => {
   test.setTimeout(240_000)
   await page.goto('/app')
   await page.getByRole('button', { name: 'Open AI usage intensity', exact: true }).click()
@@ -95,9 +95,20 @@ test('a bite check is recorded against its study, estimated, and paired in Resul
   await expect(page.getByText(/on code volume kloc/).first()).toBeVisible({ timeout: 180_000 })
 
   await chapter(page, /^Results/)
+  const saved = page.getByRole('region', { name: 'Saved results' })
   const pick = async (estimate: RegExp) => {
-    await page.getByRole('combobox', { name: 'Estimate', exact: true }).click()
-    await page.getByRole('option', { name: estimate }).click()
+    if (info.project.name === 'mobile-chromium') {
+      await page.getByRole('combobox', { name: 'Estimate', exact: true }).click()
+      await page.getByRole('option', { name: estimate }).click()
+      return
+    }
+    await saved.getByRole('heading', { name: 'Saved results' }).click()
+    await saved
+      .getByRole('list', { name: 'Estimates' })
+      .getByRole('listitem')
+      .filter({ hasText: estimate })
+      .getByRole('button', { name: 'Open' })
+      .click()
   }
   await pick(/on bugs_per_kloc/)
   const bite = page.getByRole('region', { name: 'Bite of ai_usage' })
@@ -105,7 +116,7 @@ test('a bite check is recorded against its study, estimated, and paired in Resul
   await expect(bite).toContainText('95%')
   await expect(bite).toContainText('Fitted difference in code volume kloc')
   await pick(/on code_volume_kloc/)
-  const study = page.getByRole('region', { name: 'Study', exact: true })
+  const study = page.getByRole('region', { name: 'Study', exact: true }).filter({ hasText: 'Bite check for' })
   await expect(study).toContainText('Bite check for')
   await expect(study).toContainText('Average effect of ai_usage on bugs_per_kloc')
 

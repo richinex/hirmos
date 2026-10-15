@@ -18,6 +18,9 @@ const DB_NAME = 'hirmos'
 const STORE = 'projects'
 const recoveryProjects = new Set<string>()
 export const projectInRecovery = (id: string): boolean => recoveryProjects.has(id)
+/** The last snapshot read from or written to the store, per project, so a save can be skipped without a read. */
+const persisted = new Map<string, PersistedProject>()
+let held: IDBDatabase | null = null
 
 interface StoredRecord {
   readonly header: SavedProjectHeader
@@ -79,6 +82,7 @@ export async function saveProject(
   const record: StoredRecord = { header: headerOf(snapshot), body: serialiseSnapshot(snapshot) }
   try {
     await transact('readwrite', (store) => store.put(record, snapshot.project.id))
+    persisted.set(snapshot.project.id, snapshot)
     reportStorageRecovered()
     return ok(record.header)
   } catch (cause) {
@@ -99,6 +103,52 @@ export async function saveProjectIfChanged(
 
   const saved = await saveProject(snapshot)
   return saved.ok ? ok({ kind: 'saved', header: saved.value }) : saved
+}
+
+/** Keeps one connection open while a project is open, so `saveProjectNow` needs no asynchronous open. */
+export function holdConnection(): () => void {
+  let released = false
+  void open().then(
+    (db) => {
+      if (released) {
+        db.close()
+        return
+      }
+      db.onversionchange = () => {
+        db.close()
+        if (held === db) held = null
+      }
+      held = db
+    },
+    () => undefined,
+  )
+  return () => {
+    released = true
+    held?.close()
+    held = null
+  }
+}
+
+/**
+ * Writes the snapshot in the same task, for a page that is unloading and cannot wait for the database to
+ * open. A snapshot with the stored content is not written again.
+ */
+export function saveProjectNow(snapshot: PersistedProject): void {
+  if (
+    held === null ||
+    projectInRecovery(snapshot.project.id) ||
+    snapshot.source?.recipe.kind === 'unreadable-recipe'
+  )
+    return
+  const last = persisted.get(snapshot.project.id)
+  if (last !== undefined && samePersistedProjectContent(last, snapshot)) return
+  const record: StoredRecord = { header: headerOf(snapshot), body: serialiseSnapshot(snapshot) }
+  try {
+    held.transaction(STORE, 'readwrite').objectStore(STORE).put(record, snapshot.project.id)
+    persisted.set(snapshot.project.id, snapshot)
+  } catch (cause) {
+    reportStorageFailure({ store: DB_NAME, reason: detailOf(cause), at: new Date().toISOString() })
+  }
 }
 
 export async function listProjects(): Promise<readonly SavedProjectHeader[]> {
@@ -122,6 +172,7 @@ export async function loadProject(
   const parsed = parseSnapshot(raw.value.body, recoverRecipe)
   if (parsed.ok && parsed.value.source?.recipe.kind === 'unreadable-recipe')
     recoveryProjects.add(id)
+  if (parsed.ok) persisted.set(id, parsed.value)
   return parsed
 }
 
@@ -146,6 +197,7 @@ export async function deleteProject(id: ProjectId): Promise<Result<null, Project
     await deletePreparationDrafts(id)
     await transact('readwrite', (store) => store.delete(id))
     recoveryProjects.delete(id)
+    persisted.delete(id)
     return ok(null)
   } catch (cause) {
     return err({ kind: 'storage-unavailable', detail: detailOf(cause) })

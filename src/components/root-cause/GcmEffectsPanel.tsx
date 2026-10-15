@@ -1,3 +1,4 @@
+import { PutOnDesk } from '@/components/results/desk/PutOnDesk'
 import { NumberInput } from '@/components/ui/NumberInput'
 import { useWorkspaceConfiguration } from '@/assistant/workspaceConfiguration'
 import { useRecordedAnalysis } from '@/assistant/useRecordedAnalysis'
@@ -645,7 +646,14 @@ export function GcmEffectsPanel(props: Props) {
               onCancel={cancel}
             />
           </section>
-          {latest && <GcmEffectResult run={latest} />}
+          {latest && (
+            <div className="space-y-2">
+              <div className="flex justify-end">
+                <PutOnDesk deskRef={{ kind: 'gcm-effect', id: String(latest.id) }} />
+              </div>
+              <GcmEffectResult run={latest} />
+            </div>
+          )}
         </section>
       }
     />

@@ -42,6 +42,12 @@ const subscribe = (notify: () => void): (() => void) => {
   }
 }
 
+export const readDesk = (project: string): unknown => read().desks[project] ?? null
+
+export const writeDesk = (project: string, desk: unknown): void => {
+  write({ ...read(), desks: { ...read().desks, [project]: desk } })
+}
+
 export interface ShellLayoutHandle {
   readonly layout: ShellLayout
   /** Storage adapter for `useDefaultLayout`, so one store owns every pane. */

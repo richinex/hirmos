@@ -1,3 +1,4 @@
+import { PutOnDesk } from '@/components/results/desk/PutOnDesk'
 import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { useState } from 'react'
 import { Icon } from '@/components/Icon'
@@ -48,6 +49,14 @@ export function TimeSeriesHistory<T extends Entry>({
                 )}
               </div>
             </details>
+            <PutOnDesk
+              className="shrink-0"
+              deskRef={
+                entry.kind === 'count-series-model'
+                  ? { kind: 'count-series', id: String(entry.id) }
+                  : { kind: 'time-series', id: String(entry.id) }
+              }
+            />
             <button
               type="button"
               className={iconControl('quiet', 'shrink-0')}

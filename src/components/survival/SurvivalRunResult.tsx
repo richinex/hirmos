@@ -1,3 +1,4 @@
+import { PutOnDesk } from '@/components/results/desk/PutOnDesk'
 import { Metadata } from '@/components/ui/Metadata'
 import { Alert } from '@/components/ui/Alert'
 import { memo, useMemo, useState, type ReactNode } from 'react'
@@ -2096,6 +2097,7 @@ export const SurvivalRunResult = memo(function SurvivalRunResult({
               </time>
             </div>
           )}
+          <PutOnDesk deskRef={{ kind: 'survival', id: String(run.id) }} />
           {onDelete !== undefined && (
             <button
               type="button"

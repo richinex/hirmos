@@ -1,4 +1,5 @@
 import { NumberInput } from '@/components/ui/NumberInput'
+import { PutOnDesk } from '@/components/results/desk/PutOnDesk'
 import { useWorkspaceConfiguration } from '@/assistant/workspaceConfiguration'
 import { sensitivitySettingsSchema, sensitivitySettings } from '@/domain/sensitivitySettings'
 import { ok, err } from '@/domain/dop'
@@ -163,6 +164,7 @@ function DmlRefutationCard({
     return (
       <RunFold
         title="Double machine learning probe batch"
+        actions={<PutOnDesk iconSize={13} deskRef={{ kind: 'sensitivity', id: String(run.id) }} />}
         figure={
           <RunMeta>
             {[
@@ -311,6 +313,7 @@ function RefutationCard({
     return (
       <RunFold
         title="Perturbation and residual probes"
+        actions={<PutOnDesk iconSize={13} deskRef={{ kind: 'sensitivity', id: String(run.id) }} />}
         figure={
           <RunMeta>
             {[
@@ -430,18 +433,10 @@ function RefutationRecord({
   )
 }
 
-function UnobservedCard({
+function UnobservedRecord({
   run,
-  estimation,
-  study,
-  current,
-  onDelete,
 }: {
   readonly run: Extract<SensitivityRunArtifact, { readonly kind: 'unobserved-confounding-run' }>
-  readonly estimation: EstimationRunArtifact
-  readonly study: StudySpecification
-  readonly current: boolean
-  readonly onDelete?: () => void
 }) {
   const theme = useChartTheme()
   const { evidence } = run
@@ -466,12 +461,7 @@ function UnobservedCard({
       ),
     [evidence, theme],
   )
-  const stamp = (
-    <RunMeta>
-      {[describeRun(estimation.configuration), `Seed ${evidence.seed}`, formatTime(run.createdAt)]}
-    </RunMeta>
-  )
-  const record = (
+  return (
     <>
       <h3 className={cn(sectionTitle, 'mb-1 mt-2')}>Simulated unmeasured confounder</h3>
       <p className="m-0 text-body text-muted">
@@ -526,10 +516,33 @@ function UnobservedCard({
       />
     </>
   )
+}
+
+function UnobservedCard({
+  run,
+  estimation,
+  study,
+  current,
+  onDelete,
+}: {
+  readonly run: Extract<SensitivityRunArtifact, { readonly kind: 'unobserved-confounding-run' }>
+  readonly estimation: EstimationRunArtifact
+  readonly study: StudySpecification
+  readonly current: boolean
+  readonly onDelete?: () => void
+}) {
+  const { evidence } = run
+  const stamp = (
+    <RunMeta>
+      {[describeRun(estimation.configuration), `Seed ${evidence.seed}`, formatTime(run.createdAt)]}
+    </RunMeta>
+  )
+  const record = <UnobservedRecord run={run} />
   if (!current) {
     return (
       <RunFold
         title="Unmeasured confounder"
+        actions={<PutOnDesk iconSize={13} deskRef={{ kind: 'sensitivity', id: String(run.id) }} />}
         figure={`${evidence.kappaT.length}×${evidence.kappaY.length} grid`}
         stamp={stamp}
         onDelete={onDelete}
@@ -1380,6 +1393,26 @@ function LegacySensitivityPanel({
       />
     </>
   )
+}
+
+/** One saved estimator probe, without its fold or card: the record as the Sensitivity chapter shows it. */
+export function SensitivityRunResult({
+  run,
+  study,
+}: {
+  readonly run: LegacySensitivityRunArtifact
+  readonly study: StudySpecification
+}) {
+  switch (run.kind) {
+    case 'linear-refutation-run':
+      return <RefutationRecord run={run} study={study} />
+    case 'dml-refutation-run':
+      return <DmlRefutationRecord run={run} study={study} />
+    case 'unobserved-confounding-run':
+      return <UnobservedRecord run={run} />
+    default:
+      return assertNever(run)
+  }
 }
 
 function RunRecord({ run }: { readonly run: LegacySensitivityRunArtifact }) {

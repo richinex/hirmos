@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react'
+import { PutOnDesk } from '@/components/results/desk/PutOnDesk'
 import { useWorkspaceConfiguration } from '@/assistant/workspaceConfiguration'
 import { didSensitivitySettingsSchema } from '@/domain/didSensitivitySettings'
 import { err, ok } from '@/domain/dop'
@@ -743,6 +744,7 @@ export function DidSensitivityPanel({
             {[...runs].reverse().map((run) => (
               <RunFold
                 key={run.id}
+                actions={<PutOnDesk iconSize={13} deskRef={{ kind: 'sensitivity', id: String(run.id) }} />}
                 title="DiD omitted-variable sensitivity"
                 figure={
                   <RunMeta>

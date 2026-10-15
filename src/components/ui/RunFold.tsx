@@ -14,6 +14,7 @@ export function RunFold({
   stamp,
   onDelete,
   deleteLabel,
+  actions,
   defaultOpen = false,
   children,
 }: {
@@ -22,6 +23,8 @@ export function RunFold({
   readonly stamp: ReactNode
   readonly onDelete?: () => void
   readonly deleteLabel?: string
+  /** Controls on the line before delete, revealed the same way. */
+  readonly actions?: ReactNode
   readonly defaultOpen?: boolean
   readonly children: ReactNode
 }) {
@@ -38,6 +41,11 @@ export function RunFold({
           <span className={caption('min-w-0 flex-1 text-ink')}>{title}</span>
           {figure !== undefined && <span className={num('text-label text-ink')}>{figure}</span>}
           <span className={num('ml-auto shrink-0 text-label text-faint')}>{stamp}</span>
+          {actions !== undefined && (
+            <span className="flex shrink-0 items-center opacity-0 transition-opacity group-hover/fold:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100 [&_button]:h-7 [&_button]:w-7">
+              {actions}
+            </span>
+          )}
           {onDelete !== undefined && (
             <button
               type="button"

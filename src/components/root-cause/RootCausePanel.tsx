@@ -1,3 +1,4 @@
+import { PutOnDesk } from '@/components/results/desk/PutOnDesk'
 import { NumberInput } from '@/components/ui/NumberInput'
 import { z } from 'zod'
 import { useMemo } from 'react'
@@ -1035,7 +1036,10 @@ export function RootCausePanel(props: Props) {
               </section>
               {latest !== undefined && (
                 <div className="space-y-4">
-                  <h3 className={`${sectionTitle} m-0`}>Results</h3>
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className={`${sectionTitle} m-0`}>Results</h3>
+                    <PutOnDesk deskRef={{ kind: 'root-cause', id: String(latest.id) }} />
+                  </div>
                   <RootCauseRunResult key={latest.id} run={latest} />
                 </div>
               )}

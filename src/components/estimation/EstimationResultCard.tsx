@@ -1,4 +1,5 @@
 import { ExpandableChart } from '@/charts/ExpandableChart'
+import { PutOnDesk } from '@/components/results/desk/PutOnDesk'
 import { histogramOption } from '@/charts/data/histogram'
 import { counterfactualCurvesOption } from '@/charts/estimation/counterfactualCurves'
 import { impactPathOption } from '@/charts/estimation/impactPath'
@@ -581,6 +582,7 @@ export const ResultCard = memo(function ResultCard({
     return (
       <RunFold
         title={sentence}
+        actions={<PutOnDesk iconSize={13} deskRef={{ kind: 'estimate', id: String(run.id) }} />}
         figure={
           run.kind === 'causal-forest-run' && estimate.effect.kind === 'perRow'
             ? `${estimate.effect.effects.length} conditional predictions`

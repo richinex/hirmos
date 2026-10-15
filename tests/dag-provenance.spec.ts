@@ -119,6 +119,6 @@ test('earlier revision is visible in Study design, Estimation and exported Resul
     page.getByText(/This study and its results use an earlier DAG revision/).first(),
   ).toBeVisible()
   const download = page.waitForEvent('download')
-  await page.getByRole('button', { name: 'Export the manifest' }).click()
+  await page.getByRole('button', { name: 'Export manifest' }).click()
   await download
 })

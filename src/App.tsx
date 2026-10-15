@@ -83,8 +83,10 @@ import {
   loadProject,
   readProjectRecord,
   projectInRecovery,
+  holdConnection,
   saveProject,
   saveProjectIfChanged,
+  saveProjectNow,
 } from '@/data/projectStore'
 import {
   lastStorageFailure,
@@ -528,11 +530,13 @@ function App() {
     refreshSaved()
   }, [refreshSaved])
   useEffect(() => subscribeStorageHealth(setStorageFailure), [])
-  // Every durable change is written after a short quiet period; opening an unchanged record is not a new save.
   useEffect(() => {
     const snapshot = snapshotWorkflow(workflow, new Date().toISOString())
     if (snapshot === null || projectInRecovery(snapshot.project.id)) return
-    const handle = window.setTimeout(() => {
+    let pending = true
+    const save = () => {
+      if (!pending) return
+      pending = false
       void saveProjectIfChanged(snapshot).then((result) => {
         if (!result.ok) return
         switch (result.value.kind) {
@@ -545,9 +549,21 @@ function App() {
             assertNever(result.value)
         }
       })
-    }, 400)
-    return () => window.clearTimeout(handle)
+    }
+    const leave = () => {
+      if (!pending) return
+      pending = false
+      window.clearTimeout(handle)
+      saveProjectNow(snapshot)
+    }
+    const handle = window.setTimeout(save, 400)
+    window.addEventListener('pagehide', leave)
+    return () => {
+      window.clearTimeout(handle)
+      window.removeEventListener('pagehide', leave)
+    }
   }, [workflow, refreshSaved])
+  useEffect(() => holdConnection(), [])
   /** Opens a saved project; false when it is not in this browser's store or cannot be read. */
   const reopenProject = async (id: SavedProjectHeader['id']): Promise<boolean> => {
     setReopenProblem(null)
@@ -2032,6 +2048,7 @@ function App() {
                       <Suspense fallback={<ChapterSkeleton label="Loading results…" />}>
                         <ResultsPanel
                           key={workflow.prepared.id}
+                          project={workflow.project.id}
                           source={workflow.source}
                           profile={workflow.profile}
                           prepared={workflow.prepared}

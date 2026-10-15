@@ -166,7 +166,7 @@ test('runs right-censored flexsurv on the exact breast-cancer package data', asy
     .getByRole('button', { name: /Results/ })
     .click()
   await expect(page.getByRole('heading', { name: 'Results', exact: true })).toBeVisible()
-  await expect(page.getByRole('combobox', { name: 'Survival run' })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Saved results' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Weibull AFT' }).first()).toBeVisible()
 })
 

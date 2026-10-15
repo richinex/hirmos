@@ -13,6 +13,8 @@ export const shellLayoutSchema = z
     panes: z.record(z.string(), z.string()),
     /** Row height for every data table: 24px compact or 32px comfortable. */
     tableDensity: z.enum(['compact', 'comfortable']).default('comfortable'),
+    /** Results desk layouts keyed by project, each parsed again when read. */
+    desks: z.record(z.string(), z.unknown()).default({}),
   })
   .strict()
 
@@ -25,6 +27,7 @@ export const DEFAULT_SHELL_LAYOUT: ShellLayout = {
   chapterNav: 'auto',
   panes: {},
   tableDensity: 'comfortable',
+  desks: {},
 }
 
 export function parseShellLayout(raw: string | null): ShellLayout {

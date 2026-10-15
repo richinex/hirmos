@@ -1,3 +1,4 @@
+import { PutOnDesk } from '@/components/results/desk/PutOnDesk'
 import { NumberInput } from '@/components/ui/NumberInput'
 import { RunPicker } from '@/components/ui/RunPicker'
 import { SettingsDisclosure } from '@/components/ui/SettingsDisclosure'
@@ -544,7 +545,14 @@ export function GcmInfluencePanel(props: Props) {
               onCancel={cancel}
             />
           </section>
-          {latest && <GcmInfluenceResult run={latest} />}
+          {latest && (
+            <div className="space-y-2">
+              <div className="flex justify-end">
+                <PutOnDesk deskRef={{ kind: 'gcm-influence', id: String(latest.id) }} />
+              </div>
+              <GcmInfluenceResult run={latest} />
+            </div>
+          )}
         </section>
       }
     />

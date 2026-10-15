@@ -22,6 +22,13 @@ interface Contribution {
   readonly upper: number
 }
 
+export const rootCauseRunTitle = (run: RootCauseRun): string =>
+  run.evidence.outcome.kind === 'anomaly'
+    ? 'Anomaly attribution scores'
+    : run.evidence.outcome.kind === 'change'
+      ? 'Contributions to the mean change'
+      : 'Predicted outcome after the shifts'
+
 export const RootCauseRunResult = memo(function RootCauseRunResult({
   run,
 }: {
@@ -32,12 +39,7 @@ export const RootCauseRunResult = memo(function RootCauseRunResult({
   const { outcome } = run.evidence
   const { summary } = outcome
   const nodes = outcome.nodes
-  const title =
-    outcome.kind === 'anomaly'
-      ? 'Anomaly attribution scores'
-      : outcome.kind === 'change'
-        ? 'Contributions to the mean change'
-        : 'Predicted outcome after the shifts'
+  const title = rootCauseRunTitle(run)
   const rows = nodes.map((node, index): Contribution => ({
     node,
     name: run.model.names[node],

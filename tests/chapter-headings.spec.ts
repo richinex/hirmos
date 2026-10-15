@@ -32,7 +32,7 @@ for (const example of ['A simulated process with a collider', 'Deploys and incid
       }
       await expect(page.getByText(/In this chapter/)).toHaveCount(0)
       await expect(heading.locator('..')).not.toContainText(/\d{2} · /)
-      expect(await heading.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true)
+      expect(await heading.evaluate(el => el.classList.contains('sr-only') || el.scrollWidth <= el.clientWidth + 1)).toBe(true)
       for (const theme of ['light', 'dark']) {
         await page.evaluate(value => { document.documentElement.dataset.theme = value }, theme)
         await page.screenshot({ path: info.outputPath(`${chapter.nav}-${theme}.png`) })
