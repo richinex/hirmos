@@ -191,7 +191,8 @@ export function ConnectionBar({
             onChange={(event) => onApiKey(event.target.value)}
           />
           <span className="text-label text-faint">
-            The key stays in memory and clears when this panel closes.
+            The key stays in this tab’s memory across project switches. Reload the page or forget
+            the key to clear it. Sharing consent is separate for each project.
           </span>
         </label>
         {import.meta.env.DEV ? (

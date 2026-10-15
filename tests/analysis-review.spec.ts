@@ -412,6 +412,10 @@ test('RD and IV reviews report diagnostic gaps without applying the propensity c
     'not-recorded',
   )
   expect(reviews[1].items.find((i: any) => i.id === 'strength').evidence.kind).toBe('not-recorded')
+  for (const id of ['manipulation', 'bandwidth']) {
+    expect(reviews[0].items.find((i: any) => i.id === id).capability.kind).toBe('not-offered')
+    expect(reviews[0].items.find((i: any) => i.id === id).next).toBeNull()
+  }
   expect(reviews[1].items.find((i: any) => i.id === 'exclusion').evidence.kind).toBe(
     'not-assessable',
   )

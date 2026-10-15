@@ -30,6 +30,7 @@ export interface ReviewItem {
   readonly evidence: Finding
   readonly reading: string
   readonly next: string | null
+  readonly capability?: { readonly kind: 'not-offered'; readonly reason: string }
 }
 
 export const reviewEvidenceLabels: Record<Finding['kind'], string> = {
@@ -75,6 +76,13 @@ const number = (value: number) => formatStatistic('raw', value).text
 const count = (value: number) => formatCount(value).text
 const maximum = (values: readonly number[]) => values.reduce((a, b) => Math.max(a, b), -Infinity)
 const minimum = (values: readonly number[]) => values.reduce((a, b) => Math.min(a, b), Infinity)
+
+function notOffered(id: string, title: string, reason: string): ReviewItem {
+  return {
+    ...absent(id, title, 'not-recorded', reason),
+    capability: { kind: 'not-offered', reason },
+  }
+}
 
 function recorded(
   run: EstimationRunArtifact,
@@ -570,17 +578,15 @@ export function reviewAnalysis(
                 `The robust bias-corrected interval is ${number(run.evidence.robust.interval[0])} to ${number(run.evidence.robust.interval[1])}. The conventional estimate is ${number(run.evidence.conventional.value)} and the bias-corrected estimate is ${number(run.evidence.biasCorrected.value)}.`,
                 'Read the robust interval as sampling uncertainty, not evidence that assignment is valid.',
               ),
-              absent(
+              notOffered(
                 'manipulation',
                 'Sorting at the cutoff',
-                'not-recorded',
-                'This run does not record a density or manipulation test. The outcome plot cannot establish absence of sorting.',
+                'Hirmos has no built-in RD density or manipulation test to configure. The outcome plot cannot establish absence of sorting; any external check must be described as external.',
               ),
-              absent(
+              notOffered(
                 'bandwidth',
                 'Bandwidth sensitivity',
-                'not-recorded',
-                'This record contains one selected fitting bandwidth, not a bandwidth-sensitivity analysis.',
+                'Hirmos’s sharp RD fit selects its bandwidth automatically and has no bandwidth-sensitivity control to configure. This record contains one selected fitting bandwidth, not a sensitivity analysis.',
               ),
             ]
           : run.kind === 'instrumental-variable-run'
@@ -589,7 +595,7 @@ export function reviewAnalysis(
                   run,
                   'instruments',
                   'Instrument specification',
-                  `${count(run.evidence.instruments.length)} instruments are recorded for ${count(run.evidence.observations)} observations.`,
+                  `${run.evidence.instruments.length === 1 ? 'The recorded instrument is' : 'The recorded instruments are'} ${run.evidence.instruments.map((index) => run.columns[index]?.name ?? '[name unavailable in the saved column map]').join(', ')}. The fit uses ${count(run.evidence.observations)} observations.`,
                   'Read the saved identification and specification for the named instruments and target population.',
                 ),
                 absent(
@@ -634,6 +640,7 @@ export function reviewAnalysis(
       run.kind === 'panel-intervention-run'
         ? [
             'Identification depends on the design’s parallel-trends, anticipation and interference assumptions. Saved diagnostics do not establish them.',
+            'A generic back-door no-unmeasured-confounding statement in the study record is not the identifying assumption of this DiD fit. Do not use it as a substitute for parallel trends.',
             'Sensitivity bounds describe specified departures from assumptions, not the departures actually present in the data.',
           ]
         : run.kind === 'sharp-rd-run'
@@ -647,6 +654,7 @@ export function reviewAnalysis(
             : run.kind === 'synthetic-control-run'
               ? [
                   'The donor combination must represent the untreated trajectory after intervention. Pre-treatment fit does not establish absence of spillovers, anticipation or other simultaneous changes.',
+                  'Do not substitute a generic back-door no-unmeasured-confounding checklist for this synthetic-control design.',
                 ]
               : [
                   'Identification depends on adequate overlap, consistency and no unmeasured confounding under the recorded design. Balance on measured covariates does not establish these assumptions.',

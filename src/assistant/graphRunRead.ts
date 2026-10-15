@@ -1,4 +1,30 @@
 import type { Workflow } from '@/domain/workflow'
+import type { SwigAnalysis } from '@/domain/swig'
+
+function didControls(run: SwigAnalysis) {
+  const construction = run.specification.construction
+  const conclusion = run.result.conclusion
+  if (construction.kind !== 'did' || conclusion.kind !== 'did') return null
+  const names = (indices: readonly number[]) => indices.map((i) => run.names[i] ?? null)
+  const selectedControls = names(construction.design.selected)
+  const decision = conclusion.assessment.decision
+  switch (decision.kind) {
+    case 'supportedSubjectToOverlap':
+      return {
+        selectedControls,
+        requiredControls: names(decision.required),
+        availableControls: names(decision.available),
+        selectedSupported: decision.selectedSupported,
+      }
+    case 'notEstablished':
+      return {
+        selectedControls,
+        requiredPotentialControls: names(decision.potentialSet),
+      }
+    case 'baselineIdentity':
+      return { selectedControls }
+  }
+}
 
 export function readGraphRun(
   workflow: Extract<Workflow, { kind: 'profiled' }>,
@@ -19,6 +45,7 @@ export function readGraphRun(
   const document = workflow.dagDocuments.find((d) => d.id === run.dagDocument)
   const revision = document?.audit.find((r) => r.id === run.dagRevision) ?? null
   const prepared = workflow.prepared?.id === run.preparedDataset ? workflow.prepared : null
+  const controls = run.kind === 'swig-analysis' ? didControls(run) : null
   const common = {
     kind: 'saved-run' as const,
     workspace,
@@ -58,18 +85,15 @@ export function readGraphRun(
       }
     const assessment = run.result.conclusion.assessment
     const { decision, ...restrictions } = assessment
-    const names = (indices: readonly number[]) => indices.map((i) => run.names[i] ?? null)
     return {
       ...common,
       view,
       review: {
         kind: 'available',
         decision: decision.kind,
+        ...controls,
         ...(decision.kind === 'supportedSubjectToOverlap'
           ? {
-              requiredControls: names(decision.required),
-              availableControls: names(decision.available),
-              selectedSupported: decision.selectedSupported,
               reading: decision.selectedSupported
                 ? 'The selected controls satisfy this sufficient rule, subject to overlap and the recorded assumptions.'
                 : 'The graph supports an adjustment family, but the selected controls do not satisfy its requirements.',
@@ -77,7 +101,6 @@ export function readGraphRun(
           : decision.kind === 'baselineIdentity'
             ? { reading: 'The outcome period is the baseline. Its difference from itself is zero.' }
             : {
-                requiredPotentialControls: names(decision.potentialSet),
                 blockers: [
                   ...decision.treatedBlockers.map((b) => ({ group: 'treated', ...b })),
                   ...decision.comparisonBlockers.map((b) => ({ group: 'comparison', ...b })),
@@ -121,6 +144,7 @@ export function readGraphRun(
     ? {
         ...common,
         view,
+        ...(controls ? { controls } : {}),
         names: run.names,
         construction: run.specification.construction,
         conclusion: run.result.conclusion,

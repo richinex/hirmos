@@ -61,10 +61,31 @@ test('graph readers retain recorded revisions and distinguish SWIG assessments f
         noWithinPeriodCovariateOutcomeEffect: false,
       },
     }
-    const review = readRun(
-      { ...workflow, swigAnalyses: [{ ...swig, result: { conclusion } }] },
-      { workspace: 'swig', id: swig.id, view: 'review' },
-    )
+    const didWorkflow = {
+      ...workflow,
+      swigAnalyses: [
+        {
+          ...swig,
+          specification: { construction: { kind: 'did', design: { selected: [0] } } },
+          result: { conclusion },
+        },
+      ],
+    }
+    const review = readRun(didWorkflow, { workspace: 'swig', id: swig.id, view: 'review' })
+    const didSummary = readRun(didWorkflow, { workspace: 'swig', id: swig.id })
+    const selections = [[], [0, 1]].map((selected) => {
+      const saved = didWorkflow.swigAnalyses[0]
+      const state = {
+        ...didWorkflow,
+        swigAnalyses: [
+          { ...saved, specification: { construction: { kind: 'did', design: { selected } } } },
+        ],
+      }
+      return {
+        summary: readRun(state, { workspace: 'swig', id: swig.id }),
+        review: readRun(state, { workspace: 'swig', id: swig.id, view: 'review' }),
+      }
+    })
     workflow.dagDocuments[0].audit = []
     return {
       specification,
@@ -72,6 +93,8 @@ test('graph readers retain recorded revisions and distinguish SWIG assessments f
       summary,
       unchanged,
       review,
+      didSummary,
+      selections,
       original,
       missing: readRun(workflow, { workspace: 'swig', id: swig.id, view: 'specification' }),
       wrong: readRun(workflow, { workspace: 'swig', id: query.id }),
@@ -87,6 +110,18 @@ test('graph readers retain recorded revisions and distinguish SWIG assessments f
   expect(result.wrong.kind).toBe('refused')
   expect(result.unchanged).toBe(true)
   expect(result.review.review.requiredControls).toEqual(['X0', 'X1'])
+  expect(result.review.review.selectedControls).toEqual(['X0'])
+  expect(result.didSummary.controls).toEqual({
+    selectedControls: ['X0'],
+    requiredControls: ['X0', 'X1'],
+    availableControls: ['X0', 'X1'],
+    selectedSupported: false,
+  })
+  for (const [i, selected] of [[], ['X0', 'X1']].entries()) {
+    expect(result.selections[i].summary.controls.selectedControls).toEqual(selected)
+    expect(result.selections[i].review.review.selectedControls).toEqual(selected)
+    expect(result.selections[i].review.review.requiredControls).toEqual(['X0', 'X1'])
+  }
   expect(result.review.review.selectedSupported).toBe(false)
   expect(result.review.review.reading).toContain('graph supports an adjustment family')
   expect(result.review.review.interpretation).toContain('not automatically excluded')

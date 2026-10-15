@@ -40,18 +40,20 @@ export function readRun(workflow: Workflow, raw: unknown) {
     return {
       kind: 'refused' as const,
       reason:
-        'Supply a saved run ID and its workspace, or use workspace planning with id current to read the saved planning calculation. Views are summary, specification and evidence; Estimation and SWIG also support review.',
+        'Supply a saved run ID and its workspace, or use workspace planning with id current to read the saved planning calculation. Views are summary, specification and evidence; Estimation, SWIG and Discovery also support review.',
     }
   if (workflow.kind !== 'profiled')
     return { kind: 'refused' as const, reason: 'No project with saved results is open.' }
   if (parsed.data.view === 'review') {
+    if (parsed.data.workspace === 'discovery')
+      return readDiscoveryRun(workflow, parsed.data.id, 'review')
     if (parsed.data.workspace === 'swig')
       return readGraphRun(workflow, 'swig', parsed.data.id, 'review')
     if (parsed.data.workspace !== 'estimation')
       return {
         kind: 'refused' as const,
         reason:
-          'Design-specific review currently reads Estimation and SWIG runs. Use summary or evidence for this workspace.',
+          'Design-specific review currently reads Estimation, SWIG and Discovery runs. Use summary or evidence for this workspace.',
       }
     const run = workflow.estimationRuns.find((item) => item.id === parsed.data.id)
     if (!run)

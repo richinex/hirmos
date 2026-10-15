@@ -186,10 +186,13 @@ const NAV_LAYER = 'chapter-rail'
 /** The rail's width, which the column reserves; the lobe and the pill grow past it over the stage. */
 const RAIL = 'w-14'
 const CORNER = 'rounded-r-[26px]'
-const LOBE_CLOSED = '[clip-path:inset(0_176px_0_0_round_0_26px_26px_0)]'
-const LOBE_OPEN = '[clip-path:inset(0_0_0_0_round_0_26px_26px_0)]'
-const PILL_CLOSED = '[clip-path:inset(0_184px_0_0_round_20px)]'
-const PILL_OPEN = '[clip-path:inset(0_0_0_0_round_20px)]'
+const REVEAL = 'transition-[clip-path,width] duration-(--motion-base) motion-reduce:transition-none'
+const OPENING = '[transition-timing-function:var(--default-transition-timing-function),step-start]'
+const CLOSING = '[transition-timing-function:var(--default-transition-timing-function),step-end]'
+const LOBE_CLOSED = `w-14 [clip-path:inset(0_calc(100%_-_56px)_0_0_round_0_26px_26px_0)] ${CLOSING}`
+const LOBE_OPEN = `w-[232px] [clip-path:inset(0_0_0_0_round_0_26px_26px_0)] ${OPENING}`
+const PILL_CLOSED = `w-10 [clip-path:inset(0_calc(100%_-_40px)_0_0_round_20px)] ${CLOSING}`
+const PILL_OPEN = `w-[224px] [clip-path:inset(0_0_0_0_round_20px)] ${OPENING}`
 
 /**
  * The chapter rail: a solid shape rising from the left edge under the round toggle, the mark at its
@@ -305,7 +308,8 @@ export function ChapterNav({
         <nav
           aria-label="Workspace sections"
           className={cn(
-            'absolute left-0 top-[84px] flex w-[232px] max-h-[calc(100%-84px-124px)] flex-col overflow-hidden bg-rail text-rail-ink [--scroll-thumb:var(--color-rail-faint)] transition-[clip-path] duration-(--motion-base) motion-reduce:transition-none',
+            'absolute left-0 top-[84px] flex max-h-[calc(100%-84px-124px)] flex-col overflow-hidden bg-rail text-rail-ink [--scroll-thumb:var(--color-rail-faint)]',
+            REVEAL,
             CORNER,
             lobeOpen ? LOBE_OPEN : LOBE_CLOSED,
           )}
@@ -414,7 +418,8 @@ export function ChapterNav({
         {project !== null && (
           <div
             className={cn(
-              'absolute bottom-3 left-2 flex h-10 w-[224px] items-center overflow-hidden rounded-full bg-rail text-rail-ink transition-[clip-path] duration-(--motion-base) motion-reduce:transition-none',
+              'absolute bottom-3 left-2 flex h-10 items-center overflow-hidden rounded-full bg-rail text-rail-ink',
+              REVEAL,
               lobeOpen ? PILL_OPEN : PILL_CLOSED,
             )}
           >

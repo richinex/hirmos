@@ -29,7 +29,13 @@ import {
   type StudySelectionProposal,
 } from './studySelection'
 import { conversationRecords } from './conversation'
-import { assistantLimits, DEFAULT_LIMITS, QUESTION_DEADLINE_MS } from './limits'
+import { assistantLimits, QUESTION_DEADLINE_MS } from './limits'
+import {
+  useAssistantConnection,
+  configureAssistantConnection,
+  approveAssistantProject,
+  forgetAssistantConnection,
+} from './connectionStore'
 import { readKeyCredit, type CreditStatus } from './budget'
 import { beginMemoryTask, loadMemoryTurns } from './memory/access'
 import { getActiveSessionId, rotateSession } from './memory/session'
@@ -174,20 +180,16 @@ function Session({ context, project }: { readonly context: string; readonly proj
       readonly status: 'pending' | 'applied' | 'dismissed' | ProposalProblem
     }[]
   >([])
-  const [apiKey, setApiKey] = useState('')
-  const [model, setModel] = useState('')
-  const [maxIters, setMaxIters] = useState(String(DEFAULT_LIMITS.maxIters))
-  const [maxRequests, setMaxRequests] = useState(String(DEFAULT_LIMITS.maxRequests))
-  const [maxTokens, setMaxTokens] = useState(String(DEFAULT_LIMITS.maxTokens))
+  const { apiKey, model, maxIters, maxRequests, maxTokens, approvedProjects } =
+    useAssistantConnection()
   const limits = assistantLimits.safeParse({
     maxIters: Number(maxIters),
     maxRequests: Number(maxRequests),
     maxTokens: Number(maxTokens),
   })
-  const [approvedContext, setApprovedContext] = useState<string | null>(null)
-  const approved = approvedContext !== null
+  const approved = approvedProjects.has(project)
   const credentials = apiKey.trim() !== '' && model.trim() !== '' && limits.success
-  const connected = credentials && approvedContext !== null
+  const connected = credentials && approved
   const [settingsOpen, setSettingsOpen] = useState(!connected)
   const [wasConnected, setWasConnected] = useState(connected)
   if (connected !== wasConnected) {
@@ -526,10 +528,6 @@ function Session({ context, project }: { readonly context: string; readonly proj
       }
     }
   }
-  const forget = () => {
-    setApiKey('')
-    setApprovedContext(null)
-  }
   const count = turns.length
   useEffect(() => {
     if (count > 0) scroller.current?.scrollTo({ top: scroller.current.scrollHeight })
@@ -639,19 +637,19 @@ function Session({ context, project }: { readonly context: string; readonly proj
         context={context}
         apiKey={apiKey}
         model={model}
-        onApiKey={setApiKey}
-        onModel={setModel}
+        onApiKey={(apiKey) => configureAssistantConnection({ apiKey })}
+        onModel={(model) => configureAssistantConnection({ model })}
         maxIters={maxIters}
         maxRequests={maxRequests}
         maxTokens={maxTokens}
-        onMaxIters={setMaxIters}
-        onMaxRequests={setMaxRequests}
-        onMaxTokens={setMaxTokens}
+        onMaxIters={(maxIters) => configureAssistantConnection({ maxIters })}
+        onMaxRequests={(maxRequests) => configureAssistantConnection({ maxRequests })}
+        onMaxTokens={(maxTokens) => configureAssistantConnection({ maxTokens })}
         connected={connected}
         credit={credit}
         disabled={running}
-        onConnect={() => setApprovedContext(context)}
-        onForget={forget}
+        onConnect={() => approveAssistantProject(project)}
+        onForget={forgetAssistantConnection}
       />
       {memory.kind === 'failed' || memoryWarning !== null ? (
         <p role="alert" className="m-0 border-b border-line px-4 py-2 text-label text-danger">

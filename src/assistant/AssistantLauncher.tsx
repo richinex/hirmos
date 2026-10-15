@@ -42,10 +42,10 @@ export function AssistantRailButton({
       title={expanded ? undefined : 'CausalBuddy (⌘I)'}
       onClick={toggleAssistant}
       className={cn(
-        'flex h-10 w-[224px] items-center overflow-hidden rounded-full bg-rail transition-[clip-path,color] duration-(--motion-base) motion-reduce:transition-none',
+        'flex h-10 items-center overflow-hidden rounded-full bg-rail transition-[clip-path,width,color] duration-(--motion-base) motion-reduce:transition-none',
         expanded
-          ? '[clip-path:inset(0_0_0_0_round_20px)]'
-          : '[clip-path:inset(0_184px_0_0_round_20px)]',
+          ? 'w-[224px] [clip-path:inset(0_0_0_0_round_20px)] [transition-timing-function:var(--default-transition-timing-function),step-start,var(--default-transition-timing-function)]'
+          : 'w-10 [clip-path:inset(0_calc(100%_-_40px)_0_0_round_20px)] [transition-timing-function:var(--default-transition-timing-function),step-end,var(--default-transition-timing-function)]',
         open || running ? 'text-rail-ink' : 'text-rail-faint hover:text-rail-ink',
         className,
       )}

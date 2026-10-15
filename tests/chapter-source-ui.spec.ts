@@ -125,6 +125,13 @@ test('source sharp RD through cutoff-local study and restored robust evidence',a
   const run = saved.estimationRuns[0]
   expect(run.estimate.estimand.kind).toBe('local-cutoff-effect')
   expect(run.evidence.robust.value).toBeCloseTo(1040.9315095351085,7)
+  const reviewed = await page.evaluate(async saved => {
+    const { readRun } = await import(new URL('/src/assistant/runRead.ts', location.href).href)
+    return readRun({ ...saved, kind: 'profiled' }, { id: saved.estimationRuns[0].id, view: 'review' })
+  }, saved)
+  expect(reviewed.review.kind).toBe('available')
+  expect(reviewed.review.items.find((item: { id: string }) => item.id === 'manipulation').evidence.kind).toBe('not-recorded')
+  await info.attach('saved-rd-review.json', { body: JSON.stringify({ project: saved, review: reviewed }, null, 2), contentType: 'application/json' })
   await reopenResult(page, 'chapter-rd.csv')
 })
 
