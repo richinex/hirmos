@@ -25,6 +25,7 @@ import { WorkflowProvider, useWorkflow } from '@/components/WorkflowProvider'
 import { PreparationProvider } from '@/components/data/PreparationProvider'
 import { Icon } from '@/components/Icon'
 import { ThemeControl } from '@/components/ThemeControl'
+import { ChapterControlsSlot } from '@/components/shell/ChapterControls'
 import { DataDropZone } from '@/components/data/DataDropZone'
 import { AppShell } from '@/components/shell/AppShell'
 import { ChapterBoundary } from '@/components/shell/ChapterBoundary'
@@ -1060,6 +1061,7 @@ function App() {
           onClick={() => setNavOpen((open) => !open)}
         />
       </div>
+      <ChapterControlsSlot />
       <div className="flex min-w-0 items-center gap-1.5">
         {storageFailure !== null && (
           <span

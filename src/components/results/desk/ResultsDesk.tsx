@@ -55,6 +55,7 @@ import {
   toggleMaximize,
   useDesk,
 } from './deskStore'
+import { ChapterControls } from '@/components/shell/ChapterControls'
 import { OnDesk } from './PutOnDesk'
 import { createDeskEngine, type DeskEngine, type DeskTrees } from './engine'
 import { grid, stack, type Split } from './layout'
@@ -944,57 +945,58 @@ export function ResultsDesk({
       <h2 id="results-title" className="sr-only">
         Results
       </h2>
-      <div
-        role="toolbar"
-        aria-label="Desk"
-        className="mx-3 my-2 flex h-10 min-w-0 shrink-0 items-center gap-1 rounded-lg bg-raised p-1 pointer-coarse:h-[52px]"
-      >
-        <SegmentedControl
-          variant="track"
-          frame="none"
-          size="sm"
-          ariaLabel="Desk view"
-          value={desk.view}
-          onChange={chooseView}
-          options={DESK_VIEWS.map((view, index) => ({
-            value: view,
-            label: (
-              <span className="flex items-center gap-1.5">
-                <Icon name={VIEW_ICONS[view]} size={16} />
-                {VIEW_LABELS[view]}
-              </span>
-            ),
-            ariaLabel: VIEW_LABELS[view],
-            disabled:
-              (view === 'compare' && !compareReady) || (view === 'evidence' && !evidenceReady),
-            title:
-              view === 'compare' && !compareReady
-                ? 'Choose an estimate and one to compare with in Saved results'
-                : view === 'evidence' && !evidenceReady
-                  ? 'Open an estimate first'
-                  : `Press ${index + 1} to show ${VIEW_LABELS[view].toLowerCase()}`,
-          }))}
-        />
-        <span className="mx-1 h-5 w-px shrink-0 bg-line" aria-hidden />
-        <button
-          type="button"
-          className={chromeAction('quiet', 'text-muted hover:bg-panel')}
-          title={
-            desk.view === 'compare' || desk.view === 'evidence'
-              ? 'Set the dividers back to their first positions'
-              : 'Place the open windows side by side'
-          }
-          onClick={arrange}
+      <ChapterControls>
+        <div
+          role="toolbar"
+          aria-label="Desk"
+          className="flex min-w-0 flex-1 items-center justify-end gap-1"
         >
-          <Icon name="auto_awesome_mosaic" size={16} />
-          Arrange
-        </button>
-        <p role="status" className="m-0 ml-auto truncate px-2 text-label text-faint">
-          {droppedTitle === null
-            ? ''
-            : `${droppedTitle} left the desk, which holds ten windows at a time.`}
-        </p>
-      </div>
+          <p role="status" className="m-0 min-w-0 truncate px-2 text-label text-faint">
+            {droppedTitle === null
+              ? ''
+              : `${droppedTitle} left the desk, which holds ten windows at a time.`}
+          </p>
+          <SegmentedControl
+            variant="track"
+            frame="none"
+            size="sm"
+            ariaLabel="Desk view"
+            value={desk.view}
+            onChange={chooseView}
+            options={DESK_VIEWS.map((view, index) => ({
+              value: view,
+              label: (
+                <span className="flex items-center gap-1.5">
+                  <Icon name={VIEW_ICONS[view]} size={16} />
+                  {VIEW_LABELS[view]}
+                </span>
+              ),
+              ariaLabel: VIEW_LABELS[view],
+              disabled:
+                (view === 'compare' && !compareReady) || (view === 'evidence' && !evidenceReady),
+              title:
+                view === 'compare' && !compareReady
+                  ? 'Choose an estimate and one to compare with in Saved results'
+                  : view === 'evidence' && !evidenceReady
+                    ? 'Open an estimate first'
+                    : `Press ${index + 1} to show ${VIEW_LABELS[view].toLowerCase()}`,
+            }))}
+          />
+          <button
+            type="button"
+            className={chromeAction('quiet', 'text-muted')}
+            title={
+              desk.view === 'compare' || desk.view === 'evidence'
+                ? 'Set the dividers back to their first positions'
+                : 'Place the open windows side by side'
+            }
+            onClick={arrange}
+          >
+            <Icon name="auto_awesome_mosaic" size={16} />
+            Arrange
+          </button>
+        </div>
+      </ChapterControls>
       <div ref={surface} className="results-desk" role="region" aria-label="Results desk">
         {shown.map(({ key, ref, title }) => (
           <DeskWindow
