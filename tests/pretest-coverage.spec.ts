@@ -194,13 +194,16 @@ test('pre-test coverage is available in Sensitivity and does not fabricate an ev
   await page.getByRole('radio', { name: 'Pre-test coverage', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Calculate coverage', exact: true })).toBeDisabled()
   await expect(
-    page.getByText('Choose a saved event study from this prepared dataset.', { exact: true }),
+    page.getByText('Choose a saved regression or event study from this prepared dataset.', {
+      exact: true,
+    }),
   ).toBeVisible()
   await chapter(page, /Estimation/)
   await page.getByRole('radio', { name: 'Regression designs', exact: true }).click()
   await page.getByRole('radio', { name: 'Event study', exact: true }).click()
   await choose(page, 'Outcome', 'bugs_per_kloc')
   await choose(page, 'Treatment indicator', 'adopted')
+  await page.getByRole('radio', { name: 'Bin endpoint periods', exact: true }).click()
   await page.getByRole('button', { name: 'Fit event study', exact: true }).click()
   await expect
     .poll(
@@ -223,6 +226,62 @@ test('pre-test coverage is available in Sensitivity and does not fabricate an ev
     .toBe(1)
   const saved = await snapshot(page, 'AI adoption, March cohort')
   expect(saved.sensitivityRuns[0].kind).toBe('pretest-coverage-run')
+  const bounds = await page.evaluate(async (saved) => {
+    const d = await import(new URL('/src/domain/pretestCoverage.ts', location.href).href)
+    const { honestCandidates } = await import(
+      new URL('/src/domain/honestDid.ts', location.href).href
+    )
+    const run = saved.sensitivityRuns[0]
+    const fit = saved.timeSeriesRuns.find((r: { id: string }) => r.id === run.source.run)
+    const window = fit.specification.specification.window
+    const before = JSON.stringify(fit)
+    const candidate = d.pretestCandidates([], [fit])[0]
+    const selected = fit.evidence.events
+      .filter((e: { period: number }) => e.period > window.first && e.period < window.last)
+      .sort((a: { period: number }, b: { period: number }) => a.period - b.period)
+    const indices = selected.map((e: { index: number }) =>
+      fit.evidence.terms.findIndex((t: { index: number }) => t.index === e.index),
+    )
+    const unbinned = {
+      ...fit,
+      specification: {
+        ...fit.specification,
+        specification: {
+          ...fit.specification.specification,
+          window: { ...window, tails: 'reference' },
+        },
+      },
+    }
+    const injected = { ...run, eventStudy: d.pretestCandidates([], [unbinned])[0].input.value }
+    return {
+      tails: window.tails,
+      events: candidate.input.value.events,
+      unchanged: before === JSON.stringify(fit),
+      coefficients: candidate.input.value.coefficients,
+      expectedCoefficients: indices.map((i: number) => fit.evidence.terms[i].estimate),
+      covariance: candidate.input.value.covariance,
+      expectedCovariance: indices.map((i: number) =>
+        indices.map((j: number) => fit.evidence.covariance[i][j]),
+      ),
+      honestAllowed: honestCandidates([], [fit])[0].input.ok,
+      preEndpoint: d.pretestRequest(run.eventStudy, { ...run.settings, prePeriod: window.first })
+        .ok,
+      postEndpoint: d.pretestRequest(run.eventStudy, { ...run.settings, postPeriod: window.last })
+        .ok,
+      injected: d.pretestRunMatches(injected, [], [fit]),
+      sourceMatches: d.pretestRunMatches(run, [], [fit]),
+    }
+  }, saved)
+  expect(bounds.tails).toBe('bin')
+  expect(bounds.events).toEqual([-2, 0, 1, 2])
+  expect(bounds.unchanged).toBe(true)
+  expect(bounds.coefficients).toEqual(bounds.expectedCoefficients)
+  expect(bounds.covariance).toEqual(bounds.expectedCovariance)
+  expect(bounds.sourceMatches).toBe(true)
+  expect(bounds.honestAllowed).toBe(false)
+  expect(bounds.preEndpoint).toBe(false)
+  expect(bounds.postEndpoint).toBe(false)
+  expect(bounds.injected).toBe(false)
   await page.reload()
   await chapter(page, /Sensitivity/)
   await expect(
@@ -231,6 +290,8 @@ test('pre-test coverage is available in Sensitivity and does not fabricate an ev
   const requests = await connectAssistant(page, [
     `s = await tool("workspace_settings", {"key":"pretest-coverage"})
 c = s["current"]
+p = await tool("propose_workspace", {"key":"pretest-coverage", "configuration":dict(c, prePeriod=-3), "reason":"Check the binned endpoint."})
+assert p["kind"] == "refused", p
 c["scenario"] = {"kind":"specified", "bias":0}
 p = await tool("propose_workspace", {"key":"pretest-coverage", "configuration":c, "reason":"Calculate coverage under a zero-bias scenario."})
 assert p["kind"] == "awaiting-user-review", p

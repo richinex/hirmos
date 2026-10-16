@@ -222,7 +222,7 @@ export function PanelRegressionPanel(props: PanelRegressionPanelProps) {
               <p>
                 {model.kind === 'bacon'
                   ? 'Observation weights are not supported by this decomposition. Covariate-adjusted and unadjusted decompositions have different components.'
-                  : 'Clusters are treated as independent. Observation weights must be non-negative for CR2 regression and strictly positive for the event-study fit.'}
+                  : 'Clusters are treated as independent. Observation weights must be non-negative for custom regression and strictly positive for the event-study fit.'}
               </p>
               <p>
                 Neither a fitted regression nor its decomposition establishes the identifying
@@ -334,6 +334,12 @@ export function PanelRegressionPanel(props: PanelRegressionPanelProps) {
                   )}
                   {model.kind === 'interactions' && (
                     <>
+                      <SegmentedControl
+                        ariaLabel="Clustered covariance"
+                        value={model.covariance ?? 'cr2'}
+                        options={[{ value: 'cr2', label: 'CR2' }, { value: 'cr1', label: 'CR1' }]}
+                        onChange={(covariance) => set({ ...draft, model: { ...model, covariance } })}
+                      />
                       <ColumnChecklist
                         title="Predictors"
                         help="Select main effects and variables used in interactions. Fixed effects can be represented by categorical predictors."

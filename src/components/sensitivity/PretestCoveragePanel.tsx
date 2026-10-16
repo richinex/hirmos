@@ -3,9 +3,10 @@ import { useJob } from '@/analysis/JobsProvider'
 import { useRecordedAnalysis, runReceipt } from '@/assistant/useRecordedAnalysis'
 import { useWorkspaceConfiguration } from '@/assistant/workspaceConfiguration'
 import { err, ok } from '@/domain/dop'
-import { honestCandidates } from '@/domain/honestDid'
 import {
   pretestMeaning,
+  pretestCandidates,
+  pretestInput,
   pretestRequest,
   pretestRunSchema,
   pretestSettings,
@@ -113,6 +114,16 @@ function PretestCoverageRecord({ run }: { readonly run: PretestRun }) {
           <dd className={num('m-0 text-ink')}>{period(run.settings.prePeriod)}</dd>
           <dt className="text-faint">Post-treatment period</dt>
           <dd className={num('m-0 text-ink')}>{period(run.settings.postPeriod)}</dd>
+          {'kind' in run.eventStudy && (
+            <>
+              <dt className="text-faint">Pre-treatment coefficient</dt>
+              <dd className="m-0 text-ink">{run.eventStudy.names[0]}</dd>
+              <dt className="text-faint">Post-treatment coefficient</dt>
+              <dd className="m-0 text-ink">{run.eventStudy.names[1]}</dd>
+              <dt className="text-faint">Omitted reference period</dt>
+              <dd className={num('m-0 text-ink')}>{period(run.eventStudy.reference)}</dd>
+            </>
+          )}
           <dt className="text-faint">Pre-trend bias scenario</dt>
           <dd className="m-0 text-ink">{scenarioLabel(run.settings)}</dd>
           <dt className="text-faint">Assumed pre-trend bias</dt>
@@ -169,7 +180,7 @@ export function PretestCoveragePanel({
   readonly selector: ReactNode
 }) {
   const candidates = useMemo(
-    () => honestCandidates(estimates, designs).filter((c) => c.preparedDataset === prepared.id),
+    () => pretestCandidates(estimates, designs).filter((c) => c.preparedDataset === prepared.id),
     [estimates, designs, prepared.id],
   )
   const latest = runs.at(-1)
@@ -189,16 +200,18 @@ export function PretestCoveragePanel({
     job = session.job
   const candidate = candidates.find((c) => c.source.run === settings.sourceRun)
   const check = (value: PretestSettings) => {
-    if (value.sourceRun === '') return err('Choose a saved event study from this prepared dataset.')
+    if (value.sourceRun === '')
+      return err('Choose a saved regression or event study from this prepared dataset.')
     const parsed = pretestSettingsSchema.safeParse(value)
     if (!parsed.success)
       return err(
         'Choose an event-study run, two supported periods, finite scenario values and levels strictly between zero and one.',
       )
     const source = candidates.find((c) => c.source.run === value.sourceRun)
-    if (!source) return err('Choose a saved event study from this prepared dataset.')
-    if (!source.input.ok) return err(source.input.error)
-    return pretestRequest(source.input.value, parsed.data)
+    if (!source) return err('Choose a saved regression or event study from this prepared dataset.')
+    const input = pretestInput(source, parsed.data)
+    if (!input.ok) return input
+    return pretestRequest(input.value, parsed.data)
   }
   const request = check(settings),
     readiness = request.ok ? null : request.error
@@ -225,7 +238,9 @@ export function PretestCoveragePanel({
     job.kind === 'running' ? { label: 'Pre-test coverage', progress: null } : null,
   )
   const execute = async () => {
-    if (!request.ok || !candidate?.input.ok) return
+    if (!request.ok || !candidate) return
+    const input = pretestInput(candidate, settings)
+    if (!input.ok) return
     const current = session.start('analysis', 'Calculating pre-test coverage')
     if (current === null) return
     try {
@@ -242,7 +257,7 @@ export function PretestCoveragePanel({
         preparedDataset: prepared.id,
         createdAt: new Date().toISOString(),
         source: candidate.source,
-        eventStudy: candidate.input.value,
+        eventStudy: input.value,
         settings,
         evidence: result.value,
       })
@@ -261,7 +276,7 @@ export function PretestCoveragePanel({
     key: 'pretest-coverage',
     prepared: prepared.id,
     unavailable: readiness,
-    binding: JSON.stringify({ prepared: prepared.id, settings, source: candidate?.input }),
+    binding: JSON.stringify({ prepared: prepared.id, settings, source: candidate }),
     inspection: {
       section: 'Sensitivity',
       method: 'Pre-test coverage',
@@ -308,13 +323,15 @@ export function PretestCoveragePanel({
           <section className={panel('p-(--panel-space)')}>
             <fieldset disabled={job.kind === 'running'} className="m-0 min-w-0 border-0 p-0">
               <div className={stepsStack}>
-                <SettingsStep number={1} title="Choose the event study">
+                <SettingsStep number={1} title="Choose the source run">
                   <label>
-                    <span className={fieldLabel}>Event-study run</span>
+                    <span className={fieldLabel}>Source run</span>
                     <Select
                       className={field('text', 'mt-1')}
                       value={settings.sourceRun}
-                      onChange={(e) => change({ sourceRun: e.target.value })}
+                      onChange={(e) =>
+                        change({ sourceRun: e.target.value, coefficients: undefined })
+                      }
                     >
                       <option value="">Choose run</option>
                       {candidates.map((c) => (
@@ -324,32 +341,118 @@ export function PretestCoveragePanel({
                       ))}
                     </Select>
                   </label>
+                  {candidate?.custom && (
+                    <div className="grid gap-4 @md/panel:grid-cols-2">
+                      {(['pre', 'post'] as const).map((key) => (
+                        <label key={key} className="block">
+                          <ParameterLabel
+                            className={fieldLabel}
+                            label={
+                              key === 'pre'
+                                ? 'Pre-treatment coefficient'
+                                : 'Post-treatment coefficient'
+                            }
+                            help="The coefficient on the indicator for one event period. Do not choose a tail bin, a pooled effect or an unrelated predictor."
+                          />
+                          <Select
+                            className={field('text', 'mt-1')}
+                            aria-label={
+                              key === 'pre'
+                                ? 'Pre-treatment coefficient'
+                                : 'Post-treatment coefficient'
+                            }
+                            value={settings.coefficients?.[key] ?? -1}
+                            onChange={(e) =>
+                              change({
+                                coefficients: {
+                                  pre: -1,
+                                  post: -1,
+                                  reference: -1,
+                                  ...settings.coefficients,
+                                  [key]: Number(e.target.value),
+                                },
+                              })
+                            }
+                          >
+                            <option value={-1}>Choose coefficient</option>
+                            {candidate.custom!.evidence.terms.map((t) => (
+                              <option key={t.index} value={t.index}>
+                                {t.name}
+                              </option>
+                            ))}
+                          </Select>
+                        </label>
+                      ))}
+                    </div>
+                  )}
                   <div className="grid gap-4 @md/panel:grid-cols-2">
                     {(['prePeriod', 'postPeriod'] as const).map((key) => (
                       <label key={key}>
                         <span className={fieldLabel}>
                           {key === 'prePeriod' ? 'Pre-treatment period' : 'Post-treatment period'}
                         </span>
-                        <Select
-                          className={field('text', 'mt-1')}
-                          value={String(settings[key])}
-                          onChange={(e) => change({ [key]: Number(e.target.value) })}
-                        >
-                          {candidate?.input.ok ? (
-                            candidate.input.value.events
-                              .filter((t) => (key === 'prePeriod' ? t < -1 : t >= 0))
-                              .map((t) => (
-                                <option key={t} value={t}>
-                                  {period(t)}
-                                </option>
-                              ))
-                          ) : (
-                            <option value={settings[key]}>{period(settings[key])}</option>
-                          )}
-                        </Select>
+                        {candidate?.custom ? (
+                          <NumberInput
+                            aria-label={
+                              key === 'prePeriod' ? 'Pre-treatment period' : 'Post-treatment period'
+                            }
+                            className={field('text', 'mt-1')}
+                            value={settings[key]}
+                            onChange={(e) =>
+                              change({
+                                [key]: e.target.value.trim() === '' ? NaN : Number(e.target.value),
+                              })
+                            }
+                          />
+                        ) : (
+                          <Select
+                            className={field('text', 'mt-1')}
+                            value={String(settings[key])}
+                            onChange={(e) => change({ [key]: Number(e.target.value) })}
+                          >
+                            {candidate?.input.ok ? (
+                              candidate.input.value.events
+                                .filter((t) => (key === 'prePeriod' ? t < -1 : t >= 0))
+                                .map((t) => (
+                                  <option key={t} value={t}>
+                                    {period(t)}
+                                  </option>
+                                ))
+                            ) : (
+                              <option value={settings[key]}>{period(settings[key])}</option>
+                            )}
+                          </Select>
+                        )}
                       </label>
                     ))}
                   </div>
+                  {candidate?.custom && (
+                    <div className="grid gap-4 @md/panel:grid-cols-2">
+                      <label className="block">
+                        <ParameterLabel
+                          className={fieldLabel}
+                          label="Omitted reference period"
+                          help="The event period whose indicator is left out of the regression. Both coefficients are measured relative to it."
+                        />
+                        <NumberInput
+                          aria-label="Omitted reference period"
+                          className={field('text', 'mt-1')}
+                          value={settings.coefficients?.reference ?? -1}
+                          onChange={(e) =>
+                            change({
+                              coefficients: {
+                                pre: -1,
+                                post: -1,
+                                ...settings.coefficients,
+                                reference:
+                                  e.target.value.trim() === '' ? NaN : Number(e.target.value),
+                              },
+                            })
+                          }
+                        />
+                      </label>
+                    </div>
+                  )}
                 </SettingsStep>
                 <SettingsStep number={2} title="Specify the trend scenario">
                   <div>
@@ -501,8 +604,10 @@ export function PretestCoveragePanel({
             <p>{pretestMeaning}</p>
             <p>
               The selected estimates must share a reference period and a sampling covariance. This
-              route uses unbinned event periods with period −1 omitted, zero anticipation, and a
-              universal baseline for staggered estimates.
+              event-study route uses period −1 as the reference. Custom regressions require an
+              explicit shared reference. Binned regressions are supported, but the selected periods
+              cannot be tail bins. Staggered estimates require zero anticipation and a universal
+              baseline.
             </p>
             <p>
               The calculation assumes joint normal sampling errors and a specified differential

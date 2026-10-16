@@ -286,6 +286,14 @@ export function honestCandidates(
   estimates: readonly EstimationRunArtifact[],
   designs: readonly TimeSeriesRun[],
 ): readonly HonestCandidate[] {
+  return eventStudyCandidates(estimates, designs, 'honestDid')
+}
+
+export function eventStudyCandidates(
+  estimates: readonly EstimationRunArtifact[],
+  designs: readonly TimeSeriesRun[],
+  purpose: 'honestDid' | 'pretestCoverage',
+): readonly HonestCandidate[] {
   const result: HonestCandidate[] = []
   for (const run of estimates) {
     if (
@@ -325,11 +333,21 @@ export function honestCandidates(
       continue
     const window = run.specification.specification.window,
       e = run.evidence,
-      selected = [...e.events].sort((a, b) => a.period - b.period)
+      selected = e.events
+        .filter((event) =>
+          purpose === 'pretestCoverage' && window.tails === 'bin'
+            ? event.period > window.first && event.period < window.last
+            : true,
+        )
+        .sort((a, b) => a.period - b.period)
     const index = (term: number) => e.terms.findIndex((t) => t.index === term)
     const input =
-      window.reference !== -1 || window.tails !== 'reference'
-        ? err('Use period -1 as the reference and unbinned event periods.')
+      window.reference !== -1 || (purpose === 'honestDid' && window.tails !== 'reference')
+        ? err(
+            purpose === 'honestDid'
+              ? 'Use period -1 as the reference and unbinned event periods.'
+              : 'Use period -1 as the reference for pre-test coverage.',
+          )
         : selected.some((s) => index(s.index) < 0)
           ? err('An event coefficient is missing from the saved regression evidence.')
           : eventInput(

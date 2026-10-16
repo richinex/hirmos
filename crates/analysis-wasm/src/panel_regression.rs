@@ -17,11 +17,14 @@ pub(crate) struct Window { first: i64, last: i64, reference: i64, tails: Tails }
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all="camelCase")]
 pub(crate) enum Tails { Reference, Bin }
+#[derive(Default, Deserialize, Serialize)]
+#[serde(rename_all="camelCase")]
+pub(crate) enum ClusterCovariance { Cr1, #[default] Cr2 }
 #[derive(Deserialize, Serialize)]
 #[serde(tag="kind", rename_all="camelCase", rename_all_fields="camelCase", deny_unknown_fields)]
 pub(crate) enum Specification {
     EventStudy { keys: Vec<(u64,i64)>, adoption: Vec<(u64,Option<i64>)>, covariates: Vec<usize>, window: Window },
-    Interactions { predictors: Vec<Predictor>, terms: Vec<Vec<usize>> },
+    Interactions { predictors: Vec<Predictor>, terms: Vec<Vec<usize>>, #[serde(default)] covariance: ClusterCovariance },
 }
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all="camelCase", deny_unknown_fields)]
@@ -108,7 +111,7 @@ pub(crate) fn run(values:&[f64], r:Request)->Result<Evidence,String> {
                 };
             (terms,fit.dropped.iter().map(|i|names[*i].clone()).collect(),fit.covariance,r.rows,labels.len(),events,lead_test)
         }
-        Specification::Interactions{predictors,terms}=>{
+        Specification::Interactions{predictors,terms,covariance}=>{
             if predictors.is_empty() || predictors.iter().any(|p|p.column>=r.columns || p.name!=r.names[p.column] || p.column==r.outcome || r.weights==Some(p.column)) ||
                 predictors.iter().map(|p|p.column).collect::<BTreeSet<_>>().len()!=predictors.len() || terms.is_empty() {
                 return Err("Choose distinct predictor columns and at least one model term.".into());
@@ -118,7 +121,10 @@ pub(crate) fn run(values:&[f64], r:Request)->Result<Evidence,String> {
             let terms=terms.iter().map(|t|match t.as_slice(){[a]=>Ok(design::Term::Main(*a)),[a,b]=>Ok(design::Term::Pair(*a,*b)),[a,b,c]=>Ok(design::Term::Triple(*a,*b,*c)),_=>Err("Each term needs one, two or three distinct predictors.")}).collect::<Result<Vec<_>,_>>()?;
             let design=design::hierarchical_design(&columns,&terms,&references).map_err(|e|format!("The interaction design could not be constructed: {e:?}."))?;
             let x=DMatrix::from_fn(r.rows,design.names.len(),|i,j|design.rows[i][j]);
-            let selected=cr2::fit_selecting_aliases(&y,&x,&weights,&clusters).map_err(|e|format!("Clustered regression could not be fitted: {e:?}."))?;
+            let selected=match covariance {
+                ClusterCovariance::Cr2 => cr2::fit_selecting_aliases(&y,&x,&weights,&clusters).map_err(|e|format!("Clustered regression could not be fitted: {e:?}."))?,
+                ClusterCovariance::Cr1 => fit_cr1(&y,&x,&weights,&clusters)?,
+            };
             let fit=selected.fit;let kept=selected.selection.kept();
             let terms=kept.iter().enumerate().map(|(j,i)|coefficient(*i,design.names[*i].clone(),fit.params[j],fit.covariance[(j,j)],fit.degrees_of_freedom[j],r.confidence)).collect::<Result<Vec<_>,_>>()?;
             let omitted=design.names.into_iter().enumerate().filter_map(|(i,n)|(!kept.contains(&i)).then_some(n)).collect();
@@ -127,6 +133,26 @@ pub(crate) fn run(values:&[f64], r:Request)->Result<Evidence,String> {
     };
     let covariance=(0..covariance.nrows()).map(|i|(0..covariance.ncols()).map(|j|covariance[(i,j)]).collect()).collect();
     Ok(Evidence{version:1,request:r,observations,clusters:cluster_count,terms,omitted,covariance,events,lead_test})
+}
+
+fn fit_cr1(y:&[f64], x:&DMatrix<f64>, weights:&[f64], clusters:&[u64]) -> Result<cr2::RankSelectedFit,String> {
+    let selection=estimation::aliases::select_clustered(x,weights,clusters)
+        .map_err(|e|format!("The regression design could not be selected: {e:?}."))?;
+    let rows:Vec<_>=(0..y.len()).filter(|i|weights[*i]>0.).collect();
+    let groups:Vec<_>=rows.iter().map(|i|clusters[*i]).collect();
+    let g=groups.iter().collect::<BTreeSet<_>>().len();
+    let k=selection.kept().len();
+    if k==0 || rows.len()<=k || g<2 { return Err("CR1 requires at least two positive-weight clusters and more observations than retained coefficients.".into()); }
+    let maxw=weights.iter().copied().fold(0.,f64::max);
+    let scale:Vec<_>=selection.kept().iter().map(|j|rows.iter().map(|i|x[(*i,*j)].abs()).fold(0.,f64::max)).collect();
+    let rootx=DMatrix::from_fn(rows.len(),k,|i,j|x[(rows[i],selection.kept()[j])]/scale[j]*(weights[rows[i]]/maxw).sqrt());
+    let rooty:Vec<_>=rows.iter().map(|i|y[*i]*(weights[*i]/maxw).sqrt()).collect();
+    let result=estimation::ols_cluster(&rooty,&rootx,&groups);
+    let params:Vec<_>=result.params.iter().zip(&scale).map(|(v,s)|v/s).collect();
+    let covariance=DMatrix::from_fn(k,k,|i,j|result.covariance[(i,j)]/scale[i]/scale[j]);
+    if params.iter().chain(covariance.iter()).any(|v|!v.is_finite()) { return Err("CR1 covariance could not be calculated with finite values.".into()); }
+    let residuals=(0..y.len()).map(|i|y[i]-selection.kept().iter().enumerate().map(|(j,col)|x[(i,*col)]*params[j]).sum::<f64>()).collect();
+    Ok(cr2::RankSelectedFit { selection, fit:cr2::Fit { observations:rows.len(),clusters:g,params,covariance,degrees_of_freedom:vec![(g-1) as f64;k],residuals } })
 }
 
 #[cfg(test)]
@@ -148,7 +174,7 @@ mod tests {
             for p in input {let column=names.len();let label=p["name"].as_str().unwrap().to_owned();names.push(label.clone());values.extend(numbers(&p["values"]));predictors.push(Predictor{column,name:label,coding:if p["categorical"]==true{Coding::Categorical{reference:p["reference"].as_str().unwrap().into()}}else{Coding::Numeric {}}});}
             let weight=names.len();names.push("Observation weights".into());values.extend(numbers(&c["weights"]));
             let cluster=names.len();names.push("Cluster".into());values.extend(numbers(&c["clusters"]));
-            let request=Request{rows:n,columns:names.len(),names,outcome:0,weights:Some(weight),cluster,confidence:0.95,specification:Specification::Interactions{predictors,terms:serde_json::from_value(c["term_inputs"].clone()).unwrap()}};
+            let request=Request{rows:n,columns:names.len(),names,outcome:0,weights:Some(weight),cluster,confidence:0.95,specification:Specification::Interactions{predictors,terms:serde_json::from_value(c["term_inputs"].clone()).unwrap(),covariance:ClusterCovariance::Cr2}};
             let result=run(&values,request).unwrap_or_else(|e|panic!("{name}: {e}"));
             assert_eq!(result.terms.len(),c["keep"].as_array().unwrap().len(),"{name}");
             for (j,t) in result.terms.iter().enumerate(){

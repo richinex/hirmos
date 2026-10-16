@@ -28,6 +28,7 @@ export const regressionSpecificationSchema = z.discriminatedUnion('kind', [
   z
     .object({
       kind: z.literal('interactions'),
+      covariance: z.enum(['cr1', 'cr2']).optional(),
       predictors: z
         .array(z.object({ column: index, name: z.string().min(1), coding: codingSchema }).strict())
         .min(1),
@@ -246,6 +247,7 @@ export interface PanelRegressionDraft {
       }
     | {
         readonly kind: 'interactions'
+        readonly covariance?: 'cr1' | 'cr2'
         readonly predictors: readonly {
           readonly column: ColumnId
           readonly coding: z.infer<typeof codingSchema>
@@ -299,6 +301,7 @@ export const panelRegressionDraftSchema = z
       z
         .object({
           kind: z.literal('interactions'),
+          covariance: z.enum(['cr1', 'cr2']).optional(),
           predictors: z.array(z.object({ column: columnId, coding: codingSchema }).strict()),
           terms: z.array(z.array(columnId)),
         })
@@ -364,6 +367,7 @@ export function regressionControlsMatch(
     case 'interactions':
       return (
         s.kind === 'interactions' &&
+        (s.covariance ?? 'cr2') === (model.covariance ?? 'cr2') &&
         sameSpecification(
           s.predictors,
           model.predictors.map((p) => ({

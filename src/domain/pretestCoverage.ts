@@ -1,11 +1,10 @@
 import { z } from 'zod'
 import { brand, err, ok, type Result } from './dop'
 import {
-  honestCandidates,
+  eventStudyCandidates,
   honestEventStudySchema,
   honestSourceSchema,
   type HonestCandidate,
-  type HonestEventStudy,
 } from './honestDid'
 import type { EstimationRunArtifact, ConfigurationSetting } from './estimation'
 import type { TimeSeriesRun } from './timeSeries'
@@ -26,8 +25,16 @@ export type PretestRequest = z.infer<typeof pretestRequestSchema>
 export const pretestSettingsSchema = z
   .object({
     sourceRun: z.string().uuid(),
-    prePeriod: z.number().int().max(-2),
-    postPeriod: z.number().int().nonnegative(),
+    prePeriod: z.number().int().safe(),
+    postPeriod: z.number().int().safe(),
+    coefficients: z
+      .object({
+        pre: z.number().int().nonnegative(),
+        post: z.number().int().nonnegative(),
+        reference: z.number().int().safe(),
+      })
+      .strict()
+      .optional(),
     scenario: z.discriminatedUnion('kind', [
       z.object({ kind: z.literal('calibrated'), offset: finite }).strict(),
       z.object({ kind: z.literal('specified'), bias: finite }).strict(),
@@ -57,14 +64,78 @@ export const pretestEvidenceSchema = z
   )
 export type PretestEvidence = z.infer<typeof pretestEvidenceSchema>
 
+const customStudySchema = z
+  .object({
+    kind: z.literal('custom'),
+    reference: z.number().int().safe(),
+    terms: z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()]),
+    names: z.tuple([z.string().min(1), z.string().min(1)]),
+    events: z.tuple([z.number().int().safe(), z.number().int().safe()]),
+    coefficients: z.tuple([finite, finite]),
+    covariance: z.tuple([z.tuple([finite, finite]), z.tuple([finite, finite])]),
+  })
+  .strict()
+  .refine(
+    (v) =>
+      v.terms[0] !== v.terms[1] &&
+      v.events[0] < v.reference &&
+      v.reference < v.events[1] &&
+      v.covariance[0][0] > 0 &&
+      v.covariance[1][1] > 0 &&
+      Math.abs(v.covariance[0][1] - v.covariance[1][0]) <=
+        1e-10 * Math.max(1, Math.abs(v.covariance[0][1])),
+    'Choose distinct coefficients on opposite sides of their shared reference, with a valid covariance.',
+  )
+const pretestStudySchema = z.union([honestEventStudySchema, customStudySchema])
+type PretestStudy = z.infer<typeof pretestStudySchema>
+export type PretestCandidate = HonestCandidate & {
+  readonly custom?: Extract<TimeSeriesRun, { kind: 'panel-regression' }>
+}
+
+export function pretestInput(
+  candidate: PretestCandidate,
+  settings: PretestSettings,
+): Result<PretestStudy, string> {
+  if (!candidate.custom)
+    return settings.coefficients
+      ? err('Coefficient mapping is only available for custom-regression runs.')
+      : candidate.input
+  const mapping = settings.coefficients
+  if (!mapping)
+    return err('Choose two event coefficients and their shared omitted reference period.')
+  const e = candidate.custom.evidence
+  const pre = e.terms.findIndex((t) => t.index === mapping.pre)
+  const post = e.terms.findIndex((t) => t.index === mapping.post)
+  if (pre < 0 || post < 0) return err('Choose retained coefficients from the saved regression.')
+  const parsed = customStudySchema.safeParse({
+    kind: 'custom',
+    reference: mapping.reference,
+    terms: [mapping.pre, mapping.post],
+    names: [e.terms[pre]!.name, e.terms[post]!.name],
+    events: [settings.prePeriod, settings.postPeriod],
+    coefficients: [e.terms[pre]!.estimate, e.terms[post]!.estimate],
+    covariance: [
+      [e.covariance[pre]![pre], e.covariance[pre]![post]],
+      [e.covariance[post]![pre], e.covariance[post]![post]],
+    ],
+  })
+  return parsed.success
+    ? ok(parsed.data)
+    : err(
+        'Choose distinct event coefficients with the pre-period before the omitted reference and the post-period after it.',
+      )
+}
+
 export function pretestRequest(
-  study: HonestEventStudy,
+  study: PretestStudy,
   settings: PretestSettings,
 ): Result<PretestRequest, string> {
   const pre = study.events.indexOf(settings.prePeriod),
     post = study.events.indexOf(settings.postPeriod)
   if (pre < 0 || post < 0)
-    return err('Choose pre-treatment and post-treatment periods present in this event study.')
+    return err(
+      'Choose individual pre-treatment and post-treatment periods from this event study, not binned endpoints.',
+    )
   const preVariance = study.covariance[pre]![pre]!,
     postVariance = study.covariance[post]![post]!
   const correlation = study.covariance[pre]![post]! / Math.sqrt(preVariance * postVariance)
@@ -72,8 +143,10 @@ export function pretestRequest(
     settings.scenario.kind === 'specified'
       ? settings.scenario.bias
       : study.coefficients[pre]! / Math.sqrt(preVariance) + settings.scenario.offset
-  // Linear drift is measured from the omitted period, -1, on each side of treatment.
-  const distanceRatio = (settings.postPeriod + 1) / (-settings.prePeriod - 1)
+  const reference = 'kind' in study ? study.reference : -1
+  if (settings.prePeriod >= reference || settings.postPeriod <= reference)
+    return err('The selected periods must lie on opposite sides of the omitted reference period.')
+  const distanceRatio = (settings.postPeriod - reference) / (reference - settings.prePeriod)
   const parsed = pretestRequestSchema.safeParse({
     targetBias: -distanceRatio * Math.sqrt(preVariance / postVariance) * pretestBias,
     pretestBias,
@@ -101,7 +174,7 @@ export const pretestRunSchema = z
       .transform((v) => brand<string, 'PreparedDatasetVersionId'>(v)),
     createdAt: z.iso.datetime(),
     source: honestSourceSchema,
-    eventStudy: honestEventStudySchema,
+    eventStudy: pretestStudySchema,
     settings: pretestSettingsSchema,
     evidence: pretestEvidenceSchema,
   })
@@ -110,6 +183,11 @@ export const pretestRunSchema = z
     const request = pretestRequest(run.eventStudy, run.settings)
     if (
       run.source.run !== run.settings.sourceRun ||
+      ('kind' in run.eventStudy
+        ? run.settings.coefficients?.pre !== run.eventStudy.terms[0] ||
+          run.settings.coefficients?.post !== run.eventStudy.terms[1] ||
+          run.settings.coefficients?.reference !== run.eventStudy.reference
+        : run.settings.coefficients !== undefined) ||
       !request.ok ||
       Object.entries(request.value).some(
         ([key, value]) => value !== run.evidence.request[key as keyof PretestRequest],
@@ -122,35 +200,88 @@ export const pretestRunSchema = z
   })
 export type PretestRun = z.infer<typeof pretestRunSchema>
 
+export function pretestCandidates(
+  estimates: readonly EstimationRunArtifact[],
+  designs: readonly TimeSeriesRun[],
+): readonly PretestCandidate[] {
+  return [
+    ...eventStudyCandidates(estimates, designs, 'pretestCoverage'),
+    ...designs.flatMap((run) =>
+      run.kind === 'panel-regression' && run.specification.specification.kind === 'interactions'
+        ? [
+            {
+              source: { kind: 'regressionDesign' as const, run: run.id },
+              label: `Custom regression for ${run.outcome.name}, ${run.specification.specification.covariance === 'cr1' ? 'CR1' : 'CR2'}`,
+              createdAt: run.createdAt,
+              preparedDataset: run.preparedDataset,
+              custom: run,
+              input: err(
+                'Choose two event coefficients and their shared omitted reference period.',
+              ),
+            },
+          ]
+        : [],
+    ),
+  ]
+}
+
 export function pretestRunMatches(
   run: PretestRun,
   estimates: readonly EstimationRunArtifact[],
   designs: readonly TimeSeriesRun[],
 ): boolean {
   if (!pretestRunSchema.safeParse(run).success) return false
-  const candidate = honestCandidates(estimates, designs).find(
+  const candidate = pretestCandidates(estimates, designs).find(
     (c) => c.source.kind === run.source.kind && c.source.run === run.source.run,
   )
+  const input = candidate ? pretestInput(candidate, run.settings) : null
   return (
     candidate !== undefined &&
     candidate.preparedDataset === run.preparedDataset &&
-    candidate.input.ok &&
-    JSON.stringify(candidate.input.value) === JSON.stringify(run.eventStudy)
+    input?.ok === true &&
+    JSON.stringify(input.value) === JSON.stringify(run.eventStudy)
   )
 }
 
 export function pretestSettings(
   value: PretestSettings,
-  candidates: readonly HonestCandidate[],
+  candidates: readonly PretestCandidate[],
 ): readonly ConfigurationSetting[] {
   return [
     {
       key: 'sourceRun',
-      label: 'Event-study run',
+      label: 'Source run',
       value: candidates.find((c) => c.source.run === value.sourceRun)?.label ?? 'Not selected',
     },
     { key: 'prePeriod', label: 'Pre-treatment period', value: String(value.prePeriod) },
     { key: 'postPeriod', label: 'Post-treatment period', value: String(value.postPeriod) },
+    ...(value.coefficients
+      ? [
+          {
+            key: 'preCoefficient',
+            label: 'Pre-treatment coefficient',
+            value:
+              candidates
+                .find((c) => c.source.run === value.sourceRun)
+                ?.custom?.evidence.terms.find((t) => t.index === value.coefficients!.pre)?.name ??
+              'Not selected',
+          },
+          {
+            key: 'postCoefficient',
+            label: 'Post-treatment coefficient',
+            value:
+              candidates
+                .find((c) => c.source.run === value.sourceRun)
+                ?.custom?.evidence.terms.find((t) => t.index === value.coefficients!.post)?.name ??
+              'Not selected',
+          },
+          {
+            key: 'reference',
+            label: 'Omitted reference period',
+            value: String(value.coefficients.reference),
+          },
+        ]
+      : []),
     {
       key: 'scenario',
       label: 'Pre-trend bias scenario',

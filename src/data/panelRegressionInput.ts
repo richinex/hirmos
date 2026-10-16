@@ -151,6 +151,7 @@ export async function preparePanelRegression(
   return regression(
     {
       kind: 'interactions',
+      covariance: model.covariance ?? 'cr2',
       predictors: model.predictors.map((p) => ({
         column: at(p.column),
         name: variables[at(p.column)]?.name ?? '',

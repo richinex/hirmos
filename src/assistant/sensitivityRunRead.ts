@@ -103,7 +103,15 @@ export function readSensitivityRun(
         method: 'Pre-test coverage',
         sourceMatches: pretestRunMatches(run, workflow.estimationRuns, workflow.timeSeriesRuns),
         preparedDatasetCurrent: workflow.prepared?.id === run.preparedDataset,
-        periods: { pre: run.settings.prePeriod, post: run.settings.postPeriod, reference: -1 },
+        periods: {
+          pre: run.settings.prePeriod,
+          post: run.settings.postPeriod,
+          reference: run.settings.coefficients?.reference ?? -1,
+        },
+        coefficients:
+          'kind' in run.eventStudy
+            ? { pre: run.eventStudy.names[0], post: run.eventStudy.names[1] }
+            : null,
         scenario: run.settings.scenario,
         assumptions: [
           'Differential linear trends',

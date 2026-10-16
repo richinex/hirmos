@@ -11,7 +11,7 @@ import {
 } from './estimation'
 import { resolveStudyDagRevision, studyRevisionNotice } from './dagProvenance'
 import { honestCandidates, honestRunMatches } from './honestDid'
-import { pretestRunMatches, pretestMeaning } from './pretestCoverage'
+import { pretestCandidates, pretestRunMatches, pretestMeaning } from './pretestCoverage'
 import { didSensitivitySource, didSensitivityRunMatches } from './didSensitivity'
 import type { SensitivityRunArtifact } from './sensitivity'
 import { formatCount, formatStatistic } from '@/lib/format/number'
@@ -256,6 +256,7 @@ function sensitivityReview(
   context: AnalysisReviewContext,
 ): ReviewItem[] {
   const honest = honestCandidates([run], [])[0]
+  const pretest = pretestCandidates([run], [])[0]
   const dr = didSensitivitySource(run)
   return (
     [
@@ -263,10 +264,10 @@ function sensitivityReview(
         id: 'pretest-coverage',
         title: 'Pre-test coverage',
         kind: 'pretest-coverage-run',
-        supported: honest?.input.ok === true,
+        supported: pretest?.input.ok === true,
         reason:
-          honest && !honest.input.ok
-            ? honest.input.error
+          pretest && !pretest.input.ok
+            ? pretest.input.error
             : 'This saved fit does not supply the event estimates and covariance required for pre-test coverage.',
         matches: (probe: SensitivityRunArtifact) =>
           probe.kind === 'pretest-coverage-run' && pretestRunMatches(probe, [run], []),

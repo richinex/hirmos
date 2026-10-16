@@ -228,7 +228,9 @@ export function PanelRegressionResult({
       <p className="text-body text-muted">
         {s.kind === 'eventStudy'
           ? 'Unit and period fixed effects with one-way clustered covariance and a finite-sample correction. These pooled regression coefficients are not cohort-specific ATT estimates.'
-          : 'Hierarchical interactions with CR2 clustered covariance and coefficient-specific Satterthwaite degrees of freedom. Lower-order terms are included with each interaction.'}{' '}
+          : s.covariance === 'cr1'
+            ? 'CR1 clustered covariance counts every retained coefficient, including the intercept and fixed-effect indicators. Intervals use the number of clusters minus one as degrees of freedom.'
+            : 'Hierarchical interactions with CR2 clustered covariance and coefficient-specific Satterthwaite degrees of freedom. Lower-order terms are included with each interaction.'}{' '}
         Intervals use a {formatPercent(e.request.confidence, { precision: 0 }).text} confidence
         level and are pointwise, not simultaneous.
       </p>
@@ -266,7 +268,7 @@ export function PanelRegressionResult({
           />
         </>
       )}
-      {s.kind === 'interactions' && (
+      {s.kind === 'interactions' && s.terms.some((term) => term.length === 3) && (
         <p className="text-body text-muted">
           A triple interaction measures a difference between differences in the fitted model. A
           causal interpretation requires the corresponding parallel-trends assumption for the

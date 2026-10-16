@@ -164,6 +164,7 @@ export function checkInterruptedDraft(
 }
 
 const labels: Readonly<Record<string, string>> = {
+  covariance: 'Clustered covariance',
   outcome: 'Outcome',
   selected: 'Series',
   maxLag: 'Maximum lag',
@@ -255,6 +256,8 @@ const choices: Readonly<Record<string, string>> = {
   eventStudy: 'Event study',
   summary: 'Cohort summary',
   interactions: 'Interactions / DDD',
+  cr1: 'CR1',
+  cr2: 'CR2',
   bacon: 'Bacon decomposition',
   numeric: 'Numeric',
   categorical: 'Categorical',

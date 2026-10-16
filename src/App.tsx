@@ -784,10 +784,7 @@ function App() {
     workflow.kind === 'profiled' &&
     workflow.prepared !== null &&
     (workflow.estimationRuns.length > 0 ||
-      workflow.timeSeriesRuns.some(
-        (run) =>
-          run.kind === 'panel-regression' && run.specification.specification.kind === 'eventStudy',
-      ))
+      workflow.timeSeriesRuns.some((run) => run.kind === 'panel-regression'))
 
   const chapterIsAvailable = (chapter: ChapterId): boolean => {
     if (chapter === 'projects') return workflow.kind === 'awaiting-project'
