@@ -14,6 +14,7 @@ import { describePanelDataProblem } from '@/domain/panel'
 import { materialisePrepared, describePreparedMaterialisationProblem } from './prepared'
 import { prepareRegularPanel } from './regularPanelInput'
 import { materializePanelKeysInWorker } from './client'
+import { checkPanelRegressionDraft } from '@/domain/regressionWorkspaceSettings'
 
 type Variable = { readonly id: ColumnId; readonly name: string }
 type Input =
@@ -40,9 +41,14 @@ export async function preparePanelRegression(
 ): Promise<Result<Input, string>> {
   if (draft.outcome === null) return err('Choose an outcome.')
   const model = draft.model
+  const checked = checkPanelRegressionDraft(draft, prepared.kind === 'prepared-panel')
+  if (!checked.ok) return checked
   const roles =
     model.kind === 'interactions'
-      ? model.predictors.map((p) => p.column)
+      ? [
+          ...model.predictors.map((p) => p.column),
+          ...(model.absorbed == null ? [] : [model.absorbed]),
+        ]
       : [model.onset, ...model.covariates]
   const ids = [
     ...new Set(
@@ -152,6 +158,7 @@ export async function preparePanelRegression(
     {
       kind: 'interactions',
       covariance: model.covariance ?? 'cr2',
+      ...(model.absorbed == null ? {} : { absorbed: at(model.absorbed) }),
       predictors: model.predictors.map((p) => ({
         column: at(p.column),
         name: variables[at(p.column)]?.name ?? '',

@@ -1,4 +1,4 @@
-use hirmos_causal_core::survival::comparison_surv::{
+use hirmos_causal_core::survival::comparison::{
     breslow_tarone_ware, crossing_times, fixed_point, lin_wang, lin_xu, long_term, short_term,
     weighted_kaplan_meier, ComparisonData, ComparisonTime, Event, Group, OverallConfiguration,
     RmstWindow, Side, SignificanceLevel, SurvivalSample, TwoStageConfiguration, Weight,
@@ -165,7 +165,7 @@ pub fn short_and_long_term_tests_match_comparison_surv() {
 #[cfg_attr(not(target_arch = "wasm32"), test)]
 pub fn descriptive_statistics_match_comparison_surv_and_survrm2() {
     let fixture = fixture();
-    let result = hirmos_causal_core::survival::comparison_surv::describe(
+    let result = hirmos_causal_core::survival::comparison::describe(
         &data(&fixture),
         RmstWindow::Observed,
         SignificanceLevel::new(0.05).unwrap(),
@@ -239,7 +239,7 @@ pub fn descriptive_statistics_match_comparison_surv_and_survrm2() {
         "tau",
     );
 
-    let at_fixed_time = hirmos_causal_core::survival::comparison_surv::describe(
+    let at_fixed_time = hirmos_causal_core::survival::comparison::describe(
         &data(&fixture),
         RmstWindow::At(ComparisonTime::new(fixture["data"]["t0"].as_f64().unwrap()).unwrap()),
         SignificanceLevel::new(0.05).unwrap(),
@@ -269,7 +269,7 @@ pub fn descriptive_statistics_match_comparison_surv_and_survrm2() {
 #[cfg_attr(not(target_arch = "wasm32"), test)]
 pub fn two_stage_test_matches_tshrc() {
     let fixture = fixture();
-    let result = hirmos_causal_core::survival::comparison_surv::two_stage(
+    let result = hirmos_causal_core::survival::comparison::two_stage(
         &data(&fixture),
         TwoStageConfiguration::new(NonZeroUsize::new(200).unwrap(), 0.05, 0.1, 12_345).unwrap(),
     )
@@ -285,7 +285,7 @@ pub fn two_stage_test_matches_tshrc() {
 #[cfg_attr(not(target_arch = "wasm32"), test)]
 pub fn aggregate_results_match_comparison_surv_overall_test() {
     let fixture = fixture();
-    let result = hirmos_causal_core::survival::comparison_surv::overall_test(
+    let result = hirmos_causal_core::survival::comparison::overall_test(
         &data(&fixture),
         OverallConfiguration::new(
             fixture["data"]["t0"].as_f64().unwrap(),
@@ -339,7 +339,7 @@ pub fn aggregate_results_match_comparison_surv_overall_test() {
 pub fn smooth_hazard_plot_data_matches_muhaz() {
     let fixture = fixture();
     let result =
-        hirmos_causal_core::survival::comparison_surv::smooth_hazard_curves(&data(&fixture));
+        hirmos_causal_core::survival::comparison::smooth_hazard_curves(&data(&fixture));
     for (actual, name) in [
         (&result.group_zero, "group_zero"),
         (&result.group_one, "group_one"),

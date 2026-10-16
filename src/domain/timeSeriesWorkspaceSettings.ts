@@ -6,6 +6,7 @@ import { MAX_ARMA_ORDER } from './interruptedSeries'
 import { seriesLagSchema } from './timeSeriesEstimatorSettings'
 import { describeCountSeriesReadiness, readyCountSeriesSpecification } from './countSeries'
 import type { ConfigurationSetting } from './estimation'
+import { clusterCovarianceLabels } from './panelRegression'
 
 const column = z
   .string()
@@ -165,6 +166,7 @@ export function checkInterruptedDraft(
 
 const labels: Readonly<Record<string, string>> = {
   covariance: 'Clustered covariance',
+  absorbed: 'Absorbed fixed effect',
   outcome: 'Outcome',
   selected: 'Series',
   maxLag: 'Maximum lag',
@@ -256,8 +258,7 @@ const choices: Readonly<Record<string, string>> = {
   eventStudy: 'Event study',
   summary: 'Cohort summary',
   interactions: 'Interactions / DDD',
-  cr1: 'CR1',
-  cr2: 'CR2',
+  ...clusterCovarianceLabels,
   bacon: 'Bacon decomposition',
   numeric: 'Numeric',
   categorical: 'Categorical',

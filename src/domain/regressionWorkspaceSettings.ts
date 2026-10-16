@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { brand, err, ok, type Result } from './dop'
 import type { CountRegressionDraft } from './countRegression'
-import type { PanelRegressionDraft } from './panelRegression'
+import { usesAbsorbedEffects, type PanelRegressionDraft } from './panelRegression'
 
 const column = z
   .string()
@@ -151,7 +151,11 @@ export function panelRegressionColumns(value: PanelRegressionDraft): readonly (s
     value.cluster,
     value.weight,
     ...(value.model.kind === 'interactions'
-      ? [...value.model.predictors.map((p) => p.column), ...value.model.terms.flat()]
+      ? [
+          value.model.absorbed ?? null,
+          ...value.model.predictors.map((p) => p.column),
+          ...value.model.terms.flat(),
+        ]
       : [value.model.onset, ...value.model.covariates]),
   ]
 }
@@ -171,6 +175,19 @@ export function checkPanelRegressionDraft(
   if (model.kind !== 'bacon' && !panel && value.cluster === null)
     return err('Choose a cluster column.')
   if (model.kind === 'interactions') {
+    if (usesAbsorbedEffects(model.covariance) && model.absorbed == null)
+      return err('Choose the fixed-effect column to absorb.')
+    if (!usesAbsorbedEffects(model.covariance) && model.absorbed != null)
+      return err('Choose a CR1 correction for absorbed effects.')
+    if (
+      model.absorbed != null &&
+      (model.absorbed === value.outcome ||
+        model.absorbed === value.weight ||
+        model.predictors.some((p) => p.column === model.absorbed))
+    )
+      return err(
+        'The absorbed fixed-effect column must differ from the outcome, weights and predictors.',
+      )
     const ids = model.predictors.map((p) => p.column)
     if (
       !ids.length ||

@@ -4,6 +4,17 @@ import { brand } from './dop'
 
 const index = z.number().int().nonnegative()
 const finite = z.number().finite()
+export const clusterCovarianceLabels = {
+  cr1: 'CR1',
+  cr2: 'CR2',
+  fixest: 'CR1 with absorbed effects',
+  xtreg: 'CR1 excluding absorbed effects',
+} as const
+export function usesAbsorbedEffects(
+  covariance: keyof typeof clusterCovarianceLabels | undefined,
+): boolean {
+  return covariance === 'fixest' || covariance === 'xtreg'
+}
 export const codingSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('numeric') }).strict(),
   z.object({ kind: z.literal('categorical'), reference: z.string().min(1) }).strict(),
@@ -28,7 +39,8 @@ export const regressionSpecificationSchema = z.discriminatedUnion('kind', [
   z
     .object({
       kind: z.literal('interactions'),
-      covariance: z.enum(['cr1', 'cr2']).optional(),
+      covariance: z.enum(['cr1', 'cr2', 'fixest', 'xtreg']).optional(),
+      absorbed: index.optional(),
       predictors: z
         .array(z.object({ column: index, name: z.string().min(1), coding: codingSchema }).strict())
         .min(1),
@@ -83,6 +95,15 @@ export const panelRegressionRequestSchema = z
       )
         fail('Covariates must be distinct from outcome, cluster and weights.')
     } else {
+      if (
+        usesAbsorbedEffects(s.covariance) !== (s.absorbed !== undefined) ||
+        (s.absorbed !== undefined &&
+          (s.absorbed >= r.columns ||
+            s.absorbed === r.outcome ||
+            s.absorbed === r.weights ||
+            s.predictors.some((p) => p.column === s.absorbed)))
+      )
+        fail('Choose a separate fixed-effect column and a CR1 correction for absorbed effects.')
       if (
         new Set(s.predictors.map((p) => p.column)).size !== s.predictors.length ||
         s.predictors.some(
@@ -247,7 +268,8 @@ export interface PanelRegressionDraft {
       }
     | {
         readonly kind: 'interactions'
-        readonly covariance?: 'cr1' | 'cr2'
+        readonly covariance?: keyof typeof clusterCovarianceLabels
+        readonly absorbed?: ColumnId | null
         readonly predictors: readonly {
           readonly column: ColumnId
           readonly coding: z.infer<typeof codingSchema>
@@ -301,7 +323,8 @@ export const panelRegressionDraftSchema = z
       z
         .object({
           kind: z.literal('interactions'),
-          covariance: z.enum(['cr1', 'cr2']).optional(),
+          covariance: z.enum(['cr1', 'cr2', 'fixest', 'xtreg']).optional(),
+          absorbed: columnId.nullable().optional(),
           predictors: z.array(z.object({ column: columnId, coding: codingSchema }).strict()),
           terms: z.array(z.array(columnId)),
         })
@@ -368,6 +391,7 @@ export function regressionControlsMatch(
       return (
         s.kind === 'interactions' &&
         (s.covariance ?? 'cr2') === (model.covariance ?? 'cr2') &&
+        s.absorbed === (model.absorbed == null ? undefined : at(model.absorbed)) &&
         sameSpecification(
           s.predictors,
           model.predictors.map((p) => ({

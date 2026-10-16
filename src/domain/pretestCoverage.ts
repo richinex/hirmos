@@ -8,6 +8,7 @@ import {
 } from './honestDid'
 import type { EstimationRunArtifact, ConfigurationSetting } from './estimation'
 import type { TimeSeriesRun } from './timeSeries'
+import { clusterCovarianceLabels } from './panelRegression'
 
 const finite = z.number().finite()
 const level = finite.gt(0).lt(1)
@@ -211,7 +212,7 @@ export function pretestCandidates(
         ? [
             {
               source: { kind: 'regressionDesign' as const, run: run.id },
-              label: `Custom regression for ${run.outcome.name}, ${run.specification.specification.covariance === 'cr1' ? 'CR1' : 'CR2'}`,
+              label: `Custom regression for ${run.outcome.name}, ${clusterCovarianceLabels[run.specification.specification.covariance ?? 'cr2']}`,
               createdAt: run.createdAt,
               preparedDataset: run.preparedDataset,
               custom: run,

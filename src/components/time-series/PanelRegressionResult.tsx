@@ -228,9 +228,13 @@ export function PanelRegressionResult({
       <p className="text-body text-muted">
         {s.kind === 'eventStudy'
           ? 'Unit and period fixed effects with one-way clustered covariance and a finite-sample correction. These pooled regression coefficients are not cohort-specific ATT estimates.'
-          : s.covariance === 'cr1'
-            ? 'CR1 clustered covariance counts every retained coefficient, including the intercept and fixed-effect indicators. Intervals use the number of clusters minus one as degrees of freedom.'
-            : 'Hierarchical interactions with CR2 clustered covariance and coefficient-specific Satterthwaite degrees of freedom. Lower-order terms are included with each interaction.'}{' '}
+          : s.covariance === 'xtreg'
+            ? `Fixed effects for ${e.request.names[s.absorbed!]} are absorbed. The CR1 correction counts retained slopes and an intercept, excluding absorbed effects even when their groups cross clusters. Intervals use the number of clusters minus one as degrees of freedom.`
+            : s.covariance === 'fixest'
+              ? `Fixed effects for ${e.request.names[s.absorbed!]} are absorbed. The CR1 correction excludes fixed effects nested within clusters and retains an intercept in the parameter count. Intervals use the number of clusters minus one as degrees of freedom.`
+              : s.covariance === 'cr1'
+                ? 'CR1 clustered covariance counts every retained coefficient, including the intercept and fixed-effect indicators. Intervals use the number of clusters minus one as degrees of freedom.'
+                : 'Hierarchical interactions with CR2 clustered covariance and coefficient-specific Satterthwaite degrees of freedom. Lower-order terms are included with each interaction.'}{' '}
         Intervals use a {formatPercent(e.request.confidence, { precision: 0 }).text} confidence
         level and are pointwise, not simultaneous.
       </p>

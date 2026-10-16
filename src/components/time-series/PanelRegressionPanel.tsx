@@ -5,8 +5,15 @@ import { useTimeSeriesDraft } from './useTimeSeriesDraft'
 import { useJob } from '@/analysis/JobsProvider'
 import { useRecordedAnalysis } from '@/assistant/useRecordedAnalysis'
 import { useWorkspaceConfiguration } from '@/assistant/workspaceConfiguration'
-import { panelRegressionDraftSchema } from '@/domain/panelRegression'
-import { panelRegressionColumns, checkPanelRegressionDraft } from '@/domain/regressionWorkspaceSettings'
+import {
+  clusterCovarianceLabels,
+  panelRegressionDraftSchema,
+  usesAbsorbedEffects,
+} from '@/domain/panelRegression'
+import {
+  panelRegressionColumns,
+  checkPanelRegressionDraft,
+} from '@/domain/regressionWorkspaceSettings'
 import { checkSettingsColumns, seriesDraftSettings } from '@/domain/timeSeriesWorkspaceSettings'
 import { err } from '@/domain/dop'
 import { timeSeriesSummary, TIME_SERIES_SUMMARY } from '@/assistant/analysisSummaries'
@@ -66,16 +73,26 @@ export function PanelRegressionPanel(props: PanelRegressionPanelProps) {
   )
   const model = draft.model,
     isPanel = props.prepared.kind === 'prepared-panel'
-  useWorkspaceConfiguration('regression-design', props.prepared.id, busy || session.blocked ? null : {
-    title: 'Regression design', current: draft, schema: panelRegressionDraftSchema, columns,
-    describe: next => seriesDraftSettings(next, columns),
-    validate: next => {
-      if (next.model.kind !== draft.model.kind) return err('Choose the regression analysis before configuring it.')
-      const checked = checkSettingsColumns(next, panelRegressionColumns(next), columns)
-      return checked.ok ? checkPanelRegressionDraft(next, isPanel) : checked
-    },
-    configure: set,
-  })
+  useWorkspaceConfiguration(
+    'regression-design',
+    props.prepared.id,
+    busy || session.blocked
+      ? null
+      : {
+          title: 'Regression design',
+          current: draft,
+          schema: panelRegressionDraftSchema,
+          columns,
+          describe: (next) => seriesDraftSettings(next, columns),
+          validate: (next) => {
+            if (next.model.kind !== draft.model.kind)
+              return err('Choose the regression analysis before configuring it.')
+            const checked = checkSettingsColumns(next, panelRegressionColumns(next), columns)
+            return checked.ok ? checkPanelRegressionDraft(next, isPanel) : checked
+          },
+          configure: set,
+        },
+  )
   const runs = props.runs
     .filter(isRegressionDesignRun)
     .filter((run) => run.kind === 'panel-regression' || run.kind === 'bacon')
@@ -113,19 +130,8 @@ export function PanelRegressionPanel(props: PanelRegressionPanelProps) {
       />
     </label>
   )
-  const problem =
-    draft.outcome === null
-      ? 'Choose an outcome.'
-      : model.kind !== 'interactions' && !isPanel
-        ? 'Prepare panel data to use adoption timing.'
-        : model.kind !== 'interactions' && model.onset === null
-          ? 'Choose an absorbing treatment indicator.'
-          : model.kind === 'interactions' &&
-              (model.predictors.length === 0 || model.terms.length === 0)
-            ? 'Select predictors and model terms.'
-            : model.kind !== 'bacon' && draft.cluster === null && !isPanel
-              ? 'Choose a cluster column.'
-              : null
+  const checked = checkPanelRegressionDraft(draft, isPanel)
+  const problem = checked.ok ? null : checked.error
   useRecordedAnalysis({
     key: 'regression-design',
     prepared: props.prepared.id,
@@ -337,15 +343,43 @@ export function PanelRegressionPanel(props: PanelRegressionPanelProps) {
                       <SegmentedControl
                         ariaLabel="Clustered covariance"
                         value={model.covariance ?? 'cr2'}
-                        options={[{ value: 'cr2', label: 'CR2' }, { value: 'cr1', label: 'CR1' }]}
-                        onChange={(covariance) => set({ ...draft, model: { ...model, covariance } })}
+                        options={[
+                          { value: 'cr2', label: clusterCovarianceLabels.cr2 },
+                          { value: 'cr1', label: clusterCovarianceLabels.cr1 },
+                          { value: 'fixest', label: clusterCovarianceLabels.fixest },
+                          { value: 'xtreg', label: clusterCovarianceLabels.xtreg },
+                        ]}
+                        onChange={(covariance) =>
+                          set({
+                            ...draft,
+                            model: {
+                              ...model,
+                              covariance,
+                              absorbed: usesAbsorbedEffects(covariance)
+                                ? (model.absorbed ?? null)
+                                : null,
+                            },
+                          })
+                        }
                       />
+                      {usesAbsorbedEffects(model.covariance) &&
+                        choose('Absorbed fixed effect', model.absorbed ?? null, (absorbed) => {
+                          set({
+                            ...draft,
+                            model: {
+                              ...model,
+                              absorbed,
+                              predictors: model.predictors.filter((p) => p.column !== absorbed),
+                              terms: model.terms.filter((t) => !t.includes(absorbed!)),
+                            },
+                          })
+                        })}
                       <ColumnChecklist
                         title="Predictors"
                         help="Select main effects and variables used in interactions. Fixed effects can be represented by categorical predictors."
                         columns={columns}
                         selected={model.predictors.map((p) => p.column)}
-                        reserved={[draft.outcome, draft.weight].filter(
+                        reserved={[draft.outcome, draft.weight, model.absorbed ?? null].filter(
                           (c): c is ColumnId => c !== null,
                         )}
                         onChange={(ids) =>

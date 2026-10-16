@@ -19,12 +19,12 @@ pub(crate) struct Window { first: i64, last: i64, reference: i64, tails: Tails }
 pub(crate) enum Tails { Reference, Bin }
 #[derive(Default, Deserialize, Serialize)]
 #[serde(rename_all="camelCase")]
-pub(crate) enum ClusterCovariance { Cr1, #[default] Cr2 }
+pub(crate) enum ClusterCovariance { Cr1, #[default] Cr2, Fixest, Xtreg }
 #[derive(Deserialize, Serialize)]
 #[serde(tag="kind", rename_all="camelCase", rename_all_fields="camelCase", deny_unknown_fields)]
 pub(crate) enum Specification {
     EventStudy { keys: Vec<(u64,i64)>, adoption: Vec<(u64,Option<i64>)>, covariates: Vec<usize>, window: Window },
-    Interactions { predictors: Vec<Predictor>, terms: Vec<Vec<usize>>, #[serde(default, skip_serializing_if="Option::is_none")] covariance: Option<ClusterCovariance> },
+    Interactions { predictors: Vec<Predictor>, terms: Vec<Vec<usize>>, #[serde(default, skip_serializing_if="Option::is_none")] covariance: Option<ClusterCovariance>, #[serde(default, skip_serializing_if="Option::is_none")] absorbed: Option<usize> },
 }
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all="camelCase", deny_unknown_fields)]
@@ -111,7 +111,11 @@ pub(crate) fn run(values:&[f64], r:Request)->Result<Evidence,String> {
                 };
             (terms,fit.dropped.iter().map(|i|names[*i].clone()).collect(),fit.covariance,r.rows,labels.len(),events,lead_test)
         }
-        Specification::Interactions{predictors,terms,covariance}=>{
+        Specification::Interactions{predictors,terms,covariance,absorbed}=>{
+            if matches!(covariance,Some(ClusterCovariance::Fixest | ClusterCovariance::Xtreg)) != absorbed.is_some() ||
+                absorbed.is_some_and(|c|c>=r.columns || c==r.outcome || r.weights==Some(c) || predictors.iter().any(|p|p.column==c)) {
+                return Err("Choose a separate fixed-effect column and a CR1 correction for absorbed effects.".into());
+            }
             if predictors.is_empty() || predictors.iter().any(|p|p.column>=r.columns || p.name!=r.names[p.column] || p.column==r.outcome || r.weights==Some(p.column)) ||
                 predictors.iter().map(|p|p.column).collect::<BTreeSet<_>>().len()!=predictors.len() || terms.is_empty() {
                 return Err("Choose distinct predictor columns and at least one model term.".into());
@@ -121,14 +125,37 @@ pub(crate) fn run(values:&[f64], r:Request)->Result<Evidence,String> {
             let terms=terms.iter().map(|t|match t.as_slice(){[a]=>Ok(design::Term::Main(*a)),[a,b]=>Ok(design::Term::Pair(*a,*b)),[a,b,c]=>Ok(design::Term::Triple(*a,*b,*c)),_=>Err("Each term needs one, two or three distinct predictors.")}).collect::<Result<Vec<_>,_>>()?;
             let design=design::hierarchical_design(&columns,&terms,&references).map_err(|e|format!("The interaction design could not be constructed: {e:?}."))?;
             let x=DMatrix::from_fn(r.rows,design.names.len(),|i,j|design.rows[i][j]);
+            if let Some(absorbed)=absorbed {
+                if weights.iter().any(|w|*w<0.) { return Err("Regression weights must be nonnegative.".into()); }
+                let rows:Vec<_>=(0..r.rows).filter(|i|weights[*i]>0.).collect();
+                if rows.len()<x.ncols() { return Err("The absorbed regression needs at least as many positive-weight rows as design columns.".into()); }
+                let mut levels:Vec<_>=rows.iter().map(|i|matrix[(*i,*absorbed)]).collect();
+                levels.sort_by(f64::total_cmp);levels.dedup();
+                let units:Vec<_>=rows.iter().map(|i|levels.binary_search_by(|v|v.total_cmp(&matrix[(*i,*absorbed)])).unwrap() as u64).collect();
+                let groups:Vec<_>=rows.iter().map(|i|clusters[*i]).collect();
+                let outcome:Vec<_>=rows.iter().map(|i|y[*i]).collect();
+                let weight:Vec<_>=rows.iter().map(|i|weights[*i]).collect();
+                let within=DMatrix::from_fn(rows.len(),x.ncols(),|i,j|x[(rows[i],j)]);
+                let convention=match covariance {
+                    Some(ClusterCovariance::Xtreg)=>estimation::WithinConvention::Xtreg,
+                    _=>estimation::WithinConvention::Fixest,
+                };
+                let fit=estimation::weighted_within_convention(&outcome,&within,&units,None,&weight,
+                    estimation::WithinErrors::ClusterBy(&groups),convention).map_err(|e|e.to_string())?;
+                let terms=fit.kept.iter().enumerate().map(|(j,i)|coefficient(*i,design.names[*i].clone(),fit.params[j],fit.covariance[(j,j)],fit.inference_df as f64,r.confidence)).collect::<Result<Vec<_>,_>>()?;
+                let omitted=fit.dropped.iter().map(|i|design.names[*i].clone()).collect();
+                (terms,omitted,fit.covariance,rows.len(),groups.iter().collect::<BTreeSet<_>>().len(),vec![],LeadTest::Unavailable{reason:"This specification has no event-time lead test.".into()})
+            } else {
             let selected=match covariance {
                 None | Some(ClusterCovariance::Cr2) => cr2::fit_selecting_aliases(&y,&x,&weights,&clusters).map_err(|e|format!("Clustered regression could not be fitted: {e:?}."))?,
                 Some(ClusterCovariance::Cr1) => fit_cr1(&y,&x,&weights,&clusters)?,
+                Some(ClusterCovariance::Fixest | ClusterCovariance::Xtreg) => return Err("Choose the fixed-effect column to absorb.".into()),
             };
             let fit=selected.fit;let kept=selected.selection.kept();
             let terms=kept.iter().enumerate().map(|(j,i)|coefficient(*i,design.names[*i].clone(),fit.params[j],fit.covariance[(j,j)],fit.degrees_of_freedom[j],r.confidence)).collect::<Result<Vec<_>,_>>()?;
             let omitted=design.names.into_iter().enumerate().filter_map(|(i,n)|(!kept.contains(&i)).then_some(n)).collect();
             (terms,omitted,fit.covariance,fit.observations,fit.clusters,vec![],LeadTest::Unavailable{reason:"This specification has no event-time lead test.".into()})
+            }
         }
     };
     let covariance=(0..covariance.nrows()).map(|i|(0..covariance.ncols()).map(|j|covariance[(i,j)]).collect()).collect();
@@ -174,7 +201,7 @@ mod tests {
             for p in input {let column=names.len();let label=p["name"].as_str().unwrap().to_owned();names.push(label.clone());values.extend(numbers(&p["values"]));predictors.push(Predictor{column,name:label,coding:if p["categorical"]==true{Coding::Categorical{reference:p["reference"].as_str().unwrap().into()}}else{Coding::Numeric {}}});}
             let weight=names.len();names.push("Observation weights".into());values.extend(numbers(&c["weights"]));
             let cluster=names.len();names.push("Cluster".into());values.extend(numbers(&c["clusters"]));
-            let request=Request{rows:n,columns:names.len(),names,outcome:0,weights:Some(weight),cluster,confidence:0.95,specification:Specification::Interactions{predictors,terms:serde_json::from_value(c["term_inputs"].clone()).unwrap(),covariance:Some(ClusterCovariance::Cr2)}};
+            let request=Request{rows:n,columns:names.len(),names,outcome:0,weights:Some(weight),cluster,confidence:0.95,specification:Specification::Interactions{predictors,terms:serde_json::from_value(c["term_inputs"].clone()).unwrap(),covariance:Some(ClusterCovariance::Cr2),absorbed:None}};
             let result=run(&values,request).unwrap_or_else(|e|panic!("{name}: {e}"));
             assert_eq!(result.terms.len(),c["keep"].as_array().unwrap().len(),"{name}");
             for (j,t) in result.terms.iter().enumerate(){

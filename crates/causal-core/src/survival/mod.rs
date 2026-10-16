@@ -3,7 +3,7 @@
 pub mod aft;
 pub mod aalen;
 pub mod forest;
-pub mod comparison_surv;
+pub mod comparison;
 pub mod coxph;
 pub mod flexsurv;
 pub mod nonparametric;

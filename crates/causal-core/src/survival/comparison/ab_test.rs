@@ -46,7 +46,7 @@ pub struct FixedTimeConversionResult {
     pub interval: [f64; 2],
     pub statistic: f64,
     pub p_value: f64,
-    pub comparison_surv: FixedPointResult,
+    pub scale_tests: FixedPointResult,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -93,7 +93,7 @@ pub fn fixed_time_conversion(
     data: &ComparisonData,
     time: f64,
 ) -> Result<FixedTimeConversionResult, AbTestError> {
-    let comparison_surv = fixed_point(data, time).map_err(AbTestError::FixedTime)?;
+    let scale_tests = fixed_point(data, time).map_err(AbTestError::FixedTime)?;
     let control = value_at(&curve(&data.group_samples(Group::Zero)), time);
     let treatment = value_at(&curve(&data.group_samples(Group::One)), time);
     let difference = control.survival - treatment.survival;
@@ -117,7 +117,7 @@ pub fn fixed_time_conversion(
         ],
         statistic,
         p_value: two_sided_normal(statistic),
-        comparison_surv,
+        scale_tests,
     })
 }
 

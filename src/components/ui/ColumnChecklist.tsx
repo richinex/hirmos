@@ -31,7 +31,11 @@ export function ColumnChecklist<Id extends string>({
         />
       </div>
       <p className={`${fieldHint} mb-2 max-w-[65ch]`}>{help}</p>
-      <div className="flex flex-wrap gap-x-4 gap-y-1.5" role="group" aria-label={title}>
+      <div
+        className="panel-scroll flex max-h-64 flex-wrap content-start gap-x-4 gap-y-1.5 overflow-y-auto p-0.5"
+        role="group"
+        aria-label={title}
+      >
         {columns.map((c) => (
           <label
             key={c.id}

@@ -1,7 +1,7 @@
-//! Source-compatible port of CRAN ComparisonSurv 1.1.1.
+//! Tests and summaries comparing two observed survival curves.
 //!
-//! ComparisonSurv compares two already-observed survival curves.  Its tests
-//! and summaries remain separate from flexsurv's parametric regression model.
+//! ComparisonSurv 1.1.1 supplies comparison tests and summaries; survRM2 1.0-4
+//! supplies restricted-mean calculations. Other sources are attributed in their modules.
 
 mod ab_test;
 mod cox;

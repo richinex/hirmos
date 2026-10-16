@@ -164,6 +164,8 @@ pub enum WithinConvention {
     Lfe,
     /// fixest 0.14.2: K.adj=TRUE, K.fixef="nonnested", G.adj=TRUE, t.df="min".
     Fixest,
+    /// xtreg, fe vce(cluster) nonest, without dfadj: count slopes and intercept.
+    Xtreg,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -433,6 +435,10 @@ fn within_fit(y: &[f64], x: &DMatrix<f64>, units: &[u64], times: Option<&[u64]>,
                 }
             });
             let counted = match convention {
+                WithinConvention::Xtreg => {
+                    inference_df = cluster_count - 1;
+                    n - k - 1
+                }
                 WithinConvention::Fixest => {
                     let time_nested = times.is_some_and(|times| {
                         let (ti, count) = group_index(times);

@@ -1,4 +1,4 @@
-//! Browser façades for the parity-tested flexsurv and ComparisonSurv kernels.
+//! Browser façades for survival models, curves and group comparisons.
 
 use super::*;
 mod regression;
@@ -8,7 +8,7 @@ use hirmos_causal_core::data_preparation::{
     LongitudinalStateHistory, NonEmptyVec, StateId, StateObservation, SubjectId, TransitionMatrix,
     WideEventHistory, WideSubject,
 };
-use hirmos_causal_core::survival::comparison_surv::{
+use hirmos_causal_core::survival::comparison::{
     comparison_curves, crossing_times, describe, fixed_time_conversion, g_rho_test,
     observed_conversion, overall_test, smooth_hazard_curves, ComparisonData, ComparisonError,
     ComparisonTime, DescriptiveError, Event, FixedPointResult, FixedPointScale, GRho, GRhoResult,
@@ -1503,7 +1503,7 @@ pub(crate) fn comparison_survival_evidence(
                 interval: result.interval,
                 statistic: result.statistic,
                 p_value: result.p_value,
-                scale_tests: fixed_point_tests(&result.comparison_surv)?,
+                scale_tests: fixed_point_tests(&result.scale_tests)?,
             },
         },
         Err(problem) => SurvivalSummary::Unavailable {
