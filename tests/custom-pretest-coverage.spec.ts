@@ -82,7 +82,9 @@ test('CR1 counts retained rank and positive-weight clusters; omitted covariance 
   expect(result.oneCluster.ok).toBe(false)
   expect(result.negative.ok).toBe(false)
   expect(result.explicit.ok).toBe(true)
-  expect(result.implicit).toEqual(result.explicit)
+  expect(result.implicit.ok).toBe(true)
+  expect(result.implicit.value.terms).toEqual(result.explicit.value.terms)
+  expect(result.implicit.value.covariance).toEqual(result.explicit.value.covariance)
 })
 
 test('custom CR1 regression retains its covariance through coverage, review and reload', async ({

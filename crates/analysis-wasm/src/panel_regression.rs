@@ -24,7 +24,7 @@ pub(crate) enum ClusterCovariance { Cr1, #[default] Cr2 }
 #[serde(tag="kind", rename_all="camelCase", rename_all_fields="camelCase", deny_unknown_fields)]
 pub(crate) enum Specification {
     EventStudy { keys: Vec<(u64,i64)>, adoption: Vec<(u64,Option<i64>)>, covariates: Vec<usize>, window: Window },
-    Interactions { predictors: Vec<Predictor>, terms: Vec<Vec<usize>>, #[serde(default)] covariance: ClusterCovariance },
+    Interactions { predictors: Vec<Predictor>, terms: Vec<Vec<usize>>, #[serde(default, skip_serializing_if="Option::is_none")] covariance: Option<ClusterCovariance> },
 }
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all="camelCase", deny_unknown_fields)]
@@ -122,8 +122,8 @@ pub(crate) fn run(values:&[f64], r:Request)->Result<Evidence,String> {
             let design=design::hierarchical_design(&columns,&terms,&references).map_err(|e|format!("The interaction design could not be constructed: {e:?}."))?;
             let x=DMatrix::from_fn(r.rows,design.names.len(),|i,j|design.rows[i][j]);
             let selected=match covariance {
-                ClusterCovariance::Cr2 => cr2::fit_selecting_aliases(&y,&x,&weights,&clusters).map_err(|e|format!("Clustered regression could not be fitted: {e:?}."))?,
-                ClusterCovariance::Cr1 => fit_cr1(&y,&x,&weights,&clusters)?,
+                None | Some(ClusterCovariance::Cr2) => cr2::fit_selecting_aliases(&y,&x,&weights,&clusters).map_err(|e|format!("Clustered regression could not be fitted: {e:?}."))?,
+                Some(ClusterCovariance::Cr1) => fit_cr1(&y,&x,&weights,&clusters)?,
             };
             let fit=selected.fit;let kept=selected.selection.kept();
             let terms=kept.iter().enumerate().map(|(j,i)|coefficient(*i,design.names[*i].clone(),fit.params[j],fit.covariance[(j,j)],fit.degrees_of_freedom[j],r.confidence)).collect::<Result<Vec<_>,_>>()?;
@@ -174,7 +174,7 @@ mod tests {
             for p in input {let column=names.len();let label=p["name"].as_str().unwrap().to_owned();names.push(label.clone());values.extend(numbers(&p["values"]));predictors.push(Predictor{column,name:label,coding:if p["categorical"]==true{Coding::Categorical{reference:p["reference"].as_str().unwrap().into()}}else{Coding::Numeric {}}});}
             let weight=names.len();names.push("Observation weights".into());values.extend(numbers(&c["weights"]));
             let cluster=names.len();names.push("Cluster".into());values.extend(numbers(&c["clusters"]));
-            let request=Request{rows:n,columns:names.len(),names,outcome:0,weights:Some(weight),cluster,confidence:0.95,specification:Specification::Interactions{predictors,terms:serde_json::from_value(c["term_inputs"].clone()).unwrap(),covariance:ClusterCovariance::Cr2}};
+            let request=Request{rows:n,columns:names.len(),names,outcome:0,weights:Some(weight),cluster,confidence:0.95,specification:Specification::Interactions{predictors,terms:serde_json::from_value(c["term_inputs"].clone()).unwrap(),covariance:Some(ClusterCovariance::Cr2)}};
             let result=run(&values,request).unwrap_or_else(|e|panic!("{name}: {e}"));
             assert_eq!(result.terms.len(),c["keep"].as_array().unwrap().len(),"{name}");
             for (j,t) in result.terms.iter().enumerate(){
