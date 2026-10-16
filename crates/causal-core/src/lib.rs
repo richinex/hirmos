@@ -42,6 +42,7 @@ mod nelder_mead;
 mod least_squares;
 pub mod conditional_gaussian;
 mod linalg;
+mod scaled_design;
 pub mod mackinnon;
 pub mod missing_data;
 pub mod neural_granger;

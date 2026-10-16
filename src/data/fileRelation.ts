@@ -14,5 +14,6 @@ export const fileRelation = (reading: FileReading, path: string, textColumn?: st
     types.size === 0
       ? ''
       : `, types = {${[...types].map(([column, type]) => `${sqlString(column)}: '${type}'`).join(', ')}}`
-  return `read_csv_auto(${sqlString(path)}, header = true, sample_size = 20480${declared})`
+  // A partial sample can infer integers and silently round decimals appearing later.
+  return `read_csv_auto(${sqlString(path)}, header = true, sample_size = -1${declared})`
 }

@@ -108,4 +108,36 @@ fn invalid_input_is_typed() {
         Ols::try_fit(&design, &DVector::from_row_slice(&[1.0])).unwrap_err(),
         OlsError::RowMismatch
     );
+    assert_eq!(
+        Ols::try_fit_clustered(&design, &DVector::zeros(2), &[1]).unwrap_err(),
+        OlsError::RowMismatch
+    );
+}
+
+#[test]
+fn clustered_covariance_preserves_equivalent_predictor_bases() {
+    let n = 240;
+    let x = DMatrix::from_fn(n, 3, |i, j| match j {
+        0 => 1.0,
+        1 => (i % 17) as f64 / 17.0,
+        _ => ((i * 13) % 19) as f64 / 19.0,
+    });
+    let y = DVector::from_fn(n, |i, _| {
+        2.0 + x[(i, 1)] - 0.3 * x[(i, 2)] + ((i * 7) % 11) as f64 / 11.0
+    });
+    let groups: Vec<u64> = (0..n).map(|i| (i / 8) as u64 * 7 + 3).collect();
+    let transform = DMatrix::from_row_slice(3, 3, &[1.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1e-5]);
+    let (baseline, covariance) = Ols::try_fit_clustered(&x, &y, &groups).unwrap();
+    let (changed, changed_covariance) =
+        Ols::try_fit_clustered(&(&x * &transform), &y, &groups).unwrap();
+    let inverse = transform.clone().try_inverse().unwrap();
+    let expected = &inverse * &covariance * inverse.transpose();
+    let restored_params = &transform * changed.params;
+    for i in 0..3 {
+        close("coefficient", restored_params[i], baseline.params[i], 1e-9);
+        for j in 0..3 {
+            let scale = (expected[(i, i)] * expected[(j, j)]).sqrt();
+            assert!((changed_covariance[(i, j)] - expected[(i, j)]).abs() / scale < 1e-8);
+        }
+    }
 }

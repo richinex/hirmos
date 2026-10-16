@@ -30,6 +30,42 @@ impl Ols {
 
     /// Statsmodels `OLS.fit(method="pinv")`, including minimum-norm rank-deficient fits.
     pub fn try_fit(x: &DMatrix<f64>, y: &DVector<f64>) -> Result<Self, OlsError> {
+        Self::try_fit_with(x, y, |_, _| ()).map(|(fit, ())| fit)
+    }
+
+    /// Return the fit and clustered covariance before any degrees-of-freedom correction.
+    pub fn try_fit_clustered(
+        x: &DMatrix<f64>,
+        y: &DVector<f64>,
+        groups: &[u64],
+    ) -> Result<(Self, DMatrix<f64>), OlsError> {
+        if groups.len() != x.nrows() {
+            return Err(OlsError::RowMismatch);
+        }
+        let mut labels = groups.to_vec();
+        labels.sort_unstable();
+        labels.dedup();
+        let index: Vec<usize> = groups
+            .iter()
+            .map(|label| labels.binary_search(label).unwrap())
+            .collect();
+        Self::try_fit_with(x, y, |pinv, resid| {
+            // Sum coefficient influences directly to avoid cancellation in bread * meat * bread.
+            let mut sums = DMatrix::<f64>::zeros(labels.len(), x.ncols());
+            for j in 0..x.ncols() {
+                for i in 0..x.nrows() {
+                    sums[(index[i], j)] += pinv[(j, i)] * resid[i];
+                }
+            }
+            sums.transpose() * sums
+        })
+    }
+
+    fn try_fit_with<T>(
+        x: &DMatrix<f64>,
+        y: &DVector<f64>,
+        summarize: impl FnOnce(&DMatrix<f64>, &DVector<f64>) -> T,
+    ) -> Result<(Self, T), OlsError> {
         let (nobs, k) = (x.nrows(), x.ncols());
         if nobs == 0 {
             return Err(OlsError::EmptySample);
@@ -53,16 +89,20 @@ impl Ols {
             .filter(|value| **value > rank_cutoff)
             .count();
         let normalized_cov_params = &decomposition.matrix * decomposition.matrix.transpose();
-        Ok(Ols {
-            params,
-            resid,
-            ssr,
-            nobs,
-            k,
-            rank,
-            singular_values: decomposition.singular_values,
-            normalized_cov_params,
-        })
+        let summary = summarize(&decomposition.matrix, &resid);
+        Ok((
+            Ols {
+                params,
+                resid,
+                ssr,
+                nobs,
+                k,
+                rank,
+                singular_values: decomposition.singular_values,
+                normalized_cov_params,
+            },
+            summary,
+        ))
     }
 
     /// statsmodels: llf with the ML variance ssr/nobs.

@@ -22,16 +22,60 @@ const randomDeclarations = (next: (below: number) => number): ColumnDeclarations
 }
 const delimited = (declared: ColumnDeclarations): FileReading => ({ format: 'csv', declared })
 
-test('with nothing declared the reader writes the SQL it always wrote', () => {
-  expect(fileRelation(delimited(NO_DECLARATIONS), 'p.csv')).toBe(`read_csv_auto('p.csv', header = true, sample_size = 20480)`)
-  expect(fileRelation(delimited(NO_DECLARATIONS), 'p.csv', 'when')).toBe(`read_csv_auto('p.csv', header = true, sample_size = 20480, types = {'when': 'VARCHAR'})`)
+test('late decimals survive profiling and prepared materialisation without changing integer identifiers', async ({ page }) => {
+  await page.goto('/app')
+  const result = await page.evaluate(async () => {
+    const data = await import(new URL('/src/data/client.ts', location.href).href)
+    const workflow = await import(new URL('/src/domain/workflow.ts', location.href).href)
+    const preparation = await import(new URL('/src/data/prepared.ts', location.href).href)
+    const count = 65_000
+    const file = new File([
+      'id,value,label\n' + Array.from({ length: count }, (_, i) =>
+        `9007199254740993,${i === 64_000 ? '-12.167' : i === 64_001 ? '-10.648' : '2'},001`,
+      ).join('\n'),
+    ], 'late-decimals.csv', { type: 'text/csv' })
+    const profile = await data.profileSourceInWorker(workflow.newImportRequestId(), file, { label: 'text' })
+    if (!profile.ok) throw new Error(JSON.stringify(profile.error))
+    const value = profile.value.columns.find((column: { name: string }) => column.name === 'value')
+    if (!value) throw new Error('Missing value column')
+    const preview = await data.previewWindowInWorker(file, profile.value, {
+      offset: 64_000, limit: 2, sort: null, filters: [], search: '',
+    })
+    if (!preview.ok) throw new Error(JSON.stringify(preview.error))
+    const source = { file, name: file.name, bytes: file.size, mediaType: file.type,
+      lastModified: file.lastModified, format: 'csv', declared: { label: 'text' } }
+    const prepared = {
+      kind: 'prepared-cross-section', id: 'late-decimals', recipe: 'late-decimals',
+      sourceProfile: profile.value.id, observations: count, columns: [value.id],
+      missingness: { kind: 'not-present' }, resolution: { kind: 'none' },
+      sampling: { kind: 'cross-sectional' }, seasonalAdjustment: { kind: 'none' },
+    }
+    const matrix = await preparation.materialisePrepared(source, profile.value, prepared, [value.id])
+    if (!matrix.ok) throw new Error(JSON.stringify(matrix.error))
+    return {
+      types: profile.value.columns.map((column: { duckdbType: string }) => column.duckdbType),
+      preview: preview.value.rows.map((row: { cells: unknown[] }) => row.cells),
+      values: Array.from(matrix.value.values.slice(64_000, 64_002)),
+      rows: matrix.value.rowCount,
+    }
+  })
+  expect(result.types).toEqual(['BIGINT', 'DOUBLE', 'VARCHAR'])
+  expect(result.values).toEqual([-12.167, -10.648])
+  expect(result.rows).toBe(65_000)
+  expect(JSON.stringify(result.preview)).toContain('9007199254740993')
+  expect(JSON.stringify(result.preview)).toContain('001')
+})
+
+test('delimited files use full-file inference and Parquet retains its stored types', () => {
+  expect(fileRelation(delimited(NO_DECLARATIONS), 'p.csv')).toBe(`read_csv_auto('p.csv', header = true, sample_size = -1)`)
+  expect(fileRelation(delimited(NO_DECLARATIONS), 'p.csv', 'when')).toBe(`read_csv_auto('p.csv', header = true, sample_size = -1, types = {'when': 'VARCHAR'})`)
   expect(fileRelation({ format: 'parquet' }, 'p.parquet')).toBe(`read_parquet('p.parquet')`)
 })
 
 test('declared columns become DuckDB types in name order, and a parsed time column stays text', () => {
   const declared = declareColumn(declareColumn(NO_DECLARATIONS, 'death', 'text'), "o'clock", 'time')
-  expect(fileRelation(delimited(declared), 'p.csv')).toBe(`read_csv_auto('p.csv', header = true, sample_size = 20480, types = {'death': 'VARCHAR', 'o''clock': 'TIME'})`)
-  expect(fileRelation(delimited(declared), 'p.csv', "o'clock")).toBe(`read_csv_auto('p.csv', header = true, sample_size = 20480, types = {'death': 'VARCHAR', 'o''clock': 'VARCHAR'})`)
+  expect(fileRelation(delimited(declared), 'p.csv')).toBe(`read_csv_auto('p.csv', header = true, sample_size = -1, types = {'death': 'VARCHAR', 'o''clock': 'TIME'})`)
+  expect(fileRelation(delimited(declared), 'p.csv', "o'clock")).toBe(`read_csv_auto('p.csv', header = true, sample_size = -1, types = {'death': 'VARCHAR', 'o''clock': 'VARCHAR'})`)
 })
 
 test('the column-reading laws hold on 500 random declarations', () => {

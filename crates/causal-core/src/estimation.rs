@@ -157,7 +157,7 @@ pub enum WithinErrors<'a> {
     ClusterBy(&'a [u64]),
 }
 
-/// Source-specific one-way cluster corrections. Existing callers retain PanelOLS.
+/// Within-fit conventions. Existing callers retain PanelOLS rank selection and correction.
 #[derive(Clone, Copy, Debug)]
 pub enum WithinConvention {
     PanelOls,
@@ -165,6 +165,7 @@ pub enum WithinConvention {
     /// fixest 0.14.2: K.adj=TRUE, K.fixef="nonnested", G.adj=TRUE, t.df="min".
     Fixest,
     /// xtreg, fe vce(cluster) nonest, without dfadj: count slopes and intercept.
+    /// Uses scale-aware ordered rank selection, not Stata's internal tolerance rules.
     Xtreg,
 }
 
@@ -176,6 +177,7 @@ pub enum WithinProblem {
     TooFewGroups,
     AbsorbedDesign,
     InsufficientDegreesOfFreedom,
+    DecompositionFailed,
 }
 
 impl std::fmt::Display for WithinProblem {
@@ -187,6 +189,7 @@ impl std::fmt::Display for WithinProblem {
             Self::TooFewGroups => "Each selected effect or clustering dimension needs at least two groups.",
             Self::AbsorbedDesign => "The fixed effects absorb all regressors; no coefficient can be estimated.",
             Self::InsufficientDegreesOfFreedom => "The regressors and fixed effects leave no residual degrees of freedom.",
+            Self::DecompositionFailed => "The fixed-effects design could not be resolved reliably at numerical precision.",
         })
     }
 }
@@ -206,7 +209,7 @@ pub struct WithinOls {
     pub ssr: f64,
     /// Columns of `x` the effects do not absorb, in their original order.
     pub kept: Vec<usize>,
-    /// Columns of `x` absorbed by the effects.
+    /// Columns of `x` omitted as absorbed or linearly dependent after projection.
     pub dropped: Vec<usize>,
     pub units: usize,
     /// The number of periods when period effects were fitted.
@@ -394,15 +397,43 @@ fn within_fit(y: &[f64], x: &DMatrix<f64>, units: &[u64], times: Option<&[u64]>,
             }
         }
     };
-    let kept = not_absorbed(&xd);
+    let (kept, design, scales) = match convention {
+        WithinConvention::Xtreg => {
+            let source_scales: Vec<f64> = (0..x.ncols()).map(|j| {
+                (0..n).map(|i| x[(i, j)].abs() * normalized.as_ref().map_or(1.0, |w| w[i].sqrt()))
+                    .fold(0.0, f64::max)
+            }).collect();
+            let prepared = crate::scaled_design::ScaledDesign::new(&xd, &source_scales)
+                .map_err(|_| WithinProblem::DecompositionFailed)?;
+            (prepared.kept, prepared.matrix, prepared.scales)
+        }
+        WithinConvention::PanelOls | WithinConvention::Fixest | WithinConvention::Lfe => {
+            let kept = not_absorbed(&xd);
+            let design = DMatrix::from_fn(n, kept.len(), |i, j| xd[(i, kept[j])]);
+            let scales = vec![1.0; kept.len()];
+            (kept, design, scales)
+        }
+    };
     let dropped: Vec<usize> = (0..x.ncols()).filter(|j| !kept.contains(j)).collect();
-    let design = DMatrix::from_fn(n, kept.len(), |i, j| xd[(i, kept[j])]);
     let k = kept.len();
     if k == 0 { return Err(WithinProblem::AbsorbedDesign); }
     let effects = unit_count + periods.map_or(0, |count| count - 1);
     let df_resid = n.checked_sub(k + effects)
         .filter(|df| *df > 0).ok_or(WithinProblem::InsufficientDegreesOfFreedom)?;
-    let fit = crate::ols::Ols::fit(&design, &DVector::from_column_slice(&yd));
+    let outcome = DVector::from_column_slice(&yd);
+    let (fit, clustered_covariance) = match errors {
+        WithinErrors::Cluster | WithinErrors::ClusterBy(_) => {
+            let labels = match errors { WithinErrors::ClusterBy(labels) => labels, _ => units };
+            let (fit, covariance) = crate::ols::Ols::try_fit_clustered(&design, &outcome, labels)
+                .map_err(|_| WithinProblem::DecompositionFailed)?;
+            (fit, Some(covariance))
+        }
+        _ => (crate::ols::Ols::try_fit(&design, &outcome)
+            .map_err(|_| WithinProblem::DecompositionFailed)?, None),
+    };
+    if matches!(convention, WithinConvention::Xtreg) && fit.rank != k {
+        return Err(WithinProblem::DecompositionFailed);
+    }
     let xtx_inv = fit.xtx_inverse();
     let resid: Vec<f64> = fit.resid.iter().copied().collect();
     let mut inference_df = df_resid;
@@ -418,13 +449,6 @@ fn within_fit(y: &[f64], x: &DMatrix<f64>, units: &[u64], times: Option<&[u64]>,
             let labels = match errors { WithinErrors::ClusterBy(labels) => labels, _ => units };
             let (cluster_index, cluster_count) = group_index(labels);
             if cluster_count < 2 { return Err(WithinProblem::TooFewGroups); }
-            let xu = scores(&design, &resid);
-            let mut sums = DMatrix::<f64>::zeros(cluster_count, k);
-            for i in 0..n {
-                for j in 0..k {
-                    sums[(cluster_index[i], j)] += xu[(i, j)];
-                }
-            }
             // The unit effects are nested in the clusters and not counted; period effects are not
             // nested, and then the reference counts every effect.
             let mut group_cluster = vec![None; unit_count];
@@ -476,28 +500,33 @@ fn within_fit(y: &[f64], x: &DMatrix<f64>, units: &[u64], times: Option<&[u64]>,
             let g = cluster_count as f64;
             cluster_parameters = Some(n - counted);
             let correction = g / (g - 1.0) * ((n as f64 - 1.0) / counted as f64);
-            let s = sums.transpose() * &sums * correction;
-            &xtx_inv * s * &xtx_inv
+            clustered_covariance.expect("clustered fit supplies its covariance") * correction
         }
     };
+    let params: Vec<f64> = (0..k).map(|j| fit.params[j] / scales[j]).collect();
+    let cov = DMatrix::from_fn(k, k, |i, j| cov[(i, j)] / scales[i] / scales[j]);
     let bse: Vec<f64> = (0..k).map(|j| cov[(j, j)].sqrt()).collect();
     let pvalues: Vec<f64> = (0..k)
-        .map(|j| crate::parcorr::analytic_pvalue_t((fit.params[j] / bse[j]).abs(), inference_df as f64))
+        .map(|j| crate::parcorr::analytic_pvalue_t((params[j] / bse[j]).abs(), inference_df as f64))
         .collect();
     let t975 = spec_math::cephes64::stdtri(inference_df as isize, 0.975);
     let conf_int: Vec<(f64, f64)> = (0..k)
-        .map(|j| (fit.params[j] - t975 * bse[j], fit.params[j] + t975 * bse[j]))
+        .map(|j| (params[j] - t975 * bse[j], params[j] + t975 * bse[j]))
         .collect();
     let within_tss: f64 = ye.iter().map(|value| value * value).sum();
     let within_ssr: f64 = (0..n)
         .map(|i| {
-            let fitted: f64 = kept.iter().enumerate().map(|(j, &col)| xe[(i, col)] * fit.params[j]).sum();
+            let fitted: f64 = kept.iter().enumerate().map(|(j, &col)| xe[(i, col)] * params[j]).sum();
             (ye[i] - fitted).powi(2)
         })
         .sum();
+    let within_design = match convention {
+        WithinConvention::Xtreg => DMatrix::from_fn(n, k, |i, j| xd[(i, kept[j])]),
+        _ => design,
+    };
     Ok(WithinOls {
         covariance: cov,
-        params: fit.params.iter().copied().collect(),
+        params,
         bse,
         pvalues,
         conf_int,
@@ -515,7 +544,7 @@ fn within_fit(y: &[f64], x: &DMatrix<f64>, units: &[u64], times: Option<&[u64]>,
         cluster_parameters,
         rsquared_within: 1.0 - within_ssr / within_tss,
         within_outcome: yd,
-        within_design: design,
+        within_design,
         projected_design: xd,
     })
 }
