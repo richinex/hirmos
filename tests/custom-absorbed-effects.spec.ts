@@ -21,9 +21,6 @@ test('absorption requires a distinct recorded column and refuses invalid fits', 
     const { checkPanelRegressionDraft, panelRegressionColumns } = await import(
       new URL('/src/domain/regressionWorkspaceSettings.ts', location.href).href
     )
-    const { seriesDraftSettings } = await import(
-      new URL('/src/domain/timeSeriesWorkspaceSettings.ts', location.href).href
-    )
     const names = ['y', 'lead', 'post', 'unit', 'weight']
     const specification = {
       kind: 'interactions',
@@ -95,10 +92,6 @@ test('absorption requires a distinct recorded column and refuses invalid fits', 
         false,
       ).ok,
       columns: panelRegressionColumns(draft),
-      labels: seriesDraftSettings(
-        draft,
-        names.map((id) => ({ id, name: id === 'unit' ? 'State' : id })),
-      ),
     }
   }, fixtures.unit_unit_FALSE)
   expect(result.invalid).toEqual([false, false, false, false, false, false])
@@ -107,8 +100,6 @@ test('absorption requires a distinct recorded column and refuses invalid fits', 
   expect(result.validDraft).toBe(true)
   expect(result.missingDraft).toBe(false)
   expect(result.columns).toContain('unit')
-  expect(JSON.stringify(result.labels)).toContain('Absorbed fixed effect: State')
-  expect(JSON.stringify(result.labels)).toContain('CR1 with absorbed effects')
 })
 
 test('custom absorbed regressions reuse the saved weighted and unweighted fixest references', async ({

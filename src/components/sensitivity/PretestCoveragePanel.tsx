@@ -388,9 +388,17 @@ export function PretestCoveragePanel({
                   <div className="grid gap-4 @md/panel:grid-cols-2">
                     {(['prePeriod', 'postPeriod'] as const).map((key) => (
                       <label key={key}>
-                        <span className={fieldLabel}>
-                          {key === 'prePeriod' ? 'Pre-treatment period' : 'Post-treatment period'}
-                        </span>
+                        <ParameterLabel
+                          className={fieldLabel}
+                          label={
+                            key === 'prePeriod' ? 'Pre-treatment period' : 'Post-treatment period'
+                          }
+                          help={
+                            key === 'prePeriod'
+                              ? 'The event time of the pre-treatment coefficient. The linear trend runs from the reference period through this period.'
+                              : 'The event time of the post-treatment coefficient. The linear trend is extended to this period to set the target bias.'
+                          }
+                        />
                         {candidate?.custom ? (
                           <NumberInput
                             aria-label={

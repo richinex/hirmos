@@ -1,5 +1,5 @@
 import { RunActions } from '@/components/ui/RunActions'
-import { useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useWorkflow } from '@/components/WorkflowProvider'
 import { useTimeSeriesDraft } from './useTimeSeriesDraft'
 import { useJob } from '@/analysis/JobsProvider'
@@ -22,6 +22,7 @@ import { JobNotice } from '@/components/ui/JobNotice'
 import { Alert } from '@/components/ui/Alert'
 import { Select } from '@/components/ui/Select'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
+import { ParameterLabel } from '@/components/ui/ParameterLabel'
 import { ColumnChecklist } from '@/components/ui/ColumnChecklist'
 import { SettingsStep } from '@/components/ui/SettingsStep'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
@@ -68,8 +69,15 @@ export function PanelRegressionPanel(props: PanelRegressionPanelProps) {
     busy = session.job.kind === 'running'
   useRunActivity(props.onActivity, busy ? { label: 'Panel regression', progress: null } : null)
   const [term, setTerm] = useState<readonly (ColumnId | null)[]>([null, null, null])
-  const columns = props.profile.columns.filter(
-    (c) => props.prepared.columns.includes(c.id) && isNumericDuckDbType(c.duckdbType),
+  const columns = useMemo(() => {
+    const prepared = new Set(props.prepared.columns)
+    return props.profile.columns.filter(
+      (c) => prepared.has(c.id) && isNumericDuckDbType(c.duckdbType),
+    )
+  }, [props.profile.columns, props.prepared.columns])
+  const columnById = useMemo(
+    () => new Map<string, (typeof columns)[number]>(columns.map((c) => [c.id, c])),
+    [columns],
   )
   const model = draft.model,
     isPanel = props.prepared.kind === 'prepared-panel'
@@ -108,7 +116,7 @@ export function PanelRegressionPanel(props: PanelRegressionPanelProps) {
         aria-label={label}
         className={field('text', 'mt-1')}
         value={value ?? ''}
-        onChange={(e) => onChange(columns.find((c) => c.id === e.target.value)?.id ?? null)}
+        onChange={(e) => onChange(columnById.get(e.target.value)?.id ?? null)}
       >
         <option value="">{empty}</option>
         {columns.map((c) => (
@@ -340,40 +348,73 @@ export function PanelRegressionPanel(props: PanelRegressionPanelProps) {
                   )}
                   {model.kind === 'interactions' && (
                     <>
-                      <SegmentedControl
-                        ariaLabel="Clustered covariance"
-                        value={model.covariance ?? 'cr2'}
-                        options={[
-                          { value: 'cr2', label: clusterCovarianceLabels.cr2 },
-                          { value: 'cr1', label: clusterCovarianceLabels.cr1 },
-                          { value: 'fixest', label: clusterCovarianceLabels.fixest },
-                          { value: 'xtreg', label: clusterCovarianceLabels.xtreg },
-                        ]}
-                        onChange={(covariance) =>
-                          set({
-                            ...draft,
-                            model: {
-                              ...model,
-                              covariance,
-                              absorbed: usesAbsorbedEffects(covariance)
-                                ? (model.absorbed ?? null)
-                                : null,
-                            },
-                          })
-                        }
-                      />
-                      {usesAbsorbedEffects(model.covariance) &&
-                        choose('Absorbed fixed effect', model.absorbed ?? null, (absorbed) => {
-                          set({
-                            ...draft,
-                            model: {
-                              ...model,
-                              absorbed,
-                              predictors: model.predictors.filter((p) => p.column !== absorbed),
-                              terms: model.terms.filter((t) => !t.includes(absorbed!)),
-                            },
-                          })
-                        })}
+                      <div>
+                        <ParameterLabel
+                          className={fieldLabel}
+                          label="Clustered covariance"
+                          help="CR2 uses coefficient-specific Satterthwaite degrees of freedom. CR1 counts every retained coefficient, including fixed-effect indicators, as Stata's reg and areg do. CR1 with absorbed effects leaves out absorbed effects nested within clusters, as fixest does. CR1 excluding absorbed effects leaves out all absorbed effects, as Stata's xtreg, fe does."
+                        />
+                        <SegmentedControl
+                          className="mt-1"
+                          ariaLabel="Clustered covariance"
+                          value={model.covariance ?? 'cr2'}
+                          options={[
+                            { value: 'cr2', label: clusterCovarianceLabels.cr2 },
+                            { value: 'cr1', label: clusterCovarianceLabels.cr1 },
+                            { value: 'fixest', label: clusterCovarianceLabels.fixest },
+                            { value: 'xtreg', label: clusterCovarianceLabels.xtreg },
+                          ]}
+                          onChange={(covariance) =>
+                            set({
+                              ...draft,
+                              model: {
+                                ...model,
+                                covariance,
+                                absorbed: usesAbsorbedEffects(covariance)
+                                  ? (model.absorbed ?? null)
+                                  : null,
+                              },
+                            })
+                          }
+                        />
+                      </div>
+                      {usesAbsorbedEffects(model.covariance) && (
+                        <div className={fieldRow.two}>
+                          <label>
+                            <ParameterLabel
+                              className={fieldLabel}
+                              label="Absorbed fixed effect"
+                              help="Each value of this column gets its own intercept, removed by demeaning instead of entering as indicators. The column cannot also be a predictor."
+                            />
+                            <Select
+                              aria-label="Absorbed fixed effect"
+                              className={field('text', 'mt-1')}
+                              value={model.absorbed ?? ''}
+                              onChange={(e) => {
+                                const absorbed = columnById.get(e.target.value)?.id ?? null
+                                set({
+                                  ...draft,
+                                  model: {
+                                    ...model,
+                                    absorbed,
+                                    predictors: model.predictors.filter(
+                                      (p) => p.column !== absorbed,
+                                    ),
+                                    terms: model.terms.filter((t) => !t.includes(absorbed!)),
+                                  },
+                                })
+                              }}
+                            >
+                              <option value="">Choose a column</option>
+                              {columns.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.name}
+                                </option>
+                              ))}
+                            </Select>
+                          </label>
+                        </div>
+                      )}
                       <ColumnChecklist
                         title="Predictors"
                         help="Select main effects and variables used in interactions. Fixed effects can be represented by categorical predictors."
@@ -382,81 +423,82 @@ export function PanelRegressionPanel(props: PanelRegressionPanelProps) {
                         reserved={[draft.outcome, draft.weight, model.absorbed ?? null].filter(
                           (c): c is ColumnId => c !== null,
                         )}
-                        onChange={(ids) =>
+                        onChange={(ids) => {
+                          const chosen = new Set(ids)
+                          const previous = new Map(model.predictors.map((p) => [p.column, p]))
                           set({
                             ...draft,
                             model: {
                               ...model,
                               predictors: ids.map(
                                 (column) =>
-                                  model.predictors.find((p) => p.column === column) ?? {
-                                    column,
-                                    coding: { kind: 'numeric' },
-                                  },
+                                  previous.get(column) ?? { column, coding: { kind: 'numeric' } },
                               ),
                               terms: [
-                                ...model.terms.filter((t) => t.every((id) => ids.includes(id))),
-                                ...ids
-                                  .filter((id) => !model.predictors.some((p) => p.column === id))
-                                  .map((id) => [id]),
+                                ...model.terms.filter((t) => t.every((id) => chosen.has(id))),
+                                ...ids.filter((id) => !previous.has(id)).map((id) => [id]),
                               ],
                             },
                           })
-                        }
+                        }}
                       />
-                      {model.predictors.map((p) => (
-                        <div key={p.column} className={fieldRow.two}>
-                          <label>
-                            <span className={fieldLabel}>
-                              {columns.find((c) => c.id === p.column)?.name} coding
-                            </span>
-                            <Select
-                              aria-label={`${columns.find((c) => c.id === p.column)?.name} coding`}
-                              className={field('text', 'mt-1')}
-                              value={p.coding.kind}
-                              onChange={(e) =>
-                                set({
-                                  ...draft,
-                                  model: {
-                                    ...model,
-                                    predictors: model.predictors.map((v) =>
-                                      v.column !== p.column
-                                        ? v
-                                        : {
-                                            ...p,
-                                            coding:
-                                              e.target.value === 'categorical'
-                                                ? { kind: 'categorical', reference: '0' }
-                                                : { kind: 'numeric' },
+                      {model.predictors.length > 0 && (
+                        <ColumnChecklist
+                          title="Categorical predictors"
+                          help="A categorical predictor enters as one indicator for each observed value except the reference. Unticked predictors enter as numbers."
+                          columns={model.predictors.flatMap((p) => columnById.get(p.column) ?? [])}
+                          selected={model.predictors
+                            .filter((p) => p.coding.kind === 'categorical')
+                            .map((p) => p.column)}
+                          onChange={(ids) => {
+                            const categorical = new Set(ids)
+                            set({
+                              ...draft,
+                              model: {
+                                ...model,
+                                predictors: model.predictors.map((p) =>
+                                  !categorical.has(p.column)
+                                    ? { ...p, coding: { kind: 'numeric' } }
+                                    : p.coding.kind === 'categorical'
+                                      ? p
+                                      : { ...p, coding: { kind: 'categorical', reference: '0' } },
+                                ),
+                              },
+                            })
+                          }}
+                        />
+                      )}
+                      {model.predictors.some((p) => p.coding.kind === 'categorical') && (
+                        <div className={fieldRow.three}>
+                          {model.predictors.flatMap((p) =>
+                            p.coding.kind !== 'categorical'
+                              ? []
+                              : [
+                                  <div key={p.column}>
+                                    {input(
+                                      `${columnById.get(p.column)?.name} reference`,
+                                      p.coding.reference,
+                                      (reference) =>
+                                        set({
+                                          ...draft,
+                                          model: {
+                                            ...model,
+                                            predictors: model.predictors.map((v) =>
+                                              v.column !== p.column
+                                                ? v
+                                                : {
+                                                    ...p,
+                                                    coding: { kind: 'categorical', reference },
+                                                  },
+                                            ),
                                           },
-                                    ),
-                                  },
-                                })
-                              }
-                            >
-                              <option value="numeric">Numeric</option>
-                              <option value="categorical">Categorical</option>
-                            </Select>
-                          </label>
-                          {p.coding.kind === 'categorical' &&
-                            input(
-                              `${columns.find((c) => c.id === p.column)?.name} reference`,
-                              p.coding.reference,
-                              (reference) =>
-                                set({
-                                  ...draft,
-                                  model: {
-                                    ...model,
-                                    predictors: model.predictors.map((v) =>
-                                      v.column !== p.column
-                                        ? v
-                                        : { ...p, coding: { kind: 'categorical', reference } },
-                                    ),
-                                  },
-                                }),
-                            )}
+                                        }),
+                                    )}
+                                  </div>,
+                                ],
+                          )}
                         </div>
-                      ))}
+                      )}
                     </>
                   )}
                 </SettingsStep>
@@ -512,7 +554,7 @@ export function PanelRegressionPanel(props: PanelRegressionPanelProps) {
                             <option value="">{i === 2 ? 'None (pair)' : 'Choose predictor'}</option>
                             {model.predictors.map((p) => (
                               <option key={p.column} value={p.column}>
-                                {columns.find((c) => c.id === p.column)?.name}
+                                {columnById.get(p.column)?.name}
                               </option>
                             ))}
                           </Select>
@@ -545,9 +587,7 @@ export function PanelRegressionPanel(props: PanelRegressionPanelProps) {
                         .filter((t) => t.length > 1)
                         .map((t, i) => (
                           <li key={i} className="flex items-center justify-between gap-3 text-body">
-                            <span>
-                              {t.map((id) => columns.find((c) => c.id === id)?.name).join(' × ')}
-                            </span>
+                            <span>{t.map((id) => columnById.get(id)?.name).join(' × ')}</span>
                             <button
                               className={iconControl('quiet')}
                               aria-label={`Remove interaction ${i + 1}`}

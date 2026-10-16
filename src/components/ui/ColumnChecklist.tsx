@@ -17,6 +17,8 @@ export function ColumnChecklist<Id extends string>({
   readonly reserved?: readonly Id[]
   readonly onChange: (selected: readonly Id[]) => void
 }) {
+  const chosen = new Set(selected)
+  const locked = new Set(reserved)
   return (
     <div className="min-w-0 max-w-3xl">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -24,9 +26,7 @@ export function ColumnChecklist<Id extends string>({
         <SelectionActions
           selectLabel={`Select all ${title.toLowerCase()}`}
           clearLabel={`Clear selected ${title.toLowerCase()}`}
-          onSelectAll={() =>
-            onChange(columns.filter((c) => !reserved.includes(c.id)).map((c) => c.id))
-          }
+          onSelectAll={() => onChange(columns.filter((c) => !locked.has(c.id)).map((c) => c.id))}
           onClear={() => onChange([])}
         />
       </div>
@@ -39,13 +39,13 @@ export function ColumnChecklist<Id extends string>({
         {columns.map((c) => (
           <label
             key={c.id}
-            className={`flex min-w-0 max-w-full items-start gap-2 text-body ${reserved.includes(c.id) ? 'text-faint' : 'text-ink'}`}
+            className={`flex min-w-0 max-w-full items-start gap-2 text-body ${locked.has(c.id) ? 'text-faint' : 'text-ink'}`}
           >
             <input
               className="mt-1 shrink-0"
               type="checkbox"
-              disabled={reserved.includes(c.id)}
-              checked={selected.includes(c.id) && !reserved.includes(c.id)}
+              disabled={locked.has(c.id)}
+              checked={chosen.has(c.id) && !locked.has(c.id)}
               onChange={(e) =>
                 onChange(
                   e.target.checked ? [...selected, c.id] : selected.filter((id) => id !== c.id),

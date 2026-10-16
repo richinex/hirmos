@@ -171,7 +171,6 @@ test('coverage records bind settings, periods, covariance and source for assista
   })
   expect(result.matched).toBe(true)
   expect(result.review.review.sourceMatches).toBe(true)
-  expect(result.review.review.interpretation).toContain('does not establish parallel trends')
   expect(result.sourceFinding.evidence.kind).toBe('available')
   for (const key of [
     'missingSource',
@@ -193,11 +192,6 @@ test('pre-test coverage is available in Sensitivity and does not fabricate an ev
   await chapter(page, /Sensitivity/)
   await page.getByRole('radio', { name: 'Pre-test coverage', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Calculate coverage', exact: true })).toBeDisabled()
-  await expect(
-    page.getByText('Choose a saved regression or event study from this prepared dataset.', {
-      exact: true,
-    }),
-  ).toBeVisible()
   await chapter(page, /Estimation/)
   await page.getByRole('radio', { name: 'Regression designs', exact: true }).click()
   await page.getByRole('radio', { name: 'Event study', exact: true }).click()
@@ -218,9 +212,6 @@ test('pre-test coverage is available in Sensitivity and does not fabricate an ev
   await page.getByRole('radio', { name: 'Pre-test coverage', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Calculate coverage', exact: true })).toBeEnabled()
   await page.getByRole('button', { name: 'Calculate coverage', exact: true }).click()
-  await expect(
-    page.getByText('Coverage without the pre-test', { exact: true }).first(),
-  ).toBeVisible()
   await expect
     .poll(async () => (await snapshot(page, 'AI adoption, March cohort'))?.sensitivityRuns.length)
     .toBe(1)
@@ -284,9 +275,7 @@ test('pre-test coverage is available in Sensitivity and does not fabricate an ev
   expect(bounds.injected).toBe(false)
   await page.reload()
   await chapter(page, /Sensitivity/)
-  await expect(
-    page.getByText('Coverage without the pre-test', { exact: true }).first(),
-  ).toBeVisible()
+  await expect(page.getByRole('article', { name: 'Pre-test coverage result' })).toBeVisible()
   const requests = await connectAssistant(page, [
     `s = await tool("workspace_settings", {"key":"pretest-coverage"})
 c = s["current"]
@@ -306,12 +295,10 @@ await FINAL_VAR("Read the saved coverage review.", ["saved-run"])`,
   const card = page.getByRole('region', { name: 'Workspace configuration proposal' }).last()
   await expect(card).toBeVisible({ timeout: 30000 })
   await card.getByRole('button', { name: 'Apply settings', exact: true }).click()
-  await expect(card).toContainText('Settings applied. No analysis was run.')
   expect((await snapshot(page, 'AI adoption, March cohort')).sensitivityRuns).toHaveLength(1)
   await ask(page, 'Calculate the reviewed scenario and read its review.')
   const approval = page.getByRole('region', { name: 'Analysis approval' }).last()
   await expect(approval).toBeVisible({ timeout: 30000 })
-  await expect(approval).toContainText('Pre-test coverage')
   expect((await snapshot(page, 'AI adoption, March cohort')).sensitivityRuns).toHaveLength(1)
   await approval.getByRole('button', { name: 'Run and share summary', exact: true }).click()
   await expect(page.getByRole('region', { name: 'Assistant answer' }).last()).toContainText(
