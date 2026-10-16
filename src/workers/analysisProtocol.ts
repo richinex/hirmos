@@ -52,6 +52,12 @@ import {
   type BaconEvidence,
 } from '@/domain/panelRegression'
 import { z } from 'zod'
+import {
+  pretestRequestSchema,
+  pretestEvidenceSchema,
+  type PretestRequest,
+  type PretestEvidence,
+} from '@/domain/pretestCoverage'
 import { refutationFields } from '@/domain/sensitivitySettings'
 import { onFirstUse } from '@/lib/onFirstUse'
 import {
@@ -1339,6 +1345,12 @@ export type AnalysisWorkerCommand =
       readonly model: HonestRequest
     }
   | {
+      readonly kind: 'pretest-coverage'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly model: PretestRequest
+    }
+  | {
       readonly kind: 'did-sensitivity'
       readonly request: WorkerRequestId
       readonly values: Float64Array
@@ -1981,6 +1993,11 @@ export type AnalysisWorkerEvent =
       readonly kind: 'honest-did-succeeded'
       readonly request: WorkerRequestId
       readonly result: HonestEvidence
+    }
+  | {
+      readonly kind: 'pretest-coverage-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: PretestEvidence
     }
   | {
       readonly kind: 'did-sensitivity-succeeded'
@@ -3452,6 +3469,14 @@ const commandSchema = onFirstUse(() =>
       .strict(),
     z
       .object({
+        kind: z.literal('pretest-coverage'),
+        request: requestSchema,
+        values: z.instanceof(Float64Array),
+        model: pretestRequestSchema,
+      })
+      .strict(),
+    z
+      .object({
         kind: z.literal('did-sensitivity'),
         request: requestSchema,
         values: z.instanceof(Float64Array),
@@ -4281,6 +4306,13 @@ const eventSchema = onFirstUse(() =>
       .strict(),
     z
       .object({
+        kind: z.literal('pretest-coverage-succeeded'),
+        request: requestSchema,
+        result: pretestEvidenceSchema,
+      })
+      .strict(),
+    z
+      .object({
         kind: z.literal('did-sensitivity-succeeded'),
         request: requestSchema,
         result: didSensitivityEvidenceSchema,
@@ -5012,6 +5044,12 @@ export function parseAnalysisWorkerEvent(
     const result = honestEvidenceSchema.safeParse(parsed.data.result)
     return result.success
       ? ok({ kind: 'honest-did-succeeded', request: request.value, result: result.data })
+      : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
+  }
+  if (parsed.data.kind === 'pretest-coverage-succeeded') {
+    const result = pretestEvidenceSchema.safeParse(parsed.data.result)
+    return result.success
+      ? ok({ kind: 'pretest-coverage-succeeded', request: request.value, result: result.data })
       : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
   if (parsed.data.kind === 'did-sensitivity-succeeded') {

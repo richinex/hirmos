@@ -109,6 +109,27 @@ export function tile(
   return { placed, seams }
 }
 
+/** The tree with its leaves filled in the stored order, when that order names the same windows. */
+export function inOrder(tree: Split, order: readonly string[] | undefined): Split {
+  if (order === undefined) return tree
+  const leaves: string[] = []
+  const collect = (node: Split) => {
+    if (node.kind === 'leaf') leaves.push(node.key)
+    else {
+      collect(node.a)
+      collect(node.b)
+    }
+  }
+  collect(tree)
+  if (order.length !== leaves.length || leaves.some((key) => !order.includes(key))) return tree
+  let next = 0
+  const fill = (node: Split): Split =>
+    node.kind === 'leaf'
+      ? { kind: 'leaf', key: order[next++]! }
+      : { ...node, a: fill(node.a), b: fill(node.b) }
+  return fill(tree)
+}
+
 /** A column of windows that each take a share of the height, as one split tree. */
 export function stack(keys: readonly string[], id: string): Split | null {
   if (keys.length === 0) return null

@@ -10,6 +10,7 @@ import { GcmInfluenceResult } from '@/components/root-cause/GcmInfluencePanel'
 import { RootCauseRunResult, rootCauseRunTitle } from '@/components/root-cause/RootCauseRunResult'
 import { DidSensitivityResult } from '@/components/sensitivity/DidSensitivityPanel'
 import { HonestDidResult } from '@/components/sensitivity/HonestDidPanel'
+import { PretestCoverageResult } from '@/components/sensitivity/PretestCoveragePanel'
 import { SensitivityRunResult } from '@/components/sensitivity/SensitivityPanel'
 import { SurvivalRunResult, survivalRunLabel } from '@/components/survival/SurvivalRunResult'
 import { CountSeriesRecord } from '@/components/time-series/CountSeriesCard'
@@ -58,7 +59,7 @@ import {
 import { ChapterControls } from '@/components/shell/ChapterControls'
 import { OnDesk } from './PutOnDesk'
 import { createDeskEngine, type DeskEngine, type DeskTrees } from './engine'
-import { grid, stack, type Split } from './layout'
+import { grid, inOrder, stack, type Split } from './layout'
 
 export interface DeskRecords {
   readonly inputs: ResultInputs
@@ -106,6 +107,8 @@ const ICONS: Record<DeskWindowRef['kind'], string> = {
 
 const probeTitle = (probe: SensitivityRunArtifact): string => {
   switch (probe.kind) {
+    case 'pretest-coverage-run':
+      return 'Pre-test coverage'
     case 'honest-did-run':
       return 'Parallel-trends sensitivity'
     case 'did-sensitivity-run':
@@ -480,6 +483,7 @@ const WindowBody = memo(function WindowBody({
       const probe = records.sensitivityRuns.find((candidate) => candidate.id === deskRef.id)
       if (probe === undefined) return null
       if (probe.kind === 'honest-did-run') return <HonestDidResult run={probe} />
+      if (probe.kind === 'pretest-coverage-run') return <PretestCoverageResult run={probe} />
       if (probe.kind === 'did-sensitivity-run')
         return (
           <DidSensitivityResult
@@ -559,6 +563,7 @@ function DeskWindow({
   const titlebar = useRef<HTMLDivElement>(null)
   const grip = useRef<HTMLDivElement>(null)
   const badge = useRef<HTMLSpanElement>(null)
+  const handle = useRef<HTMLButtonElement>(null)
   useLayoutEffect(() => {
     if (
       engine === null ||
@@ -566,7 +571,8 @@ function DeskWindow({
       !content.current ||
       !titlebar.current ||
       !grip.current ||
-      !badge.current
+      !badge.current ||
+      !handle.current
     )
       return
     return engine.register(windowKey, {
@@ -575,6 +581,7 @@ function DeskWindow({
       titlebar: titlebar.current,
       grip: grip.current,
       badge: badge.current,
+      handle: handle.current,
     })
   }, [engine, windowKey])
   return (
@@ -587,7 +594,16 @@ function DeskWindow({
     >
       <div ref={titlebar} className="desk-titlebar">
         <div className="desk-title">
-          <Icon name={icon} size={15} className="shrink-0 text-faint" />
+          <button
+            ref={handle}
+            type="button"
+            className="desk-handle"
+            aria-label={`Move ${title}`}
+            aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown"
+            title="Drag to another place, or use the arrow keys"
+          >
+            <Icon name={icon} size={15} />
+          </button>
           <h3 className="desk-name" title={title}>
             {title}
           </h3>
@@ -775,8 +791,10 @@ export function ResultsDesk({
         b: column as Split,
       }
     }
+    if (result.compare) result.compare = inOrder(result.compare, desk.order.compare)
+    if (result.evidence) result.evidence = inOrder(result.evidence, desk.order.evidence)
     return result
-  }, [desk.pair, desk.ratios, records.sensitivityRuns])
+  }, [desk.pair, desk.ratios, desk.order, records.sensitivityRuns])
 
   const treesRef = useRef(trees)
   useLayoutEffect(() => {

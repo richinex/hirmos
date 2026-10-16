@@ -6,6 +6,7 @@ import {
   focusWindow,
   placeWindows,
   setRatio,
+  setSlotOrder,
 } from './deskStore'
 import {
   dockTile,
@@ -14,6 +15,7 @@ import {
   MARGIN,
   MIN_HEIGHT,
   MIN_WIDTH,
+  overlaps,
   tidy,
   tile,
   workspaceOf,
@@ -37,6 +39,8 @@ export interface DeskWindowElements {
   readonly titlebar: HTMLElement
   readonly grip: HTMLElement
   readonly badge: HTMLElement
+  /** The window's mark: drags it between slots and moves it with the arrow keys. */
+  readonly handle: HTMLElement
 }
 
 /** The tiled views' split trees, built from the records on the desk. */
@@ -45,6 +49,11 @@ export type DeskTrees = Partial<Record<'compare' | 'evidence', Split | null>>
 interface Spring {
   value: number
   velocity: number
+}
+
+interface Slots {
+  readonly keys: readonly string[]
+  readonly rects: readonly Rect[]
 }
 
 interface Live {
@@ -72,6 +81,8 @@ export function createDeskEngine(surface: HTMLElement, trees: () => DeskTrees) {
   let pendingPlacements: Map<string, Rect> | null = null
   let started = false
   const layouts = new Map<DeskViewName, ReturnType<typeof tile>>()
+  /** Where windows are drawn while a window is carried between slots, before the swap is stored. */
+  const preview = new Map<string, Rect>()
 
   const calmQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
   const reduced = () => calmQuery.matches
@@ -150,7 +161,63 @@ export function createDeskEngine(surface: HTMLElement, trees: () => DeskTrees) {
       : tiles(view).placed.has(key)
 
   const visibleRect = (key: string, view: DeskViewName): Rect =>
-    view === 'desk' ? deskRect(key) : (tiles(view).placed.get(key) ?? deskRect(key))
+    preview.get(key) ??
+    (view === 'desk' ? deskRect(key) : (tiles(view).placed.get(key) ?? deskRect(key)))
+
+  // A tiled view, or a desk whose open windows do not overlap, holds its windows in slots read in
+  // reading order. A carried window is inserted at the slot its centre enters and the windows between
+  // shift along, as a Motion reorder group does along one axis. Overlapping windows have no slots.
+  const slotsNow = (): Slots | null => {
+    const view = state().view
+    let entries: (readonly [string, Rect])[]
+    if (view === 'compare' || view === 'evidence') entries = [...tiles(view).placed]
+    else if (view === 'desk') {
+      const shown = state().windows.filter((window) => window.visible && !window.maximized)
+      if (shown.length < 2) return null
+      entries = shown.map((window) => [window.key, deskRect(window.key)] as const)
+      const boxes = entries.map(([, rect]) => rect)
+      if (boxes.some((a, i) => boxes.slice(i + 1).some((b) => overlaps(a, b)))) return null
+    } else return null
+    const sorted = [...entries].sort(([, a], [, b]) =>
+      Math.abs(a.top - b.top) > 1 ? a.top - b.top : a.left - b.left,
+    )
+    return { keys: sorted.map(([key]) => key), rects: sorted.map(([, rect]) => rect) }
+  }
+
+  const inserted = (keys: readonly string[], key: string, index: number) => {
+    const rest = keys.filter((other) => other !== key)
+    rest.splice(index, 0, key)
+    return rest
+  }
+
+  /** Every window except the carried one drawn at its slot in `order`. */
+  const showOrder = (slots: Slots, order: readonly string[], carried: string | null) => {
+    order.forEach((other, i) => {
+      if (other === carried) return
+      const rect = slots.rects[i]!
+      const was = visibleRect(other, state().view)
+      if (Math.abs(was.width - rect.width) > 1 || Math.abs(was.height - rect.height) > 1)
+        markSizing(other)
+      preview.set(other, rect)
+    })
+    schedule()
+  }
+
+  const commitOrder = (slots: Slots, order: readonly string[]) => {
+    const view = state().view
+    showOrder(slots, order, null)
+    if (view === 'compare' || view === 'evidence') {
+      // The tree is rebuilt from the stored order on the next render; the preview holds until then.
+      const byRect = new Map(slots.rects.map((rect, i) => [rect, order[i]!] as const))
+      setSlotOrder(
+        view,
+        [...tiles(view).placed.values()].map((rect) => byRect.get(rect)!),
+      )
+    } else {
+      placeWindows(new Map(order.map((key, i) => [key, slots.rects[i]!] as const)))
+      preview.clear()
+    }
+  }
 
   const target = (key: string, runtime: Live): Record<Field, number> => {
     const rect = visibleRect(key, runtime.view)
@@ -478,38 +545,129 @@ export function createDeskEngine(surface: HTMLElement, trees: () => DeskTrees) {
       elements.frame.addEventListener('pointerdown', onDown)
       elements.frame.addEventListener('focusin', onDown)
 
-      let drag: { x: number; y: number; started: boolean; rect: Rect | null } | null = null
+      let carry: {
+        x: number
+        y: number
+        started: boolean
+        start: Rect | null
+        slots: Slots | null
+        order: string[]
+        follow: Rect | null
+      } | null = null
+      const end = () => {
+        delete elements.titlebar.dataset.dragging
+        delete elements.frame.dataset.carried
+        document.removeEventListener('keydown', onEscape, true)
+        carry = null
+      }
+      // Escape puts every window back in the slot it held when the carry began.
+      const onEscape = (event: KeyboardEvent) => {
+        if (event.key !== 'Escape' || carry?.slots == null) return
+        event.preventDefault()
+        event.stopPropagation()
+        preview.clear()
+        schedule()
+        end()
+      }
       const onTitleDown = (event: PointerEvent) => {
-        if (event.button !== 0 || (event.target as Element).closest('button')) return
+        const button = (event.target as Element).closest('button')
+        if (event.button !== 0 || (button !== null && button !== elements.handle)) return
         const window = state().windows.find((candidate) => candidate.key === key)
         if (state().view === 'desk' && window?.maximized) return
-        drag = { x: event.clientX, y: event.clientY, started: false, rect: null }
+        carry = {
+          x: event.clientX,
+          y: event.clientY,
+          started: false,
+          start: null,
+          slots: null,
+          order: [],
+          follow: null,
+        }
         elements.titlebar.setPointerCapture(event.pointerId)
       }
       const onTitleMove = (event: PointerEvent) => {
-        if (drag === null) return
-        const dx = event.clientX - drag.x
-        const dy = event.clientY - drag.y
-        if (!drag.started) {
+        if (carry === null) return
+        const dx = event.clientX - carry.x
+        const dy = event.clientY - carry.y
+        if (!carry.started) {
           if (Math.hypot(dx, dy) < 4) return
           const start = visibleRect(key, runtime.view)
-          tearOff()
-          drag = { ...drag, started: true, rect: start }
+          const slots = slotsNow()
+          if (slots === null) tearOff()
+          else {
+            elements.frame.dataset.carried = ''
+            document.addEventListener('keydown', onEscape, true)
+          }
+          carry = { ...carry, started: true, start, slots, order: slots ? [...slots.keys] : [] }
           elements.titlebar.dataset.dragging = ''
         }
-        runtime.override = { ...drag.rect!, left: drag.rect!.left + dx, top: drag.rect!.top + dy }
+        const follow = { ...carry.start!, left: carry.start!.left + dx, top: carry.start!.top + dy }
+        carry.follow = follow
+        if (carry.slots === null) {
+          runtime.override = follow
+          settle(key)
+          schedule()
+          return
+        }
+        preview.set(key, follow)
         settle(key)
+        const cx = follow.left + follow.width / 2
+        const cy = follow.top + follow.height / 2
+        const index = carry.slots.rects.findIndex(
+          (r) => cx >= r.left && cx <= r.left + r.width && cy >= r.top && cy <= r.top + r.height,
+        )
+        if (index >= 0 && carry.order[index] !== key) {
+          carry.order = inserted(carry.order, key, index)
+          showOrder(carry.slots, carry.order, key)
+        }
         schedule()
       }
       const onTitleUp = () => {
-        if (drag?.started && runtime.override !== null) {
+        if (carry?.started && carry.slots === null && runtime.override !== null) {
           const rect = fit(runtime.override, workspaceOf(size()))
           runtime.override = null
           placeWindows(new Map([[key, rect]]))
+        } else if (carry?.started && carry.slots !== null) {
+          const moved = carry.order.some((other, i) => other !== carry!.slots!.keys[i])
+          if (moved) commitOrder(carry.slots, carry.order)
+          else {
+            preview.clear()
+            schedule()
+          }
         }
-        delete elements.titlebar.dataset.dragging
-        drag = null
+        end()
       }
+      // Left and right move one place in reading order; up and down move to the nearest slot in the
+      // row above or below. The windows between shift along, as with a drag.
+      const onHandleKey = (event: KeyboardEvent) => {
+        if (event.altKey || event.ctrlKey || event.metaKey) return
+        if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return
+        const slots = slotsNow()
+        const from = slots?.keys.indexOf(key) ?? -1
+        if (slots === null || from < 0) return
+        let to = event.key === 'ArrowLeft' ? from - 1 : event.key === 'ArrowRight' ? from + 1 : -1
+        if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+          const own = slots.rects[from]!
+          const middle = (r: Rect) => [r.left + r.width / 2, r.top + r.height / 2] as const
+          const [ox, oy] = middle(own)
+          let best = Infinity
+          slots.rects.forEach((r, i) => {
+            const [x, y] = middle(r)
+            const rows = event.key === 'ArrowUp' ? oy - y : y - oy
+            if (i === from || rows <= 1) return
+            const distance = rows * 4 + Math.abs(x - ox)
+            if (distance < best) {
+              best = distance
+              to = i
+            }
+          })
+        }
+        if (to < 0 || to >= slots.keys.length) return
+        event.preventDefault()
+        event.stopPropagation()
+        commitOrder(slots, inserted(slots.keys, key, to))
+      }
+      elements.handle.addEventListener('keydown', onHandleKey)
       elements.titlebar.addEventListener('pointerdown', onTitleDown)
       elements.titlebar.addEventListener('pointermove', onTitleMove)
       elements.titlebar.addEventListener('pointerup', onTitleUp)
@@ -550,6 +708,8 @@ export function createDeskEngine(surface: HTMLElement, trees: () => DeskTrees) {
       return () => {
         elements.frame.removeEventListener('pointerdown', onDown)
         elements.frame.removeEventListener('focusin', onDown)
+        elements.handle.removeEventListener('keydown', onHandleKey)
+        document.removeEventListener('keydown', onEscape, true)
         elements.titlebar.removeEventListener('pointerdown', onTitleDown)
         elements.titlebar.removeEventListener('pointermove', onTitleMove)
         elements.titlebar.removeEventListener('pointerup', onTitleUp)
@@ -580,6 +740,7 @@ export function createDeskEngine(surface: HTMLElement, trees: () => DeskTrees) {
     workspace: () => workspaceOf(size()),
     refresh() {
       layouts.clear()
+      preview.clear()
       placeSeams()
       schedule()
     },

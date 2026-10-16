@@ -1,5 +1,5 @@
-import {rawBalanceSchema} from '@/domain/covariateBalance'
-import {powerEvidenceSchema} from '@/domain/powerPlanning'
+import { rawBalanceSchema } from '@/domain/covariateBalance'
+import { powerEvidenceSchema } from '@/domain/powerPlanning'
 import { surrogatePathEvidenceSchema, surrogatePathMatches } from '@/domain/surrogatePath'
 import {
   surrogateDiagnosticEvidenceSchema,
@@ -84,6 +84,7 @@ import {
 } from '@/domain/estimation'
 import { parseDmlRefutationEvidence } from '@/domain/sensitivity'
 import { honestEvidenceSchema } from '@/domain/honestDid'
+import { pretestEvidenceSchema } from '@/domain/pretestCoverage'
 import { didSensitivityEvidenceSchema } from '@/domain/didSensitivity'
 import {
   dynamicCounterfactualUncertaintyMatches,
@@ -437,8 +438,15 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
       }
     case 'swig-analysis':
       return { kind: 'swigAnalysis', specification: command.specification, names: command.names }
-    case 'raw-balance': return {kind:'rawBalance',rows:command.rows,columns:command.columns,treatedReference:command.treatedReference}
-    case 'power-planning': return {kind:'powerPlanning',specification:command.specification}
+    case 'raw-balance':
+      return {
+        kind: 'rawBalance',
+        rows: command.rows,
+        columns: command.columns,
+        treatedReference: command.treatedReference,
+      }
+    case 'power-planning':
+      return { kind: 'powerPlanning', specification: command.specification }
     case 'adjustment-validate':
       return { kind: 'adjustmentValidate', ...command.design }
     case 'dag-check':
@@ -780,6 +788,8 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
       }
     case 'honest-did':
       return { kind: 'honestDid', model: command.model }
+    case 'pretest-coverage':
+      return { kind: 'pretestCoverage', model: command.model }
     case 'did-sensitivity':
       return {
         kind: 'didSensitivity',
@@ -1337,22 +1347,56 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         return
       }
       case 'raw-balance': {
-        const parsed=rawBalanceSchema.safeParse(decoded)
-        if(!parsed.success || parsed.data.rows.length!==command.columns-1 || parsed.data.rows.some((r,i)=>r.column!==i)){fail(command.request,{kind:'worker-protocol-failed',detail:'Balance returned an invalid column mapping.'});return}
-        emit({kind:'raw-balance-succeeded',request:command.request,result:parsed.data});return
-      }
-      case 'power-planning': {
-        const parsed=z.object({kind:z.literal('powerPlanning'),result:powerEvidenceSchema}).strict().safeParse(decoded)
-        if(!parsed.success || parsed.data.result.kind!==command.specification.kind){fail(command.request,{kind:'worker-protocol-failed',detail:'The power calculation returned an invalid result.'});return}
-        emit({kind:'power-planning-succeeded',request:command.request,result:parsed.data.result});return
-      }
-      case 'adjustment-validate': {
-        const parsed = adjustmentResponseSchema.extend({ kind: z.literal('adjustmentValidation') }).safeParse(decoded)
-        if (!parsed.success || parsed.data.checks.length !== command.design.sets.length) {
-          fail(command.request, { kind: 'worker-protocol-failed', detail: 'Invalid adjustment validation response.' })
+        const parsed = rawBalanceSchema.safeParse(decoded)
+        if (
+          !parsed.success ||
+          parsed.data.rows.length !== command.columns - 1 ||
+          parsed.data.rows.some((r, i) => r.column !== i)
+        ) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: 'Balance returned an invalid column mapping.',
+          })
           return
         }
-        emit({ kind: 'adjustment-validation-succeeded', request: command.request, result: { checks: parsed.data.checks, analysis: parsed.data.analysis } })
+        emit({ kind: 'raw-balance-succeeded', request: command.request, result: parsed.data })
+        return
+      }
+      case 'power-planning': {
+        const parsed = z
+          .object({ kind: z.literal('powerPlanning'), result: powerEvidenceSchema })
+          .strict()
+          .safeParse(decoded)
+        if (!parsed.success || parsed.data.result.kind !== command.specification.kind) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: 'The power calculation returned an invalid result.',
+          })
+          return
+        }
+        emit({
+          kind: 'power-planning-succeeded',
+          request: command.request,
+          result: parsed.data.result,
+        })
+        return
+      }
+      case 'adjustment-validate': {
+        const parsed = adjustmentResponseSchema
+          .extend({ kind: z.literal('adjustmentValidation') })
+          .safeParse(decoded)
+        if (!parsed.success || parsed.data.checks.length !== command.design.sets.length) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: 'Invalid adjustment validation response.',
+          })
+          return
+        }
+        emit({
+          kind: 'adjustment-validation-succeeded',
+          request: command.request,
+          result: { checks: parsed.data.checks, analysis: parsed.data.analysis },
+        })
         return
       }
       case 'dag-check': {
@@ -1741,6 +1785,25 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         }
         emit({
           kind: 'honest-did-succeeded',
+          request: command.request,
+          result: envelope.data.evidence,
+        })
+        return
+      }
+      case 'pretest-coverage': {
+        const envelope = z
+          .object({ kind: z.literal('pretestCoverage'), evidence: pretestEvidenceSchema })
+          .strict()
+          .safeParse(decoded)
+        if (!envelope.success) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: z.prettifyError(envelope.error),
+          })
+          return
+        }
+        emit({
+          kind: 'pretest-coverage-succeeded',
           request: command.request,
           result: envelope.data.evidence,
         })

@@ -1813,6 +1813,7 @@ mod tests {
             | AnalysisCommand::SunAbraham { .. }
             | AnalysisCommand::RidgeAugmentedSynthetic { .. }
             | AnalysisCommand::HonestDid { .. }
+            | AnalysisCommand::PretestCoverage { .. }
             | AnalysisCommand::DidSensitivity { .. }
             | AnalysisCommand::SwigAnalysis { .. }
             | AnalysisCommand::PropensityMatching { .. }

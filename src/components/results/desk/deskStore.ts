@@ -26,6 +26,7 @@ export const emptyDesk = (): DeskState => ({
   windows: [{ key: 'runs', placed: null, visible: true, maximized: false, rank: 0 }],
   view: 'desk',
   ratios: {},
+  order: {},
   focused: 'runs',
   pair: { selected: null, compareWith: null },
 })
@@ -250,6 +251,10 @@ export const resetRatios = (ids: readonly string[]): void =>
     ...desk,
     ratios: Object.fromEntries(Object.entries(desk.ratios).filter(([id]) => !ids.includes(id))),
   }))
+
+/** The windows of a tiled view in the order its slots are filled. */
+export const setSlotOrder = (view: 'compare' | 'evidence', keys: readonly string[]): void =>
+  update((desk) => ({ ...desk, order: { ...desk.order, [view]: [...keys] } }))
 
 export const setPair = (pair: DeskState['pair']): void => update((desk) => ({ ...desk, pair }))
 

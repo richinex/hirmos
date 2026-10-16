@@ -431,15 +431,17 @@ export function ResultRecord({ manifest, stepLabel, bite, checked }: ManifestPar
               ? 'none recorded'
               : manifest.sensitivity
                   .map((probe) =>
-                    probe.kind === 'did-sensitivity-run'
-                      ? `DiD omitted-variable sensitivity, ${probe.evidence.scenarios.length} scenarios`
-                      : probe.kind === 'honest-did-run'
-                        ? `parallel-trends sensitivity, ${probe.evidence.request.configuration.bounds.length} restriction bounds`
-                        : probe.kind === 'linear-refutation-run'
-                          ? `movement-only perturbations, no refuter p-values (placebo ${formatStatistic('raw', probe.evidence.placeboEffect).text}; subset ${formatStatistic('raw', probe.evidence.subsetEffect).text})`
-                          : probe.kind === 'dml-refutation-run'
-                            ? `DML mean-shift tests (placebo p ${formatP(probe.evidence.placebo.pValue, { withLabel: false }).text}; random covariate p ${formatP(probe.evidence.randomCommonCause.pValue, { withLabel: false }).text})`
-                            : `simulated-confounder movement grid ${probe.evidence.kappaT.length}×${probe.evidence.kappaY.length}, no p-value`,
+                    probe.kind === 'pretest-coverage-run'
+                      ? 'pre-test coverage under a specified linear-trend scenario'
+                      : probe.kind === 'did-sensitivity-run'
+                        ? `DiD omitted-variable sensitivity, ${probe.evidence.scenarios.length} scenarios`
+                        : probe.kind === 'honest-did-run'
+                          ? `parallel-trends sensitivity, ${probe.evidence.request.configuration.bounds.length} restriction bounds`
+                          : probe.kind === 'linear-refutation-run'
+                            ? `movement-only perturbations, no refuter p-values (placebo ${formatStatistic('raw', probe.evidence.placeboEffect).text}; subset ${formatStatistic('raw', probe.evidence.subsetEffect).text})`
+                            : probe.kind === 'dml-refutation-run'
+                              ? `DML mean-shift tests (placebo p ${formatP(probe.evidence.placebo.pValue, { withLabel: false }).text}; random covariate p ${formatP(probe.evidence.randomCommonCause.pValue, { withLabel: false }).text})`
+                              : `simulated-confounder movement grid ${probe.evidence.kappaT.length}×${probe.evidence.kappaY.length}, no p-value`,
                   )
                   .join('; ')}
           </Row>

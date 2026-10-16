@@ -41,7 +41,7 @@ export function EligibilityView({
         groups.map((group) => group.action).find((candidate) => candidate !== null) ?? null
       return (
         <Alert tone="warn" live={false} className="mt-4" testId="eligibility-notice">
-          <p className="m-0">Review required; the estimator remains runnable</p>
+          <p className="m-0">Review is required. However, you can still run the estimator.</p>
           {groups.map((group) => (
             <p key={group.summary} className="mb-0 mt-1 text-muted">
               {group.summary}

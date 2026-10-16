@@ -8,6 +8,7 @@ import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { useMemo, useState } from 'react'
 import { TimeSeriesRunResult } from '@/components/time-series/TimeSeriesRunResult'
 import { HonestDidResult } from '@/components/sensitivity/HonestDidPanel'
+import { PretestCoverageResult } from '@/components/sensitivity/PretestCoveragePanel'
 import { CountSeriesRecord } from '@/components/time-series/CountSeriesCard'
 import { isRegressionDesignRun, type TimeSeriesRun } from '@/domain/timeSeries'
 import type { CountSeriesModelArtifact } from '@/domain/countSeries'
@@ -341,10 +342,14 @@ export function ResultsPanel({
               <div key={run.id} className="space-y-4">
                 <TimeSeriesRunResult run={run} />
                 {sensitivityRuns.map((probe) =>
-                  probe.kind === 'honest-did-run' &&
+                  (probe.kind === 'honest-did-run' || probe.kind === 'pretest-coverage-run') &&
                   probe.source.kind === 'regressionDesign' &&
                   probe.source.run === run.id ? (
-                    <HonestDidResult key={probe.id} run={probe} />
+                    probe.kind === 'pretest-coverage-run' ? (
+                      <PretestCoverageResult key={probe.id} run={probe} />
+                    ) : (
+                      <HonestDidResult key={probe.id} run={probe} />
+                    )
                   ) : null,
                 )}
               </div>
@@ -474,7 +479,9 @@ export function ResultsPanel({
               />
             )}
             {manifest?.sensitivity.map((probe) =>
-              probe.kind === 'honest-did-run' ? (
+              probe.kind === 'pretest-coverage-run' ? (
+                <PretestCoverageResult key={probe.id} run={probe} />
+              ) : probe.kind === 'honest-did-run' ? (
                 <HonestDidResult key={probe.id} run={probe} />
               ) : probe.kind === 'did-sensitivity-run' ? (
                 <DidSensitivityResult

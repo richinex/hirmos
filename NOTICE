@@ -170,3 +170,15 @@ Numdifftools 0.11.1 — BSD-3-Clause
   Central Hessian, Richardson extrapolation, DEA3 and estimate selection.
   Modified to report typed failures and recover from invalid leading steps.
   Full terms: licenses/upstream/numdifftools-LICENSE.txt.
+
+Pre-test coverage calibration fixtures
+  tests/fixtures/pretest-calibration.json derives scalar calibration inputs
+  from Jonathan Roth (2022), Pre-test with Caution: Event-study Estimates
+  After Testing for Parallel Trends, and the twelve studies named in the fixture.
+  Archive: https://www.openicpsr.org/openicpsr/project/151982/version/V1/view
+  Modified: exported selected coefficients and covariances; computed coverage
+  references for de Chaisemartin and D'Haultfoeuille, SSRN 4975578.
+  The archive LICENSE assigns CC BY 4.0 to data and BSD-3-Clause to code;
+  its README contains a conflicting later CC-BY-NC paragraph. The original
+  licence is preserved in licenses/upstream/Roth-archive-LICENSE.txt.
+  No archive analysis code was copied into the numerical kernel.

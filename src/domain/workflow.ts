@@ -28,6 +28,7 @@ import type { EstimationRunArtifact, EstimationRunId } from './estimation'
 import type { SensitivityRunArtifact, SensitivityRunId } from './sensitivity'
 import { sensitivityEstimationRun } from './sensitivity'
 import { honestRunMatches } from './honestDid'
+import { pretestRunMatches } from './pretestCoverage'
 import { didSensitivityRunMatches } from './didSensitivity'
 import type { CounterfactualRunArtifact, CounterfactualRunId } from './counterfactual'
 import type { SurvivalRunArtifact, SurvivalRunId } from './survival'
@@ -846,11 +847,13 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
         event.type === 'sensitivity-run-created' &&
         state.prepared !== null &&
         event.run.preparedDataset === state.prepared.id &&
-        (event.run.kind === 'honest-did-run'
-          ? honestRunMatches(event.run, state.estimationRuns, state.timeSeriesRuns)
-          : event.run.kind === 'did-sensitivity-run'
-            ? didSensitivityRunMatches(event.run, state.estimationRuns)
-            : state.estimationRuns.some((run) => run.id === sensitivityEstimationRun(event.run)))
+        (event.run.kind === 'pretest-coverage-run'
+          ? pretestRunMatches(event.run, state.estimationRuns, state.timeSeriesRuns)
+          : event.run.kind === 'honest-did-run'
+            ? honestRunMatches(event.run, state.estimationRuns, state.timeSeriesRuns)
+            : event.run.kind === 'did-sensitivity-run'
+              ? didSensitivityRunMatches(event.run, state.estimationRuns)
+              : state.estimationRuns.some((run) => run.id === sensitivityEstimationRun(event.run)))
       ) {
         return { ...state, sensitivityRuns: [...state.sensitivityRuns, event.run] }
       }
@@ -927,7 +930,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
           timeSeriesRuns: state.timeSeriesRuns.filter((run) => run.id !== event.run),
           sensitivityRuns: state.sensitivityRuns.filter(
             (run) =>
-              run.kind !== 'honest-did-run' ||
+              (run.kind !== 'honest-did-run' && run.kind !== 'pretest-coverage-run') ||
               run.source.kind !== 'regressionDesign' ||
               run.source.run !== event.run,
           ),

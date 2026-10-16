@@ -1864,6 +1864,18 @@ export function runHonestDid(
     values = new Float64Array()
   return post('honest-did-succeeded', { kind: 'honest-did', request, values, model }, values)
 }
+
+export function runPretestCoverage(
+  model: import('@/domain/pretestCoverage').PretestRequest,
+): Promise<Result<import('@/domain/pretestCoverage').PretestEvidence, AnalysisWorkerProblem>> {
+  const request = newWorkerRequestId(),
+    values = new Float64Array()
+  return post(
+    'pretest-coverage-succeeded',
+    { kind: 'pretest-coverage', request, values, model },
+    values,
+  )
+}
 export function runDidSensitivity(
   values: Float64Array,
   rows: number,
@@ -2390,18 +2402,40 @@ export function runSurrogatePath(
 }
 import type { AdjustmentResponse, AdjustmentValidationDesign } from '@/domain/adjustmentValidation'
 
-export function validateAdjustmentSets(design: AdjustmentValidationDesign): Promise<Result<AdjustmentResponse, AnalysisWorkerProblem>> {
+export function validateAdjustmentSets(
+  design: AdjustmentValidationDesign,
+): Promise<Result<AdjustmentResponse, AnalysisWorkerProblem>> {
   const request = newWorkerRequestId()
   const values = new Float64Array(0)
-  return post('adjustment-validation-succeeded', { kind: 'adjustment-validate', request, values, design }, values)
+  return post(
+    'adjustment-validation-succeeded',
+    { kind: 'adjustment-validate', request, values, design },
+    values,
+  )
 }
 
-export function calculatePower(specification: import('@/domain/powerPlanning').PowerRequest): Promise<Result<import('@/domain/powerPlanning').PowerEvidence, AnalysisWorkerProblem>> {
-  const request=newWorkerRequestId(), values=new Float64Array(0)
-  return post('power-planning-succeeded',{kind:'power-planning',request,values,specification},values)
+export function calculatePower(
+  specification: import('@/domain/powerPlanning').PowerRequest,
+): Promise<Result<import('@/domain/powerPlanning').PowerEvidence, AnalysisWorkerProblem>> {
+  const request = newWorkerRequestId(),
+    values = new Float64Array(0)
+  return post(
+    'power-planning-succeeded',
+    { kind: 'power-planning', request, values, specification },
+    values,
+  )
 }
 
-export function calculateRawBalance(values:Float64Array,rows:number,columns:number,treatedReference:boolean):Promise<Result<import('@/domain/covariateBalance').RawBalance,AnalysisWorkerProblem>> {
- const request=newWorkerRequestId()
- return post('raw-balance-succeeded',{kind:'raw-balance',request,values,rows,columns,treatedReference},values)
+export function calculateRawBalance(
+  values: Float64Array,
+  rows: number,
+  columns: number,
+  treatedReference: boolean,
+): Promise<Result<import('@/domain/covariateBalance').RawBalance, AnalysisWorkerProblem>> {
+  const request = newWorkerRequestId()
+  return post(
+    'raw-balance-succeeded',
+    { kind: 'raw-balance', request, values, rows, columns, treatedReference },
+    values,
+  )
 }

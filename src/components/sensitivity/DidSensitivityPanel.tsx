@@ -666,7 +666,7 @@ export function DidSensitivityPanel({
               </div>
             </fieldset>
             {readiness !== null && (
-              <Alert tone="info" live={false}>
+              <Alert tone="info" live={false} className="mt-4">
                 <p className="m-0">{readiness}</p>
               </Alert>
             )}

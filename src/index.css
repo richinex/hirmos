@@ -867,6 +867,24 @@ mark.passage-bound {
   visibility: hidden;
   outline: none;
 }
+.desk-handle {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-left: -4px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-faint);
+  cursor: grab;
+  touch-action: none;
+  transition: background-color 120ms ease-out, color 120ms ease-out;
+}
+@media (hover: hover) { .desk-handle:hover { background-color: var(--color-well); color: var(--color-ink); } }
+.desk-window[data-carried] .desk-handle, .desk-titlebar[data-dragging] { cursor: grabbing; }
 .desk-titlebar {
   height: var(--title-height);
   display: flex;

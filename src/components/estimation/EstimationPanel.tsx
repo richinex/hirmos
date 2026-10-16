@@ -1823,7 +1823,7 @@ export function EstimationPanel({
     pendingDelete === null
       ? 0
       : sensitivityRuns.filter((probe) =>
-          probe.kind === 'honest-did-run'
+          probe.kind === 'honest-did-run' || probe.kind === 'pretest-coverage-run'
             ? probe.source.kind === 'estimation' && probe.source.run === pendingDelete.id
             : probe.estimationRun === pendingDelete.id,
         ).length

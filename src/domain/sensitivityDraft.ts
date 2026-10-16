@@ -20,7 +20,11 @@ export interface SensitivityDraft {
 }
 
 export type SensitivityEvent =
-  | { readonly type: 'settings-applied'; readonly run: EstimationRunId; readonly configuration: SensitivityConfiguration }
+  | {
+      readonly type: 'settings-applied'
+      readonly run: EstimationRunId
+      readonly configuration: SensitivityConfiguration
+    }
   | { readonly type: 'run-chosen'; readonly run: EstimationRunId | null }
   | { readonly type: 'probe-chosen'; readonly probe: SensitivityProbe }
   | { readonly type: 'configured'; readonly configuration: SensitivityConfiguration }
@@ -31,7 +35,12 @@ export function initialSensitivityDraft(
 ): SensitivityDraft {
   const latest =
     runs
-      .filter((run) => run.kind !== 'honest-did-run' && run.kind !== 'did-sensitivity-run')
+      .filter(
+        (run) =>
+          run.kind !== 'honest-did-run' &&
+          run.kind !== 'did-sensitivity-run' &&
+          run.kind !== 'pretest-coverage-run',
+      )
       .at(-1) ?? null
   const probed =
     latest === null ? null : (estimates.find((run) => run.id === latest.estimationRun) ?? null)
@@ -91,7 +100,15 @@ export function stepSensitivityDraft(
 ): SensitivityDraft {
   switch (event.type) {
     case 'settings-applied':
-      return { ...state, estimationRun: event.run, probe: event.configuration.kind, configurations: { ...state.configurations, [event.configuration.kind]: event.configuration } }
+      return {
+        ...state,
+        estimationRun: event.run,
+        probe: event.configuration.kind,
+        configurations: {
+          ...state.configurations,
+          [event.configuration.kind]: event.configuration,
+        },
+      }
     case 'run-chosen':
       return { ...state, estimationRun: event.run }
     case 'probe-chosen':

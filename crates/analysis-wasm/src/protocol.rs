@@ -1128,6 +1128,7 @@ pub(crate) enum AnalysisCommand {
     RootCauseChecks { request: crate::root_cause_checks::Request },
     ArdlModel { rows: usize, columns: usize, model: crate::ardl_model::Request },
     HonestDid { model: crate::honest_did::Request },
+    PretestCoverage { model: crate::pretest_coverage::Request },
     DidSensitivity { rows: usize, columns: usize, units: Vec<String>, times: Vec<i64>, model: crate::did_sensitivity::Request },
     StationarityBattery,
     Multicollinearity {
@@ -2792,6 +2793,7 @@ pub(crate) enum AnalysisResult {
     RootCauseChecks { evidence: crate::root_cause_checks::Evidence },
     ArdlModel { evidence: crate::ardl_model::Evidence },
     HonestDid { evidence: crate::honest_did::Evidence },
+    PretestCoverage { evidence: crate::pretest_coverage::Evidence },
     DidSensitivity { evidence: crate::did_sensitivity::Evidence },
     DiscreteStateRefused {
         query: DiscreteStateQuery,

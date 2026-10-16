@@ -90,6 +90,7 @@ import { formatTime, formatTimestamp } from '@/lib/format/date'
 import { interpretSensitivityResult } from '@/domain/resultInterpretation'
 import { cn } from '@/lib/utils'
 import { HonestDidPanel } from './HonestDidPanel'
+import { PretestCoveragePanel } from './PretestCoveragePanel'
 import { DidSensitivityPanel } from './DidSensitivityPanel'
 import { didSensitivitySource } from '@/domain/didSensitivity'
 import { SensitivityAdjustment } from './SensitivityAdjustment'
@@ -611,30 +612,43 @@ function LegacySensitivityPanel({
 
   const session = useJob('sensitivity')
   const { job } = session
-  useWorkspaceConfiguration('sensitivity-probe', prepared.id + JSON.stringify(estimationRuns.map(run => run.id)), job.kind === 'running' || session.blocked ? null : {
-    title: 'Estimator probes',
-    current: { estimationRun: state.estimationRun, configuration },
-    schema: sensitivitySettingsSchema,
-    columns: [],
-    describe: value => {
-      const run = estimationRuns.find(candidate => candidate.id === value.estimationRun)
-      const bound = studies.find(candidate => candidate.id === run?.study)
-      return [
-        ...(bound ? [{ key: 'study', label: 'Study', value: estimandSentence(bound) }] : []),
-        ...sensitivitySettings(value),
-      ]
-    },
-    validate: next => {
-      const run = estimationRuns.find(candidate => candidate.id === next.estimationRun)
-      if (!run || run.preparedDataset !== prepared.id) return err('Choose a saved estimation run for this prepared dataset.')
-      if (!studies.some(candidate => candidate.id === run.study)) return err('The source run’s study is unavailable.')
-      const checked = probeEligibility(next.configuration.kind, run, null)
-      return checked.kind === 'refused' ? err(checked.reason) : ok(next)
-    },
-    configure: next => {
-      if (next.estimationRun !== null) dispatch({ type: 'settings-applied', run: next.estimationRun, configuration: next.configuration })
-    },
-  })
+  useWorkspaceConfiguration(
+    'sensitivity-probe',
+    prepared.id + JSON.stringify(estimationRuns.map((run) => run.id)),
+    job.kind === 'running' || session.blocked
+      ? null
+      : {
+          title: 'Estimator probes',
+          current: { estimationRun: state.estimationRun, configuration },
+          schema: sensitivitySettingsSchema,
+          columns: [],
+          describe: (value) => {
+            const run = estimationRuns.find((candidate) => candidate.id === value.estimationRun)
+            const bound = studies.find((candidate) => candidate.id === run?.study)
+            return [
+              ...(bound ? [{ key: 'study', label: 'Study', value: estimandSentence(bound) }] : []),
+              ...sensitivitySettings(value),
+            ]
+          },
+          validate: (next) => {
+            const run = estimationRuns.find((candidate) => candidate.id === next.estimationRun)
+            if (!run || run.preparedDataset !== prepared.id)
+              return err('Choose a saved estimation run for this prepared dataset.')
+            if (!studies.some((candidate) => candidate.id === run.study))
+              return err('The source run’s study is unavailable.')
+            const checked = probeEligibility(next.configuration.kind, run, null)
+            return checked.kind === 'refused' ? err(checked.reason) : ok(next)
+          },
+          configure: (next) => {
+            if (next.estimationRun !== null)
+              dispatch({
+                type: 'settings-applied',
+                run: next.estimationRun,
+                configuration: next.configuration,
+              })
+          },
+        },
+  )
   useRunActivity(
     onActivity,
     job.kind === 'running' ? { label: describeProbe(state.probe), progress: null } : null,
@@ -1464,8 +1478,9 @@ function RunRecord({ run }: { readonly run: LegacySensitivityRunArtifact }) {
 function openingTrack(
   runs: readonly SensitivityRunArtifact[],
   estimates: readonly EstimationRunArtifact[],
-): 'estimation' | 'parallelTrends' | 'didOmitted' {
+): 'estimation' | 'parallelTrends' | 'didOmitted' | 'pretestCoverage' {
   const run = runs.at(-1)
+  if (run?.kind === 'pretest-coverage-run') return 'pretestCoverage'
   if (run?.kind === 'did-sensitivity-run') return 'didOmitted'
   if (run?.kind === 'honest-did-run' || estimates.length === 0) return 'parallelTrends'
   if (run === undefined && didSensitivitySource(estimates.at(-1)!) !== null) return 'didOmitted'
@@ -1475,9 +1490,12 @@ function openingTrack(
 const sensitivityTracks = [
   { value: 'estimation', label: 'Estimator probes' },
   { value: 'parallelTrends', label: 'Parallel trends' },
+  { value: 'pretestCoverage', label: 'Pre-test coverage' },
   { value: 'didOmitted', label: 'DiD omitted variables' },
 ] as const
-const sensitivityTrackSchema = z.object({ track: z.enum(['estimation', 'parallelTrends', 'didOmitted']) }).strict()
+const sensitivityTrackSchema = z
+  .object({ track: z.enum(['estimation', 'parallelTrends', 'didOmitted', 'pretestCoverage']) })
+  .strict()
 
 export function SensitivityPanel(
   props: Omit<React.ComponentProps<typeof LegacySensitivityPanel>, 'runs' | 'selector'> & {
@@ -1488,15 +1506,34 @@ export function SensitivityPanel(
   const [track, setTrack] = useState(() => openingTrack(props.runs, props.estimationRuns))
   const [busy, setBusy] = useState(false)
   const report = props.onActivity
-  const onActivity = useCallback((activity: RunActivity | null) => {
-    setBusy(activity !== null)
-    report?.(activity)
-  }, [report])
-  useWorkspaceConfiguration('sensitivity-analysis', props.prepared.id, busy ? null : {
-    title: 'Sensitivity analysis', current: { track }, schema: sensitivityTrackSchema, columns: [],
-    describe: value => [{ key: 'track', label: 'Analysis', value: sensitivityTracks.find(item => item.value === value.track)!.label }],
-    validate: ok, configure: value => setTrack(value.track),
-  })
+  const onActivity = useCallback(
+    (activity: RunActivity | null) => {
+      setBusy(activity !== null)
+      report?.(activity)
+    },
+    [report],
+  )
+  useWorkspaceConfiguration(
+    'sensitivity-analysis',
+    props.prepared.id,
+    busy
+      ? null
+      : {
+          title: 'Sensitivity analysis',
+          current: { track },
+          schema: sensitivityTrackSchema,
+          columns: [],
+          describe: (value) => [
+            {
+              key: 'track',
+              label: 'Analysis',
+              value: sensitivityTracks.find((item) => item.value === value.track)!.label,
+            },
+          ],
+          validate: ok,
+          configure: (value) => setTrack(value.track),
+        },
+  )
   const selector = (
     <SegmentedControl
       variant="line"
@@ -1509,6 +1546,19 @@ export function SensitivityPanel(
     />
   )
   switch (track) {
+    case 'pretestCoverage':
+      return (
+        <PretestCoveragePanel
+          prepared={props.prepared}
+          estimates={props.estimationRuns}
+          designs={props.designRuns}
+          runs={props.runs.filter((run) => run.kind === 'pretest-coverage-run')}
+          onRun={props.onRun}
+          onDelete={props.onDeleteRun}
+          onActivity={onActivity}
+          selector={selector}
+        />
+      )
     case 'didOmitted':
       return (
         <DidSensitivityPanel
@@ -1542,7 +1592,10 @@ export function SensitivityPanel(
           {...props}
           onActivity={onActivity}
           runs={props.runs.filter(
-            (run) => run.kind !== 'honest-did-run' && run.kind !== 'did-sensitivity-run',
+            (run) =>
+              run.kind !== 'honest-did-run' &&
+              run.kind !== 'did-sensitivity-run' &&
+              run.kind !== 'pretest-coverage-run',
           )}
           selector={selector}
         />

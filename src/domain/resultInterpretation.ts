@@ -1461,6 +1461,16 @@ export function interpretSensitivityResult(run: SensitivityRunArtifact): ResultI
           },
         ],
       }
+    case 'pretest-coverage-run':
+      return {
+        kind: 'result-interpretation',
+        statements: [
+          {
+            kind: 'qualification',
+            text: 'These coverage probabilities describe repeated samples under the recorded linear-trend scenario. They do not measure actual coverage or establish parallel trends. The calculation conditions on passing one pre-test, not a joint test of several leads.',
+          },
+        ],
+      }
     case 'linear-refutation-run': {
       const placeboDistance = Math.abs(run.evidence.placeboEffect)
       const subsetMovement = Math.abs(run.evidence.subsetEffect - run.evidence.estimate)

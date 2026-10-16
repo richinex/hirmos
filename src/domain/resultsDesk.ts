@@ -74,6 +74,13 @@ export const deskStateSchema = z
     windows: z.array(windowSchema).max(DESK_CAPACITY),
     view: z.enum(DESK_VIEWS),
     ratios: z.record(z.string(), z.number().min(0.1).max(0.9)),
+    order: z
+      .object({
+        compare: z.array(z.string()).max(DESK_CAPACITY).optional(),
+        evidence: z.array(z.string()).max(DESK_CAPACITY).optional(),
+      })
+      .strict()
+      .default({}),
     focused: z.string().nullable(),
     pair: z
       .object({ selected: z.string().nullable(), compareWith: z.string().nullable() })

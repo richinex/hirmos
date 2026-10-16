@@ -104,6 +104,25 @@ const openEverySavedResult = async (page: Page) => {
   return count
 }
 
+/** Carries a window by its handle until its centre lies on `to`, then releases unless told to hold. */
+const carry = async (page: Page, key: string, to: Box, hold = false) => {
+  const window = page.locator(`.desk-window[data-key="${key}"]`)
+  const handle = (await window.locator('.desk-handle').boundingBox())!
+  const box = (await window.boundingBox())!
+  const dx = (to.left + to.right) / 2 - (box.x + box.width / 2)
+  const dy = (to.top + to.bottom) / 2 - (box.y + box.height / 2)
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(handle.x + handle.width / 2 + dx, handle.y + handle.height / 2 + dy, { steps: 20 })
+  if (!hold) await page.mouse.up()
+}
+
+/** Keys in reading order: top to bottom, then left to right. */
+const reading = (boxes: readonly Box[]) =>
+  [...boxes]
+    .sort((a, b) => (Math.abs(a.top - b.top) > 2 ? a.top - b.top : a.left - b.left))
+    .map((box) => box.key)
+
 test.beforeEach(({}, info) => {
   test.skip(info.project.name !== 'chromium', 'Phones keep the single-column Results page.')
 })
@@ -160,25 +179,51 @@ test('Evidence and Focus tile without overlap, and a dragged title bar returns t
   expect(await outside(page, tiled)).toEqual([])
 
   const recordKey = tiled.find((box) => box.key.startsWith('record'))!.key
-  const record = page.locator(`.desk-window[data-key="${recordKey}"] .desk-titlebar`)
-  const bar = (await record.boundingBox())!
-  await page.mouse.move(bar.x + 120, bar.y + bar.height / 2)
-  await page.mouse.down()
-  await page.mouse.move(bar.x + 200, bar.y + bar.height / 2 + 60, { steps: 8 })
-  await page.mouse.up()
-  await expect(page.getByRole('radio', { name: 'Desk' })).toBeChecked()
-  const torn = await settled(page)
-  const moved = torn.find((box) => box.key === recordKey)!
-  const was = tiled.find((box) => box.key === recordKey)!
-  expect(moved.left).toBeGreaterThan(was.left + 40)
-  expect(torn.map((box) => box.key).sort()).toEqual(tiled.map((box) => box.key).sort())
+  const order = reading(tiled)
+  const last = tiled.find((box) => box.key === order.at(-1))!
+  await carry(page, recordKey, last)
+  await expect(page.getByRole('radio', { name: 'Evidence' })).toBeChecked()
+  const reordered = await settled(page)
+  expect(reading(reordered)).toEqual([...order.filter((key) => key !== recordKey), recordKey])
+  expect(overlapping(reordered)).toEqual([])
+  expect(await outside(page, reordered)).toEqual([])
 
   await page.locator(`.desk-window[data-key="${recordKey}"] .desk-name`).click()
   await page.keyboard.press('4')
   const focused = await settled(page)
   expect(focused).toHaveLength(1)
-  expect(focused[0]!.key).toBe(moved.key)
+  expect(focused[0]!.key).toBe(recordKey)
   expect(await outside(page, focused)).toEqual([])
+})
+
+test('a carried window is inserted where it lands, Escape cancels, and its handle moves it with the arrow keys', async ({ page }) => {
+  await openResults(page, 'Seat-belt law and road deaths')
+  await view(page, 'Desk')
+  await openEverySavedResult(page)
+  await page.getByRole('button', { name: 'Arrange' }).click()
+  const arranged = await settled(page)
+  const order = reading(arranged)
+  const [first, , third] = order.map((key) => arranged.find((box) => box.key === key)!)
+
+  await carry(page, first!.key, third!, true)
+  const during = await settled(page)
+  expect(reading(during)).toEqual([order[1], order[2], order[0], ...order.slice(3)])
+  await page.keyboard.press('Escape')
+  await page.mouse.up()
+  expect(reading(await settled(page))).toEqual(order)
+
+  await carry(page, first!.key, third!)
+  const after = await settled(page)
+  expect(reading(after)).toEqual([order[1], order[2], order[0], ...order.slice(3)])
+  expect(overlapping(after)).toEqual([])
+
+  const handle = page.locator(`.desk-window[data-key="${first!.key}"] .desk-handle`)
+  await expect(handle).toHaveAccessibleName(/^Move /)
+  await handle.focus()
+  await page.keyboard.press('ArrowLeft')
+  expect(reading(await settled(page))).toEqual([order[1], order[0], order[2], ...order.slice(3)])
+  await page.keyboard.press('ArrowRight')
+  expect(reading(await settled(page))).toEqual([order[1], order[2], order[0], ...order.slice(3)])
 })
 
 test('Compare on a full desk keeps both estimates and their differences', async ({ page }) => {
@@ -194,6 +239,16 @@ test('Compare on a full desk keeps both estimates and their differences', async 
   const boxes = await settled(page)
   expect(boxes.map((box) => box.key.split(':')[0]).sort()).toEqual(['differences', 'estimate', 'estimate'])
   expect(overlapping(boxes)).toEqual([])
+
+  const order = reading(boxes)
+  const differences = boxes.find((box) => box.key === 'differences')!
+  await carry(page, order[0]!, differences)
+  const reordered = await settled(page)
+  expect(reading(reordered)).toEqual([...order.slice(1), order[0]])
+  expect(overlapping(reordered)).toEqual([])
+  await page.reload()
+  await expect(page.locator('.desk-window[data-key="differences"]')).toHaveCSS('visibility', 'visible')
+  expect(reading(await settled(page))).toEqual(reading(reordered))
 })
 
 test('a run put on the desk from its chapter opens there, and the desk survives a reload', async ({ page }) => {

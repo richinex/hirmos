@@ -51,6 +51,7 @@ import {
 import type { PreparedDatasetArtifact, StationarityEvidenceArtifact } from './preprocessing'
 import type { SensitivityRunArtifact } from './sensitivity'
 import { honestRunSchema, honestRunMatches } from './honestDid'
+import { pretestRunSchema, pretestRunMatches } from './pretestCoverage'
 import { didSensitivityRunSchema, didSensitivityRunMatches } from './didSensitivity'
 import {
   EMPTY_STUDY_DRAFT,
@@ -368,11 +369,13 @@ const envelopeSchema = z.object({
   sensitivityRuns: z.array(
     artifact.superRefine((run, ctx) => {
       const schema =
-        run.kind === 'honest-did-run'
-          ? honestRunSchema
-          : run.kind === 'did-sensitivity-run'
-            ? didSensitivityRunSchema
-            : null
+        run.kind === 'pretest-coverage-run'
+          ? pretestRunSchema
+          : run.kind === 'honest-did-run'
+            ? honestRunSchema
+            : run.kind === 'did-sensitivity-run'
+              ? didSensitivityRunSchema
+              : null
       if (schema !== null) {
         const parsed = schema.safeParse(run)
         if (!parsed.success)
@@ -1364,6 +1367,22 @@ export function parseSnapshotValue(
         return err({
           kind: 'invalid-snapshot',
           detail: 'DiD sensitivity evidence does not match its saved two-period DR DiD source.',
+        })
+      continue
+    }
+    if (record.kind === 'pretest-coverage-run') {
+      const run = pretestRunSchema.safeParse(record)
+      if (
+        !run.success ||
+        !pretestRunMatches(
+          run.data,
+          estimationRuns as unknown as PersistedProject['estimationRuns'],
+          parsed.data.timeSeriesRuns,
+        )
+      )
+        return err({
+          kind: 'invalid-snapshot',
+          detail: 'Pre-test coverage does not match its saved event-study source.',
         })
       continue
     }

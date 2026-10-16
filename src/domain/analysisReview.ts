@@ -11,6 +11,7 @@ import {
 } from './estimation'
 import { resolveStudyDagRevision, studyRevisionNotice } from './dagProvenance'
 import { honestCandidates, honestRunMatches } from './honestDid'
+import { pretestRunMatches, pretestMeaning } from './pretestCoverage'
 import { didSensitivitySource, didSensitivityRunMatches } from './didSensitivity'
 import type { SensitivityRunArtifact } from './sensitivity'
 import { formatCount, formatStatistic } from '@/lib/format/number'
@@ -224,6 +225,10 @@ function propensityReview(run: PropensityRun): ReviewItem[] {
 }
 
 function sensitivityFinding(probe: SensitivityRunArtifact): string {
+  if (probe.kind === 'pretest-coverage-run') {
+    const e = probe.evidence
+    return `For periods ${probe.settings.prePeriod} and ${probe.settings.postPeriod}, coverage is ${number(100 * e.unconditional)}% without conditioning and ${number(100 * e.conditional)}% among samples that pass the pre-test; passing has probability ${number(100 * e.passProbability)}%. The assumed standardised pre-trend bias is ${number(e.request.pretestBias)}. ${pretestMeaning}`
+  }
   if (probe.kind === 'did-sensitivity-run') {
     const e = probe.evidence
     return `The omitted-variable analysis reports robustness values of ${number(e.robustnessValue)} for the estimate and ${number(e.robustnessValueCi)} for its interval, expressed as shares, with null ${number(e.request.null)}, level ${number(e.request.level)} and rho ${number(e.request.rho)}.`
@@ -255,6 +260,18 @@ function sensitivityReview(
   return (
     [
       {
+        id: 'pretest-coverage',
+        title: 'Pre-test coverage',
+        kind: 'pretest-coverage-run',
+        supported: honest?.input.ok === true,
+        reason:
+          honest && !honest.input.ok
+            ? honest.input.error
+            : 'This saved fit does not supply the event estimates and covariance required for pre-test coverage.',
+        matches: (probe: SensitivityRunArtifact) =>
+          probe.kind === 'pretest-coverage-run' && pretestRunMatches(probe, [run], []),
+      },
+      {
         id: 'parallel-trends',
         title: 'Parallel-trends sensitivity',
         kind: 'honest-did-run',
@@ -281,7 +298,7 @@ function sensitivityReview(
     const linked = context.sensitivityRuns.filter(
       (probe) =>
         probe.kind === check.kind &&
-        (probe.kind === 'honest-did-run'
+        (probe.kind === 'honest-did-run' || probe.kind === 'pretest-coverage-run'
           ? probe.source.kind === 'estimation' && probe.source.run === run.id
           : probe.estimationRun === run.id),
     )

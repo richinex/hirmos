@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { HonestRun } from './honestDid'
+import type { PretestRun } from './pretestCoverage'
 import type { DidSensitivityRun } from './didSensitivity'
 import { assertNever, brand, err, ok, type Brand, type NonEmptyArray, type Result } from './dop'
 import {
@@ -348,9 +349,10 @@ export type LegacySensitivityRunArtifact =
       readonly evidence: DmlRefutationEvidence
       readonly refuters: NonEmptyArray<RefuterFact>
     })
-export type SensitivityRunArtifact = LegacySensitivityRunArtifact | HonestRun | DidSensitivityRun
+export type SensitivityRunArtifact =
+  LegacySensitivityRunArtifact | HonestRun | DidSensitivityRun | PretestRun
 export function sensitivityEstimationRun(run: SensitivityRunArtifact): EstimationRunId | null {
-  return run.kind === 'honest-did-run'
+  return run.kind === 'honest-did-run' || run.kind === 'pretest-coverage-run'
     ? run.source.kind === 'estimation'
       ? brand<string, 'EstimationRunId'>(run.source.run)
       : null
