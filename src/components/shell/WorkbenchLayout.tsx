@@ -281,7 +281,7 @@ function DesktopWorkbench({
                 id="canvas"
                 minSize={200}
                 className={cn(
-                  'flex min-h-0 flex-col [container-type:size] [container-name:layout]',
+                  'workbench-canvas flex min-h-0 flex-col [container-type:size] [container-name:layout]',
                   stageScroll ? 'panel-scroll overflow-y-auto' : 'overflow-hidden',
                 )}
               >

@@ -48,17 +48,17 @@ export function AppShell({ skipTarget, mode, header, nav, stage, notice, footer 
         {header}
       </header>
 
-      <div className="@container/shell relative flex min-h-0 flex-1">
+      <div className="shell-row @container/shell relative flex min-h-0 flex-1">
         {nav}
         <AssistantSplit
           chapter={
             <main
               id={skipTarget}
-              className={`flex min-h-0 min-w-0 flex-1 @md/shell:mx-5 @md/shell:mb-5 @md/shell:bg-panel stage-sheet${notice ? ' flex-col' : ''}`}
+              className={`flex min-h-0 min-w-0 flex-1 stage-sheet${notice ? ' flex-col' : ''}`}
             >
               {notice}
               {mode === 'reading' ? (
-                <div className="panel-scroll min-w-0 flex-1 overflow-y-auto [container-type:size]">
+                <div className="reading-sheet panel-scroll min-w-0 flex-1 overflow-y-auto [container-type:size]">
                   <div className="dashboard-reading @container/panel mx-auto flex min-h-full w-full max-w-[1440px] flex-col px-5 pt-0 pb-8 sm:px-8 lg:px-10">
                     {stage}
                   </div>

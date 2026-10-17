@@ -78,7 +78,7 @@ export default function AssistantDock({
         collapsed={!docked}
         transition={HOUSE_CURVE}
         className={cn(
-          'relative flex min-w-0 border-line',
+          'assistant-dock relative flex min-w-0 border-line',
           docked && (assistantFirst ? 'border-r' : 'border-l'),
         )}
       >

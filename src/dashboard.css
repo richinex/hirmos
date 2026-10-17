@@ -70,8 +70,22 @@ details[open] > .disclosure-summary > .disclosure-chevron { transform: rotate(90
   .dashboard .metric-cards { grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); padding: 16px; gap: 16px; }
   .dashboard .workbench-stage { padding: 8px 16px 20px; }
 }
-/* The stage is one sheet on the page with a soft halo, after Basic Reader; on a narrow shell it is the page.
-   A block on the sheet shares its ground, so it is drawn as a hairline box instead of a lit one. */
+@media (min-width: 48rem) {
+  .dashboard, .dashboard > header { background: var(--color-panel); }
+  .dashboard .shell-row { padding: 0 8px 8px 0; }
+  .dashboard :is(.reading-sheet, .workbench-canvas, .workbench-bottom, .workbench-inspector, .assistant-dock:has(> *)) { border: 1px solid var(--color-line); border-radius: 10px; background: var(--color-panel); }
+  .dashboard .workbench-pane-header { background: transparent; }
+  .dashboard .results-desk { background-color: var(--color-panel); }
+  .dashboard :is(.workbench-stage, .reading-sheet > .dashboard-reading) { padding-top: 20px; }
+  .dashboard .assistant-dock:is(.border-l, .border-r) { width: calc(100% - 8px) !important; }
+  .dashboard .assistant-dock.border-r { margin-right: 8px; }
+  .dashboard .seam { background-clip: content-box; }
+  .dashboard .seam-v { width: 8px; padding-inline: 3.5px; }
+  .dashboard .seam-h { height: 8px; padding-block: 3.5px; }
+}
 @container shell (min-width: 48rem) {
-  .dashboard .stage-sheet { box-shadow: var(--shadow-sheet); --shadow-lift: 0 0 0 1px var(--color-line); }
+  .dashboard .stage-sheet { background: var(--color-panel); --shadow-lift: none; }
+  .dashboard .stage-sheet :is(.lift, .result-surface, .project-create) { padding-inline: 0; }
+  .dashboard .stage-sheet .example-card { box-shadow: 0 0 0 1px var(--color-line); }
+  .dashboard .stage-sheet .example-card:hover { box-shadow: 0 0 0 1px var(--color-hair), 0 4px 16px rgb(22 32 46 / .08); }
 }
