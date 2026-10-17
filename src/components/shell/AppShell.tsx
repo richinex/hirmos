@@ -54,7 +54,7 @@ export function AppShell({ skipTarget, mode, header, nav, stage, notice, footer 
           chapter={
             <main
               id={skipTarget}
-              className={`flex min-h-0 min-w-0 flex-1${notice ? ' flex-col' : ''}`}
+              className={`flex min-h-0 min-w-0 flex-1 @md/shell:mx-5 @md/shell:mb-5 @md/shell:bg-panel stage-sheet${notice ? ' flex-col' : ''}`}
             >
               {notice}
               {mode === 'reading' ? (

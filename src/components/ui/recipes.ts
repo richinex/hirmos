@@ -158,8 +158,9 @@ export const fieldHint = 'mt-1 text-body text-faint text-pretty'
 /**
  * Which typeface, and why (index.css rule 5).
  *
- * Asta Sans for everything read or operated: headings, prose, labels, buttons, table cells and every
- * number; h1 to h3 take the heading weight from index.css. Mono is a
+ * Asta Sans for everything operated or compared: labels, buttons, table cells and every figure; h1 to
+ * h3 take the heading weight from index.css. Georgia for what is read at length: chapter headings and
+ * `prose()`. Mono is a
  * reading aid, not a house style: it buys a fixed pitch and unambiguous shapes, so 1/l and 0/O stay
  * apart in an id you may have to retype, and it costs legibility in running text. So mono only for what
  * is read character by character: code, ids, locators, hashes.
@@ -168,7 +169,8 @@ export const fieldHint = 'mt-1 text-body text-faint text-pretty'
 /** Running text: the paragraph under a chapter title, the explanation beside a method, the reading of a
  *  result. The reading tier (16px on the 24px unit) on a 65-character measure. Colour is the call
  *  site's: muted for a narrative, faint for an aside. */
-export const prose = (extra?: string): string => cn('max-w-[65ch] text-subtitle text-pretty', extra)
+export const prose = (extra?: string): string =>
+  cn('max-w-[65ch] font-reading text-subtitle text-pretty', extra)
 
 /** The paragraph under a chapter title: two columns that fill the stage. A column is at least 45
  *  characters wide; the browser fits two when the width holds two and shares the remaining width between

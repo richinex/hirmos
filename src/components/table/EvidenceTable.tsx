@@ -122,14 +122,21 @@ export function EvidenceTable<Row>({
   const [sorting, setSorting] = useState<SortingState>([])
   const [query, setQuery] = useState('')
   const [density, setDensity] = useTableDensity()
-  const textColumns = useMemo(() => columns.filter((column) => column.align !== 'right'), [columns])
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase()
     if (needle.length === 0) return rows
     return rows.filter((row) =>
-      textColumns.some((column) => String(column.value(row)).toLowerCase().includes(needle)),
+      columns.some((column) => {
+        const value = column.value(row)
+        const printed = column.format?.(value, row)
+        return [value, printed].some(
+          (text) =>
+            (typeof text === 'string' || typeof text === 'number') &&
+            String(text).toLowerCase().includes(needle),
+        )
+      }),
     )
-  }, [query, rows, textColumns])
+  }, [columns, query, rows])
   const definitions = useMemo<ColumnDef<Row, EvidenceValue>[]>(
     () =>
       columns.map((column) => ({
@@ -270,10 +277,6 @@ export function EvidenceTable<Row>({
     URL.revokeObjectURL(url)
   }, [columns, exportName, modelRows])
 
-  const sortText =
-    sorting[0] === undefined
-      ? undefined
-      : `sorted by ${columns.find((column) => column.id === sorting[0]?.id)?.header.toLowerCase() ?? sorting[0].id} ${sorting[0].desc ? 'descending' : 'ascending'}`
   const padding = cellPadding(density)
   const items = virtualizer.getVirtualItems()
   const leadHeight = items[0]?.start ?? 0
@@ -327,7 +330,7 @@ export function EvidenceTable<Row>({
       toolbar={
         <>
           {filters}
-          {textColumns.length > 0 && rows.length > 1 && (
+          {rows.length > 1 && (
             <FilterField
               value={query}
               onChange={setQuery}
@@ -351,7 +354,11 @@ export function EvidenceTable<Row>({
           )}
         </>
       }
-      count={countLine(visible.length, total ?? rows.length, noun, sortText)}
+      count={
+        visible.length < (total ?? rows.length)
+          ? countLine(visible.length, total ?? rows.length, noun)
+          : undefined
+      }
     >
       <table
         ref={tableRef}

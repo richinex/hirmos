@@ -84,8 +84,8 @@ export function TableShell({
   /** Search, facets, chips: the row under the title. */
   readonly toolbar?: ReactNode
   readonly lead?: ReactNode
-  /** The live row-count line under the table. */
-  readonly count: ReactNode
+  /** The live row-count line under the table; without one the live region stays mounted but unseen. */
+  readonly count?: ReactNode
   readonly foot?: ReactNode
   readonly children: ReactNode
   readonly className?: string
@@ -162,7 +162,7 @@ export function TableShell({
       </div>
       {!folded && foot}
       {!folded && (
-        <p aria-live="polite" className={cn(tableFoot, 'm-0')}>
+        <p aria-live="polite" className={count === undefined ? 'sr-only' : cn(tableFoot, 'm-0')}>
           {count}
         </p>
       )}
@@ -214,13 +214,11 @@ export function SortHeader({
           )}
         >
           <span>{children}</span>
-          {sorted !== false && (
-            <Icon
-              name={sorted === 'asc' ? 'arrow_upward' : 'arrow_downward'}
-              size={11}
-              className="shrink-0"
-            />
-          )}
+          <Icon
+            name={sorted === 'asc' ? 'arrow_upward' : 'arrow_downward'}
+            size={11}
+            className={cn('shrink-0', sorted === false && 'invisible')}
+          />
         </button>
       ) : (
         <span className="block whitespace-nowrap px-3.5 py-[7px]">{children}</span>

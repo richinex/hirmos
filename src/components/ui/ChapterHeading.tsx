@@ -13,7 +13,7 @@ export function ChapterHeading({
   return (
     <h2
       id={id}
-      className={`chapter-heading mt-0 min-w-0 text-heading text-ink [overflow-wrap:anywhere] ${className}`}
+      className={`chapter-heading mt-0 min-w-0 font-reading font-normal text-heading text-ink [overflow-wrap:anywhere] ${className}`}
     >
       {children}
     </h2>

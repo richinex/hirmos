@@ -70,3 +70,8 @@ details[open] > .disclosure-summary > .disclosure-chevron { transform: rotate(90
   .dashboard .metric-cards { grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); padding: 16px; gap: 16px; }
   .dashboard .workbench-stage { padding: 8px 16px 20px; }
 }
+/* The stage is one sheet on the page with a soft halo, after Basic Reader; on a narrow shell it is the page.
+   A block on the sheet shares its ground, so it is drawn as a hairline box instead of a lit one. */
+@container shell (min-width: 48rem) {
+  .dashboard .stage-sheet { box-shadow: var(--shadow-sheet); --shadow-lift: 0 0 0 1px var(--color-line); }
+}
