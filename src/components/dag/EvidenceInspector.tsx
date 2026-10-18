@@ -237,7 +237,7 @@ export function EvidenceInspector({
                 'block w-full px-2.5 py-2 text-left transition-colors hover:border-edge aria-pressed:border-signal aria-pressed:bg-raised',
               )}
             >
-              <span className="block text-body font-medium text-ink">
+              <span className="block text-body font-bold text-ink">
                 {candidate.source.name}{' '}
                 {candidate.kind === 'endpoint-marked' || candidate.kind === 'regime-endpoint-marked'
                   ? candidate.mark

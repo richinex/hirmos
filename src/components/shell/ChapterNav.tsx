@@ -34,7 +34,7 @@ export interface RailProject {
   readonly detail: string
 }
 
-const statusGlyph = (
+export const statusGlyph = (
   status: ChapterStatus,
 ): { readonly icon: string; readonly tone: string; readonly text: string } | null => {
   switch (status) {
@@ -54,7 +54,7 @@ const statusGlyph = (
 }
 
 /** The rail's progress bar. It subscribes itself, so progress redraws only this bar. */
-function BusyBar({
+export function BusyBar({
   chapter,
   className,
 }: {

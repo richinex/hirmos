@@ -65,6 +65,7 @@ export function SwigCanvas({ record }: { readonly record: SwigAnalysis }) {
           data: {
             name,
             kind: 'derived',
+            part: null,
             role:
               evidence.kind === 'fixed'
                 ? 'Fixed intervention'

@@ -132,7 +132,7 @@ export const field = (variant: 'text' | 'mono' = 'text', extra?: string): string
 
 /** The label above a field. Ink, not muted: the label is the anchor of the group, and muted sat one
  *  step from the faint hint below it, which made label, hint and placeholder read as one grey. */
-export const fieldLabel = 'block text-body font-medium text-ink'
+export const fieldLabel = 'block text-body font-bold text-ink'
 
 /** 500, because the theme's medium weight is 700. */
 export const stepTitle = 'font-heading text-subtitle [font-weight:500] text-ink text-balance'
@@ -158,9 +158,8 @@ export const fieldHint = 'mt-1 text-body text-faint text-pretty'
 /**
  * Which typeface, and why (index.css rule 5).
  *
- * Asta Sans for everything operated or compared: labels, buttons, table cells and every figure; h1 to
- * h3 take the heading weight from index.css. Georgia for what is read at length: chapter headings and
- * `prose()`. Mono is a
+ * Calibri for everything operated, compared or read: labels, buttons, table cells, every figure and
+ * `prose()`. Arial Black for h1 to h3 and chapter headings. Mono is a
  * reading aid, not a house style: it buys a fixed pitch and unambiguous shapes, so 1/l and 0/O stay
  * apart in an id you may have to retype, and it costs legibility in running text. So mono only for what
  * is read character by character: code, ids, locators, hashes.
@@ -268,7 +267,7 @@ export const resultSurface = (extra?: string): string =>
  *
  * A heading, so it is set in sentence case, at the reading size in bold: a pane is inside the chapter, one
  * step below a surface's subject. Capitals are for a label naming a slot, not for a heading naming a surface. */
-export const panelTitle = 'text-subtitle font-medium text-ink text-balance'
+export const panelTitle = 'text-subtitle font-bold text-ink text-balance'
 
 /** Row padding per density: 24px compact and 32px comfortable rows with 12px body text, including the 1px hairline under the row. */
 export const rowPadding = {

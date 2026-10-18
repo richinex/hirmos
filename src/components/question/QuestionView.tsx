@@ -33,7 +33,7 @@ export function QuestionView({
           </ChapterHeading>
           <form onSubmit={submit} className="grid gap-4 @md:grid-cols-2">
             <label className="block">
-              <span className="mb-1.5 block text-body font-medium text-ink">Treatment</span>
+              <span className="mb-1.5 block text-body font-bold text-ink">Treatment</span>
               <Select
                 className={field('text')}
                 value={state.treatment ?? ''}
@@ -52,7 +52,7 @@ export function QuestionView({
               </Select>
             </label>
             <label className="block">
-              <span className="mb-1.5 block text-body font-medium text-ink">Outcome</span>
+              <span className="mb-1.5 block text-body font-bold text-ink">Outcome</span>
               <Select
                 className={field('text')}
                 value={state.outcome ?? ''}

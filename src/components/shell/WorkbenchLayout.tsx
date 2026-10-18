@@ -2,11 +2,12 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { Group, Panel, Separator, useDefaultLayout, usePanelRef } from 'react-resizable-panels'
 import { Icon } from '@/components/Icon'
 import { Sheet } from '@/components/ui/Sheet'
-import { button, iconControl, label, panelTitle } from '@/components/ui/recipes'
+import { button, iconControl, panelTitle } from '@/components/ui/recipes'
 import { trackActivePane } from '@/lib/activePane'
 import { useIsMobile } from '@/lib/useMediaQuery'
 import { cn } from '@/lib/utils'
 import { useShellLayout } from './useShellLayout'
+import { useWorkflow } from '@/components/WorkflowProvider'
 
 export interface WorkbenchPane {
   readonly title: string
@@ -45,7 +46,7 @@ function PaneHeader({
           heading, so its accessible name and a test's text query both see it. */}
       <div className="flex min-w-0 items-center gap-2">
         <span aria-hidden className="pane-dot" />
-        <h2 id={id} className={label('m-0 min-w-0 truncate text-nowrap text-ink')} title={title}>
+        <h2 id={id} className="m-0 min-w-0 truncate text-nowrap font-sans text-body font-bold text-ink" title={title}>
           {title}
         </h2>
       </div>
@@ -233,6 +234,9 @@ function DesktopWorkbench({
 }) {
   const shell = useShellLayout()
   const bottomRef = usePanelRef()
+  const projectName = useWorkflow((state) =>
+    state.workflow.kind === 'awaiting-project' ? null : state.workflow.project.name,
+  )
   const inspectorRef = usePanelRef()
   const [bottomCollapsed, setBottomCollapsed] = useState(bottom?.defaultCollapsed ?? false)
   const [inspectorCollapsed, setInspectorCollapsed] = useState(false)
@@ -372,6 +376,11 @@ function DesktopWorkbench({
                       >
                         {inspector.title}
                       </span>
+                      {projectName === null ? null : (
+                        <span className="max-h-[60%] truncate font-heading text-label text-muted [writing-mode:vertical-rl]">
+                          {projectName}
+                        </span>
+                      )}
                     </button>
                   ) : (
                     <>
@@ -385,6 +394,11 @@ function DesktopWorkbench({
                           icon: { open: 'right_panel_close', closed: 'right_panel_open' },
                         }}
                       />
+                      {projectName === null ? null : (
+                        <p className="m-0 shrink-0 border-b border-line px-4 py-2.5 font-heading text-label text-ink [overflow-wrap:anywhere]">
+                          {projectName}
+                        </p>
+                      )}
                       <div className="inspector-content panel-scroll min-h-0 flex-1 overflow-y-auto p-3">
                         {inspector.body}
                       </div>

@@ -58,6 +58,13 @@ const rectSchema = z
   })
   .strict()
 
+const sizeSchema = z
+  .object({
+    width: z.number().finite().positive(),
+    height: z.number().finite().positive(),
+  })
+  .strict()
+
 const windowSchema = z
   .object({
     key: z.string().min(1),
@@ -72,6 +79,8 @@ export const deskStateSchema = z
   .object({
     version: z.literal(1),
     windows: z.array(windowSchema).max(DESK_CAPACITY),
+    /** The workspace the placements were measured on, so they scale with the desk; null on desks saved before it was kept. */
+    space: sizeSchema.nullable().default(null),
     view: z.enum(DESK_VIEWS),
     ratios: z.record(z.string(), z.number().min(0.1).max(0.9)),
     order: z

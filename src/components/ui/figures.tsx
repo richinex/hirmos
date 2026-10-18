@@ -7,6 +7,7 @@ import { label as labelCn, num, well } from './recipes'
 import {
   formatEstimate,
   formatInterval,
+  noEffectValue,
   type EffectScale,
   type Formatted,
   type IntervalType,
@@ -159,6 +160,50 @@ export function MetricGrid({
   )
 }
 
+/** The interval on its own axis with the no-effect value marked, so a reader sees whether it crosses it. */
+function IntervalStrip({
+  estimate,
+  lower,
+  upper,
+  reference,
+  accent,
+}: {
+  readonly estimate: number
+  readonly lower: number
+  readonly upper: number
+  readonly reference: number
+  readonly accent: boolean
+}) {
+  if (![estimate, lower, upper].every(Number.isFinite) || upper < lower) return null
+  const low = Math.min(lower, reference)
+  const high = Math.max(upper, reference)
+  const pad = (high - low) * 0.06 || 1
+  const at = (value: number) => `${((value - low + pad) / (high - low + 2 * pad)) * 100}%`
+
+  return (
+    <div aria-hidden className="relative mt-3 mb-5 h-5 w-full max-w-[26rem]">
+      <span
+        className="absolute inset-y-0 border-l border-dashed border-muted"
+        style={{ left: at(reference) }}
+      />
+      <span
+        className={labelCn('absolute top-full mt-0.5 -translate-x-1/2 text-faint')}
+        style={{ left: at(reference) }}
+      >
+        {reference}
+      </span>
+      <span
+        className={cn('absolute top-1/2 h-2 -translate-y-1/2', accent ? 'bg-signal-text' : 'bg-bone')}
+        style={{ left: at(lower), width: `calc(${at(upper)} - ${at(lower)})` }}
+      />
+      <span
+        className="absolute top-1/2 size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-panel bg-ink"
+        style={{ left: at(estimate) }}
+      />
+    </div>
+  )
+}
+
 /** The hero estimate: the estimand sentence, the figure, its named interval, and the scale line. */
 export function IntervalFigure({
   sentence,
@@ -196,10 +241,10 @@ export function IntervalFigure({
       : formatEstimate(standardError, scale, { precision: { kind: 'significant', digits: 2 } }).text
   return (
     <figure className="m-0" data-testid={testId}>
-      <figcaption className="text-title leading-7 text-ink">{sentence}</figcaption>
+      <figcaption className="font-heading text-title leading-7 text-ink">{sentence}</figcaption>
       <p
         className={cn(
-          'mb-0 mt-1 text-metric font-semibold leading-none tracking-tight',
+          'mb-0 mt-1 font-heading text-metric leading-none tracking-tight',
           accent ? 'text-signal-text' : 'text-ink',
         )}
         title={figure.exact}
@@ -207,7 +252,7 @@ export function IntervalFigure({
         <span className="sr-only">
           {pointFigure.srText}; {figure.srInterval}
         </span>
-        <span aria-hidden className={num()}>
+        <span aria-hidden className={num('font-heading')}>
           {point.map((part, index) =>
             part.kind === 'unit' ? (
               <span key={index} className="text-display-sub font-medium text-bone">
@@ -219,6 +264,13 @@ export function IntervalFigure({
           )}
         </span>
       </p>
+      <IntervalStrip
+        estimate={estimate}
+        lower={lower}
+        upper={upper}
+        reference={noEffectValue(scale)}
+        accent={accent}
+      />
       <p aria-hidden className={num('mb-0 mt-1 text-body text-bone')}>
         <Metadata>
           <span>

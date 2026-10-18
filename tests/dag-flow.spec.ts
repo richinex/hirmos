@@ -204,28 +204,28 @@ test('derives roles, flows, paths, and adjustment from treatment-to-outcome path
     {
       adjustment: { kind: string; variables?: string[] }
       roles: Record<string, string>
-      edges: Record<string, { causal: boolean; biasing: boolean }>
+      edges: Record<string, { causal: boolean; backdoor: string }>
       paths: string[]
     }
   >
 
-  expect(r.triangle.edges.e2).toEqual({ causal: true, biasing: false })
-  expect(r.triangle.edges.e0).toEqual({ causal: false, biasing: true })
-  expect(r.triangle.edges.e1.biasing).toBe(true)
+  expect(r.triangle.edges.e2).toEqual({ causal: true, backdoor: 'none' })
+  expect(r.triangle.edges.e0).toEqual({ causal: false, backdoor: 'closed' })
+  expect(r.triangle.edges.e1.backdoor).toBe('closed')
   expect(r.triangle.adjustment).toEqual({ kind: 'sufficient', variables: ['health'] })
   expect(r.triangle.roles.health).toBe('confounder')
   expect(r.triangle.paths).toContain('outreach-health-revenue:closed-by-adjustment')
 
-  expect(Object.values(r.chain.edges).every((edge) => edge.causal && !edge.biasing)).toBe(true)
+  expect(Object.values(r.chain.edges).every((edge) => edge.causal && edge.backdoor === 'none')).toBe(true)
   expect(r.chain.adjustment.kind).toBe('unnecessary')
   expect(r.chain.roles.health).toBe('mediator')
 
   expect(r.latent.adjustment.kind).toBe('none')
-  expect(r.latent.edges.e0.biasing).toBe(true)
+  expect(r.latent.edges.e0.backdoor).toBe('open')
   expect(r.latent.roles.u).toBe('unmeasured')
   expect(r.latent.paths).toContain('outreach-u-revenue:open-through-unmeasured')
 
-  expect(r.collider.edges.e1).toEqual({ causal: false, biasing: false })
+  expect(r.collider.edges.e1).toEqual({ causal: false, backdoor: 'none' })
   expect(r.collider.adjustment.kind).toBe('unnecessary')
   expect(r.collider.roles.adoption).toBe('collider')
 

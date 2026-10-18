@@ -90,9 +90,15 @@ export type DagCausalRole =
   | { readonly kind: 'unmeasured' }
   | { readonly kind: 'unrelated' }
 
+/**
+ * Where an arrow stands on the treatment's back-door paths: on none, on one the recorded adjustment
+ * set leaves open (or opens, by conditioning on a collider), or only on ones that set closes.
+ */
+export type DagBackdoor = 'none' | 'open' | 'closed'
+
 export interface DagEdgeFlow {
   readonly causal: boolean
-  readonly biasing: boolean
+  readonly backdoor: DagBackdoor
 }
 
 export type PostTreatmentRelationship =
@@ -300,17 +306,23 @@ export function analyseDagCausalFlow(
     outcome,
     'backward',
   )
+  const adjusted = new Set<DagNodeId>(adjustment.kind === 'sufficient' ? adjustment.variables : [])
   const biasing = backdoorEdges(edges, treatment, outcome, new Set())
+  const open = adjusted.size === 0 ? biasing : backdoorEdges(edges, treatment, outcome, adjusted)
 
   const flows = new Map<DagEdgeId, DagEdgeFlow>()
   for (const edge of edges) {
     const causal =
       (edge.cause === treatment || descendantsOfTreatment.has(edge.cause)) &&
       (edge.effect === outcome || ancestorsOfOutcome.has(edge.effect))
-    flows.set(edge.id, { causal, biasing: biasing.has(edge.id) })
+    const backdoor: DagBackdoor = open.has(edge.id)
+      ? 'open'
+      : biasing.has(edge.id)
+        ? 'closed'
+        : 'none'
+    flows.set(edge.id, { causal, backdoor })
   }
 
-  const adjusted = new Set<DagNodeId>(adjustment.kind === 'sufficient' ? adjustment.variables : [])
   const raw = enumeratePaths(
     edges.map((edge) => ({ from: edge.cause, to: edge.effect })),
     treatment,

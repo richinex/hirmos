@@ -249,12 +249,14 @@ export function PreviewTable({
   summary,
   selectedColumn,
   onSelectColumn,
+  className,
 }: {
   readonly source: SelectedSource
   readonly profile: DatasetProfile
   readonly summary: DatasetSummaryState
   readonly selectedColumn: ColumnId | null
   readonly onSelectColumn: (column: ColumnId) => void
+  readonly className?: string
 }) {
   const titleId = useId()
   const [density] = useTableDensity()
@@ -376,6 +378,7 @@ export function PreviewTable({
 
   return (
     <TableShell
+      className={className}
       collapsible
       title="Preview"
       titleId={titleId}
@@ -383,6 +386,11 @@ export function PreviewTable({
       toolbar={
         <>
           <div className="flex w-full min-w-0 items-center gap-2 @lg/table:w-auto @lg/table:flex-1">
+            <span
+              ref={countRef}
+              role="status"
+              className="shrink-0 whitespace-nowrap text-label text-faint"
+            />
             <FilterField
               value={searchDraft}
               onChange={setSearchDraft}
@@ -453,7 +461,6 @@ export function PreviewTable({
           ))}
         </>
       }
-      count={<span ref={countRef} />}
       lead={
         <>
           {editing !== null && (

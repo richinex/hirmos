@@ -412,7 +412,7 @@ function RefutationRecord({
           noun="lag"
           empty="No Ljung–Box lags."
           columns={[
-            { id: 'lag', header: 'Lag', align: 'right', value: (row) => row.lag },
+            { id: 'lag', header: 'Lag', value: (row) => row.lag },
             {
               id: 'q',
               header: 'Q',

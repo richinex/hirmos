@@ -667,7 +667,7 @@ export function SegmentedControl<V extends string>({
                 : option.value === displayed
                   ? cn(
                       'text-ink',
-                      form !== 'wrap' && 'font-medium',
+                      form !== 'wrap' && 'font-bold',
                       wrap && 'after:scale-100 after:opacity-100',
                     )
                   : cn(

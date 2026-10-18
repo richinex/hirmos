@@ -81,6 +81,7 @@ export function SchemaTable({
   selectedColumn,
   onSelectColumn,
   onDeclare,
+  className,
 }: {
   readonly profile: DatasetProfile
   readonly summary: DatasetSummaryState
@@ -88,6 +89,7 @@ export function SchemaTable({
   readonly onSelectColumn: (column: ColumnId) => void
   /** Declares how a column of a delimited file is read; absent where the reading cannot change. */
   readonly onDeclare?: (column: string, type: DeclaredType | null) => void
+  readonly className?: string
 }) {
   const titleId = useId()
   const [density, setDensity] = useTableDensity()
@@ -287,19 +289,19 @@ export function SchemaTable({
     getSortedRowModel: getSortedRowModel(),
   })
 
-  const sortText =
-    sorting[0] === undefined
-      ? undefined
-      : `sorted by ${sorting[0].id === 'nullShare' ? 'missing share' : sorting[0].id === 'nullCount' ? 'missing' : sorting[0].id} ${sorting[0].desc ? 'descending' : 'ascending'}`
   const padding = cellPadding(density)
 
   return (
     <TableShell
+      className={className}
       title="Physical schema"
       titleId={titleId}
       toolbar={
         <>
           <div className="flex w-full min-w-0 items-center gap-2 @lg/table:w-auto @lg/table:flex-1">
+            <span role="status" className="shrink-0 whitespace-nowrap text-label text-faint">
+              {visible.length === rows.length ? '' : countLine(visible.length, rows.length, 'column')}
+            </span>
             <FilterField
               value={search}
               onChange={setSearch}
@@ -325,7 +327,6 @@ export function SchemaTable({
           )}
         </>
       }
-      count={countLine(visible.length, rows.length, 'column', sortText)}
       foot={
         summary.kind === 'failed' ? (
           <p
@@ -388,6 +389,7 @@ export function SchemaTable({
                           padding,
                           align === 'right' && num('whitespace-nowrap text-right'),
                           cell.column.id === 'name' && 'max-w-56',
+                          selected &&'bg-raised shadow-[1px_0_0_var(--color-raised)]',
                         ),
                       )}
                     >

@@ -25,7 +25,7 @@ export function SettingsDisclosure({
     <details className={cn(well('group min-w-0 max-w-4xl'), className)} open={defaultOpen}>
       <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 [&::-webkit-details-marker]:hidden">
         <span className="min-w-0">
-          <span className="block text-body font-medium text-ink">{title}</span>
+          <span className="block text-body font-bold text-ink">{title}</span>
           {/* The values while closed; once open the fields show them, so the summary steps aside. */}
           <span className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-body text-muted group-open:hidden">
             {items.map((item) => (

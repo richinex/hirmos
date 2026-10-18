@@ -15,7 +15,15 @@ interface AppShellProps {
 }
 
 /** Header, chapter rail, and the stage as flex siblings. The header sits on the stage with no seam so the rail below it reads as one shape rising from the page edge; the row is the shell container the rail queries. */
-export function AppShell({ skipTarget, mode, header, nav, stage, notice, footer }: AppShellProps) {
+export function AppShell({
+  skipTarget,
+  mode,
+  header,
+  nav,
+  stage,
+  notice,
+  footer,
+}: AppShellProps) {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (
@@ -44,7 +52,7 @@ export function AppShell({ skipTarget, mode, header, nav, stage, notice, footer 
       >
         Skip to workspace
       </a>
-      <header className="flex h-12 shrink-0 items-center justify-between gap-4 bg-stage pl-2 pr-3.5">
+      <header className="flex h-12 shrink-0 items-center justify-between gap-4 bg-stage pl-2 pr-3.5 md:items-end md:gap-3 md:px-4">
         {header}
       </header>
 
@@ -54,7 +62,7 @@ export function AppShell({ skipTarget, mode, header, nav, stage, notice, footer 
           chapter={
             <main
               id={skipTarget}
-              className={`flex min-h-0 min-w-0 flex-1 stage-sheet${notice ? ' flex-col' : ''}`}
+              className="flex min-h-0 min-w-0 flex-1 flex-col stage-sheet"
             >
               {notice}
               {mode === 'reading' ? (
@@ -64,7 +72,7 @@ export function AppShell({ skipTarget, mode, header, nav, stage, notice, footer 
                   </div>
                 </div>
               ) : (
-                stage
+                <div className="flex min-h-0 min-w-0 flex-1">{stage}</div>
               )}
             </main>
           }

@@ -12,7 +12,7 @@ import {
   type DeskWindowRef,
   type DeskWindowState,
 } from '@/domain/resultsDesk'
-import type { Rect } from './layout'
+import { MARGIN, scaled, type Rect, type Size } from './layout'
 
 interface DeskStore {
   readonly project: string | null
@@ -24,6 +24,7 @@ interface DeskStore {
 export const emptyDesk = (): DeskState => ({
   version: 1,
   windows: [{ key: 'runs', placed: null, visible: true, maximized: false, rank: 0 }],
+  space: null,
   view: 'desk',
   ratios: {},
   order: {},
@@ -194,29 +195,67 @@ export const toggleMaximize = (key: string): void =>
     ),
   }))
 
-/** Stores rectangles as the user placed them and shows those windows on the free desk; `hideOthers` docks the rest. */
+/**
+ * The workspace a desk's placements were measured on. A desk saved before that was kept is read as having
+ * been as large as its placements reach, plus the margin they were laid out with.
+ */
+export function placementSpace(desk: DeskState): Size | null {
+  if (desk.space !== null) return desk.space
+  const placed = desk.windows.flatMap((window) => (window.placed === null ? [] : [window.placed]))
+  if (placed.length === 0) return null
+  return {
+    width: Math.max(...placed.map((rect) => rect.left + rect.width)) + MARGIN,
+    height: Math.max(...placed.map((rect) => rect.top + rect.height)) + MARGIN,
+  }
+}
+
+/** The desk with every earlier placement restated on `space`, so new rectangles measured there join them. */
+const measuredOn = (desk: DeskState, space: Size): DeskState => {
+  const from = placementSpace(desk)
+  return {
+    ...desk,
+    space: { width: space.width, height: space.height },
+    windows:
+      from === null || (from.width === space.width && from.height === space.height)
+        ? desk.windows
+        : desk.windows.map((window) =>
+            window.placed === null
+              ? window
+              : { ...window, placed: scaled(window.placed, from, space) },
+          ),
+  }
+}
+
+/** Stores rectangles as the user placed them on `space` and shows those windows on the free desk; `hideOthers` docks the rest. */
 export const placeWindows = (
   rects: ReadonlyMap<string, Rect>,
+  space: Size,
   options: { readonly hideOthers?: boolean } = {},
 ): void =>
-  update((desk) => ({
-    ...desk,
-    view: 'desk',
-    windows: desk.windows.map((window) => {
-      const rect = rects.get(window.key)
-      if (rect === undefined) return options.hideOthers ? { ...window, visible: false } : window
-      return { ...window, placed: rect, maximized: false, visible: true }
-    }),
-  }))
+  update((current) => {
+    const desk = measuredOn(current, space)
+    return {
+      ...desk,
+      view: 'desk',
+      windows: desk.windows.map((window) => {
+        const rect = rects.get(window.key)
+        if (rect === undefined) return options.hideOthers ? { ...window, visible: false } : window
+        return { ...window, placed: rect, maximized: false, visible: true }
+      }),
+    }
+  })
 
-export const fillPlacements = (rects: ReadonlyMap<string, Rect>): void =>
-  update((desk) => ({
-    ...desk,
-    windows: desk.windows.map((window) => {
-      const rect = rects.get(window.key)
-      return window.placed === null && rect !== undefined ? { ...window, placed: rect } : window
-    }),
-  }))
+export const fillPlacements = (rects: ReadonlyMap<string, Rect>, space: Size): void =>
+  update((current) => {
+    const desk = measuredOn(current, space)
+    return {
+      ...desk,
+      windows: desk.windows.map((window) => {
+        const rect = rects.get(window.key)
+        return window.placed === null && rect !== undefined ? { ...window, placed: rect } : window
+      }),
+    }
+  })
 
 export const setView = (view: DeskViewName, open: readonly DeskWindowRef[] = []): void =>
   deskStore.setState((state) => {

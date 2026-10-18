@@ -43,6 +43,21 @@ export type IntervalType =
 
 export type AbsenceReason = 'notRun' | 'notApplicable' | 'notIdentified' | 'refused' | 'unavailable'
 
+/** The value an effect takes when the treatment changes nothing: one on a ratio scale, zero on every other. */
+export function noEffectValue(scale: EffectScale): number {
+  switch (scale.kind) {
+    case 'ratio':
+      return 1
+    case 'additive':
+    case 'probabilityDifference':
+    case 'logRatio':
+    case 'elasticity':
+      return 0
+    default:
+      return assertNever(scale)
+  }
+}
+
 const THIN_SPACE = ' '
 const MINUS = '−'
 

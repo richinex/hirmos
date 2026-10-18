@@ -12,6 +12,9 @@ import { PreviewTable } from './PreviewTable'
 import { SchemaTable } from './SchemaTable'
 import { useDatasetSummary } from './useDatasetSummary'
 
+const PAIRED_TABLE =
+  '@min-[68.75rem]/studio:row-span-3 @min-[68.75rem]/studio:grid @min-[68.75rem]/studio:grid-rows-subgrid @min-[68.75rem]/studio:[&:has(>:nth-child(4))]:flex @min-[68.75rem]/studio:[&>:first-child]:content-start'
+
 /**
  * The Data Studio stage: the physical schema as a sortable, filterable table, the preview as a window
  * onto the whole file, and the preparation cards passed as children. Selecting a column in either
@@ -84,13 +87,14 @@ export function DataProfileView({
         </dl>
       </header>
 
-      <div className="grid gap-3 @5xl/studio:grid-cols-[minmax(420px,0.9fr)_minmax(0,1.4fr)]">
+      <div className="grid gap-3 @min-[68.75rem]/studio:grid-cols-[minmax(34rem,0.9fr)_minmax(0,1.4fr)] @min-[68.75rem]/studio:gap-y-0">
         <SchemaTable
           profile={profile}
           summary={summary}
           selectedColumn={selectedColumn}
           onSelectColumn={onSelectColumn}
           onDeclare={onDeclare}
+          className={PAIRED_TABLE}
         />
         <PreviewTable
           source={source}
@@ -98,6 +102,7 @@ export function DataProfileView({
           summary={summary}
           selectedColumn={selectedColumn}
           onSelectColumn={onSelectColumn}
+          className={PAIRED_TABLE}
         />
       </div>
 

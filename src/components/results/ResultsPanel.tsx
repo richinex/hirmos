@@ -169,6 +169,7 @@ const resultIntroduction = (view: ResultView): string => {
 
 export function ResultsPanel({
   project,
+  onExportProject,
   source,
   profile,
   prepared,
@@ -188,6 +189,8 @@ export function ResultsPanel({
   gcmInfluences,
 }: {
   readonly project: string
+  /** Saves the open project as a bundle file. */
+  readonly onExportProject: () => void
   readonly source: SelectedSource
   readonly profile: DatasetProfile
   readonly prepared: PreparedDatasetArtifact
@@ -370,7 +373,7 @@ export function ResultsPanel({
           <>
             <div className="grid grid-cols-1 gap-3 @lg/panel:grid-cols-2">
               <label className="block">
-                <span className="block text-body font-medium text-ink">Estimate</span>
+                <span className="block text-body font-bold text-ink">Estimate</span>
                 <Select
                   className="mt-1 w-full rounded-md border border-control bg-well px-2 py-1.5 text-body text-ink"
                   value={activeView.selected ?? ''}
@@ -396,7 +399,7 @@ export function ResultsPanel({
                 </Select>
               </label>
               <label className="block">
-                <span className="block text-body font-medium text-ink">Compare with</span>
+                <span className="block text-body font-bold text-ink">Compare with</span>
                 <Select
                   className="mt-1 w-full rounded-md border border-control bg-well px-2 py-1.5 text-body text-ink"
                   value={activeView.compareWith ?? ''}
@@ -499,7 +502,7 @@ export function ResultsPanel({
         return (
           <>
             <label className="block max-w-xl">
-              <span className="block text-body font-medium text-ink">Survival run</span>
+              <span className="block text-body font-bold text-ink">Survival run</span>
               <Select
                 className="mt-1 w-full rounded-md border border-control bg-well px-2 py-1.5 text-body text-ink"
                 value={activeView.selected ?? ''}
@@ -668,6 +671,7 @@ export function ResultsPanel({
         stage={
           <ResultsDesk
             project={project}
+            onExportProject={onExportProject}
             records={{
               inputs,
               stepLabel,

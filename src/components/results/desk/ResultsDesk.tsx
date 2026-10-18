@@ -56,10 +56,9 @@ import {
   toggleMaximize,
   useDesk,
 } from './deskStore'
-import { ChapterControls } from '@/components/shell/ChapterControls'
 import { OnDesk } from './PutOnDesk'
 import { createDeskEngine, type DeskEngine, type DeskTrees } from './engine'
-import { grid, inOrder, stack, type Split } from './layout'
+import { grid, inOrder, stack, TILE, TILE_GAP, type Split } from './layout'
 
 export interface DeskRecords {
   readonly inputs: ResultInputs
@@ -670,7 +669,7 @@ function DockTile({
       aria-label={title}
       onClick={onActivate}
     >
-      <Icon name={icon} size={22} />
+      <Icon name={icon} size={18} />
       <i aria-hidden />
     </button>
   )
@@ -681,9 +680,11 @@ const rootRatio = (desk: DeskState, id: string, fallback: number) => desk.ratios
 export function ResultsDesk({
   project,
   records,
+  onExportProject,
 }: {
   readonly project: string
   readonly records: DeskRecords
+  readonly onExportProject: () => void
 }) {
   const surface = useRef<HTMLDivElement>(null)
   const [engine, setEngine] = useState<DeskEngine | null>(null)
@@ -839,11 +840,13 @@ export function ResultsDesk({
     const open = [...desk.windows]
       .filter((window) => window.visible)
       .sort((a, b) => a.rank - b.rank)
+    const space = engine.workspace()
     placeWindows(
       grid(
         open.map((window) => window.key),
-        engine.workspace(),
+        space,
       ),
+      space,
     )
   }
 
@@ -963,58 +966,6 @@ export function ResultsDesk({
       <h2 id="results-title" className="sr-only">
         Results
       </h2>
-      <ChapterControls>
-        <div
-          role="toolbar"
-          aria-label="Desk"
-          className="flex min-w-0 flex-1 items-center justify-end gap-1"
-        >
-          <p role="status" className="m-0 min-w-0 truncate px-2 text-label text-faint">
-            {droppedTitle === null
-              ? ''
-              : `${droppedTitle} left the desk, which holds ten windows at a time.`}
-          </p>
-          <SegmentedControl
-            variant="track"
-            frame="none"
-            size="sm"
-            ariaLabel="Desk view"
-            value={desk.view}
-            onChange={chooseView}
-            options={DESK_VIEWS.map((view, index) => ({
-              value: view,
-              label: (
-                <span className="flex items-center gap-1.5">
-                  <Icon name={VIEW_ICONS[view]} size={16} />
-                  {VIEW_LABELS[view]}
-                </span>
-              ),
-              ariaLabel: VIEW_LABELS[view],
-              disabled:
-                (view === 'compare' && !compareReady) || (view === 'evidence' && !evidenceReady),
-              title:
-                view === 'compare' && !compareReady
-                  ? 'Choose an estimate and one to compare with in Saved results'
-                  : view === 'evidence' && !evidenceReady
-                    ? 'Open an estimate first'
-                    : `Press ${index + 1} to show ${VIEW_LABELS[view].toLowerCase()}`,
-            }))}
-          />
-          <button
-            type="button"
-            className={chromeAction('quiet', 'text-muted')}
-            title={
-              desk.view === 'compare' || desk.view === 'evidence'
-                ? 'Set the dividers back to their first positions'
-                : 'Place the open windows side by side'
-            }
-            onClick={arrange}
-          >
-            <Icon name="auto_awesome_mosaic" size={16} />
-            Arrange
-          </button>
-        </div>
-      </ChapterControls>
       <div ref={surface} className="results-desk" role="region" aria-label="Results desk">
         {shown.map(({ key, ref, title }) => (
           <DeskWindow
@@ -1048,7 +999,7 @@ export function ResultsDesk({
           <span
             className="desk-wire"
             aria-hidden
-            style={{ width: `${shown.length * 62 + 28}px` }}
+            style={{ width: `${shown.length * (TILE + TILE_GAP) + 28}px` }}
           />
           {shown.map(({ key, ref, title }) => (
             <DockTile
@@ -1067,6 +1018,63 @@ export function ResultsDesk({
             />
           ))}
         </nav>
+        <p role="status" className="desk-note m-0 text-label text-faint">
+          {droppedTitle === null
+            ? ''
+            : `${droppedTitle} left the desk, which holds ten windows at a time.`}
+        </p>
+        <div role="toolbar" aria-label="Desk" className="desk-bar max-md:hidden">
+          <SegmentedControl
+            variant="track"
+            frame="well"
+            size="sm"
+            ariaLabel="Desk view"
+            value={desk.view}
+            onChange={chooseView}
+            options={DESK_VIEWS.map((view, index) => ({
+              value: view,
+              label: (
+                <span className="flex items-center gap-1.5">
+                  <Icon name={VIEW_ICONS[view]} size={16} />
+                  <span className="desk-bar-label">{VIEW_LABELS[view]}</span>
+                </span>
+              ),
+              ariaLabel: VIEW_LABELS[view],
+              disabled:
+                (view === 'compare' && !compareReady) || (view === 'evidence' && !evidenceReady),
+              title:
+                view === 'compare' && !compareReady
+                  ? 'Choose an estimate and one to compare with in Saved results'
+                  : view === 'evidence' && !evidenceReady
+                    ? 'Open an estimate first'
+                    : `Press ${index + 1} to show ${VIEW_LABELS[view].toLowerCase()}`,
+            }))}
+          />
+          <button
+            type="button"
+            className={chromeAction('quiet', 'ml-auto text-muted')}
+            aria-label="Arrange"
+            title={
+              desk.view === 'compare' || desk.view === 'evidence'
+                ? 'Set the dividers back to their first positions'
+                : 'Place the open windows side by side'
+            }
+            onClick={arrange}
+          >
+            <Icon name="auto_awesome_mosaic" size={16} />
+            <span className="desk-bar-label">Arrange</span>
+          </button>
+          <button
+            type="button"
+            className={chromeAction('quiet', 'text-muted')}
+            aria-label="Export project"
+            title="Export this project as a bundle"
+            onClick={onExportProject}
+          >
+            <Icon name="download" size={16} />
+            <span className="desk-bar-label">Export project</span>
+          </button>
+        </div>
       </div>
     </section>
   )

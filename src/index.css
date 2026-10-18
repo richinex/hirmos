@@ -9,7 +9,7 @@
 .sheet-opener:active,
 .sheet-opener[aria-expanded='true'] { background: var(--color-raised); box-shadow: inset 0 2px 3px rgb(0 0 0 / .12); }
 
-/* Hirmos: blue with one orange, set on a rhythm.
+/* Hirmos: slate with one orange, set on a rhythm.
    ------------------------------------------------------------------------
    What this palette IS, and the reasoning behind it. Earlier experiments were tried and reverted; their
    reasons are recorded here because they are the useful part.
@@ -22,8 +22,7 @@
       discs (2D); tracePath and geometryFor still take a `shape` argument so call sites did not have to
       change, and both ignore it.
 
-   2. ONE SCHEME, TWO HUES. The palette is a complementary scheme on the artists' wheel: blue is the base,
-      orange its complement. Blue is cool and recedes, so it holds the large areas: the band that carries
+   2. ONE SCHEME, TWO HUES. Slate is the base, orange its complement. Blue is cool and recedes, so it holds the large areas: the band that carries
       the rail and the header, the tint in every grey. Orange is warm and pops, so it is the one signal:
       --color-signal means "this is live", the answer to your question, an in-progress compile, the
       primary action. It is NOT a category colour and never encodes a node's type; that is what the group
@@ -40,14 +39,12 @@
       the alternating status pulse eases at its turning points. Reduced motion removes movement,
       not status feedback. JavaScript canvas movement reads the same tokens through lib/motion.ts.
 
-   5. TYPE IS TWO FACES ON A RHYTHM. Asta Sans for everything operated or compared: labels, buttons,
-      fields, tables, figures, panel titles. Georgia, after Andreas Viklund's Basic Reader, for what is
-      read at length: chapter headings and running prose (`prose()`). Asta Sans numerals are the closest measured match to the scale lettering of a
-      Faber-Castell slide rule: a flat-topped 3, a flagged 1 with no foot, round bowls. Fira Code only for what is read character by character (`literal()`,
-      code). The root is 16px and is the only pixel size; every other size, line height and vertical
+   5. TYPE IS TWO FACES ON A RHYTHM. Arial Black for headings, Calibri for everything else; neither may
+      be bundled, so Archivo Black and Carlito stand in. Fira Code only for what is read character by
+      character (`literal()`, code).
+      The root is 16px and is the only pixel size; every other size, line height and vertical
       margin is rem. One rhythm unit is 1.5rem (24px). Sizes come from a modular scale, 1.2 on a phone and
-      1.333 from 720px up, so a headline grows with the format while the reading size stays put. Asta Sans
-      has no italic, so emphasis in italic is the browser's oblique.
+      1.333 from 720px up, so a headline grows with the format while the reading size stays put.
 
    6. TEXTURE IS CLEAN AND GRAINY. A subtle noise and a radial gradient on the band so a large flat blue
       reads as a surface lit from above; a one-pixel top highlight and a faint gradient on a filled
@@ -57,22 +54,13 @@
    The two faces of the palette live in themes.css under :root[data-theme=...], with a pre-paint boot
    script in index.html. Light is the default. */
 
-/* Asta Sans draws the ellipsis at mid-height, like ⋯. This face supplies only U+2026, from the system
-   sans, so "Loading…" ends on the baseline; every other character stays Asta Sans. */
-@font-face {
-  font-family: 'Baseline Ellipsis';
-  src: local('Helvetica Neue'), local('HelveticaNeue'), local('Helvetica'), local('Arial'),
-    local('Liberation Sans');
-  unicode-range: U+2026;
-}
-
 @theme {
-  --font-sans: 'Baseline Ellipsis', 'Asta Sans Variable', 'Asta Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  --font-heading: 'Baseline Ellipsis', 'Asta Sans Variable', 'Asta Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-sans: Calibri, Carlito, Arial, sans-serif;
+  --font-heading: 'Arial Black', 'Archivo Black', Arial, sans-serif;
   --font-mono: 'Fira Code Variable', 'Fira Code', 'Courier New', Courier, monospace;
-  --font-reading: Georgia, 'Times New Roman', serif;
-  /* Asta Sans is variable from 300 to 800, so medium and semibold are true weights. */
-  --font-weight-medium: 500;
+  --font-reading: Calibri, Carlito, Arial, sans-serif;
+  /* Calibri has regular and bold: medium renders regular, semibold takes the bold. */
+  --font-weight-medium: 400;
   --font-weight-semibold: 600;
 
   /* The house curve is the default for every transition utility, so a button's 150ms colour change
@@ -82,44 +70,47 @@
   /* The colour tokens, at their light values, so Tailwind generates the utilities (bg-panel, border-hair,
      text-ink). Both faces of the palette are restated in themes.css under :root[data-theme]; a utility
      compiles to var(--color-*) and takes the face that is live. */
-  --color-stage: #ECF1F6;        /* the canvas: a watered-down blue */
-  --color-panel: #FFFFFF;        /* a lit block on the canvas */
-  --color-column: #F5F8FB;       /* the bottom pane's ground */
-  --color-well: #F5F8FB;         /* an inset field */
-  --color-raised: #DFE7EF;       /* a selected row or chip */
-  --color-line: #D6DEE8;         /* a divider */
-  --color-hair: #C2CDDA;         /* a control border */
-  --color-edge: #9DACBE;         /* an emphasised border */
-  --color-control: #7A8AA3;      /* an input boundary: 3:1 on the well */
-  --color-ink: #16202E;
-  --color-bone: #33415A;
-  --color-muted: #4C5A70;
-  --color-faint: #59687F;        /* the smallest text allowed */
-  --color-dim: #C2CDDA;          /* non-text only */
-  --color-signal: #E8891D;       /* the action, the live answer: orange, always under dark ink */
-  --color-signal-ink: #16202E;
-  --color-signal-hover: #F29A33;
-  --color-signal-line: #F2C48A;  /* signal at border strength */
-  --color-signal-text: #8F5308;
-  --color-link: #2457A8;         /* a link keeps the base hue: the complement never sits as text */
-  --color-ok: #1A7353;
-  --color-info: #2457A8;
-  --color-warn: #8A5700;
-  --color-danger: #B23A3A;
+  --color-stage: #D6DCE5;        /* the canvas: slate at 20% */
+  --color-panel: #F2F2F2;        /* a lit block on the canvas */
+  --color-column: #F2F2F2;       /* the bottom pane's ground */
+  --color-well: #FFFFFF;         /* an inset field */
+  --color-raised: #D6DCE5;       /* a selected row or chip */
+  --color-line: #D6DCE5;         /* a divider */
+  --color-hair: #ACB9CA;         /* a control border */
+  --color-edge: #8497B0;         /* an emphasised border */
+  --color-control: #7F7F7F;      /* an input boundary: 3:1 on the well */
+  --color-ink: #222A35;
+  --color-bone: #333F50;
+  --color-muted: #333F50;
+  --color-faint: #44546A;        /* the smallest text allowed */
+  --color-dim: #ACB9CA;          /* non-text only */
+  --color-signal: #ED7D31;       /* the action, the live answer: orange, always under dark ink */
+  --color-signal-ink: #222A35;
+  --color-signal-hover: #F4B183;
+  --color-signal-line: #F4B183;  /* signal at border strength */
+  --color-signal-text: #843C0C;
+  --color-link: #2F5597;         /* a link keeps the base hue: the complement never sits as text */
+  --color-ok: #385723;
+  --color-info: #2F5597;
+  --color-warn: #7C5034;
+  --color-danger: #8B0304;
   --color-highlight: rgba(255, 255, 255, 0.35);
-  --color-track: #E3EAF1;
+  --color-track: #D6DCE5;
   --color-knob: #FFFFFF;
-  --color-rail: #16305A;
-  --color-rail-active: #234478;
+  --color-rail: #44546A;
+  --color-rail-active: #333F50;
   --color-rail-ink: #FFFFFF;
-  --color-rail-faint: #B8C7DE;
-  --color-rail-dim: #4E6A96;
-  --color-rail-signal: #F2A24A;
-  --color-rail-ok: #6FD3AE;
-  --color-rail-info: #8CB8E8;
-  --color-rail-danger: #F28B82;
+  --color-rail-faint: #D6DCE5;
+  --color-rail-dim: #8497B0;
+  --color-rail-signal: #F4B183;
+  --color-rail-ok: #A9D18E;
+  --color-rail-info: #B4C7E7;
+  --color-rail-danger: #F8CBAD;
+  --color-tab: #ACB9CA;
+  --color-tab-ink: #222A35;
+  --color-tab-hover: #8497B0;
 
-  /* THE TYPE RAMP: the modular scale, named by tier. The reading size is 1rem (16px) on the 1.5rem unit.
+  /* THE TYPE RAMP: the modular scale, named by tier. The reading size is 1.0625rem (17px) on the 1.5rem unit.
      Upward steps are powers of the wide-screen ratio 1.333 (the phone ratio 1.2 applies below 720px,
      in the media query after this block); downward steps follow the shallower 1.2 ratio, as a type-scale
      tool does, so the smallest sizes stay legible. Line heights of the reading tiers are whole units;
@@ -143,15 +134,15 @@
   --text-title: 1.3333rem;              /* 1.333^1, 21.3px: a surface's subject */
   --text-title--line-height: 1.5rem;    /* one unit */
   --text-title--font-weight: 500;
-  --text-subtitle: 1rem;                /* 16px: reading prose; the body element's own size */
+  --text-subtitle: 1.0625rem;           /* 17px: reading prose; the body element's own size */
   --text-subtitle--line-height: 1.5rem; /* one unit */
-  --text-body: 0.8333rem;               /* 1 / 1.2, 13.3px: working text: fields, dialogs, hints */
+  --text-body: 0.8854rem;               /* 1 / 1.2, 14.2px: working text: fields, dialogs, hints */
   --text-body--line-height: 1.5;
-  --text-table: 0.8333rem;              /* data cells, independent of prose */
+  --text-table: 0.8854rem;              /* data cells, independent of prose */
   --text-table--line-height: 1.5;
-  --text-label: 0.6944rem;              /* 1 / 1.2^2, 11.1px: chrome: buttons, panel titles, captions */
+  --text-label: 0.7378rem;              /* 1 / 1.2^2, 11.8px: chrome: buttons, panel titles, captions */
   --text-label--line-height: 1rem;
-  --text-micro: 0.6944rem;              /* the floor: timings, keycaps; the same step as label */
+  --text-micro: 0.7378rem;              /* the floor: timings, keycaps; the same step as label */
   --text-micro--line-height: 1rem;
 }
 /* The phone scale: 1.2 between tiers, so a heading takes less of a small screen. */
@@ -195,7 +186,7 @@
 
 html, body { height: 100%; margin: 0; }
 /* The one pixel size on the page: the root. Every other size, line height and margin is rem against it. */
-html { font-size: 16px; }
+html { font-size: 16px; font-synthesis: none; }
 #root { height: 100%; height: 100dvh; }
 body {
   background: var(--color-stage);
@@ -267,7 +258,8 @@ button:not([role='combobox']):not(:disabled):not([aria-disabled='true']):active,
    a surface and keeps the sans at bold. In `base`, so a `font-sans` utility can take a heading back when
    it is a line of chrome. */
 @layer base {
-  h1, h2, h3 { font-family: var(--font-heading); font-weight: 500; }
+  h1, h2 { font-family: var(--font-heading); font-weight: 500; }
+  h3 { font-weight: 700; }
 }
 
 /* Figures in tables and definition lists align down a column without every cell opting in through
@@ -843,6 +835,7 @@ mark.passage-bound {
   min-height: 0;
   overflow: hidden;
   touch-action: none;
+  container: desk / inline-size;
   background:
     radial-gradient(circle at .5px .5px, var(--color-hair) 0 .75px, transparent 1.25px) 11px 11px / 24px 24px,
     var(--color-stage);
@@ -976,6 +969,11 @@ mark.passage-bound {
   --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M20 12A8 8 0 0 1 12 20' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
 }
 .desk-dock { position: absolute; z-index: 5; inset: 0; pointer-events: none; }
+.desk-bar { position: absolute; z-index: 5; right: 12px; bottom: 14px; left: 12px; display: flex; height: 32px; align-items: center; gap: 4px; pointer-events: none; }
+.desk-bar > * { pointer-events: auto; }
+.desk-bar [data-segment-option] { min-height: 24px; }
+@container desk (max-width: 80rem) { .desk-bar-label { display: none; } }
+.desk-note { position: absolute; z-index: 5; bottom: 52px; left: 50%; max-width: calc(100% - 48px); translate: -50% 0; text-align: center; pointer-events: none; }
 .desk-wire { position: absolute; bottom: 6px; left: 50%; max-width: calc(100% - 48px); height: 1px; background: var(--color-signal-line); translate: -50% 0; }
 .desk-wire::before, .desk-wire::after { content: ""; position: absolute; top: -3px; width: 7px; height: 7px; border: 1px solid var(--color-signal); border-radius: 50%; background: var(--color-stage); }
 .desk-wire::before { left: -7px; }
@@ -988,7 +986,7 @@ mark.passage-bound {
   place-items: center;
   padding: 0;
   border: 1px solid color-mix(in srgb, var(--color-edge) 70%, transparent);
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--color-panel);
   color: color-mix(in srgb, var(--color-ink) calc(45% + var(--open) * 55%), transparent);
   box-shadow: 0 1px 1px rgb(var(--desk-shadow) / .05), 0 2px 6px rgb(var(--desk-shadow) / .06);

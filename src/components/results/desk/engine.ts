@@ -4,6 +4,7 @@ import {
   deskStore,
   fillPlacements,
   focusWindow,
+  placementSpace,
   placeWindows,
   setRatio,
   setSlotOrder,
@@ -16,6 +17,7 @@ import {
   MIN_HEIGHT,
   MIN_WIDTH,
   overlaps,
+  scaled,
   tidy,
   tile,
   workspaceOf,
@@ -136,7 +138,9 @@ export function createDeskEngine(surface: HTMLElement, trees: () => DeskTrees) {
     if (window?.maximized) return inset(space, MARGIN)
     const runtime = live.get(key)
     if (runtime?.override) return fit(runtime.override, space)
-    if (window?.placed) return fit(window.placed, space)
+    const measured = placementSpace(state())
+    if (window?.placed)
+      return fit(measured === null ? window.placed : scaled(window.placed, measured, space), space)
     const missing = state()
       .windows.filter((candidate) => candidate.placed === null)
       .map((candidate) => candidate.key)
@@ -214,7 +218,10 @@ export function createDeskEngine(surface: HTMLElement, trees: () => DeskTrees) {
         [...tiles(view).placed.values()].map((rect) => byRect.get(rect)!),
       )
     } else {
-      placeWindows(new Map(order.map((key, i) => [key, slots.rects[i]!] as const)))
+      placeWindows(
+        new Map(order.map((key, i) => [key, slots.rects[i]!] as const)),
+        workspaceOf(size()),
+      )
       preview.clear()
     }
   }
@@ -380,7 +387,7 @@ export function createDeskEngine(surface: HTMLElement, trees: () => DeskTrees) {
     if (pendingPlacements !== null) {
       const placements = pendingPlacements
       pendingPlacements = null
-      queueMicrotask(() => fillPlacements(placements))
+      queueMicrotask(() => fillPlacements(placements, workspaceOf(size())))
     }
     if (moving) frame = requestAnimationFrame(tick)
   }
@@ -521,7 +528,7 @@ export function createDeskEngine(surface: HTMLElement, trees: () => DeskTrees) {
       runtime.view = 'desk'
     }
     lastView = 'desk'
-    placeWindows(placed, { hideOthers: view !== 'focus' })
+    placeWindows(placed, workspaceOf(size()), { hideOthers: view !== 'focus' })
   }
 
   const onSurfaceDown = (event: PointerEvent) => {
@@ -626,7 +633,7 @@ export function createDeskEngine(surface: HTMLElement, trees: () => DeskTrees) {
         if (carry?.started && carry.slots === null && runtime.override !== null) {
           const rect = fit(runtime.override, workspaceOf(size()))
           runtime.override = null
-          placeWindows(new Map([[key, rect]]))
+          placeWindows(new Map([[key, rect]]), workspaceOf(size()))
         } else if (carry?.started && carry.slots !== null) {
           const moved = carry.order.some((other, i) => other !== carry!.slots!.keys[i])
           if (moved) commitOrder(carry.slots, carry.order)
@@ -696,7 +703,7 @@ export function createDeskEngine(surface: HTMLElement, trees: () => DeskTrees) {
         if (resizing !== null && runtime.override !== null) {
           const rect = fit(runtime.override, workspaceOf(size()))
           runtime.override = null
-          placeWindows(new Map([[key, rect]]))
+          placeWindows(new Map([[key, rect]]), workspaceOf(size()))
         }
         resizing = null
       }

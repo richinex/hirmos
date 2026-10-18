@@ -9,7 +9,7 @@ details[open] > .disclosure-summary > .disclosure-hide { display: inline-flex; }
 .disclosure-summary > .disclosure-chevron { flex-shrink: 0; align-self: center; display: inline-flex; color: var(--color-faint); transition: transform var(--motion-fast); }
 details[open] > .disclosure-summary > .disclosure-chevron { transform: rotate(90deg); }
 :root[data-surface="workbench"] { font-size: 100%; }
-.workbench-bottom-content { --text-body: .8125rem; }
+.workbench-bottom-content { --text-body: .8633rem; }
 .inspector-content :where(h3, h4) { font-size: 1rem; font-weight: 600; line-height: 1.5; color: var(--color-ink); }
 .inspector-content :where(dl > dt) { font-size: var(--text-label); font-weight: 500; }
    with the names, as a sheet: nothing behind it reflows, and a press anywhere off it puts it away. */
@@ -71,21 +71,27 @@ details[open] > .disclosure-summary > .disclosure-chevron { transform: rotate(90
   .dashboard .workbench-stage { padding: 8px 16px 20px; }
 }
 @media (min-width: 48rem) {
-  .dashboard, .dashboard > header { background: var(--color-panel); }
-  .dashboard .shell-row { padding: 0 8px 8px 0; }
-  .dashboard :is(.reading-sheet, .workbench-canvas, .workbench-bottom, .workbench-inspector, .assistant-dock:has(> *)) { border: 1px solid var(--color-line); border-radius: 10px; background: var(--color-panel); }
+  .dashboard, .dashboard > header { background: var(--color-stage); }
+  .dashboard .shell-row { margin: 0 16px 16px; padding: 14px; border-radius: 28px; background: var(--color-rail); }
+  .dashboard .dashboard-sidebar { display: none; }
+  .dashboard :is(.reading-sheet, .workbench-canvas, .workbench-bottom, .workbench-inspector, .assistant-dock:has(> *)) { border: 0; border-radius: 20px; background: var(--color-panel); }
   .dashboard .workbench-pane-header { background: transparent; }
   .dashboard .results-desk { background-color: var(--color-panel); }
   .dashboard :is(.workbench-stage, .reading-sheet > .dashboard-reading) { padding-top: 20px; }
-  .dashboard .assistant-dock:is(.border-l, .border-r) { width: calc(100% - 8px) !important; }
-  .dashboard .assistant-dock.border-r { margin-right: 8px; }
+  .dashboard .assistant-dock:is(.border-l, .border-r) { width: calc(100% - 12px) !important; }
+  .dashboard .assistant-dock.border-r { margin-right: 12px; }
   .dashboard .seam { background-clip: content-box; }
-  .dashboard .seam-v { width: 8px; padding-inline: 3.5px; }
-  .dashboard .seam-h { height: 8px; padding-block: 3.5px; }
+  .dashboard .seam-v { width: 12px; padding-inline: 5.5px; }
+  .dashboard .seam-h { height: 12px; padding-block: 5.5px; }
 }
 @container shell (min-width: 48rem) {
-  .dashboard .stage-sheet { background: var(--color-panel); --shadow-lift: none; }
+  .dashboard .stage-sheet { background: transparent; --shadow-lift: none; }
   .dashboard .stage-sheet :is(.lift, .result-surface, .project-create) { padding-inline: 0; }
-  .dashboard .stage-sheet .example-card { box-shadow: 0 0 0 1px var(--color-line); }
-  .dashboard .stage-sheet .example-card:hover { box-shadow: 0 0 0 1px var(--color-hair), 0 4px 16px rgb(22 32 46 / .08); }
+  .dashboard .stage-sheet .example-card { background: var(--color-well); box-shadow: none; }
+  .dashboard .stage-sheet .example-card:hover { background: var(--color-raised); box-shadow: none; }
 }
+.chapter-tab[aria-current='page']::before, .chapter-tab[aria-current='page']::after { content: ''; position: absolute; bottom: 0; width: 12px; height: 12px; }
+.chapter-tab[aria-current='page']::before { left: -12px; background: radial-gradient(circle at 0 0, transparent 11.5px, var(--color-rail) 12px); }
+.chapter-tab[aria-current='page']::after { right: -12px; background: radial-gradient(circle at 100% 0, transparent 11.5px, var(--color-rail) 12px); }
+.chapter-tabs:not([data-compact]) .chapter-tab:not([aria-current='page']) .chapter-tab-icon,
+.chapter-tabs[data-compact] .chapter-tab:not([aria-current='page']) .chapter-tab-name { display: none; }

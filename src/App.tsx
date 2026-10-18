@@ -25,12 +25,14 @@ import { WorkflowProvider, useWorkflow } from '@/components/WorkflowProvider'
 import { PreparationProvider } from '@/components/data/PreparationProvider'
 import { Icon } from '@/components/Icon'
 import { ThemeControl } from '@/components/ThemeControl'
-import { ChapterControlsSlot } from '@/components/shell/ChapterControls'
 import { DataDropZone } from '@/components/data/DataDropZone'
 import { AppShell } from '@/components/shell/AppShell'
 import { ChapterBoundary } from '@/components/shell/ChapterBoundary'
 import { ChapterSkeleton } from '@/components/shell/ChapterSkeleton'
 import { ChapterNav, type ChapterEntry, type ChapterStatus } from '@/components/shell/ChapterNav'
+import { ChapterTabs } from '@/components/shell/ChapterTabs'
+import { HirmosMark } from '@/components/HirmosMark'
+import { InternalLink } from '@/components/ui/InternalLink'
 import { RunActivityChip } from '@/components/shell/RunActivityChip'
 import { AssistantHeaderButton } from '@/assistant/AssistantLauncher'
 import { REPORT_ACTIVITY } from '@/lib/runActivityStore'
@@ -1053,12 +1055,20 @@ function App() {
   const header = (
     <>
       <div className="flex min-w-0 items-center">
+        <InternalLink
+          href="/"
+          className="hidden h-8 w-10 place-items-center rounded-full no-underline transition-opacity hover:opacity-80 md:grid"
+          title="Hirmos home"
+        >
+          <HirmosMark size={28} />
+          <span className="sr-only">Hirmos</span>
+        </InternalLink>
         {/* The round toggle sits in the corner above the rail: two bars that turn into a cross while the lobe is out. */}
         <button
           type="button"
           data-rail-toggle
           className={cn(
-            'relative h-10 w-10 shrink-0 rounded-full bg-rail transition-opacity hover:opacity-85',
+            'relative h-10 w-10 shrink-0 rounded-full bg-rail transition-opacity hover:opacity-85 md:hidden',
             'before:absolute before:left-3 before:h-[2px] before:w-4 before:rounded-full before:bg-rail-ink before:transition-[top,transform] before:duration-(--motion-base) before:content-[""]',
             'after:absolute after:left-3 after:h-[2px] after:w-4 after:rounded-full after:bg-rail-ink after:transition-[top,transform] after:duration-(--motion-base) after:content-[""]',
             navOpen
@@ -1071,8 +1081,13 @@ function App() {
           onClick={() => setNavOpen((open) => !open)}
         />
       </div>
-      <ChapterControlsSlot />
-      <div className="flex min-w-0 items-center gap-1.5">
+      <ChapterTabs
+        chapters={chapters}
+        active={activeChapter}
+        onNavigate={navigateToChapter}
+        onPrefetch={prefetchChapter}
+      />
+      <div className="flex min-w-0 shrink-0 items-center gap-1.5 md:h-8">
         {storageFailure !== null && (
           <span
             role="status"
@@ -1084,7 +1099,7 @@ function App() {
           </span>
         )}
         <RunActivityChip onOpen={navigateToChapter} />
-        <AssistantHeaderButton className="md:hidden" />
+        <AssistantHeaderButton />
         <ThemeControl />
       </div>
     </>
@@ -1202,7 +1217,7 @@ function App() {
                   </ChapterHeading>
                   <form onSubmit={createProject} className="project-create">
                     <label className="block">
-                      <span className="mb-1.5 block text-body font-medium text-ink">
+                      <span className="mb-1.5 block text-body font-bold text-ink">
                         Project name
                       </span>
                       <input
@@ -2095,6 +2110,7 @@ function App() {
                         <ResultsPanel
                           key={workflow.prepared.id}
                           project={workflow.project.id}
+                          onExportProject={() => void exportProject()}
                           source={workflow.source}
                           profile={workflow.profile}
                           prepared={workflow.prepared}

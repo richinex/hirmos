@@ -35,6 +35,7 @@ import { XYHandle, isMouseEvent } from '@xyflow/system'
 import { Icon } from '@/components/Icon'
 import { Tooltip } from '@/components/ui/Tooltip'
 import { iconControl, label, literal } from '@/components/ui/recipes'
+import { cn } from '@/lib/utils'
 import {
   describeDagEditProblem,
   inspectDagEdgeAddition,
@@ -87,6 +88,8 @@ interface DagNodeData extends Record<string, unknown> {
   readonly kind: 'observed' | 'latent' | 'derived'
   /** The variable's place relative to the bound treatment and outcome; null when nothing is bound. */
   readonly role: string | null
+  /** Whether the card is the bound treatment or outcome, which fills it in the signal tones. */
+  readonly part: 'treatment' | 'outcome' | null
   readonly evidenceRole: 'none' | 'source' | 'target' | 'both'
   /** During a drag, whether the arrow in hand may land on this card. */
   readonly droppable: boolean
@@ -177,7 +180,16 @@ export function DagVariableCard({
           : null
   return (
     <div
-      className="group relative flex flex-col justify-center rounded-lg border bg-panel px-3 text-center transition-shadow"
+      className={cn(
+        'group relative flex flex-col justify-center rounded-lg border px-3 text-center transition-shadow',
+        data.kind === 'latent'
+          ? 'bg-panel'
+          : data.part === 'treatment'
+            ? 'bg-signal'
+            : data.part === 'outcome'
+              ? 'bg-signal-line'
+              : 'bg-raised',
+      )}
       style={{
         width: data.size.width,
         height: data.size.height,
@@ -193,7 +205,7 @@ export function DagVariableCard({
                   : data.intervention === 'read'
                     ? 'var(--color-info)'
                     : (evidenceColor ??
-                      (data.kind === 'latent' ? 'var(--color-faint)' : 'var(--color-muted)')),
+                      (data.kind === 'latent' ? 'var(--color-faint)' : 'transparent')),
         borderStyle: data.kind === 'latent' ? 'dashed' : 'solid',
         boxShadow:
           selected || (isTarget && !refused) || evidenceColor !== null
@@ -254,14 +266,14 @@ export function DagVariableCard({
         title={isConnectable ? `Drag to draw an arrow from ${data.name}` : undefined}
       />
       <span
-        className={`${CARD_GRIP} relative z-10 line-clamp-3 ${draggable ? 'cursor-grab active:cursor-grabbing' : ''} whitespace-normal text-body font-medium text-ink [overflow-wrap:break-word]`}
+        className={`${CARD_GRIP} relative z-10 line-clamp-3 ${draggable ? 'cursor-grab active:cursor-grabbing' : ''} whitespace-normal text-body font-bold ${data.part === 'treatment' ? 'text-signal-ink' : 'text-ink'} [overflow-wrap:break-word]`}
         title={draggable ? `${data.name}, drag to move` : data.name}
       >
         {data.name}
       </span>
       <span
         className={label(
-          `mt-0.5 truncate ${data.intervention === 'set' ? 'text-signal-text' : data.intervention === 'read' ? 'text-[var(--color-info)]' : 'text-faint'}`,
+          `mt-0.5 truncate ${data.intervention === 'set' ? 'text-signal-text' : data.intervention === 'read' ? 'text-[var(--color-info)]' : data.part === 'treatment' ? 'text-signal-ink' : data.part === 'outcome' ? 'text-ink' : 'text-faint'}`,
         )}
         title={data.role ?? undefined}
       >
@@ -973,9 +985,9 @@ export const canvasModel = (
     const edgeFlow = flow?.edges.get(edge.id) ?? null
     // Graph surgery: an arrow into the set node is severed, so it is drawn faint and broken.
     const cut = intervention !== null && edge.effect === intervention.set
-    // With a binding, the flow overlay distinguishes causal paths, open biasing paths, and other edges.
-    // An arrow on both stays causal, so a directed path reads unbroken; its biasing path still shows
-    // through that path's other arrows.
+    // With a binding, the flow overlay distinguishes causal paths, open and closed back-door paths, and
+    // other edges. An arrow on both stays causal, so a directed path reads unbroken; its back-door path
+    // still shows through that path's other arrows.
     const stroke = cut
       ? 'var(--color-faint)'
       : invalid
@@ -983,9 +995,11 @@ export const canvasModel = (
         : edgeFlow !== null
           ? edgeFlow.causal
             ? 'var(--color-ok)'
-            : edgeFlow.biasing
+            : edgeFlow.backdoor === 'open'
               ? 'var(--color-danger)'
-              : 'var(--color-muted)'
+              : edgeFlow.backdoor === 'closed'
+                ? 'var(--color-info)'
+                : 'var(--color-muted)'
           : unstated
             ? 'var(--color-warn)'
             : edge.evidence.length > 0
@@ -994,13 +1008,15 @@ export const canvasModel = (
     const flowWords =
       edgeFlow === null
         ? ''
-        : edgeFlow.causal && edgeFlow.biasing
+        : edgeFlow.causal && edgeFlow.backdoor === 'open'
           ? '; lies on a directed causal path and an open biasing path'
           : edgeFlow.causal
             ? '; lies on a directed causal path'
-            : edgeFlow.biasing
+            : edgeFlow.backdoor === 'open'
               ? '; lies on an open biasing path'
-              : '; not on an active treatment–outcome path'
+              : edgeFlow.backdoor === 'closed'
+                ? '; lies on a back-door path the adjustment set closes'
+                : '; not on an active treatment–outcome path'
     const edgeLabel = routeLabelText(edge)
     return [
       {
@@ -1062,6 +1078,14 @@ export const canvasModel = (
                   : flow === null
                     ? null
                     : roleWord(flow.roles.get(node.id) ?? { kind: 'unrelated' }),
+            part:
+              flow === null
+                ? null
+                : node.id === flow.treatment
+                  ? 'treatment'
+                  : node.id === flow.outcome
+                    ? 'outcome'
+                    : null,
             evidenceRole,
             droppable: true,
             intervention:
@@ -1671,6 +1695,10 @@ export function DagCanvas({
             <span className="flex items-center gap-1.5">
               <span aria-hidden className="h-[2px] w-4 rounded bg-danger" />
               open biasing path
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span aria-hidden className="h-[2px] w-4 rounded bg-info" />
+              back-door path closed by adjustment
             </span>
             <span className="flex items-center gap-1.5">
               <span aria-hidden className="h-[2px] w-4 rounded bg-muted" />

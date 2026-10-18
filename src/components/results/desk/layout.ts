@@ -31,13 +31,13 @@ export interface Seam {
   readonly rect: Rect
 }
 
-export const DOCK_HEIGHT = 76
+export const DOCK_HEIGHT = 52
 export const MARGIN = 12
 export const GAP = 12
 export const MIN_WIDTH = 280
 export const MIN_HEIGHT = 180
-export const TILE = 50
-export const TILE_GAP = 12
+export const TILE = 32
+export const TILE_GAP = 10
 
 export const workspaceOf = (desk: Size): Rect => ({
   left: 0,
@@ -55,6 +55,13 @@ export function fit(rect: Rect, space: Rect): Rect {
     width,
     height,
   }
+}
+
+/** A rectangle placed on a workspace of size `from`, at the same proportions on one of size `to`. */
+export const scaled = (rect: Rect, from: Size, to: Size): Rect => {
+  const x = to.width / from.width
+  const y = to.height / from.height
+  return { left: rect.left * x, top: rect.top * y, width: rect.width * x, height: rect.height * y }
 }
 
 export const inset = (space: Rect, by: number): Rect => ({
@@ -215,7 +222,7 @@ export function tidy(keys: readonly string[], space: Rect): Map<string, Rect> {
 }
 
 export function dockTile(index: number, count: number, desk: Size): Rect {
-  const size = desk.width < 400 ? 44 : TILE
+  const size = desk.width < 400 ? 30 : TILE
   const gap = desk.width < 400 ? 8 : TILE_GAP
   const row = count * size + (count - 1) * gap
   return {

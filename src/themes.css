@@ -1,49 +1,50 @@
-/* The palette: a complementary scheme on the artists' wheel. Blue is the base, chosen for stability and
-   clarity of purpose; orange, its complement, is the one warm colour and marks the one action and the live
-   answer. The greys are tinted toward the blue, with more tint in the darker steps. Every text colour
-   measures at least 4.5:1 on every ground it sits on (design/samples/build.mjs carries the source values).
-   Variables are named for what they do, never for their colour.
+/* The palette: the infographic course's Office theme. Status and link inks are theme steps the slide does
+   not use, because no slide colour passes their contrast floor. Every text colour measures at least 4.5:1
+   on every ground it sits on. Variables are named for what they do, never for their colour.
 
    Two faces of the same palette. Light is the default; dark keeps the same roles at the same contrast. */
 :root[data-theme="light"] {
   color-scheme: light;
-  --color-stage: #ECF1F6;        /* the canvas: a watered-down blue */
-  --color-panel: #FFFFFF;        /* a lit block on the canvas */
-  --color-column: #F5F8FB;       /* the bottom pane's ground */
-  --color-well: #F5F8FB;         /* an inset field */
-  --color-raised: #DFE7EF;       /* a selected row or chip */
-  --color-line: #D6DEE8;         /* a divider */
-  --color-hair: #C2CDDA;         /* a control border */
-  --color-edge: #9DACBE;         /* an emphasised border */
-  --color-control: #7A8AA3;      /* an input boundary: 3:1 on the well */
-  --color-ink: #16202E;
-  --color-bone: #33415A;
-  --color-muted: #4C5A70;
-  --color-faint: #59687F;        /* the smallest text allowed */
-  --color-dim: #C2CDDA;          /* non-text only */
-  --color-signal: #E8891D;       /* the action, the live answer: orange, always under dark ink */
-  --color-signal-ink: #16202E;
-  --color-signal-hover: #F29A33;
-  --color-signal-line: #F2C48A;  /* signal at border strength */
-  --color-signal-text: #8F5308;  /* the signal as a word: the orange darkened until it passes as text on every light ground */
-  --color-link: #2457A8;         /* a link keeps the base hue: the complement never sits as text */
-  --color-ok: #1A7353;
-  --color-info: #2457A8;
-  --color-warn: #8A5700;
-  --color-danger: #B23A3A;
+  --color-stage: #D6DCE5;        /* the canvas: slate at 20% */
+  --color-panel: #F2F2F2;        /* a lit block on the canvas */
+  --color-column: #F2F2F2;       /* the bottom pane's ground */
+  --color-well: #FFFFFF;         /* an inset field */
+  --color-raised: #D6DCE5;       /* a selected row or chip */
+  --color-line: #D6DCE5;         /* a divider */
+  --color-hair: #ACB9CA;         /* a control border */
+  --color-edge: #8497B0;         /* an emphasised border */
+  --color-control: #7F7F7F;      /* an input boundary: 3:1 on the well */
+  --color-ink: #222A35;
+  --color-bone: #333F50;
+  --color-muted: #333F50;
+  --color-faint: #44546A;        /* the smallest text allowed */
+  --color-dim: #ACB9CA;          /* non-text only */
+  --color-signal: #ED7D31;       /* the action, the live answer: orange, always under dark ink */
+  --color-signal-ink: #222A35;
+  --color-signal-hover: #F4B183;
+  --color-signal-line: #F4B183;  /* signal at border strength */
+  --color-signal-text: #843C0C;  /* the signal as a word: the orange darkened until it passes as text on every light ground */
+  --color-link: #2F5597;         /* a link keeps the base hue: the complement never sits as text */
+  --color-ok: #385723;
+  --color-info: #2F5597;
+  --color-warn: #7C5034;
+  --color-danger: #8B0304;
   --color-highlight: rgba(255, 255, 255, 0.35);
-  --color-track: #E3EAF1;        /* a segmented control's track, pressed into the panel */
+  --color-track: #D6DCE5;        /* a segmented control's track, pressed into the panel */
   --color-knob: #FFFFFF;         /* the knob on a track, lit from above */
   /* The band: the rail and the header. */
-  --color-rail: #16305A;
-  --color-rail-active: #234478;
+  --color-rail: #44546A;
+  --color-rail-active: #333F50;
   --color-rail-ink: #FFFFFF;
-  --color-rail-faint: #B8C7DE;
-  --color-rail-dim: #4E6A96;
-  --color-rail-signal: #F2A24A;
-  --color-rail-ok: #6FD3AE;
-  --color-rail-info: #8CB8E8;
-  --color-rail-danger: #F28B82;
+  --color-rail-faint: #D6DCE5;
+  --color-rail-dim: #8497B0;
+  --color-rail-signal: #F4B183;
+  --color-rail-ok: #A9D18E;
+  --color-rail-info: #B4C7E7;
+  --color-rail-danger: #F8CBAD;
+  --color-tab: #ACB9CA;
+  --color-tab-ink: #222A35;
+  --color-tab-hover: #8497B0;
   /* A block on the canvas: a soft contact shadow, no ring and no top line; the value step does the rest. */
   --shadow-lift: 0 1px 2px rgb(22 32 46 / .06), 0 2px 8px rgb(22 32 46 / .04);
   --shadow-float: 0 2px 4px rgb(22 32 46 / .12), 0 24px 48px rgb(22 32 46 / .18);
@@ -55,45 +56,48 @@
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --color-stage: #0F151E;
-  --color-panel: #17202C;
-  --color-column: #121A25;
-  --color-well: #121A25;
-  --color-raised: #22303F;
-  --color-line: #24313F;
-  --color-hair: #33445A;
-  --color-edge: #4E6280;
-  --color-control: #6E82A0;
-  --color-ink: #EAF0F7;
-  --color-bone: #C3CEDD;
-  --color-muted: #A2B0C3;
-  --color-faint: #8C9BB0;
-  --color-dim: #33445A;
-  --color-signal: #F2A24A;
-  --color-signal-ink: #0F151E;
-  --color-signal-hover: #F7B56C;
-  --color-signal-line: #6E4A1E;
-  --color-signal-text: #F2A24A;
-  --color-link: #7FB2F0;
-  --color-ok: #4FC79A;
-  --color-info: #7FB2F0;
-  --color-warn: #F2C14E;
-  --color-danger: #F28B82;
-  --color-highlight: rgba(255, 255, 255, 0.07);
-  --color-track: #0F151E;
-  --color-knob: #243244;         /* dark enough that the faintest text still holds 4.5:1 on it */
-  --color-rail: #0A1426;
-  --color-rail-active: #1B2E4E;
-  --color-rail-ink: #EAF0F7;
-  --color-rail-faint: #8C9BB0;
-  --color-rail-dim: #3A4D6B;
-  --color-rail-signal: #F2A24A;
-  --color-rail-ok: #4FC79A;
-  --color-rail-info: #7FB2F0;
-  --color-rail-danger: #F28B82;
+  --color-stage: #222A35;
+  --color-panel: #333F50;
+  --color-column: #222A35;
+  --color-well: #222A35;
+  --color-raised: #44546A;
+  --color-line: #44546A;
+  --color-hair: #44546A;
+  --color-edge: #8497B0;
+  --color-control: #8497B0;
+  --color-ink: #FFFFFF;
+  --color-bone: #F2F2F2;
+  --color-muted: #D6DCE5;
+  --color-faint: #C9C9C9;
+  --color-dim: #44546A;
+  --color-signal: #ED7D31;
+  --color-signal-ink: #222A35;
+  --color-signal-hover: #F4B183;
+  --color-signal-line: #843C0C;
+  --color-signal-text: #F4B183;
+  --color-link: #B4C7E7;
+  --color-ok: #A9D18E;
+  --color-info: #B4C7E7;
+  --color-warn: #FFC000;
+  --color-danger: #F4948B;
+  --color-highlight: rgba(255, 255, 255, 0.14);
+  --color-track: #222A35;
+  --color-knob: #44546A;         /* dark enough that the faintest text still holds 4.5:1 on it */
+  --color-rail: #44546A;
+  --color-rail-active: #333F50;
+  --color-rail-ink: #FFFFFF;
+  --color-rail-faint: #D6DCE5;
+  --color-rail-dim: #8497B0;
+  --color-rail-signal: #F4B183;
+  --color-rail-ok: #A9D18E;
+  --color-rail-info: #B4C7E7;
+  --color-rail-danger: #F8CBAD;
+  --color-tab: #333F50;
+  --color-tab-ink: #D6DCE5;
+  --color-tab-hover: #44546A;
   --shadow-lift: 0 1px 2px rgb(0 0 0 / .25), 0 2px 8px rgb(0 0 0 / .18);
   --shadow-float: 0 2px 4px rgb(0 0 0 / .4), 0 24px 48px rgb(0 0 0 / .5);
-  --shadow-track: inset 0 1px 2px rgb(0 0 0 / .12), inset 0 0 0 1px rgb(0 0 0 / .05);
-  --shadow-knob: 0 0 0 1px rgb(0 0 0 / .07), 0 1px 2px rgb(0 0 0 / .14), 0 3px 8px -2px rgb(0 0 0 / .12), inset 0 1px 0 var(--color-highlight);
-  --gradient-knob: linear-gradient(to bottom, rgb(255 255 255 / .16), rgb(255 255 255 / 0));
+  --shadow-track: inset 0 1px 3px rgb(0 0 0 / .35), inset 0 0 0 1px rgb(0 0 0 / .2);
+  --shadow-knob: 0 0 0 1px rgb(0 0 0 / .2), 0 1px 2px rgb(0 0 0 / .35), 0 3px 8px -2px rgb(0 0 0 / .4), inset 0 1px 0 var(--color-highlight);
+  --gradient-knob: linear-gradient(to bottom, rgb(255 255 255 / .2), rgb(255 255 255 / 0));
 }

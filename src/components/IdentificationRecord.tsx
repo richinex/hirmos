@@ -154,7 +154,7 @@ export function IdentificationRecord({
   if (identification.kind === 'cutoff-design')
     return (
       <section aria-label="Identification record" className="mb-3">
-        <span className="block text-body font-medium text-ink">Cutoff design</span>
+        <span className="block text-body font-bold text-ink">Cutoff design</span>
         <ul className="mt-2 list-none space-y-2 p-0">
           {identification.basis.map((entry) => (
             <DerivedRow key={entry.id} entry={entry} />
@@ -165,7 +165,7 @@ export function IdentificationRecord({
   if (identification.kind === 'backdoor-not-identified') {
     return (
       <section aria-label="Identification record" className="@container/record mb-3">
-        <span className="block text-body font-medium text-ink">Identification record</span>
+        <span className="block text-body font-bold text-ink">Identification record</span>
         <p className="mb-1 mt-1 flex items-center gap-2 text-body text-ink">
           <Icon name="block" size={16} className="text-muted" /> No measured back-door adjustment
           set
@@ -204,7 +204,7 @@ export function IdentificationRecord({
           : 'The instrumental variable estimator is enabled. However, level 2 graphical assumptions alone do not identify the effect estimated here. Additional parametric assumptions are required.'
     return (
       <section aria-label="Identification record" className="@container/record mb-3">
-        <span className="block text-body font-medium text-ink">Identification record</span>
+        <span className="block text-body font-bold text-ink">Identification record</span>
         <p className="mb-1 mt-1 flex items-center gap-2 text-body text-ink">
           <Icon name="check_circle" size={16} className="text-ok" /> {headline}
         </p>
@@ -272,7 +272,7 @@ export function IdentificationRecord({
 
   return (
     <section aria-label="Identification record" className="@container/record mb-3">
-      <span className="block text-body font-medium text-ink">Identification record</span>
+      <span className="block text-body font-bold text-ink">Identification record</span>
       <ul className="m-0 mt-1 list-none space-y-0.5 p-0 text-body">
         <li className="flex items-center gap-2 text-ink">
           <Icon name="check_circle" size={16} className="text-ok" /> {pathSummary}
