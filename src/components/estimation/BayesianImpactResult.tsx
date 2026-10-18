@@ -91,7 +91,6 @@ export function BayesianImpactResult({
     ...quantity('absolute', 'Absolute effect (s.d.)', (summary) => summary.absolute, figure),
     ...quantity('relative', 'Relative effect (s.d.)', (summary) => summary.relative, share),
   ]
-  type Row = (typeof rows)[number]
   return (
     <div className="mt-3 grid gap-3">
       <EvidenceTable

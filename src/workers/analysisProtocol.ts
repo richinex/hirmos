@@ -145,7 +145,6 @@ import {
   type InterruptedModel,
   type InterruptedSeasonal,
   type InterruptedSeriesEvidence,
-  type LinearErrorModel,
 } from '@/domain/interruptedSeries'
 
 /** The adjusted regression's error treatments: the series error models, an HC1 covariance, or a covariance clustered by one column of the matrix. */

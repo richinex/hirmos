@@ -22,17 +22,7 @@ import type { GcmInfluenceRun } from '@/domain/gcmInfluence'
 import { GcmInfluenceResult } from '@/components/root-cause/GcmInfluencePanel'
 import type { RootCauseRun } from '@/domain/rootCauseAnalysis'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
-import {
-  chapterIntroFor,
-  label,
-  num,
-  panel,
-  table,
-  td,
-  th,
-  tr,
-  well,
-} from '@/components/ui/recipes'
+import { chapterIntroFor, num, panel, table, td, th, tr, well } from '@/components/ui/recipes'
 import { Select } from '@/components/ui/Select'
 import type { CounterfactualRunArtifact } from '@/domain/counterfactual'
 import { type DagDocument } from '@/domain/dag'
@@ -40,7 +30,6 @@ import type { DatasetProfile } from '@/domain/dataset'
 import {
   describeRun,
   headlineValue,
-  intervalTypeOf,
   type EstimationRunArtifact,
   type EstimationRunId,
 } from '@/domain/estimation'

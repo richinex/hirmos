@@ -16,7 +16,7 @@ import { SurvivalRunResult, survivalRunLabel } from '@/components/survival/Survi
 import { CountSeriesRecord } from '@/components/time-series/CountSeriesCard'
 import { TimeSeriesRunResult } from '@/components/time-series/TimeSeriesRunResult'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
-import { button, chromeAction, table, td, th, tr, num } from '@/components/ui/recipes'
+import { chromeAction, table, td, th, tr, num } from '@/components/ui/recipes'
 import { useWorkspaceConfiguration } from '@/assistant/workspaceConfiguration'
 import { assertNever, err, ok } from '@/domain/dop'
 import { describeRun, headlineValue, type EstimationRunArtifact } from '@/domain/estimation'

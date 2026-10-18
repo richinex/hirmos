@@ -21,14 +21,12 @@ import {
   useTableDensity,
   type Facet,
 } from '@/components/table/primitives'
-import { literal, num, table as tableCn, td, tr } from '@/components/ui/recipes'
+import { num, table as tableCn, td, tr } from '@/components/ui/recipes'
 import {
-  isNumericDuckDbType,
   type ColumnId,
   type ColumnSummary,
   type DatasetProfile,
 } from '@/domain/dataset'
-import { assertNever } from '@/domain/dop'
 import { formatCount, formatPercent, formatStored, storedDigits } from '@/lib/format/number'
 import { cn } from '@/lib/utils'
 import { columnReading, type DeclaredType } from '@/domain/fileReading'

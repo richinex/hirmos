@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from '@playwright/test'
+import { expect, test, type Locator } from '@playwright/test'
 import { identifyEffect } from './examples/support'
 
 const choose = async (trigger: Locator, label: string) => {

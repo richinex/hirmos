@@ -9,6 +9,7 @@ test-results-*/
 crates/analysis-wasm/target/
 crates/causal-core/target/
 crates/structural-timeseries/target/
+.build/
 *.local
 .DS_Store
 

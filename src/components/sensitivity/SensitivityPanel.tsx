@@ -6,7 +6,6 @@ import { ok, err } from '@/domain/dop'
 import { RunActions } from '@/components/ui/RunActions'
 import { RunDetails } from '@/components/ui/RunDetails'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
-import { Orb } from '@/components/ui/Orb'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { RunFold } from '@/components/ui/RunFold'
@@ -42,7 +41,6 @@ import {
   panel,
   sectionTitle,
   stepsStack,
-  well,
 } from '@/components/ui/recipes'
 import { SettingsStep } from '@/components/ui/SettingsStep'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
@@ -63,7 +61,6 @@ import {
   REFUTER_METHODS,
   SENSITIVITY_DIAGNOSTIC_METHODS,
   SHAPIRO_WILK_METHOD_ID,
-  UNOBSERVED_COMMON_CAUSE_METHOD_ID,
 } from '@/domain/methods'
 import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
 import {

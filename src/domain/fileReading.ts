@@ -52,6 +52,37 @@ export type FileReading =
   | { readonly format: DelimitedFormat; readonly declared: ColumnDeclarations }
   | { readonly format: 'parquet' }
 
+/** How DuckDB split a delimited file into rows and fields when it read the whole file. An empty quote, escape or comment means the file has none. */
+export const csvDialectSchema = z
+  .object({
+    delimiter: z.string().min(1),
+    quote: z.string(),
+    escape: z.string(),
+    newLine: z.enum(['\\n', '\\r', '\\r\\n']),
+    comment: z.string(),
+    skipRows: z.number().int().nonnegative(),
+  })
+  .strict()
+  .readonly()
+
+export type CsvDialect = z.infer<typeof csvDialectSchema>
+
+/** Whether a profile kept the dialect it detected; profiles read before it was kept did not, nor did a sniff that could not be read. */
+export const dialectRecordSchema = z.discriminatedUnion('kind', [
+  z
+    .object({ kind: z.literal('recorded'), dialect: csvDialectSchema })
+    .strict()
+    .readonly(),
+  z
+    .object({ kind: z.literal('not-recorded') })
+    .strict()
+    .readonly(),
+])
+
+export type DialectRecord = z.infer<typeof dialectRecordSchema>
+
+export const NOT_RECORDED: DialectRecord = { kind: 'not-recorded' }
+
 /** Just the reading of anything that carries one: a source, a profile's source, an input. */
 export const fileReading = (value: FileReading): FileReading =>
   value.format === 'parquet'
@@ -100,7 +131,8 @@ export const declaredTypeSchema = z.enum(DECLARED_TYPE_NAMES as [DeclaredType, .
 
 export const columnDeclarationsSchema = z.record(z.string().min(1), declaredTypeSchema)
 
-export type FileReadingProblem = { readonly kind: 'declarations-on-parquet' }
+export type FileReadingProblem =
+  { readonly kind: 'declarations-on-parquet' } | { readonly kind: 'dialect-on-parquet' }
 
 /** A stored format and declarations, read back. Records written before declarations existed have none. */
 export const fileReadingOf = (
@@ -113,4 +145,30 @@ export const fileReadingOf = (
       : err({ kind: 'declarations-on-parquet' })
   }
   return ok({ format, declared: declared ?? NO_DECLARATIONS })
+}
+
+/** A reading as a profile records it: a delimited file carries the dialect it was read with. */
+export type ProfiledReading =
+  | (Extract<FileReading, { readonly format: DelimitedFormat }> & {
+      readonly dialect: DialectRecord
+    })
+  | Extract<FileReading, { readonly format: 'parquet' }>
+
+/** A reading with the dialect a profile records for it; Parquet has none. */
+export const profiledReading = (reading: FileReading, dialect: DialectRecord): ProfiledReading =>
+  reading.format === 'parquet'
+    ? { format: reading.format }
+    : { format: reading.format, declared: reading.declared, dialect }
+
+/** A stored format, declarations and dialect, read back. Records written before the dialect was kept have none. */
+export const profiledReadingOf = (
+  format: DelimitedFormat | 'parquet',
+  declared: ColumnDeclarations | undefined,
+  dialect: DialectRecord | undefined,
+): Result<ProfiledReading, FileReadingProblem> => {
+  const reading = fileReadingOf(format, declared)
+  if (!reading.ok) return reading
+  if (reading.value.format === 'parquet' && dialect !== undefined)
+    return err({ kind: 'dialect-on-parquet' })
+  return ok(profiledReading(reading.value, dialect ?? NOT_RECORDED))
 }

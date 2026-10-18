@@ -337,7 +337,7 @@ export type PreprocessingReadinessProblem =
   | { readonly kind: 'seasonal-columns-required' }
   | { readonly kind: 'resampling-aggregations-required'; readonly columns: NonEmptyArray<ColumnId> }
 
-export const initialPreprocessingDraft = (profile: DatasetProfile): PreprocessingDraft => {
+export const initialPreprocessingDraft = (): PreprocessingDraft => {
   return {
     sampling: { kind: 'unconfigured' },
     frequencyOrigin: 'assumed',

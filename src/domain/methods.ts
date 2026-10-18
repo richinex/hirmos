@@ -355,18 +355,6 @@ const SHPITSER_PEARL_COUNTERFACTUAL = paper(
   'Complete identification methods for the causal hierarchy (Shpitser and Pearl, 2008)',
   'JMLR 9:1941–1979; ID* and IDC*',
 )
-const CINELLI_FORNEY_PEARL = paper(
-  'A crash course in good and bad controls (Cinelli, Forney and Pearl, 2022)',
-  'good, neutral and bad controls',
-)
-const HENCKEL_2019 = paper(
-  'Graphical criteria for efficient total effect estimation via adjustment in causal linear models (Henckel, Perković and Maathuis, 2019)',
-  'efficient adjustment sets',
-)
-const ROTNITZKY_SMUCLER_2019 = paper(
-  'Efficient adjustment sets for population average treatment effect estimation in nonparametric causal graphical models (Rotnitzky and Smucler, 2019)',
-  'efficient adjustment sets',
-)
 const CHERNOZHUKOV_DML = paper(
   'Double/debiased machine learning for treatment and causal parameters (Chernozhukov and others, 2018)',
   'arXiv:1608.00060; partially linear model, cross-fitting, root-n normality',
@@ -390,10 +378,6 @@ const HINES_2022 = paper(
 const RUNGE_2021 = paper(
   'Necessary and sufficient graphical conditions for optimal adjustment sets in causal graphical models with hidden variables (Runge, NeurIPS 2021)',
   'optimal adjustment set; identifiability',
-)
-const MAEDA_SHIMIZU_2021 = paper(
-  'Causal additive models with unobserved variables (Maeda and Shimizu, UAI 2021)',
-  'proceedings.mlr.press/v161/maeda21a',
 )
 
 // Primary literature checked against the publication record and, where available, the vendored package documentation.

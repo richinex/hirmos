@@ -14,13 +14,11 @@ import { isNumericDuckDbType, type PreviewCell } from '@/domain/dataset'
 import { assertNever } from '@/domain/dop'
 import {
   blockLabel,
-  describeCalendarWindow,
   describePipelineProblem,
   type PipelineBlock,
   type PipelineBlockId,
   type PipelineEdge,
   type PipelineNode,
-  type RowTest,
 } from '@/domain/pipeline'
 import type { SqlInputAlias, SqlPreparationInput } from '@/domain/sourceInputs'
 import { columnReading, type DeclaredType } from '@/domain/fileReading'

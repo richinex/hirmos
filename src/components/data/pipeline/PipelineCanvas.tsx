@@ -1,5 +1,4 @@
 import { canvasMotion } from '@/lib/motion'
-import { Metadata } from '@/components/ui/Metadata'
 import { useCallback, useEffect, useMemo, useState, type DragEvent } from 'react'
 import {
   Background,

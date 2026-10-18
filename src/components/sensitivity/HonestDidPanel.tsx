@@ -18,7 +18,6 @@ import {
   honestEnvelope,
   honestRequestSchema,
   honestRunSchema,
-  type HonestEvidence,
   type HonestRun,
 } from '@/domain/honestDid'
 import { sameSpecification } from '@/domain/panelRegression'

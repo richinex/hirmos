@@ -1,7 +1,6 @@
 import { NumberInput, numberValue } from '@/components/ui/NumberInput'
 import { RunActions } from '@/components/ui/RunActions'
 import { RunDetails } from '@/components/ui/RunDetails'
-import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { Metadata } from '@/components/ui/Metadata'
 import { useJob } from '@/analysis/JobsProvider'
 import { useRecordedAnalysis, runReceipt } from '@/assistant/useRecordedAnalysis'
@@ -10,7 +9,6 @@ import { useRunActivity } from '@/lib/useRunActivity'
 import type { RunActivity } from '@/domain/activity'
 import { STANDARDISED_INPUTS_NOTE, type DiscoveryRunEvent } from '@/domain/discovery'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
-import { EmptyState } from '@/components/ui/EmptyState'
 import { Select } from '@/components/ui/Select'
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Icon } from '@/components/Icon'
@@ -377,9 +375,6 @@ const analysisFailureEvent = (problem: AnalysisWorkerProblem) => {
 const pValue = (value: number): string => (value < 0.0001 ? '<0.0001' : value.toFixed(4))
 const statistic = (value: number): string =>
   Math.abs(value) >= 10_000 ? value.toExponential(4) : value.toFixed(6)
-
-const asNumber = (value: string | number): number =>
-  typeof value === 'number' ? value : Number(value)
 
 type ConstraintConfiguration = Extract<
   DiscoveryConfiguration,

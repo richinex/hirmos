@@ -1,7 +1,15 @@
 import { categoricalMembershipSchema, type CategoricalMembership } from '@/domain/sampleMembership'
 import * as duckdb from '@duckdb/duckdb-wasm'
-import { fileRelation } from './fileRelation'
-import { fileReading } from '@/domain/fileReading'
+import {
+  declaredTypesOption,
+  DETECT,
+  dialectRecord,
+  fileRelation,
+  layoutFromSniff,
+  profileRelation,
+  type RelationLayout,
+} from './fileRelation'
+import { profiledReading, type DialectRecord, type FileReading } from '@/domain/fileReading'
 import { inspectCalendar } from './calendar'
 import {
   timestampSql,
@@ -256,6 +264,7 @@ async function readProfile(
   source: SelectedSource,
   fingerprint: SourceFingerprint,
   engineVersion: string,
+  dialect: DialectRecord,
 ): Promise<Result<DatasetProfile, DatasetProfileProblem>> {
   const previewTable = await connection.query(`SELECT * FROM ${relation} LIMIT ${PREVIEW_ROWS}`)
   const fields = [...previewTable.schema.fields]
@@ -334,7 +343,7 @@ async function readProfile(
       fileName: source.name,
       bytes: source.bytes,
       persistence: { kind: 'ephemeral' },
-      ...fileReading(source),
+      ...profiledReading(source, dialect),
     },
     parser: {
       kind: 'duckdb-wasm',
@@ -345,6 +354,40 @@ async function readProfile(
     columns: builtColumns,
     preview: builtPreview,
   })
+}
+
+const SNIFFED_FIELDS = [
+  'Delimiter',
+  'Quote',
+  'Escape',
+  'NewLineDelimiter',
+  'Comment',
+  'SkipRows',
+  'Columns',
+]
+
+/** Asks DuckDB once for a delimited file's dialect and column types over the whole file, honouring declared types. */
+export async function detectLayout(
+  connection: duckdb.AsyncDuckDBConnection,
+  reading: FileReading,
+  path: string,
+): Promise<RelationLayout> {
+  try {
+    const sniffed = await connection.query(
+      `SELECT ${SNIFFED_FIELDS.join(', ')} FROM sniff_csv(${sqlString(path)}, header = true, sample_size = -1${declaredTypesOption(reading)})`,
+    )
+    const columns = sniffed.getChild('Columns')?.get(0) as
+      { readonly length: number; get(index: number): { toJSON(): unknown } } | null | undefined
+    return layoutFromSniff({
+      ...Object.fromEntries(SNIFFED_FIELDS.map((name) => [name, sniffed.getChild(name)?.get(0)])),
+      Columns:
+        columns === null || columns === undefined
+          ? null
+          : Array.from({ length: columns.length }, (_, index) => columns.get(index).toJSON()),
+    })
+  } catch {
+    return DETECT
+  }
 }
 
 /** Canonical CSV/TSV/Parquet profile. DuckDB reads from the browser File handle. Arrow vectors are
@@ -374,12 +417,20 @@ export async function profileSource(
     return err({ kind: 'registration-failed', detail: detailOf(cause) })
   }
 
-  const relation = fileRelation(source, registeredPath)
   let connection: duckdb.AsyncDuckDBConnection | null = null
   let outcome: Result<DatasetProfile, DatasetProfileProblem>
   try {
     connection = await running.db.connect()
-    outcome = await readProfile(connection, relation, source, fingerprint.value, running.version)
+    const layout =
+      source.format === 'parquet' ? DETECT : await detectLayout(connection, source, registeredPath)
+    outcome = await readProfile(
+      connection,
+      fileRelation(source, registeredPath, undefined, layout),
+      source,
+      fingerprint.value,
+      running.version,
+      dialectRecord(layout),
+    )
   } catch (cause) {
     outcome = err({ kind: 'parse-failed', detail: detailOf(cause) })
   }
@@ -835,7 +886,7 @@ export async function inspectPanelStructure(
   } catch (cause) {
     return err({ kind: 'panel-data-failed', detail: detailOf(cause) })
   }
-  const relation = fileRelation(profile.source, registeredPath)
+  const relation = profileRelation(profile, registeredPath)
   const unit = sqlIdentifier(unitColumn.name)
   const time = sqlIdentifier(timeColumn.name)
   let connection: duckdb.AsyncDuckDBConnection | null = null
@@ -920,7 +971,7 @@ export async function materializePanelKeys(
   } catch (cause) {
     return err({ kind: 'panel-data-failed', detail: detailOf(cause) })
   }
-  const relation = fileRelation(profile.source, registeredPath)
+  const relation = profileRelation(profile, registeredPath)
   const unit = sqlIdentifier(unitColumn.name)
   const time = sqlIdentifier(timeColumn.name)
   let connection: duckdb.AsyncDuckDBConnection | null = null
@@ -1062,7 +1113,7 @@ export async function materializePanelLong(
   } catch (cause) {
     return err({ kind: 'panel-data-failed', detail: detailOf(cause) })
   }
-  const relation = fileRelation(profile.source, registeredPath)
+  const relation = profileRelation(profile, registeredPath)
   const unit = sqlIdentifier(unitColumn.name)
   const time = sqlIdentifier(timeColumn.name)
   const numericProjection = numericColumns
@@ -1225,7 +1276,7 @@ export async function profileColumn(
   } catch (cause) {
     return err({ kind: 'column-profile-failed', detail: detailOf(cause) })
   }
-  const relation = fileRelation(profile.source, registeredPath)
+  const relation = profileRelation(profile, registeredPath)
   const name = sqlIdentifier(column.name)
 
   let connection: duckdb.AsyncDuckDBConnection | null = null
@@ -1389,7 +1440,7 @@ async function withSource<Value, Problem>(
   } catch (cause) {
     return err(failure(detailOf(cause)))
   }
-  const relation = fileRelation(profile.source, registeredPath, textColumn)
+  const relation = profileRelation(profile, registeredPath, textColumn)
   let connection: duckdb.AsyncDuckDBConnection | null = null
   let outcome: Result<Value, Problem>
   try {

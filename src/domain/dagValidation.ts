@@ -203,34 +203,6 @@ const reaches = (
   return false
 }
 
-const reachable = (
-  edges: readonly DirectedDagEdge[],
-  start: DagNodeId,
-  direction: 'forward' | 'backward',
-): Set<DagNodeId> => {
-  const result = new Set<DagNodeId>()
-  const pending: DagNodeId[] = [start]
-  while (pending.length > 0) {
-    const current = pending.pop()
-    if (current === undefined) continue
-    for (const edge of edges) {
-      const next =
-        direction === 'forward'
-          ? edge.cause === current
-            ? edge.effect
-            : null
-          : edge.effect === current
-            ? edge.cause
-            : null
-      if (next !== null && !result.has(next)) {
-        result.add(next)
-        pending.push(next)
-      }
-    }
-  }
-  return result
-}
-
 const implicationKey = (implication: DagConditionalIndependenceImplication): string => {
   const pair = [implication.x, implication.y].sort().join('\u001f')
   return `${pair}\u001e${[...implication.given].sort().join('\u001f')}`

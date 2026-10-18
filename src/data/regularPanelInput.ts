@@ -1,5 +1,5 @@
 import { isNumericDuckDbType, type DatasetProfile } from '@/domain/dataset'
-import { assertNever, err, ok, type Result } from '@/domain/dop'
+import { assertNever, err, type Result } from '@/domain/dop'
 import { describePanelDataProblem } from '@/domain/panel'
 import {
   calendarSchedules,

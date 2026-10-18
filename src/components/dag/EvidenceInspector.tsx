@@ -2,7 +2,7 @@ import { Select } from '@/components/ui/Select'
 import { useMemo } from 'react'
 import { LagGraphViews } from '@/components/discovery/LagGraphViews'
 import { NeuralSummaryPlot } from '@/components/discovery/DiscoveryPlots'
-import { label, literal, num, well } from '@/components/ui/recipes'
+import { literal, num, well } from '@/components/ui/recipes'
 import { assertNever } from '@/domain/dop'
 import {
   describeEvidenceSemantics,
@@ -50,30 +50,6 @@ const methodTitle = (run: DiscoveryRunArtifact): string => {
   }
 }
 
-const variablesOf = (view: DiscoveryEvidenceView) => {
-  switch (view.run.kind) {
-    case 'direct-lingam-run':
-    case 'pc-stable-run':
-    case 'fci-run':
-    case 'pcmci-plus-run':
-    case 'jpcmci-plus-run':
-    case 'lpcmci-run':
-    case 'rpcmci-run':
-    case 'cdnots-run':
-    case 'cdnots-plus-run':
-    case 'grace-run':
-    case 'dynotears-run':
-    case 'var-lingam-run':
-    case 'ocse-run':
-      return view.run.variables
-    case 'cmlp-run':
-    case 'clstm-run':
-      return view.run.variables
-    default:
-      return assertNever(view.run)
-  }
-}
-
 const statistic = (value: number): string =>
   Math.abs(value) >= 1_000 || (Math.abs(value) > 0 && Math.abs(value) < 0.001)
     ? value.toExponential(2)
@@ -81,27 +57,6 @@ const statistic = (value: number): string =>
 
 const pValue = (value: number): string =>
   value < 0.001 ? value.toExponential(2) : value.toFixed(3)
-
-const candidateLabel = (candidate: DiscoveryCandidate): string => {
-  switch (candidate.kind) {
-    case 'cross-sectional-endpoint':
-      return candidate.mark
-    case 'endpoint-marked':
-      return `${candidate.mark}${candidate.lag === 0 ? '' : `, t−${candidate.lag}`}`
-    case 'regime-endpoint-marked':
-      return `Regime ${candidate.regime + 1}, ${candidate.mark}${candidate.lag === 0 ? '' : `, t−${candidate.lag}`}`
-    case 'weighted-directed':
-      return `w ${statistic(candidate.weight)}${candidate.lag === 0 ? '' : `, t−${candidate.lag}`}`
-    case 'lagged-information':
-      return `CMI ${statistic(candidate.cmi)}, t−${candidate.lag}`
-    case 'neural-lagged':
-      return `${candidate.method === 'GRACE' ? 'gate' : 'score'} ${statistic(candidate.score)}, t−${candidate.lag}`
-    case 'neural-window':
-      return `score ${statistic(candidate.score)}, ${candidate.context}-step window`
-    default:
-      return assertNever(candidate)
-  }
-}
 
 const candidateDetail = (candidate: DiscoveryCandidate): string => {
   switch (candidate.kind) {

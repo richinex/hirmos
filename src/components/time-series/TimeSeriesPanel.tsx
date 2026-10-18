@@ -21,7 +21,6 @@ import { TimeSeriesRunResult } from './TimeSeriesRunResult'
 import { TimeSeriesHistory } from './TimeSeriesHistory'
 import { ArdlModelPanel } from './ArdlModelPanel'
 import { InterruptedSeriesPanel } from './InterruptedSeriesPanel'
-import { Orb } from '@/components/ui/Orb'
 import { Select } from '@/components/ui/Select'
 import { ColumnChecklist } from '@/components/ui/ColumnChecklist'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
@@ -38,7 +37,6 @@ import {
   stepsStack,
 } from '@/components/ui/recipes'
 import { SettingsStep } from '@/components/ui/SettingsStep'
-import { cn } from '@/lib/utils'
 import { isNumericDuckDbType, type ColumnId, type DatasetProfile } from '@/domain/dataset'
 import { assertNever, type NonEmptyArray } from '@/domain/dop'
 import {

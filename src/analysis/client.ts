@@ -75,7 +75,6 @@ import type {
   InterruptedModel,
   InterruptedSeasonal,
   InterruptedSeriesEvidence,
-  LinearErrorModel,
 } from '@/domain/interruptedSeries'
 import type { MulticollinearityEvidence } from '@/domain/multicollinearity'
 import { GrangerSsrEvidence } from '@/domain/granger'

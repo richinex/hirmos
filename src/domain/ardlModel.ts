@@ -8,7 +8,6 @@ const interval = z
   .tuple([finite, finite])
   .refine(([lower, upper]) => lower <= upper, 'Interval limits are reversed.')
 const level = z.number().gt(0).lt(1)
-const values = z.array(finite)
 const series = z.tuple([finite]).rest(finite)
 export const omittedEcmChangeSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('outcome'), lag: lag.min(1) }).strict(),

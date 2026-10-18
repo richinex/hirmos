@@ -1,7 +1,7 @@
 import type { CounterfactualRunArtifact } from './counterfactual'
 import { namesInProse } from '@/lib/format/names'
 import type { DiscoveryRunArtifact } from './discovery'
-import { assertNever, isNonEmpty, type NonEmptyArray } from './dop'
+import { assertNever, type NonEmptyArray } from './dop'
 import {
   adjustmentLabels,
   boundsReading,

@@ -36,7 +36,6 @@ import { ParameterLabel } from '@/components/ui/ParameterLabel'
 import { ESTIMATION_PARAMETER_HELP } from '@/domain/parameterHelp'
 import { Select } from '@/components/ui/Select'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
-import { Orb } from '@/components/ui/Orb'
 import {
   actionGap,
   button,
@@ -47,7 +46,6 @@ import {
   stepsStack,
 } from '@/components/ui/recipes'
 import { SettingsStep } from '@/components/ui/SettingsStep'
-import { cn } from '@/lib/utils'
 import { useRunActivity } from '@/lib/useRunActivity'
 import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
 import { TimeSeriesHeading, type TimeSeriesPanelProps } from './TimeSeriesPanel'
@@ -137,7 +135,6 @@ export function InterruptedSeriesPanel(
   const lag = integer(draft.lag) ?? 0
   const pairs = period === null ? 0 : (integer(draft.harmonicPairs) ?? 0)
   const model = draft.model
-  const count = model.kind === 'count'
   // Every row here is a screen row, numbered from 1; the kernel's index is taken once, at the call.
   const interventionRow = typedRow === null ? null : rowNumber(typedRow)
   const until = draft.impact.kind === 'temporaryLevel' ? integer(draft.impact.until) : null

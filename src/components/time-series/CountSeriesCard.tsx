@@ -16,7 +16,6 @@ import type { RunActivity } from '@/domain/activity'
 import { ExpandableChart } from '@/charts/ExpandableChart'
 import type { VisibleWindow } from '@/charts/window'
 import { TimeSeriesEquation } from './TimeSeriesEquation'
-import { Orb } from '@/components/ui/Orb'
 import { MetricGrid, MetricTile } from '@/components/ui/figures'
 import { countSeriesFitOption, interventionScoreOption } from '@/charts/data/countSeriesModel'
 import { useChartTheme } from '@/charts/theme'
@@ -37,7 +36,6 @@ import {
   well,
 } from '@/components/ui/recipes'
 import { SettingsStep } from '@/components/ui/SettingsStep'
-import { cn } from '@/lib/utils'
 import {
   describeCountSeriesReadiness,
   newCountSeriesModelId,

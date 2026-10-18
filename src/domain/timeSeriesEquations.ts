@@ -38,8 +38,8 @@ const errorsDefinition = (errors: ContinuousErrorEvidence): string => {
 }
 
 const armaTex = (errors: Extract<ContinuousErrorEvidence, { kind: 'arma' }>): string => {
-  const ar = errors.ar.map((term, i) => `\\phi_{${i + 1}} u_{t-${i + 1}}`).join('+')
-  const ma = errors.ma.map((term, i) => `\\theta_{${i + 1}} \\varepsilon_{t-${i + 1}}`).join('+')
+  const ar = errors.ar.map((_, i) => `\\phi_{${i + 1}} u_{t-${i + 1}}`).join('+')
+  const ma = errors.ma.map((_, i) => `\\theta_{${i + 1}} \\varepsilon_{t-${i + 1}}`).join('+')
   return `u_t=${ar === '' ? '' : `${ar}+`}\\varepsilon_t${ma === '' ? '' : `+${ma}`}`
 }
 

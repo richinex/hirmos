@@ -1,15 +1,14 @@
 import * as duckdb from '@duckdb/duckdb-wasm'
 import { RecordBatchFileWriter } from 'apache-arrow'
 import { fingerprintFile } from './fingerprint'
-import { fileRelation } from './fileRelation'
+import { DETECT, fileRelation } from './fileRelation'
 import { declareColumn, fileReading, type DeclaredType } from '@/domain/fileReading'
-import { isolatedDuckDbEngine, type DuckDbEngine } from './duckdb'
+import { detectLayout, isolatedDuckDbEngine, type DuckDbEngine } from './duckdb'
 import { rememberInputFiles } from './inputFiles'
 import { exportDirectory, type SqlInputDescriptor } from '@/domain/sourceInputs'
 import { err, isNonEmpty, ok, type NonEmptyArray, type Result } from '@/domain/dop'
 import { selectSource, type SelectedSource } from '@/domain/workflow'
 import {
-  PREPARED_VIEW,
   sqlViewName,
   sqlDerivedRecipe,
   uniqueSqlInputAlias,
@@ -67,11 +66,6 @@ const scalarCount = (value: unknown): Result<number, SqlPreparationProblem> => {
   })
 }
 
-const relationFor = (
-  input: Exclude<SqlPreparationInput, { readonly format: 'duckdb-export-file' }>,
-  path: string,
-): string => fileRelation(input, path)
-
 export async function registerInputs(
   engine: DuckDbEngine,
   inputs: readonly SqlPreparationInput[],
@@ -91,10 +85,13 @@ export async function registerInputs(
           duckdb.DuckDBDataProtocol.BROWSER_FILEREADER,
           true,
         )
-        if (input.format !== 'duckdb-export-file')
+        if (input.format !== 'duckdb-export-file') {
+          const layout =
+            input.format === 'parquet' ? DETECT : await detectLayout(connection, input, path)
           await connection.query(
-            `CREATE OR REPLACE VIEW ${sqlIdentifier(input.alias)} AS SELECT * FROM ${relationFor(input, path)}`,
+            `CREATE OR REPLACE VIEW ${sqlIdentifier(input.alias)} AS SELECT * FROM ${fileRelation(input, path, undefined, layout)}`,
           )
+        }
       } catch (cause) {
         return err({
           kind: 'input-registration-failed',

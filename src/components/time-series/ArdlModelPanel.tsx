@@ -21,7 +21,6 @@ import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { Select } from '@/components/ui/Select'
 import { ColumnChecklist } from '@/components/ui/ColumnChecklist'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
-import { Orb } from '@/components/ui/Orb'
 import {
   actionGap,
   button,

@@ -1,7 +1,7 @@
 import { describePanelDataProblem } from '@/domain/panel'
 import { adjustedRegressionPlan } from '@/analysis/adjustedRegressionPlan'
 import type { ColumnId } from '@/domain/dataset'
-import { ok, type NonEmptyArray } from '@/domain/dop'
+import { type NonEmptyArray } from '@/domain/dop'
 import { describeDesignExpansionProblem, designLayouts, expandDesign } from '@/domain/designMatrix'
 import {
   causalEstimateFrom,

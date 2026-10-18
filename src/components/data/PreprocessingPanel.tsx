@@ -8,7 +8,6 @@ import { CalendarReport } from './CalendarReport'
 import { ParameterLabel, ParameterHelp } from '@/components/ui/ParameterLabel'
 import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { fieldHint, resultSurface, stepTitle } from '@/components/ui/recipes'
-import { Metadata } from '@/components/ui/Metadata'
 import { Select } from '@/components/ui/Select'
 import { describePanelDataProblem } from '@/domain/panel'
 import { RadioList } from '@/components/ui/RadioList'
@@ -21,7 +20,6 @@ import { previewTimeColumnInWorker } from '@/data/client'
 import { useJob } from '@/analysis/JobsProvider'
 import { useWorkflow } from '@/components/WorkflowProvider'
 import { JobNotice } from '@/components/ui/JobNotice'
-import { Orb } from '@/components/ui/Orb'
 import { Icon } from '@/components/Icon'
 import { SelectionActions } from '@/components/ui/SelectionActions'
 import { Alert } from '@/components/ui/Alert'
@@ -36,16 +34,12 @@ import {
   button,
   field,
   fieldLabel,
-  label,
   num,
   panel,
   prose,
-  sectionTitle,
   table,
   td,
-  th,
   tr,
-  well,
 } from '@/components/ui/recipes'
 import { cellPadding, SortHeader, useTableDensity } from '@/components/table/primitives'
 import {
@@ -71,7 +65,6 @@ import {
   readyPreprocessingRecipe,
   seriesTransformFor,
   type PreprocessingEvent,
-  transformSeries,
   transformWarmup,
   type Frequency,
   type MissingnessDraft,
@@ -84,11 +77,9 @@ import {
 } from '@/domain/preprocessing'
 import {
   assessStationarity,
-  decisiveEvidence,
   describeStationarityAssessment,
   describeStationarityConflict,
   type StationarityAssessment,
-  type StationarityTestRef,
 } from '@/domain/stationarityAssessment'
 import { seasonalPeriodOf } from '@/domain/seasonal'
 import type { SelectedSource } from '@/domain/workflow'
@@ -206,29 +197,6 @@ const TONE_CLASS = {
   muted: 'text-muted',
 } as const
 
-const specificationName = (specification: StationarityTestRef['specification']): string => {
-  switch (specification) {
-    case 'c':
-      return 'constant'
-    case 'ct':
-      return 'constant and trend'
-    case 'level':
-      return 'level break'
-    case 'trend':
-      return 'trend break'
-    case 'levelAndTrend':
-      return 'level and trend break'
-    default:
-      return assertNever(specification)
-  }
-}
-
-const ruleLabel = (ref: StationarityTestRef): string => {
-  const test = ref.test === 'zivot-andrews' ? 'Zivot–Andrews' : ref.test.toUpperCase()
-  const scale = ref.series === 'first-difference' ? 'first difference' : 'prepared values'
-  return `${test}, ${specificationName(ref.specification)}, ${scale}: p ${pValue(ref.pValue)}`
-}
-
 /** The interpreted route for one series with the tests that decided it. */
 function StationarityVerdict({
   assessment,
@@ -260,9 +228,6 @@ function StationarityVerdict({
     </div>
   )
 }
-
-const transformIsSelected = (selected: SeriesTransform, candidate: SeriesTransform): boolean =>
-  selected.kind === candidate.kind
 
 const missingnessChoice = (kind: MissingnessDraft['kind'], cells: number): MissingnessDraft => {
   switch (kind) {
@@ -303,8 +268,6 @@ const toggleAnalysisMaskRole = (
     : [...selected, role]
   return isNonEmpty(next) ? { kind: 'roles', roles: next } : { kind: 'ignore' }
 }
-
-const pValue = (value: number): string => formatP(value, { withLabel: false }).text
 
 interface TestStatisticRow {
   readonly name: string

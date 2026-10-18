@@ -599,7 +599,6 @@ export function shapeLoggedRows(
   const valid = (index: number) => (validity[index >> 3]! & (1 << (index & 7))) !== 0
   const at = (column: number, row: number) => values[column * rowCount + row]!
   const arms = new Map(actions.map((value, index) => [value, index]))
-  const width = layout.inputs.length
   const index = new Map<string, number>()
   const patterns: number[][] = []
   const demonstrated: number[][] = []

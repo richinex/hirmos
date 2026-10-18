@@ -13,7 +13,6 @@ import { checkSettingsColumns, seriesDraftSettings } from '@/domain/timeSeriesWo
 import { err } from '@/domain/dop'
 import { timeSeriesSummary, TIME_SERIES_SUMMARY } from '@/assistant/analysisSummaries'
 import { JobNotice } from '@/components/ui/JobNotice'
-import { Orb } from '@/components/ui/Orb'
 import { Alert } from '@/components/ui/Alert'
 import { Select } from '@/components/ui/Select'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'

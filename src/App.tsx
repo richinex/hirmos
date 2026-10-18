@@ -36,7 +36,6 @@ import { InternalLink } from '@/components/ui/InternalLink'
 import { RunActivityChip } from '@/components/shell/RunActivityChip'
 import { AssistantHeaderButton } from '@/assistant/AssistantLauncher'
 import { REPORT_ACTIVITY } from '@/lib/runActivityStore'
-import { useShellLayout } from '@/components/shell/useShellLayout'
 import {
   button,
   chromeAction,
@@ -127,7 +126,7 @@ import {
 import { identificationAllowsEstimation } from '@/domain/study'
 import { isRegressionDesignRun } from '@/domain/timeSeries'
 import { type DiscoveryEvent } from '@/domain/discovery'
-import { assertNever, err, isNonEmpty, type Result } from '@/domain/dop'
+import { assertNever, err, type Result } from '@/domain/dop'
 import { isDerivedRecipe, type SourceRecipe } from '@/domain/sqlPreparation'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { cn } from '@/lib/utils'
@@ -271,10 +270,8 @@ function App() {
   const openSourceEditor = useWorkflow((state) => state.openSourceEditor)
   const showSourceEditor = useWorkflow((state) => state.showSourceEditor)
   const closeSourceEditor = useWorkflow((state) => state.closeSourceEditor)
-  const fileInput = useRef<HTMLInputElement>(null)
   const [dataEntryMode, setDataEntryMode] = useState<'file' | 'sql' | 'pipeline'>('file')
   const { location, route } = useRoute()
-  const shell = useShellLayout()
   /** Whether the rail's lobe is out over the stage; on a phone, whether the rail is slid in. Session state, never saved. */
   const [navOpen, setNavOpen] = useState(false)
   const openNav = useCallback(() => setNavOpen(true), [])

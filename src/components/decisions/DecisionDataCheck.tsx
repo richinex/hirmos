@@ -47,7 +47,7 @@ import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
 import { categoricalMembershipSchema, type CategoricalMembership } from '@/domain/sampleMembership'
 import type { SelectedSource } from '@/domain/workflow'
 import { formatTime } from '@/lib/format/date'
-import { formatCount, formatPercent, formatStatistic, formatWords } from '@/lib/format/number'
+import { formatCount, formatPercent, formatStatistic } from '@/lib/format/number'
 import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
 
 type Props = {

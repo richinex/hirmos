@@ -52,10 +52,8 @@ import {
   survivalFamilyLabel,
   survivalRunSummary,
 } from '@/components/survival/SurvivalRunResult'
-import { Alert } from '@/components/ui/Alert'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { Orb } from '@/components/ui/Orb'
 import { ParameterLabel } from '@/components/ui/ParameterLabel'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { Select } from '@/components/ui/Select'

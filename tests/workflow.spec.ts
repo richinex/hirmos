@@ -6,7 +6,6 @@ import { CHAPTER_IDS } from '../src/domain/navigation'
 
 const seatbelts = fileURLToPath(new URL('./fixtures/Seatbelts.csv', import.meta.url))
 const seatbeltsParquet = fileURLToPath(new URL('./fixtures/Seatbelts.parquet', import.meta.url))
-const gaps = fileURLToPath(new URL('./fixtures/gaps.csv', import.meta.url))
 
 /** Pick an option in a Radix select: open the trigger, then click the option in the listbox. */
 const choose = async (trigger: Locator, option: { readonly label?: string; readonly index?: number }) => {

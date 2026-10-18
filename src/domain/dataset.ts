@@ -3,9 +3,11 @@ import { brand, err, ok, type Brand, type NonEmptyArray, type Result } from './d
 import { isNonEmpty } from './dop'
 import {
   columnDeclarationsSchema,
+  dialectRecordSchema,
   declarationsKey,
-  fileReadingOf,
+  profiledReadingOf,
   type FileReading,
+  type ProfiledReading,
 } from './fileReading'
 
 export type SourceFingerprint = Brand<string, 'SourceFingerprint'>
@@ -77,7 +79,7 @@ export type SourceArtifact = {
   readonly fileName: string
   readonly bytes: number
   readonly persistence: SourcePersistence
-} & FileReading
+} & ProfiledReading
 
 export interface DatasetProfile {
   readonly id: DatasetProfileId
@@ -242,6 +244,7 @@ const datasetProfileSchema = z
         bytes: z.number().int().nonnegative(),
         format: z.enum(['csv', 'tsv', 'parquet']),
         declared: columnDeclarationsSchema.optional(),
+        dialect: dialectRecordSchema.optional(),
         persistence: z.object({ kind: z.enum(['ephemeral', 'cached-locally']) }).strict(),
       })
       .strict(),
@@ -408,11 +411,18 @@ export function parseDatasetProfile(
       detail: 'The source fingerprint is not a SHA-256 digest.',
     })
   }
-  const reading = fileReadingOf(parsed.data.source.format, parsed.data.source.declared)
+  const reading = profiledReadingOf(
+    parsed.data.source.format,
+    parsed.data.source.declared,
+    parsed.data.source.dialect,
+  )
   if (!reading.ok) {
     return err({
       kind: 'inconsistent-profile',
-      detail: 'A Parquet file stores its column types, so a profile of one declares none.',
+      detail:
+        reading.error.kind === 'declarations-on-parquet'
+          ? 'A Parquet file stores its column types, so a profile of one declares none.'
+          : 'A Parquet file has no delimited dialect, so a profile of one records none.',
     })
   }
   const expectedProfileId = datasetProfileId(

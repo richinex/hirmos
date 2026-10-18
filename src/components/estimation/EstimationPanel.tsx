@@ -204,8 +204,6 @@ export function EstimationPanel({
   readonly onDeleteRun: (run: EstimationRunArtifact['id']) => void
   readonly onOpenStudy: () => void
 }) {
-  const columnName = (id: string): string =>
-    profile.columns.find((column) => column.id === id)?.name ?? id
   const identified = identifications.filter((identification) =>
     estimableIdentification(identification.result),
   )

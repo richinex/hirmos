@@ -105,7 +105,7 @@ test('perfect-fit validation is labelled and restored without t inference',async
   test.setTimeout(90000)
   const b=bases.find(b=>b.propensity_design===null&&b.experimental[0]?.length===2)
   if(b===undefined)throw new Error('The pinned oracle must include an unadjusted one-surrogate design.')
-  const csv=['sample,treatment,outcome,surrogate',...b.experimental.map((r,i)=>[1,b.treatment[i],r[1],r[1]].join(',')),...b.observational.map((r,i)=>[0,'',r[1],r[1]].join(','))].join('\n')
+  const csv=['sample,treatment,outcome,surrogate',...b.experimental.map((r,i)=>[1,b.treatment[i],r[1],r[1]].join(',')),...b.observational.map((r)=>[0,'',r[1],r[1]].join(','))].join('\n')
   const file={name:'surrogate-validation.csv',mimeType:'text/csv',buffer:Buffer.from(csv)}
   await page.goto('/app')
   await page.getByRole('textbox',{name:'Project name',exact:true}).fill('Perfect-fit validation acceptance')

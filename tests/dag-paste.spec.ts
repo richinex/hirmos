@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { choose as pick, fixture, prepare as prepareDataset } from './examples/support'
+import { fixture, prepare as prepareDataset } from './examples/support'
 import { expectVerdict } from './dagitty-verdict'
 
 const fixtureDir = fileURLToPath(new URL('fixtures/dagitty/', import.meta.url))

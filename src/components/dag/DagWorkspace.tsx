@@ -6,7 +6,6 @@ import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { Metadata } from '@/components/ui/Metadata'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { ParameterHelp } from '@/components/ui/ParameterLabel'
-import { Orb } from '@/components/ui/Orb'
 import { Alert } from '@/components/ui/Alert'
 import { Select } from '@/components/ui/Select'
 import { Fragment, useEffect, useMemo, useReducer, useState } from 'react'
@@ -73,7 +72,6 @@ import {
 } from '@/domain/dagImport'
 import {
   discoveryEvidenceReference,
-  discoveryEvidenceView,
   type DiscoveryCandidate,
 } from '@/domain/dagEvidence'
 import {

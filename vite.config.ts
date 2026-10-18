@@ -47,6 +47,7 @@ export default defineConfig({
         '**/test-results/**',
         '**/playwright-report/**',
         '**/*.md',
+        '**/.build/**',
       ],
     },
   },

@@ -74,7 +74,7 @@ export function retainPreprocessing(
   const draft =
     prepared !== null && prepared.sourceProfile === workflow.profile.id
       ? preparedDraft(prepared)
-      : initialPreprocessingDraft(workflow.profile)
+      : initialPreprocessingDraft()
   const recipe = readyPreprocessingRecipe(draft)
   return {
     profile: workflow.profile.id,
