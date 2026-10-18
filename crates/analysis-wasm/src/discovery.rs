@@ -1807,6 +1807,10 @@ mod tests {
                 assert!(matches!(samples, TemporalSamples::Dense));
             }
             AnalysisCommand::PropensityWeighting { .. }
+            | AnalysisCommand::ImitationRule { .. }
+            | AnalysisCommand::DecisionChecks { .. }
+            | AnalysisCommand::DecisionEvidence { .. }
+            | AnalysisCommand::LoggedPolicyValue { .. }
             | AnalysisCommand::SurrogatePath { .. }
             | AnalysisCommand::SurrogateDiagnostics { .. }
             | AnalysisCommand::Surrogate { .. }

@@ -1113,6 +1113,10 @@ pub(crate) enum IdentifiedDiscreteResult {
     deny_unknown_fields
 )]
 pub(crate) enum AnalysisCommand {
+    ImitationRule { request: crate::imitation_rule::Request },
+    DecisionChecks { request: crate::decision_checks::Request },
+    DecisionEvidence { request: crate::decision_evidence::Request },
+    LoggedPolicyValue { request: crate::logged_policy_value::Request },
     SurrogatePath { request: crate::surrogate::PathRequest },
     SurrogateDiagnostics { request: crate::surrogate::DiagnosticRequest },
     Surrogate { request: crate::surrogate::Request },
@@ -2778,6 +2782,10 @@ pub(crate) enum DagFalsificationEvidence {
 pub(crate) enum AnalysisResult {
     RawBalance { rows: Vec<crate::raw_balance::Row> },
     PowerPlanning { result: crate::power_planning::Evidence },
+    ImitationRule { evidence: crate::imitation_rule::Evidence },
+    DecisionChecks { evidence: crate::decision_checks::Evidence },
+    DecisionEvidence { evidence: crate::decision_evidence::Evidence },
+    LoggedPolicyValue { evidence: crate::logged_policy_value::Evidence },
     SurrogatePath { evidence: crate::surrogate::PathEvidence },
     SurrogateDiagnostics { evidence: crate::surrogate::DiagnosticEvidence },
     Surrogate { evidence: crate::surrogate::Evidence },

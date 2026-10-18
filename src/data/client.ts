@@ -38,6 +38,7 @@ import {
 
 type ProfileOutcome = Result<DatasetProfile, DatasetProfileProblem>
 type MaterializationOutcome = Result<NullableNumericMatrix, NumericMaterializationProblem>
+export type DecisionCellsOutcome = Result<Float64Array, NumericMaterializationProblem>
 type TimeSeriesMaterializationOutcome = Result<
   TimeOrderedNumericMatrix,
   TimeSeriesMaterializationProblem
@@ -78,6 +79,10 @@ type PendingRequest =
       readonly kind: 'time-series-materialization'
       readonly profile: DatasetProfile
       readonly resolve: (outcome: TimeSeriesMaterializationOutcome) => void
+    }
+  | {
+      readonly kind: 'decision-cells'
+      readonly resolve: (outcome: DecisionCellsOutcome) => void
     }
   | {
       readonly kind: 'panel-inspection'
@@ -124,6 +129,9 @@ const stopAll = (problem: SharedWorkerProblem) => {
         request.resolve(err(problem))
         break
       case 'time-series-materialization':
+        request.resolve(err(problem))
+        break
+      case 'decision-cells':
         request.resolve(err(problem))
         break
       case 'panel-inspection':
@@ -316,6 +324,30 @@ const dataWorker = (): Worker => {
       )
       return
     }
+    if (waiting.kind === 'decision-cells') {
+      if (
+        parsed.value.kind !== 'decision-cells-succeeded' &&
+        parsed.value.kind !== 'materialization-failed'
+      ) {
+        failAll('The data worker returned another response for a decision cell request.')
+        return
+      }
+      pending.delete(parsed.value.request)
+      if (parsed.value.kind === 'decision-cells-succeeded') {
+        waiting.resolve({ ok: true, value: parsed.value.cells })
+        return
+      }
+      const problem = parsed.value.problem
+      waiting.resolve(
+        problem.kind === 'time-value-unparseable' || problem.kind === 'duplicate-time-value'
+          ? err({
+              kind: 'worker-protocol-failed',
+              detail: 'The data worker returned a time-axis failure for a decision cell request.',
+            })
+          : err(problem),
+      )
+      return
+    }
     if (waiting.kind === 'time-series-materialization') {
       if (
         parsed.value.kind !== 'time-series-materialization-succeeded' &&
@@ -433,6 +465,40 @@ export function materializeNumericColumnsInWorker(
       file,
       profile,
       columnIds,
+    }
+    try {
+      dataWorker().postMessage(command)
+    } catch (cause: unknown) {
+      pending.delete(request)
+      resolve(
+        err({
+          kind: 'worker-unavailable',
+          detail: cause instanceof Error ? cause.message : String(cause),
+        }),
+      )
+    }
+  })
+}
+
+/** Count the prepared rows by action, outcome and sample in the data worker. */
+export function countDecisionCellsInWorker(
+  file: File,
+  profile: DatasetProfile,
+  action: ColumnId,
+  outcome: ColumnId,
+  membership?: import('@/domain/sampleMembership').CategoricalMembership,
+): Promise<DecisionCellsOutcome> {
+  const request = newImportRequestId()
+  return new Promise((resolve) => {
+    pending.set(request, { kind: 'decision-cells', resolve })
+    const command: DataWorkerCommand = {
+      kind: 'count-decision-cells',
+      request,
+      file,
+      profile,
+      action,
+      outcome,
+      membership,
     }
     try {
       dataWorker().postMessage(command)

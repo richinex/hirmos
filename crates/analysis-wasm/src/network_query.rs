@@ -1,4 +1,5 @@
 use super::*;
+use hirmos_causal_core::discrete_bn::{DiscreteBnError, Intervention};
 
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -60,12 +61,23 @@ pub fn run(values: &[f64], q: NetworkQuery) -> Result<AnalysisResult, String> {
             Ok((q.names[a.variable].clone(), state.0.clone()))
         }).collect()
     };
-    let interventions = resolve(&q.interventions)?;
+    let interventions = resolve(&q.interventions)?
+        .into_iter()
+        .map(|(variable, state)| Intervention { variable, state })
+        .collect::<Vec<_>>();
     let observations = resolve(&q.observations)?;
     let edges = q.edges.iter().map(|&(a,b)| (q.names[a].clone(),q.names[b].clone())).collect::<Vec<_>>();
     let bn = DiscreteBn::fit(DiscreteDag::new(&edges,&q.names), &frame, q.equivalent_sample_size);
     let outcomes = q.outcomes.iter().map(|&i| q.names[i].clone()).collect::<Vec<_>>();
-    let distribution = bn.distribution(&outcomes, &interventions, &observations)?;
+    let result = bn
+        .query_under_intervention(&outcomes, &interventions, &observations)
+        .map_err(|error| match error {
+            DiscreteBnError::ZeroProbabilityEvidence => {
+                "The observed evidence has zero probability under this model.".to_string()
+            }
+            other => other.to_string(),
+        })?;
+    let distribution = result.states.into_iter().zip(result.probabilities).collect();
     Ok(AnalysisResult::NetworkQuery { observations: q.rows, states, distribution })
 }
 

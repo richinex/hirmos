@@ -2,6 +2,7 @@
 
 import {
   inspectPanelStructure,
+  countDecisionCells,
   materializeNumericColumns,
   materializePanelKeys,
   materializePanelLong,
@@ -46,6 +47,7 @@ self.onmessage = (message: MessageEvent<unknown>) => {
           emit({ kind: 'column-profile-failed', request: command.request, problem })
           return
         case 'materialize-numeric':
+        case 'count-decision-cells':
           emit({ kind: 'materialization-failed', request: command.request, problem })
           return
         case 'materialize-time-series':
@@ -125,6 +127,22 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         emit(
           { kind: 'materialization-succeeded', request: command.request, matrix: result.value },
           [result.value.values.buffer, result.value.validity.buffer],
+        )
+        return
+      }
+      case 'count-decision-cells': {
+        const result = await countDecisionCells(
+          source.value,
+          command.profile,
+          command.action,
+          command.outcome,
+          command.membership,
+        )
+        emit(
+          result.ok
+            ? { kind: 'decision-cells-succeeded', request: command.request, cells: result.value }
+            : { kind: 'materialization-failed', request: command.request, problem: result.error },
+          result.ok ? [result.value.buffer] : undefined,
         )
         return
       }

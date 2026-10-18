@@ -11,6 +11,9 @@ const NOUNS = {
   'dag-check': 'graph check',
   'model-check': 'causal model check',
   'swig-graph': 'saved graph',
+  'decision-frame': 'framed decision',
+  'decision-evidence': 'evidence run',
+  'decision-record': 'recorded decision',
 } as const satisfies Record<DeletionTarget['kind'], string>
 
 const CONFIRM_LABELS = {
@@ -19,6 +22,9 @@ const CONFIRM_LABELS = {
   'dag-check': 'Delete check',
   'model-check': 'Delete check',
   'swig-graph': 'Delete graph',
+  'decision-frame': 'Delete decision',
+  'decision-evidence': 'Delete run',
+  'decision-record': 'Delete record',
 } as const satisfies Record<DeletionTarget['kind'], string>
 
 export function ArtifactDeletionDialog({

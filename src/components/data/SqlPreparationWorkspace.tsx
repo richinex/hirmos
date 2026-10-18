@@ -221,7 +221,7 @@ function SqlEditor({
         Prepare with SQL
       </ChapterHeading>
       {recovery}
-      <div className="mac-terminal mx-3 mb-3 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[10px]">
+      <div className="mac-terminal flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <div className="mac-terminal-bar relative flex h-7 shrink-0 select-none items-center px-2">
           <span className="flex gap-2" aria-hidden>
             <i className="size-3 rounded-full bg-[#FF5F57]" />

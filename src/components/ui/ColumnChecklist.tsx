@@ -9,6 +9,7 @@ export function ColumnChecklist<Id extends string>({
   selected,
   reserved = [],
   onChange,
+  width = 'max-w-3xl',
 }: {
   readonly title: string
   readonly help: string
@@ -16,18 +17,21 @@ export function ColumnChecklist<Id extends string>({
   readonly selected: readonly Id[]
   readonly reserved?: readonly Id[]
   readonly onChange: (selected: readonly Id[]) => void
+  /** Match the controls above it, so the actions end where they end. */
+  readonly width?: 'max-w-md' | 'max-w-2xl' | 'max-w-3xl'
 }) {
   const chosen = new Set(selected)
   const locked = new Set(reserved)
   return (
-    <div className="min-w-0 max-w-3xl">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className={`min-w-0 ${width}`}>
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <span className={fieldLabel}>{title}</span>
         <SelectionActions
           selectLabel={`Select all ${title.toLowerCase()}`}
           clearLabel={`Clear selected ${title.toLowerCase()}`}
           onSelectAll={() => onChange(columns.filter((c) => !locked.has(c.id)).map((c) => c.id))}
           onClear={() => onChange([])}
+          size="sm"
         />
       </div>
       <p className={`${fieldHint} mb-2 max-w-[65ch]`}>{help}</p>

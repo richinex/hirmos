@@ -4,6 +4,11 @@
 //! The façade owns browser-facing validation and serialization. It does not reinterpret test
 //! evidence or copy the numerical implementations out of the Hirmos causal core.
 
+mod decision_checks;
+mod decision_evidence;
+mod holdout;
+mod logged_policy_value;
+mod imitation_rule;
 mod raw_balance;
 mod causal_forest;
 mod swig_analysis;
@@ -177,6 +182,10 @@ pub fn run_analysis(
         );
     };
     let result = match command {
+        AnalysisCommand::DecisionChecks { request } => decision_checks::run(request).map(|evidence| AnalysisResult::DecisionChecks { evidence }),
+        AnalysisCommand::DecisionEvidence { request } => decision_evidence::run(request, values).map(|evidence| AnalysisResult::DecisionEvidence { evidence }),
+        AnalysisCommand::LoggedPolicyValue { request } => logged_policy_value::run(request, values, |stage, done, total| progress(stage, done, total)).map(|evidence| AnalysisResult::LoggedPolicyValue { evidence }),
+        AnalysisCommand::ImitationRule { request } => imitation_rule::run(request, values).map(|evidence| AnalysisResult::ImitationRule { evidence }),
         AnalysisCommand::SurrogatePath { request } => surrogate::path(request).map(|evidence| AnalysisResult::SurrogatePath { evidence }),
         AnalysisCommand::SurrogateDiagnostics { request } => surrogate::diagnose(request).map(|evidence| AnalysisResult::SurrogateDiagnostics { evidence }),
         AnalysisCommand::Surrogate { request } => surrogate::run(request).map(|evidence| AnalysisResult::Surrogate { evidence }),

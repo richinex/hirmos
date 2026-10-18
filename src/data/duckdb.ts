@@ -130,7 +130,9 @@ export interface EngineOptions {
   readonly arrowLosslessConversion?: boolean
 }
 
-const startEngine = async ({ arrowLosslessConversion = true }: EngineOptions = {}): Promise<DuckDbEngine> => {
+const startEngine = async ({
+  arrowLosslessConversion = true,
+}: EngineOptions = {}): Promise<DuckDbEngine> => {
   const bundle = await duckdb.selectBundle(LOCAL_BUNDLES)
   if (!bundle.mainWorker) throw new Error('This browser did not select a DuckDB worker bundle.')
   const worker = new Worker(bundle.mainWorker)
@@ -523,6 +525,62 @@ export async function materializeNumericColumns(
         profile,
         selected.value,
       ),
+  )
+}
+
+/** Most distinct (action, outcome, sample) cells a decision log may reduce to. */
+export const DECISION_CELL_LIMIT = 1_000_000
+
+/**
+ * Rows grouped by action, outcome and sample, four numbers per cell: action, outcome, sample and
+ * count. Sample 1 is randomised, 0 logged and 2 neither; without a membership every row is logged.
+ */
+export async function countDecisionCells(
+  source: SelectedSource,
+  profile: DatasetProfile,
+  action: ColumnId,
+  outcome: ColumnId,
+  membership?: CategoricalMembership,
+): Promise<Result<Float64Array, NumericMaterializationProblem>> {
+  const named = (id: ColumnId) => profile.columns.find((column) => column.id === id)
+  const actionColumn = named(action)
+  const outcomeColumn = named(outcome)
+  const sampleColumn = membership === undefined ? null : named(membership.column)
+  if (actionColumn === undefined || outcomeColumn === undefined || sampleColumn === undefined)
+    return err({
+      kind: 'materialization-failed',
+      detail: 'A decision column is not in the dataset.',
+    })
+  const a = sqlIdentifier(actionColumn.name)
+  const y = sqlIdentifier(outcomeColumn.name)
+  const sample =
+    membership === undefined || sampleColumn === null
+      ? '0'
+      : `CASE WHEN ${sqlIdentifier(sampleColumn.name)} IS NULL THEN 2 WHEN ${filterClause(sampleColumn.name, { kind: 'one-of', column: sampleColumn.id, values: membership.experimental })} THEN 1 WHEN ${filterClause(sampleColumn.name, { kind: 'one-of', column: sampleColumn.id, values: membership.observational })} THEN 0 ELSE 2 END`
+  return withSource(
+    source,
+    profile,
+    (detail): NumericMaterializationProblem => ({ kind: 'materialization-failed', detail }),
+    (expected, actual): NumericMaterializationProblem => ({
+      kind: 'source-changed',
+      expected,
+      actual,
+    }),
+    async (connection, relation) => {
+      const table = await connection.query(
+        `SELECT CAST(${a} AS DOUBLE) AS a, CAST(${y} AS DOUBLE) AS y, CAST(${sample} AS DOUBLE) AS s, CAST(count(*) AS DOUBLE) AS n FROM ${relation} WHERE ${a} IS NOT NULL AND ${y} IS NOT NULL GROUP BY ALL ORDER BY ALL LIMIT ${DECISION_CELL_LIMIT + 1}`,
+      )
+      if (table.numRows > DECISION_CELL_LIMIT)
+        return err({
+          kind: 'materialization-failed',
+          detail: `The action and outcome take more than ${DECISION_CELL_LIMIT.toLocaleString('en-GB')} distinct pairs.`,
+        })
+      const columns = ['a', 'y', 's', 'n'].map((name) => table.getChild(name)!)
+      const cells = new Float64Array(table.numRows * 4)
+      for (let row = 0; row < table.numRows; row += 1)
+        for (let j = 0; j < 4; j += 1) cells[row * 4 + j] = Number(columns[j]!.get(row))
+      return ok(cells)
+    },
   )
 }
 

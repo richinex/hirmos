@@ -156,6 +156,9 @@ const loadSensitivityPanel = preloadable(
 const loadCounterfactualPanel = preloadable(
   async () => (await import('@/components/counterfactual/CounterfactualPanel')).CounterfactualPanel,
 )
+const loadDecisionWorkspace = preloadable(
+  async () => (await import('@/components/decisions/DecisionWorkspace')).DecisionWorkspace,
+)
 const loadResultsPanel = preloadable(
   async () => (await import('@/components/results/ResultsPanel')).ResultsPanel,
 )
@@ -176,6 +179,7 @@ const PANEL_LOADERS: Partial<Record<ChapterId, () => Promise<unknown>>> = {
   estimation: loadEstimationPanel,
   sensitivity: loadSensitivityPanel,
   counterfactual: loadCounterfactualPanel,
+  decisions: loadDecisionWorkspace,
   results: loadResultsPanel,
 }
 
@@ -194,6 +198,7 @@ function chapter<P extends object>(load: () => Promise<ComponentType<P>>): Compo
 }
 
 const DagWorkspace = chapter(loadDagWorkspace)
+const DecisionWorkspace = chapter(loadDecisionWorkspace)
 
 const SurvivalPanel = chapter(loadSurvivalPanel)
 const RootCausePanel = chapter(loadRootCausePanel)
@@ -804,6 +809,8 @@ function App() {
     if (chapter === 'sensitivity') return hasSensitivitySource
     if (chapter === 'counterfactual')
       return workflow.kind === 'profiled' && workflow.estimationRuns.length > 0
+    if (chapter === 'decisions')
+      return workflow.kind === 'profiled' && workflow.dagDocuments.length > 0
     if (chapter === 'results')
       return (
         workflow.kind === 'profiled' &&
@@ -879,6 +886,12 @@ function App() {
         return !hasSensitivitySource
           ? 'locked'
           : workflow.sensitivityRuns.length > 0
+            ? 'done'
+            : 'not-started'
+      case 'decisions':
+        return workflow.kind !== 'profiled' || workflow.dagDocuments.length === 0
+          ? 'locked'
+          : workflow.decisionFrames.length > 0
             ? 'done'
             : 'not-started'
       case 'counterfactual':
@@ -1092,6 +1105,7 @@ function App() {
         'estimation',
         'sensitivity',
         'counterfactual',
+        'decisions',
         'results',
       ].includes(activeChapter))
 
@@ -1994,6 +2008,39 @@ function App() {
                           onRun={(run) => dispatch({ type: 'counterfactual-run-created', run })}
                           onDeleteRun={(run) =>
                             dispatch({ type: 'counterfactual-run-deleted', run })
+                          }
+                        />
+                      </Suspense>
+                    </ChapterBoundary>
+                  )}
+                  {activeChapter === 'decisions' && workflow.prepared !== null && (
+                    <ChapterBoundary key={activeChapter} chapter={activeName}>
+                      <Suspense fallback={<ChapterSkeleton label="Loading the decision lab…" />}>
+                        <DecisionWorkspace
+                          key={workflow.prepared.id}
+                          onActivity={reportActivity.decisions}
+                          documents={workflow.dagDocuments}
+                          frames={workflow.decisionFrames}
+                          onFrame={(frame) => dispatch({ type: 'decision-frame-created', frame })}
+                          onDeleteFrame={(id) => setDeletionTarget({ kind: 'decision-frame', id })}
+                          data={{
+                            source: workflow.source,
+                            profile: workflow.profile,
+                            prepared: workflow.prepared,
+                          }}
+                          evidence={workflow.decisionEvidence}
+                          onEvidence={(evidence) =>
+                            dispatch({ type: 'decision-evidence-created', evidence })
+                          }
+                          onDeleteEvidence={(id) =>
+                            setDeletionTarget({ kind: 'decision-evidence', id })
+                          }
+                          records={workflow.decisionRecords}
+                          onRecordDecision={(record) =>
+                            dispatch({ type: 'decision-record-created', record })
+                          }
+                          onDeleteRecord={(id) =>
+                            setDeletionTarget({ kind: 'decision-record', id })
                           }
                         />
                       </Suspense>

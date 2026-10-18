@@ -3,6 +3,21 @@ import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import { ColumnChecklist } from '@/components/ui/ColumnChecklist'
 import { field, fieldHint, fieldRow } from '@/components/ui/recipes'
 
+type CategoryTitles = {
+  readonly experimental: string
+  readonly experimentalHelp: string
+  readonly observational: string
+  readonly observationalHelp: string
+}
+
+const SAMPLE_TITLES: CategoryTitles = {
+  experimental: 'Experimental sample categories',
+  experimentalHelp:
+    'Choose the values belonging to the experimental sample. Each value can belong to only one sample. Unselected values are excluded and counted. Missing membership values are not assigned to either sample.',
+  observational: 'Observational sample categories',
+  observationalHelp: 'Choose the values belonging to the observational sample.',
+}
+
 type Categories =
   | { readonly kind: 'loading' }
   | { readonly kind: 'failed'; readonly message: string }
@@ -14,6 +29,7 @@ export function SurrogateCategoryPicker({
   experimental,
   observational,
   onChange,
+  titles = SAMPLE_TITLES,
 }: {
   readonly file: File
   readonly profile: DatasetProfile
@@ -21,6 +37,7 @@ export function SurrogateCategoryPicker({
   readonly experimental: readonly string[]
   readonly observational: readonly string[]
   readonly onChange: (experimental: readonly string[], observational: readonly string[]) => void
+  readonly titles?: CategoryTitles
 }) {
   const [categories, setCategories] = useState<Categories>({ kind: 'loading' })
   const [search, setSearch] = useState('')
@@ -92,8 +109,8 @@ export function SurrogateCategoryPicker({
       <div className={fieldRow.two}>
         <div className="max-h-64 overflow-auto">
           <ColumnChecklist
-            title="Experimental sample categories"
-            help="Choose the values belonging to the experimental sample. Each value can belong to only one sample. Unselected values are excluded and counted. Missing membership values are not assigned to either sample."
+            title={titles.experimental}
+            help={titles.experimentalHelp}
             columns={choices}
             selected={experimental}
             reserved={observational}
@@ -102,8 +119,8 @@ export function SurrogateCategoryPicker({
         </div>
         <div className="max-h-64 overflow-auto">
           <ColumnChecklist
-            title="Observational sample categories"
-            help="Choose the values belonging to the observational sample."
+            title={titles.observational}
+            help={titles.observationalHelp}
             columns={choices}
             selected={observational}
             reserved={experimental}

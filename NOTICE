@@ -94,6 +94,51 @@ CausalNex — Apache-2.0
   the QuantumBlack logo are trademarks of QuantumBlack Visual Analytics Limited and
   are not licensed.
 
+PyMDPtoolbox — BSD-3-Clause
+  Copyright (c) 2011-2013 Steven A. W. Cordwell. Copyright (c) 2009 INRA.
+  https://github.com/sawcordwell/pymdptoolbox (revision 7c96789c).
+  Port: crates/causal-core/src/reinforcement/decision_process.rs (MDP._bellmanOperator,
+  ValueIteration, FiniteHorizon, QLearning; modified 2026-10: interventional transition rows,
+  fixed-policy evaluation and action values added).
+
+Causal-RL and Causal-Gymnasium — Apache-2.0
+  CausalAILab, Columbia University. https://github.com/CausalAILab/Causal-RL and
+  https://github.com/CausalAILab/Causal-Gymnasium; the repositories give no copyright line.
+  Ports: crates/causal-core/src/reinforcement/{where_to_intervene,offline_to_online,
+  counterfactual_bandit,optimistic_q_learning}.rs (algo/where_do, algo/cool,
+  algo/ctf_do/ctfucb.py, algo/ctf_do/ucbq.py and the mab_cool and greedy_casino
+  environments, modified 2026-10: restructured as typed values, with seeded episodes and
+  NumPy's binomial sampler for reproducible runs). reinforcement/{reward_shaping,windy_grid}.rs
+  port algo/reward_shaping/{q_ucb,calculate_values}.py, envs/windy_minigrid.py,
+  envs/lava_minigrid.py and MiniGridActionRemapWrapper, modified 2026-10 in the same way.
+  reinforcement/counterfactual_planning.rs is written from the paper's Algorithms 10 and 11,
+  not from algo/ctf_do/ucbvi.py; reinforcement/sequential_backdoor.rs from Definition 15;
+  reinforcement/treatment_regimes.rs from Algorithms 6 and 7, Theorems 11 and 12 and Eq. 302;
+  reinforcement/hybrid_policy.rs from section 7.3, solved as a constrained MDP instead of the
+  paper's polynomial program.
+  reinforcement/imitation.rs ports find_pi_backdoor, conditioning_set and
+  find_sequential_pi_backdoor from algo/imitation/{imitate_single_step,imitate}.py, taking
+  observed variables and the time order as inputs instead of reading them from names.
+  reinforcement/{policy_networks,behaviour_cloning,adversarial_imitation,soft_imitation}.rs
+  port the networks and training of algo/imitation/imitate.py (PolicyNN, ContinuousPolicyNN,
+  train_policy), gail/ (core_net.py, causal_gail.py), sqil/ and iqlearn/ to Burn, modified
+  2026-10: weights and dropout drawn from a seeded generator, discrete GAIL actions one-hot in
+  the discriminator input, gradient-norm clipping across all parameters as in PyTorch.
+
+Open Bandit Pipeline — Apache-2.0
+  Copyright 2020 Yuta Saito, Yusuke Narita, and ZOZO Technologies, Inc.
+  https://github.com/st-tech/zr-obp (version 0.5.5). reinforcement/off_policy_evaluation.rs
+  ports InverseProbabilityWeighting, SelfNormalizedInverseProbabilityWeighting and
+  estimate_confidence_interval_by_bootstrap from
+  obp/ope/estimators.py and obp/utils.py, modified 2026-10: the target policy's probability of
+  each logged action is passed per row instead of as a full action distribution.
+
+Minigrid — Apache-2.0
+  Farama Foundation. https://github.com/Farama-Foundation/Minigrid (version 3.2.0); the
+  licence file gives no copyright line. reinforcement/windy_grid.rs ports the grid moves and
+  agent placement of minigrid_env.MiniGridEnv, modified 2026-10: a fixed 9 by 9 grid with
+  only the cells and moves the lava layouts use.
+
 Rust crates linked into the wasm binary (licences as declared on crates.io):
   nalgebra, nalgebra-macros, simba, approx — Apache-2.0
   libm, zmij — MIT

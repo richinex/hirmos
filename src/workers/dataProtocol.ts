@@ -64,6 +64,15 @@ export type DataWorkerCommand =
       readonly columnIds: readonly [ColumnId, ...ColumnId[]]
     }
   | {
+      readonly kind: 'count-decision-cells'
+      readonly request: ImportRequestId
+      readonly file: File
+      readonly profile: DatasetProfile
+      readonly action: ColumnId
+      readonly outcome: ColumnId
+      readonly membership?: CategoricalMembership
+    }
+  | {
       readonly kind: 'materialize-time-series'
       readonly interpretation?: TimeInterpretation
       readonly request: ImportRequestId
@@ -147,6 +156,12 @@ export type DataWorkerEvent =
       readonly kind: 'time-series-materialization-succeeded'
       readonly request: ImportRequestId
       readonly matrix: TimeOrderedNumericMatrix
+    }
+  | {
+      readonly kind: 'decision-cells-succeeded'
+      readonly request: ImportRequestId
+      /** Action, outcome, sample and count for each cell. */
+      readonly cells: Float64Array
     }
   | {
       readonly kind: 'materialization-failed'
@@ -241,6 +256,17 @@ const commandSchema = onFirstUse(() =>
         file: z.instanceof(File),
         profile: z.unknown(),
         columnIds: z.array(z.string()).min(1),
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('count-decision-cells'),
+        request: requestSchema,
+        file: z.instanceof(File),
+        profile: z.unknown(),
+        action: z.string(),
+        outcome: z.string(),
+        membership: categoricalMembershipSchema.optional(),
       })
       .strict(),
     z
@@ -429,6 +455,13 @@ const eventSchema = onFirstUse(() =>
         kind: z.literal('time-series-materialization-succeeded'),
         request: requestSchema,
         matrix: z.unknown(),
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('decision-cells-succeeded'),
+        request: requestSchema,
+        cells: z.instanceof(Float64Array).refine((cells) => cells.length % 4 === 0),
       })
       .strict(),
     z
@@ -723,6 +756,23 @@ export function parseDataWorkerCommand(
         columnId: column.id,
       })
     }
+    case 'count-decision-cells': {
+      const columns = bindColumns(known, [
+        data.action,
+        data.outcome,
+        ...(data.membership === undefined ? [] : [data.membership.column]),
+      ])
+      if (!columns.ok) return columns
+      return ok({
+        kind: 'count-decision-cells',
+        request: request.value,
+        file: data.file,
+        profile: profile.value,
+        action: columns.value[0],
+        outcome: columns.value[1]!,
+        membership: data.membership,
+      })
+    }
     case 'materialize-numeric': {
       if (data.membership !== undefined && !data.columnIds.includes(data.membership.column))
         return err({
@@ -763,6 +813,7 @@ export function parseDataWorkerEvent(value: unknown): Result<DataWorkerEvent, Da
     case 'column-profile-failed':
     case 'summary-succeeded':
     case 'preview-window-succeeded':
+    case 'decision-cells-succeeded':
       return ok({ ...parsed.data, request: request.value })
     case 'summary-failed':
       return ok({

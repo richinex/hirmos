@@ -14,6 +14,7 @@ export const CHAPTER_IDS = [
   'counterfactual',
   'root-cause',
   'survival',
+  'decisions',
   'results',
 ] as const
 
@@ -26,6 +27,7 @@ const CHAPTER_SECTION_TITLES = [
   'Estimate',
   'Causal models',
   'Time to event',
+  'Decide',
   'Report',
 ] as const
 type ChapterSectionTitle = (typeof CHAPTER_SECTION_TITLES)[number]
@@ -80,6 +82,7 @@ export const CHAPTER_METADATA = {
     icon: 'vital_signs',
     section: 'Time to event',
   },
+  decisions: { name: 'Decision lab', shortName: 'Decisions', icon: 'route', section: 'Decide' },
   results: { name: 'Results', shortName: 'Results', icon: 'monitoring', section: 'Report' },
 } as const satisfies Readonly<Record<ChapterId, ChapterMetadata>>
 
@@ -110,7 +113,10 @@ export type RouteProblem =
   | { readonly kind: 'invalid-chapter-query'; readonly value: string }
 
 /** The project list never names a project; every other chapter does while one is open. */
-export const chapterPath = (chapter: ChapterId, project: ProjectId | null = null): `/app/${string}` =>
+export const chapterPath = (
+  chapter: ChapterId,
+  project: ProjectId | null = null,
+): `/app/${string}` =>
   project === null || chapter === 'projects'
     ? `/app/${chapter}`
     : `/app/projects/${encodeURIComponent(project)}/${chapter}`

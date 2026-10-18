@@ -150,6 +150,13 @@ import type { PandasResamplingEvidence, ResamplingAggregation } from '@/domain/r
 import type { BackdoorIdentificationEvidence } from '@/domain/study'
 import type { DagCheckEvidence } from '@/domain/dagValidation'
 import type { SwigSpecification, SwigEvidence } from '@/domain/swig'
+import type { DecisionChecksRequest, DecisionChecksEvidence } from '@/domain/decisionFrame'
+import type {
+  DecisionEvidenceRequest,
+  DecisionEvidenceResult,
+  LoggedPolicyValueRequest,
+  LoggedPolicyValueResult,
+} from '@/domain/decisionEvidence'
 import type { IdentifiedDiscreteQueryEvidence } from '@/domain/intervention'
 import type { NetworkQuery, NetworkQueryEvidence } from '@/domain/networkQuery'
 import type {
@@ -2207,6 +2214,42 @@ export function runBinaryEtt(
     'binary-ett-succeeded',
     { kind: 'binary-ett', request, values, rows, columns, ...design },
     values,
+  )
+}
+
+export function runDecisionChecks(
+  model: DecisionChecksRequest,
+): Promise<Result<DecisionChecksEvidence, AnalysisWorkerProblem>> {
+  const request = newWorkerRequestId()
+  const values = new Float64Array()
+  return post(
+    'decision-checks-succeeded',
+    { kind: 'decision-checks', request, values, model },
+    values,
+  )
+}
+
+export function runDecisionEvidence(
+  cells: Float64Array,
+  model: DecisionEvidenceRequest,
+): Promise<Result<DecisionEvidenceResult, AnalysisWorkerProblem>> {
+  const request = newWorkerRequestId()
+  return post(
+    'decision-evidence-succeeded',
+    { kind: 'decision-evidence', request, values: cells, model },
+    cells,
+  )
+}
+
+export function runLoggedPolicyValue(
+  rows: Float64Array,
+  model: LoggedPolicyValueRequest,
+): Promise<Result<LoggedPolicyValueResult, AnalysisWorkerProblem>> {
+  const request = newWorkerRequestId()
+  return post(
+    'logged-policy-value-succeeded',
+    { kind: 'logged-policy-value', request, values: rows, model },
+    rows,
   )
 }
 

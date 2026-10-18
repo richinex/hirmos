@@ -179,6 +179,26 @@ export const adjustedRegressionFixedEffectsSchema = z.discriminatedUnion('kind',
 export type AdjustedRegressionFixedEffects = z.infer<typeof adjustedRegressionFixedEffectsSchema>
 import { dagCheckEvidenceSchema, type DagCheckEvidence } from '@/domain/dagValidation'
 import {
+  decisionChecksRequestSchema,
+  decisionChecksEvidenceSchema,
+  type DecisionChecksRequest,
+  type DecisionChecksEvidence,
+} from '@/domain/decisionFrame'
+import {
+  decisionEvidenceRequestSchema,
+  decisionEvidenceResultSchema,
+  loggedPolicyValueRequestSchema,
+  loggedPolicyValueResultSchema,
+  type DecisionEvidenceRequest,
+  type DecisionEvidenceResult,
+  type LoggedPolicyValueRequest,
+  type LoggedPolicyValueResult,
+  imitationRuleRequestSchema,
+  imitationRuleEvidenceSchema,
+  type ImitationRuleRequest,
+  type ImitationRuleEvidence,
+} from '@/domain/decisionEvidence'
+import {
   swigSpecificationSchema,
   swigEvidenceSchema,
   type SwigSpecification,
@@ -909,6 +929,33 @@ export type AnalysisWorkerCommand =
       readonly outcome: number
       readonly unobserved: readonly number[]
       readonly estimand: 'ate' | 'att'
+    }
+  | {
+      readonly kind: 'decision-checks'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly model: DecisionChecksRequest
+    }
+  | {
+      readonly kind: 'decision-evidence'
+      readonly request: WorkerRequestId
+      /** Action, outcome, sample and count for each cell. */
+      readonly values: Float64Array
+      readonly model: DecisionEvidenceRequest
+    }
+  | {
+      readonly kind: 'logged-policy-value'
+      readonly request: WorkerRequestId
+      /** Action, reward, logged propensity and input pattern for each logged row. */
+      readonly values: Float64Array
+      readonly model: LoggedPolicyValueRequest
+    }
+  | {
+      readonly kind: 'imitation-rule'
+      readonly request: WorkerRequestId
+      /** One row of the rule's inputs per demonstration. */
+      readonly values: Float64Array
+      readonly model: ImitationRuleRequest
     }
   | {
       readonly kind: 'swig-analysis'
@@ -1818,6 +1865,26 @@ export type AnalysisWorkerEvent =
       readonly kind: 'backdoor-identification-succeeded'
       readonly request: WorkerRequestId
       readonly result: BackdoorIdentificationEvidence
+    }
+  | {
+      readonly kind: 'decision-checks-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: DecisionChecksEvidence
+    }
+  | {
+      readonly kind: 'decision-evidence-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: DecisionEvidenceResult
+    }
+  | {
+      readonly kind: 'logged-policy-value-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: LoggedPolicyValueResult
+    }
+  | {
+      readonly kind: 'imitation-rule-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: ImitationRuleEvidence
     }
   | {
       readonly kind: 'swig-analysis-succeeded'
@@ -2928,6 +2995,43 @@ const commandSchema = onFirstUse(() =>
         estimand: z.enum(['ate', 'att']),
       })
       .strict(),
+    z
+      .object({
+        kind: z.literal('decision-checks'),
+        request: requestSchema,
+        values: z.instanceof(Float64Array).refine((v) => v.length === 0),
+        model: decisionChecksRequestSchema,
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('decision-evidence'),
+        request: requestSchema,
+        values: z.instanceof(Float64Array).refine((v) => v.length > 0 && v.length % 4 === 0),
+        model: decisionEvidenceRequestSchema,
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('logged-policy-value'),
+        request: requestSchema,
+        values: z.instanceof(Float64Array).refine((v) => v.length > 0 && v.length % 4 === 0),
+        model: loggedPolicyValueRequestSchema,
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('imitation-rule'),
+        request: requestSchema,
+        values: z.instanceof(Float64Array),
+        model: imitationRuleRequestSchema,
+      })
+      .strict()
+      .refine(
+        (command) =>
+          command.values.length === command.model.width * command.model.actions.chosen.length,
+        'The inputs do not match the demonstrations.',
+      ),
     z
       .object({
         kind: z.literal('swig-analysis'),
@@ -4061,6 +4165,34 @@ const eventSchema = onFirstUse(() =>
       .strict(),
     z
       .object({
+        kind: z.literal('decision-checks-succeeded'),
+        request: requestSchema,
+        result: decisionChecksEvidenceSchema,
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('decision-evidence-succeeded'),
+        request: requestSchema,
+        result: decisionEvidenceResultSchema,
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('logged-policy-value-succeeded'),
+        request: requestSchema,
+        result: loggedPolicyValueResultSchema,
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('imitation-rule-succeeded'),
+        request: requestSchema,
+        result: imitationRuleEvidenceSchema,
+      })
+      .strict(),
+    z
+      .object({
         kind: z.literal('swig-analysis-succeeded'),
         request: requestSchema,
         result: swigEvidenceSchema,
@@ -4857,6 +4989,14 @@ export function parseAnalysisWorkerEvent(
         })
       : err({ kind: 'invalid-event', detail: result.error.detail })
   }
+  if (parsed.data.kind === 'decision-checks-succeeded')
+    return ok({ kind: parsed.data.kind, request: request.value, result: parsed.data.result })
+  if (parsed.data.kind === 'decision-evidence-succeeded')
+    return ok({ kind: parsed.data.kind, request: request.value, result: parsed.data.result })
+  if (parsed.data.kind === 'logged-policy-value-succeeded')
+    return ok({ kind: parsed.data.kind, request: request.value, result: parsed.data.result })
+  if (parsed.data.kind === 'imitation-rule-succeeded')
+    return ok({ kind: parsed.data.kind, request: request.value, result: parsed.data.result })
   if (parsed.data.kind === 'swig-analysis-succeeded') {
     return ok({
       kind: 'swig-analysis-succeeded',

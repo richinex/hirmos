@@ -1,7 +1,8 @@
 //! Discrete Bayesian-network operations ported from pgmpy. The input adapter preserves observed
 //! states for already-discrete columns and quantile-bins higher-cardinality measurements. The
 //! remaining operations cover BDeu tables, variable elimination, minimal adjustment, and
-//! parent-adjusted do-queries.
+//! parent-adjusted do-queries. The chapter 12 lane adds checked explicit kernels and ideal
+//! graph-surgery queries, including additional evidence and simultaneous interventions.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
@@ -218,7 +219,7 @@ pub fn discretize_for_discrete_bn(
 }
 
 /// A directed acyclic graph over named nodes.
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Dag {
     pub nodes: Vec<String>,
     pub edges: Vec<(String, String)>,
@@ -406,7 +407,7 @@ impl Dag {
 
 /// A conditional probability table. `values[state * n_cols + col]`, where the columns run
 /// over the parent configurations with the first parent varying slowest.
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Cpd {
     pub variable: String,
     pub states: Vec<String>,
@@ -434,6 +435,90 @@ impl Cpd {
     }
 }
 
+/// Failures at the checked discrete Bayesian-network boundary.
+#[derive(Clone, Debug, PartialEq)]
+pub enum DiscreteBnError {
+    EmptyNode,
+    DuplicateNode(String),
+    UnknownEdgeNode(String),
+    DuplicateEdge(String, String),
+    Cycle,
+    MissingCpd(String),
+    DuplicateCpd(String),
+    UnknownCpdVariable(String),
+    ParentMismatch {
+        variable: String,
+        graph: Vec<String>,
+        cpd: Vec<String>,
+    },
+    ParentStateMismatch {
+        variable: String,
+        parent: String,
+    },
+    EmptyStates(String),
+    DuplicateState {
+        variable: String,
+        state: String,
+    },
+    InvalidCpdLength {
+        variable: String,
+        expected: usize,
+        actual: usize,
+    },
+    InvalidProbability {
+        variable: String,
+        index: usize,
+        value: f64,
+    },
+    UnnormalizedCpdColumn {
+        variable: String,
+        column: usize,
+        sum: f64,
+    },
+    EmptyTargets,
+    DuplicateTarget(String),
+    UnknownVariable(String),
+    UnknownState {
+        variable: String,
+        state: String,
+    },
+    DuplicateIntervention(String),
+    ConflictingAssignment {
+        variable: String,
+        intervention: String,
+        evidence: String,
+    },
+    ZeroProbabilityEvidence,
+    StateSpaceTooLarge,
+    InvalidTolerance(f64),
+}
+
+impl std::fmt::Display for DiscreteBnError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "{self:?}")
+    }
+}
+
+impl std::error::Error for DiscreteBnError {}
+
+/// One ideal intervention fixing a named variable to a named state.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Intervention {
+    pub variable: String,
+    pub state: String,
+}
+
+/// A normalized distribution over one or more query variables.
+///
+/// Each entry in `states` is one joint assignment in `variables` order.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DiscreteDistribution {
+    pub variables: Vec<String>,
+    pub states: Vec<Vec<String>>,
+    pub probabilities: Vec<f64>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct DiscreteBn {
     pub dag: Dag,
     pub cpds: Vec<Cpd>,
@@ -481,9 +566,9 @@ pub fn estimate_cpd(
                 counts[s * n_cols + col] /= total;
             }
         } else {
-            // pgmpy MaximumLikelihoodEstimator uses a uniform conditional for
-            // a parent configuration absent from the training table.
-            for s in 0..node_card { counts[s * n_cols + col] = 1.0 / node_card as f64; }
+            for s in 0..node_card {
+                counts[s * n_cols + col] = 1.0 / node_card as f64;
+            }
         }
     }
     Cpd {
@@ -496,59 +581,107 @@ pub fn estimate_cpd(
 }
 
 impl DiscreteBn {
-    /// Truncated factorisation followed by conditioning. Empty interventions
-    /// give ordinary observational inference. Unlike parent adjustment, this
-    /// also supports simultaneous interventions and post-intervention evidence.
-    pub fn distribution(
-        &self,
-        targets: &[String],
-        interventions: &HashMap<String, String>,
-        evidence: &HashMap<String, String>,
-    ) -> Result<Vec<(Vec<String>, f64)>, String> {
-        if targets.is_empty() || targets.iter().collect::<BTreeSet<_>>().len() != targets.len() {
-            return Err("Choose distinct outcome variables.".into());
+    /// Build a Bayesian network from explicitly supplied causal Markov kernels.
+    ///
+    /// This is the checked boundary used by the chapter 12 decision examples.
+    pub fn from_cpds(dag: Dag, cpds: Vec<Cpd>) -> Result<Self, DiscreteBnError> {
+        Self::from_cpds_with_tolerance(dag, cpds, 1e-12)
+    }
+
+    pub fn from_cpds_with_tolerance(
+        dag: Dag,
+        cpds: Vec<Cpd>,
+        normalization_tolerance: f64,
+    ) -> Result<Self, DiscreteBnError> {
+        if !normalization_tolerance.is_finite() || normalization_tolerance < 0.0 {
+            return Err(DiscreteBnError::InvalidTolerance(normalization_tolerance));
         }
-        for name in targets.iter().chain(interventions.keys()).chain(evidence.keys()) {
-            if !self.state_names.contains_key(name) { return Err(format!("Unknown query variable: {name}")); }
-        }
-        if interventions.keys().any(|n| evidence.contains_key(n)) || targets.iter().any(|n| interventions.contains_key(n) || evidence.contains_key(n)) {
-            return Err("Outcome, intervention and observation variables must be distinct.".into());
-        }
-        let mut assignment = HashMap::new();
-        for (name, state) in interventions.iter().chain(evidence.iter()) {
-            let index = self.state_names[name].iter().position(|s| s == state)
-                .ok_or_else(|| format!("State {state} is absent for {name}."))?;
-            assignment.insert(name.clone(), index);
-        }
-        // Ancestral pruning is performed on the intervened graph. No CPD of an
-        // observed node is removed: evidence must retain its likelihood factor.
-        let edges = self.dag.edges.iter().filter(|(_, b)| !interventions.contains_key(b)).cloned().collect::<Vec<_>>();
-        let graph = Dag::new(&edges, &self.dag.nodes);
-        let roots = targets.iter().chain(evidence.keys()).cloned().collect::<Vec<_>>();
-        let relevant = graph.ancestral_graph(&roots).nodes;
-        let free = relevant.iter().filter(|n| !assignment.contains_key(*n)).collect::<Vec<_>>();
-        let count = free.iter().try_fold(1usize, |a, n| a.checked_mul(self.state_names[*n].len()))
-            .ok_or("The query state space exceeds the addressable size.")?;
-        let mut out = std::collections::BTreeMap::<Vec<String>, f64>::new();
-        for combination in 0..count {
-            let mut remaining = combination;
-            for name in &free {
-                let card = self.state_names[*name].len();
-                assignment.insert((*name).clone(), remaining % card);
-                remaining /= card;
+        validate_dag(&dag)?;
+
+        let mut cpds_by_variable: HashMap<&str, &Cpd> = HashMap::new();
+        for cpd in &cpds {
+            if !dag.nodes.contains(&cpd.variable) {
+                return Err(DiscreteBnError::UnknownCpdVariable(cpd.variable.clone()));
             }
-            let mut probability = 1.0;
-            for node in &relevant {
-                if interventions.contains_key(node) { continue; }
-                let cpd = self.cpd(node);
-                probability *= cpd.values[assignment[node] * cpd.n_cols() + cpd.column(&assignment)];
+            if cpds_by_variable.insert(&cpd.variable, cpd).is_some() {
+                return Err(DiscreteBnError::DuplicateCpd(cpd.variable.clone()));
             }
-            let key = targets.iter().map(|n| self.state_names[n][assignment[n]].clone()).collect();
-            *out.entry(key).or_default() += probability;
         }
-        let mass: f64 = out.values().sum();
-        if !mass.is_finite() || mass <= 0.0 { return Err("The observed evidence has zero probability under this model.".into()); }
-        Ok(out.into_iter().map(|(states, p)| (states, p / mass)).collect())
+        for node in &dag.nodes {
+            if !cpds_by_variable.contains_key(node.as_str()) {
+                return Err(DiscreteBnError::MissingCpd(node.clone()));
+            }
+        }
+
+        let mut state_names = HashMap::new();
+        for cpd in &cpds {
+            validate_states(&cpd.variable, &cpd.states)?;
+            state_names.insert(cpd.variable.clone(), cpd.states.clone());
+        }
+
+        for cpd in &cpds {
+            let graph_parents: BTreeSet<String> = dag.parents(&cpd.variable).into_iter().collect();
+            let cpd_parents: BTreeSet<String> = cpd.parents.iter().cloned().collect();
+            if cpd.parents.len() != cpd_parents.len() || graph_parents != cpd_parents {
+                return Err(DiscreteBnError::ParentMismatch {
+                    variable: cpd.variable.clone(),
+                    graph: graph_parents.into_iter().collect(),
+                    cpd: cpd.parents.clone(),
+                });
+            }
+            if cpd.parents.len() != cpd.parent_states.len() {
+                return Err(DiscreteBnError::ParentMismatch {
+                    variable: cpd.variable.clone(),
+                    graph: graph_parents.into_iter().collect(),
+                    cpd: cpd.parents.clone(),
+                });
+            }
+            for (parent, supplied_states) in cpd.parents.iter().zip(&cpd.parent_states) {
+                if state_names.get(parent) != Some(supplied_states) {
+                    return Err(DiscreteBnError::ParentStateMismatch {
+                        variable: cpd.variable.clone(),
+                        parent: parent.clone(),
+                    });
+                }
+            }
+
+            let columns = cpd.n_cols();
+            let expected = cpd.states.len() * columns;
+            if cpd.values.len() != expected {
+                return Err(DiscreteBnError::InvalidCpdLength {
+                    variable: cpd.variable.clone(),
+                    expected,
+                    actual: cpd.values.len(),
+                });
+            }
+            for (index, &value) in cpd.values.iter().enumerate() {
+                if !value.is_finite() || value < 0.0 {
+                    return Err(DiscreteBnError::InvalidProbability {
+                        variable: cpd.variable.clone(),
+                        index,
+                        value,
+                    });
+                }
+            }
+            for column in 0..columns {
+                let sum: f64 = (0..cpd.states.len())
+                    .map(|state| cpd.values[state * columns + column])
+                    .sum();
+                if (sum - 1.0).abs() > normalization_tolerance {
+                    return Err(DiscreteBnError::UnnormalizedCpdColumn {
+                        variable: cpd.variable.clone(),
+                        column,
+                        sum,
+                    });
+                }
+            }
+        }
+
+        Ok(Self {
+            dag,
+            cpds,
+            state_names,
+        })
     }
 
     /// Fits every node's CPD with a BDeu prior.
@@ -677,6 +810,180 @@ impl DiscreteBn {
             .collect()
     }
 
+    /// Exact enumeration equivalent to pgmpy's variable elimination for a checked model.
+    pub fn query_checked(
+        &self,
+        variables: &[String],
+        evidence: &HashMap<String, String>,
+    ) -> Result<DiscreteDistribution, DiscreteBnError> {
+        self.query_under_intervention(variables, &[], evidence)
+    }
+
+    /// Evaluate `P(variables | do(interventions), evidence)` by ideal graph surgery.
+    ///
+    /// During enumeration an intervened node's original causal Markov kernel is replaced
+    /// by a point mass. This is algebraically identical to removing its incoming edges and
+    /// installing the one-column kernel used by AltDeep's `pgmpy_do.py`.
+    pub fn query_under_intervention(
+        &self,
+        variables: &[String],
+        interventions: &[Intervention],
+        evidence: &HashMap<String, String>,
+    ) -> Result<DiscreteDistribution, DiscreteBnError> {
+        if variables.is_empty() {
+            return Err(DiscreteBnError::EmptyTargets);
+        }
+
+        let mut targets = HashSet::new();
+        for variable in variables {
+            self.validate_variable(variable)?;
+            if !targets.insert(variable) {
+                return Err(DiscreteBnError::DuplicateTarget(variable.clone()));
+            }
+        }
+        for (variable, state) in evidence {
+            self.validate_state(variable, state)?;
+        }
+
+        let mut fixed: HashMap<String, usize> = HashMap::new();
+        for intervention in interventions {
+            self.validate_state(&intervention.variable, &intervention.state)?;
+            if fixed.contains_key(&intervention.variable) {
+                return Err(DiscreteBnError::DuplicateIntervention(
+                    intervention.variable.clone(),
+                ));
+            }
+            let state = self.state_index(&intervention.variable, &intervention.state);
+            fixed.insert(intervention.variable.clone(), state);
+        }
+        for (variable, evidence_state) in evidence {
+            if let Some(&intervention_state) = fixed.get(variable) {
+                let intervention_name = &self.state_names[variable][intervention_state];
+                if intervention_name != evidence_state {
+                    return Err(DiscreteBnError::ConflictingAssignment {
+                        variable: variable.clone(),
+                        intervention: intervention_name.clone(),
+                        evidence: evidence_state.clone(),
+                    });
+                }
+            }
+            fixed.insert(variable.clone(), self.state_index(variable, evidence_state));
+        }
+
+        let surgery: Vec<(String, String)> = self
+            .dag
+            .edges
+            .iter()
+            .filter(|(_, child)| !fixed_by_intervention(interventions, child))
+            .cloned()
+            .collect();
+        let roots: Vec<String> = variables.iter().chain(evidence.keys()).cloned().collect();
+        let relevant = Dag::new(&surgery, &self.dag.nodes).ancestral_graph(&roots).nodes;
+        let cards: Vec<usize> = relevant
+            .iter()
+            .map(|node| self.state_names[node].len())
+            .collect();
+        let combinations = cards
+            .iter()
+            .try_fold(1usize, |total, card| total.checked_mul(*card))
+            .ok_or(DiscreteBnError::StateSpaceTooLarge)?;
+
+        let target_cards: Vec<usize> = variables
+            .iter()
+            .map(|variable| self.state_names[variable].len())
+            .collect();
+        let target_combinations: usize = target_cards.iter().product();
+        let mut probabilities = vec![0.0; target_combinations];
+
+        let intervention_variables: HashSet<&str> = interventions
+            .iter()
+            .map(|intervention| intervention.variable.as_str())
+            .collect();
+        for combination in 0..combinations {
+            let assignment = decode_assignment(&relevant, &cards, combination);
+            if fixed
+                .iter()
+                .any(|(variable, state)| assignment[variable] != *state)
+            {
+                continue;
+            }
+
+            let mut probability = 1.0;
+            for node in &relevant {
+                if intervention_variables.contains(node.as_str()) {
+                    continue;
+                }
+                let cpd = self.cpd(node);
+                let column = cpd.column(&assignment);
+                probability *= cpd.values[assignment[node] * cpd.n_cols() + column];
+            }
+            if probability == 0.0 {
+                continue;
+            }
+
+            let mut output_index = 0;
+            for (variable, card) in variables.iter().zip(&target_cards) {
+                output_index = output_index * card + assignment[variable];
+            }
+            probabilities[output_index] += probability;
+        }
+
+        let normalization: f64 = probabilities.iter().sum();
+        if !normalization.is_finite() || normalization == 0.0 {
+            return Err(DiscreteBnError::ZeroProbabilityEvidence);
+        }
+        for probability in &mut probabilities {
+            *probability /= normalization;
+        }
+
+        let states = (0..target_combinations)
+            .map(|combination| {
+                let indices = decode_indices_left_major(&target_cards, combination);
+                variables
+                    .iter()
+                    .zip(indices)
+                    .map(|(variable, state)| self.state_names[variable][state].clone())
+                    .collect()
+            })
+            .collect();
+
+        Ok(DiscreteDistribution {
+            variables: variables.to_vec(),
+            states,
+            probabilities,
+        })
+    }
+
+    fn validate_variable(&self, variable: &str) -> Result<(), DiscreteBnError> {
+        if self.state_names.contains_key(variable) {
+            Ok(())
+        } else {
+            Err(DiscreteBnError::UnknownVariable(variable.to_string()))
+        }
+    }
+
+    fn validate_state(&self, variable: &str, state: &str) -> Result<(), DiscreteBnError> {
+        self.validate_variable(variable)?;
+        if self.state_names[variable]
+            .iter()
+            .any(|candidate| candidate == state)
+        {
+            Ok(())
+        } else {
+            Err(DiscreteBnError::UnknownState {
+                variable: variable.to_string(),
+                state: state.to_string(),
+            })
+        }
+    }
+
+    fn state_index(&self, variable: &str, state: &str) -> usize {
+        self.state_names[variable]
+            .iter()
+            .position(|candidate| candidate == state)
+            .expect("state was validated")
+    }
+
     /// `CausalInference.get_minimal_adjustment_set(X, Y)`.
     pub fn minimal_adjustment_set(&self, x: &str, y: &str) -> Option<BTreeSet<String>> {
         self.dag
@@ -761,4 +1068,101 @@ impl DiscreteBn {
         }
         out
     }
+}
+
+fn validate_states(variable: &str, states: &[String]) -> Result<(), DiscreteBnError> {
+    if states.is_empty() {
+        return Err(DiscreteBnError::EmptyStates(variable.to_string()));
+    }
+    let mut seen = HashSet::new();
+    for state in states {
+        if !seen.insert(state) {
+            return Err(DiscreteBnError::DuplicateState {
+                variable: variable.to_string(),
+                state: state.clone(),
+            });
+        }
+    }
+    Ok(())
+}
+
+fn validate_dag(dag: &Dag) -> Result<(), DiscreteBnError> {
+    let mut nodes = HashSet::new();
+    for node in &dag.nodes {
+        if node.is_empty() {
+            return Err(DiscreteBnError::EmptyNode);
+        }
+        if !nodes.insert(node) {
+            return Err(DiscreteBnError::DuplicateNode(node.clone()));
+        }
+    }
+
+    let mut edges = HashSet::new();
+    let mut indegree: HashMap<&str, usize> =
+        dag.nodes.iter().map(|node| (node.as_str(), 0)).collect();
+    let mut children: HashMap<&str, Vec<&str>> = HashMap::new();
+    for (cause, effect) in &dag.edges {
+        if !nodes.contains(cause) {
+            return Err(DiscreteBnError::UnknownEdgeNode(cause.clone()));
+        }
+        if !nodes.contains(effect) {
+            return Err(DiscreteBnError::UnknownEdgeNode(effect.clone()));
+        }
+        if !edges.insert((cause, effect)) {
+            return Err(DiscreteBnError::DuplicateEdge(
+                cause.clone(),
+                effect.clone(),
+            ));
+        }
+        *indegree.get_mut(effect.as_str()).expect("known node") += 1;
+        children.entry(cause).or_default().push(effect);
+    }
+
+    let mut ready: Vec<&str> = indegree
+        .iter()
+        .filter_map(|(&node, &degree)| (degree == 0).then_some(node))
+        .collect();
+    let mut visited = 0;
+    while let Some(node) = ready.pop() {
+        visited += 1;
+        if let Some(next) = children.get(node) {
+            for child in next {
+                let degree = indegree.get_mut(child).expect("known child");
+                *degree -= 1;
+                if *degree == 0 {
+                    ready.push(child);
+                }
+            }
+        }
+    }
+    if visited != dag.nodes.len() {
+        return Err(DiscreteBnError::Cycle);
+    }
+    Ok(())
+}
+
+fn fixed_by_intervention(interventions: &[Intervention], variable: &str) -> bool {
+    interventions.iter().any(|intervention| intervention.variable == variable)
+}
+
+fn decode_assignment(
+    variables: &[String],
+    cards: &[usize],
+    mut combination: usize,
+) -> HashMap<String, usize> {
+    let mut assignment = HashMap::with_capacity(variables.len());
+    for (variable, card) in variables.iter().zip(cards) {
+        assignment.insert(variable.clone(), combination % card);
+        combination /= card;
+    }
+    assignment
+}
+
+fn decode_indices_left_major(cards: &[usize], mut combination: usize) -> Vec<usize> {
+    let mut indices = vec![0; cards.len()];
+    for position in (0..cards.len()).rev() {
+        indices[position] = combination % cards[position];
+        combination /= cards[position];
+    }
+    indices
 }

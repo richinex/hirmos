@@ -100,6 +100,12 @@ import { parseStationarityBattery } from '@/domain/stationarity'
 import { parseBackdoorIdentificationEvidence } from '@/domain/study'
 import { dagCheckEvidenceSchema } from '@/domain/dagValidation'
 import { swigEvidenceSchema } from '@/domain/swig'
+import { decisionChecksEvidenceSchema } from '@/domain/decisionFrame'
+import {
+  decisionEvidenceResultSchema,
+  loggedPolicyValueResultSchema,
+  imitationRuleEvidenceSchema,
+} from '@/domain/decisionEvidence'
 import { identifiedDiscreteQueryEvidenceSchema } from '@/domain/intervention'
 import { networkQueryEvidenceSchema } from '@/domain/networkQuery'
 import { conditionalGaussianEvidenceSchema } from '@/domain/conditionalGaussianQuery'
@@ -436,6 +442,14 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
         unobserved: command.unobserved,
         estimand: command.estimand,
       }
+    case 'decision-checks':
+      return { kind: 'decisionChecks', request: command.model }
+    case 'decision-evidence':
+      return { kind: 'decisionEvidence', request: command.model }
+    case 'logged-policy-value':
+      return { kind: 'loggedPolicyValue', request: command.model }
+    case 'imitation-rule':
+      return { kind: 'imitationRule', request: command.model }
     case 'swig-analysis':
       return { kind: 'swigAnalysis', specification: command.specification, names: command.names }
     case 'raw-balance':
@@ -1324,6 +1338,108 @@ self.onmessage = (message: MessageEvent<unknown>) => {
           kind: 'backdoor-identification-succeeded',
           request: command.request,
           result: result.value,
+        })
+        return
+      }
+      case 'decision-checks': {
+        const parsed = z
+          .object({ kind: z.literal('decisionChecks'), evidence: decisionChecksEvidenceSchema })
+          .strict()
+          .safeParse(decoded)
+        if (!parsed.success) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: z.prettifyError(parsed.error),
+          })
+          return
+        }
+        const decisions = command.model.decisions.map((stage) => stage.node)
+        if (
+          parsed.data.evidence.stages.length !== decisions.length ||
+          parsed.data.evidence.stages.some((stage, i) => stage.decision !== decisions[i])
+        ) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: 'The decision checks do not match the requested decisions.',
+          })
+          return
+        }
+        emit({
+          kind: 'decision-checks-succeeded',
+          request: command.request,
+          result: parsed.data.evidence,
+        })
+        return
+      }
+      case 'decision-evidence': {
+        const parsed = z
+          .object({ kind: z.literal('decisionEvidence'), evidence: decisionEvidenceResultSchema })
+          .strict()
+          .safeParse(decoded)
+        if (
+          !parsed.success ||
+          parsed.data.evidence.actions.length !== command.model.actions.length
+        ) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: parsed.success
+              ? 'The decision evidence does not cover the requested actions.'
+              : z.prettifyError(parsed.error),
+          })
+          return
+        }
+        emit({
+          kind: 'decision-evidence-succeeded',
+          request: command.request,
+          result: parsed.data.evidence,
+        })
+        return
+      }
+      case 'logged-policy-value': {
+        const parsed = z
+          .object({ kind: z.literal('loggedPolicyValue'), evidence: loggedPolicyValueResultSchema })
+          .strict()
+          .safeParse(decoded)
+        if (!parsed.success || parsed.data.evidence.plans.length !== command.model.plans.length) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: parsed.success
+              ? 'The scores do not cover the requested plans.'
+              : z.prettifyError(parsed.error),
+          })
+          return
+        }
+        emit({
+          kind: 'logged-policy-value-succeeded',
+          request: command.request,
+          result: parsed.data.evidence,
+        })
+        return
+      }
+      case 'imitation-rule': {
+        const parsed = z
+          .object({ kind: z.literal('imitationRule'), evidence: imitationRuleEvidenceSchema })
+          .strict()
+          .safeParse(decoded)
+        if (
+          !parsed.success ||
+          parsed.data.evidence.probabilities.length !== command.model.probes.length ||
+          parsed.data.evidence.probabilities.some(
+            (row) => row.length !== command.model.actions.count,
+          )
+        ) {
+          fail(command.request, {
+            kind: 'worker-protocol-failed',
+            detail: parsed.success
+              ? 'The copied rule does not cover every input pattern and action.'
+              : z.prettifyError(parsed.error),
+          })
+          return
+        }
+        emit({
+          kind: 'imitation-rule-succeeded',
+          request: command.request,
+          result: parsed.data.evidence,
         })
         return
       }

@@ -215,6 +215,25 @@ export function ChapterNav({
 }: ChapterNavProps) {
   const phone = useIsMobile()
   const column = useRef<HTMLDivElement>(null)
+  const list = useRef<HTMLDivElement>(null)
+  const [overflow, setOverflow] = useState({ above: false, below: false })
+  useEffect(() => {
+    const element = list.current
+    if (element === null) return
+    const measure = () =>
+      setOverflow({
+        above: element.scrollTop > 1,
+        below: element.scrollTop + element.clientHeight < element.scrollHeight - 1,
+      })
+    measure()
+    element.addEventListener('scroll', measure, { passive: true })
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    return () => {
+      element.removeEventListener('scroll', measure)
+      observer.disconnect()
+    }
+  }, [])
   const slide = usePhoneSlide(column, onOpen, onClose)
   const drag = phone ? slide.drag : null
   const slidIn = phone && (open || drag !== null)
@@ -289,7 +308,7 @@ export function ChapterNav({
         <div
           aria-hidden
           className={cn(
-            'absolute inset-y-0 left-0 top-3 bottom-4 bg-rail text-rail-ink',
+            'absolute inset-y-0 left-0 top-3 bottom-3 bg-rail text-rail-ink',
             RAIL,
             CORNER,
           )}
@@ -315,7 +334,22 @@ export function ChapterNav({
           )}
         >
           {/* The list scrolls inside a box inset by the corner radius, so the scrollbar stays on the straight edge. */}
-          <div className="my-[26px] min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain">
+          {/* A clipped row fades at the edge that has more rows beyond it, so the cut reads as more to scroll. */}
+          <div
+            ref={list}
+            className={cn(
+              'my-[26px] min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain',
+              overflow.above &&
+                overflow.below &&
+                '[mask-image:linear-gradient(to_bottom,transparent,black_40px,black_calc(100%-40px),transparent)]',
+              overflow.above &&
+                !overflow.below &&
+                '[mask-image:linear-gradient(to_bottom,transparent,black_40px)]',
+              !overflow.above &&
+                overflow.below &&
+                '[mask-image:linear-gradient(to_bottom,black_calc(100%-40px),transparent)]',
+            )}
+          >
             {CHAPTER_SECTIONS.map((section) => (
               <div key={section.title} className="not-first:mt-2">
                 <div

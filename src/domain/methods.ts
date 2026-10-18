@@ -5,7 +5,13 @@ export type MethodId = Brand<string, 'MethodId'>
 export type MethodCaveatId = Brand<string, 'MethodCaveatId'>
 
 export type MethodFamily =
-  'diagnostic' | 'discovery' | 'identification' | 'estimation' | 'refuter' | 'counterfactual'
+  | 'diagnostic'
+  | 'discovery'
+  | 'identification'
+  | 'estimation'
+  | 'refuter'
+  | 'counterfactual'
+  | 'decision'
 
 export type MethodSource =
   | {
@@ -23,6 +29,7 @@ export type MethodSource =
         | 'causalnex'
         | 'synthdid'
         | 'linearmodels'
+        | 'open-bandit-pipeline'
       readonly revision: string
       readonly locator: string
     }
@@ -3789,7 +3796,234 @@ const INTERRUPTED_SERIES: MethodDefinition = {
   ],
 }
 
+const CAUSAL_RL = paper(
+  'An Introduction to Causal Reinforcement Learning (Bareinboim, Zhang and Lee, 2026)',
+  'arXiv 2606.24160',
+)
+export const SEQUENTIAL_BACKDOOR_METHOD_ID = methodId('sequential-backdoor-check')
+export const NATURAL_BOUNDS_METHOD_ID = methodId('natural-bounds')
+export const LOGGED_PROPENSITY_WEIGHTING_METHOD_ID = methodId('logged-propensity-weighting')
+export const BOUNDED_LEARNING_REPLAY_METHOD_ID = methodId('bounded-learning-replay')
+
+export const SEQUENTIAL_BACKDOOR_CHECK: MethodDefinition = {
+  id: SEQUENTIAL_BACKDOOR_METHOD_ID,
+  name: 'Sequential backdoor check',
+  family: 'decision',
+  summary:
+    'For each decision in turn, the check asks whether the variables its rule may read block every back-door path to the objective. When every decision passes, recorded data identify the value of any rule in the policy space.',
+  caveats: [
+    {
+      id: caveatId('decision-graph-complete'),
+      category: 'identification',
+      requirement:
+        'The graph includes every common cause of a decision and the objective, whether or not it is measured.',
+      consequenceIfUnmet:
+        'A missing common cause leaves a back-door path open that the check cannot see, so a value reported as identified may be biased.',
+      sources: [CAUSAL_RL],
+    },
+    {
+      id: caveatId('decision-time-order'),
+      category: 'identification',
+      requirement:
+        'Decisions are listed in the order they are made, and each rule reads only variables settled before its decision.',
+      consequenceIfUnmet:
+        'A rule that reads a later variable cannot be followed in practice, and the check answers a different question.',
+      sources: [CAUSAL_RL],
+    },
+    {
+      id: caveatId('decision-possibly-optimal'),
+      category: 'interpretation',
+      requirement:
+        'The sets worth intervening on follow from the graph alone. A listed set is optimal in at least one model compatible with the graph, which does not make it better than doing nothing in this population.',
+      consequenceIfUnmet: 'A listed set is read as a recommendation the data have not tested.',
+      sources: [CAUSAL_RL],
+    },
+  ],
+}
+
+export const NATURAL_BOUNDS: MethodDefinition = {
+  id: NATURAL_BOUNDS_METHOD_ID,
+  name: 'Natural bounds',
+  family: 'decision',
+  summary:
+    'The bounds use the logged rows alone. For each action, the lower bound is its logged outcome rate times its logged share, and the upper bound adds the share of rows that chose another action.',
+  summaryTex: {
+    tex: 'E[Y \\mid x]\\,P(x) \\le E_x[Y] \\le E[Y \\mid x]\\,P(x) + 1 - P(x)',
+    plain: 'E[Y | x] P(x) ≤ E_x[Y] ≤ E[Y | x] P(x) + 1 − P(x)',
+  },
+  caveats: [
+    {
+      id: caveatId('natural-bounds-unit-outcome'),
+      category: 'functional-form',
+      requirement: 'The outcome lies between 0 and 1, as a click or a conversion does.',
+      consequenceIfUnmet: 'The bounds are derived for that range and do not hold outside it.',
+      sources: [CAUSAL_RL],
+    },
+    {
+      id: caveatId('natural-bounds-same-population'),
+      category: 'sampling-structure',
+      requirement:
+        'The randomised rows and the logged rows come from the same population, and both measure the outcome the same way.',
+      consequenceIfUnmet:
+        'A randomised estimate outside the bounds then shows that the two samples differ; it does not show that the bounds fail.',
+      sources: [CAUSAL_RL],
+    },
+    {
+      id: caveatId('natural-bounds-width'),
+      category: 'interpretation',
+      requirement:
+        'The width of each interval is one minus the action’s logged share, so the bounds say little about an action the log rarely chose.',
+      consequenceIfUnmet: 'A wide interval is read as evidence against the action.',
+      sources: [CAUSAL_RL],
+    },
+  ],
+}
+
+export const LOGGED_PROPENSITY_WEIGHTING: MethodDefinition = {
+  id: LOGGED_PROPENSITY_WEIGHTING_METHOD_ID,
+  name: 'Logged propensity weighting',
+  family: 'decision',
+  summary:
+    'Each logged outcome is weighted by the rule’s probability of the logged action divided by the probability the logging policy recorded for it. The weighted mean estimates what the rule would have achieved.',
+  caveats: [
+    {
+      id: caveatId('logged-propensity-recorded'),
+      category: 'identification',
+      requirement:
+        'The propensity column records, for every row, the logging policy’s probability of the action actually taken.',
+      consequenceIfUnmet:
+        'Weights built from estimated or mismatched probabilities bias the value.',
+      sources: [CAUSAL_RL],
+    },
+    {
+      id: caveatId('logged-propensity-positivity'),
+      category: 'sampling-structure',
+      requirement: 'Every action the rule can choose has a positive logged probability.',
+      consequenceIfUnmet:
+        'Actions the rule would choose but the log never did contribute nothing, and the estimate misses that part of the value.',
+      sources: [CAUSAL_RL],
+    },
+    {
+      id: caveatId('logged-propensity-normalisation'),
+      category: 'finite-sample',
+      requirement:
+        'The self-normalised estimator divides by the sum of the weights instead of the number of rows. It is slightly biased, but it varies less when some weights are large.',
+      consequenceIfUnmet: 'Large weights make the plain estimate unstable.',
+      sources: [
+        {
+          kind: 'reference-implementation',
+          repository: 'open-bandit-pipeline',
+          revision: '8cbd5fa4558b7ad2ba4781546d6604e4cc3e07c4',
+          locator: 'obp/ope/estimators.py#SelfNormalizedInverseProbabilityWeighting',
+        },
+      ],
+    },
+    {
+      id: caveatId('logged-propensity-interval'),
+      category: 'interpretation',
+      requirement:
+        'Intervals are percentile bootstraps over the logged rows with a fixed seed, for up to six compared plans. Each difference from the observed average is bootstrapped from per-row differences on the same rows, not by subtracting two intervals.',
+      consequenceIfUnmet: 'A point estimate without an interval is read as exact.',
+      sources: [
+        hirmos('crates/causal-core/src/reinforcement/off_policy_evaluation.rs#bootstrap_intervals'),
+      ],
+    },
+    {
+      id: caveatId('logged-propensity-support'),
+      category: 'finite-sample',
+      requirement:
+        'Recorded chances do not guarantee precision for every plan. Support, the largest weight and the effective rows show how many logged rows a plan’s estimate rests on.',
+      consequenceIfUnmet:
+        'An estimate resting on a few heavily weighted rows is read as if it used the whole log.',
+      sources: [
+        hirmos('crates/causal-core/src/reinforcement/off_policy_evaluation.rs#weight_diagnostics'),
+      ],
+    },
+  ],
+}
+
+export const BOUNDED_LEARNING_REPLAY: MethodDefinition = {
+  id: BOUNDED_LEARNING_REPLAY_METHOD_ID,
+  name: 'Bounded learning replay',
+  family: 'decision',
+  summary:
+    'An upper confidence bound learner chooses one action per step and receives an outcome drawn from that action’s randomised rows. It runs twice, once from scratch and once with each action’s index kept inside its natural bounds.',
+  caveats: [
+    {
+      id: caveatId('learning-replay-randomised'),
+      category: 'sampling-structure',
+      requirement: 'Every action has randomised rows to draw outcomes from.',
+      consequenceIfUnmet: 'The replay cannot run.',
+      sources: [CAUSAL_RL],
+    },
+    {
+      id: caveatId('learning-replay-regret'),
+      category: 'interpretation',
+      requirement:
+        'Regret is the outcome given up against always choosing the action with the best randomised estimate. The replay draws from recorded rows, so it is not a live experiment.',
+      consequenceIfUnmet: 'The replay is read as the result of a deployment.',
+      sources: [CAUSAL_RL],
+    },
+    {
+      id: caveatId('learning-replay-bounds'),
+      category: 'interpretation',
+      requirement:
+        'Clipping helps only when an action’s upper bound lies below the best action’s mean. When the bounds are wrong for the population, clipping can slow learning.',
+      consequenceIfUnmet: 'A slower bounded learner is read as a failure of the method.',
+      sources: [CAUSAL_RL],
+    },
+  ],
+}
+
+export const BEHAVIOUR_CLONING_METHOD_ID = methodId('behaviour-cloning')
+
+export const BEHAVIOUR_CLONING: MethodDefinition = {
+  id: BEHAVIOUR_CLONING_METHOD_ID,
+  name: 'Behaviour cloning',
+  family: 'decision',
+  summary:
+    'A small network learns, from the logged rows, the probability that the demonstrator chose each action given the variables the decision may read. Several seeds train in parallel, and the copy is their mean.',
+  caveats: [
+    {
+      id: caveatId('cloning-safe-inputs'),
+      category: 'identification',
+      requirement:
+        'The copier reads every recorded variable the decision checks require for copying to keep the demonstrator’s value.',
+      consequenceIfUnmet:
+        'A copy that cannot see what the demonstrator saw reproduces its choices only on average, and it can lose the demonstrator’s value.',
+      sources: [CAUSAL_RL],
+    },
+    {
+      id: caveatId('cloning-logged-rows'),
+      category: 'sampling-structure',
+      requirement:
+        'The copy trains on logged rows only, and on a seeded random sample of them when there are more rows than the training limit.',
+      consequenceIfUnmet:
+        'Randomised rows would teach the copy the experimenter’s choices instead.',
+      sources: [hirmos('src/domain/decisionEvidence.ts#shapeLoggedRows')],
+    },
+    {
+      id: caveatId('cloning-fit-not-value'),
+      category: 'interpretation',
+      requirement:
+        'The copy is judged by how closely its probabilities match the logged action shares for each input pattern; its value comes only from propensity weighting, on a seeded fifth of the logged rows held out from training.',
+      consequenceIfUnmet:
+        'A close fit is read as evidence that the copy performs as well as the demonstrator.',
+      sources: [hirmos('crates/analysis-wasm/src/imitation_rule.rs#run')],
+    },
+  ],
+}
+
+export const DECISION_METHODS: NonEmptyArray<MethodDefinition> = [
+  SEQUENTIAL_BACKDOOR_CHECK,
+  NATURAL_BOUNDS,
+  LOGGED_PROPENSITY_WEIGHTING,
+  BOUNDED_LEARNING_REPLAY,
+  BEHAVIOUR_CLONING,
+]
+
 export const METHOD_CATALOG: NonEmptyArray<MethodDefinition> = [
+  ...DECISION_METHODS,
   SHARP_RD,
   RD_DESIGN,
   ADF,

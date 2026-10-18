@@ -53,6 +53,22 @@ impl SeedSequence {
         SeedSequence { pool }
     }
 
+    pub fn generate<const N: usize>(&self) -> [u64; N] {
+        let mut hash_const = INIT_B;
+        let mut word = |i: usize| {
+            let mut v = self.pool[i % 4];
+            v ^= hash_const;
+            hash_const = hash_const.wrapping_mul(MULT_B);
+            v = v.wrapping_mul(hash_const);
+            v ^= v >> XSHIFT;
+            v
+        };
+        std::array::from_fn(|i| {
+            let low = word(2 * i) as u64;
+            low | (word(2 * i + 1) as u64) << 32
+        })
+    }
+
     pub fn generate_u64(&self, n_words: usize) -> Vec<u64> {
         let mut hash_const = INIT_B;
         let words: Vec<u32> = (0..n_words * 2)
@@ -83,16 +99,9 @@ pub struct NpRng {
 
 impl NpRng {
     pub fn seeded(seed: u64) -> Self {
-        let mut entropy = Vec::new();
-        let mut v = seed;
-        while v > 0 {
-            entropy.push(v as u32);
-            v >>= 32;
-        }
-        if entropy.is_empty() {
-            entropy.push(0);
-        }
-        let words = SeedSequence::new(&entropy).generate_u64(4);
+        let halves = [seed as u32, (seed >> 32) as u32];
+        let entropy = if seed >> 32 > 0 { &halves[..] } else { &halves[..1] };
+        let words: [u64; 4] = SeedSequence::new(entropy).generate();
         let initstate = (words[0] as u128) << 64 | words[1] as u128;
         let initseq = (words[2] as u128) << 64 | words[3] as u128;
         let mut rng = NpRng {
@@ -265,10 +274,61 @@ impl NpRng {
     pub fn next_f64(&mut self) -> f64 {
         (self.next_u64() >> 11) as f64 / 9007199254740992.0
     }
+
+    /// Generator.choice(len(p), p=p): the first index whose normalised cumulative weight exceeds a uniform draw.
+    pub fn choice_weighted(&mut self, weights: &[f64]) -> usize {
+        let last: f64 = weights.iter().fold(0.0, |total, weight| total + weight);
+        let draw = self.next_f64();
+        let mut total = 0.0;
+        weights
+            .iter()
+            .take_while(|weight| {
+                total += *weight;
+                total / last <= draw
+            })
+            .count()
+    }
+
+    /// Generator.binomial(n, p) by inversion, or `None` when min(p, 1 - p) * n > 30 needs BTPE.
+    pub fn binomial(&mut self, n: u64, p: f64) -> Option<u64> {
+        if n == 0 || p == 0.0 {
+            return Some(0);
+        }
+        let n_f = n as f64;
+        if p <= 0.5 {
+            (p * n_f <= 30.0).then(|| self.binomial_inversion(n, p))
+        } else {
+            let q = 1.0 - p;
+            (q * n_f <= 30.0).then(|| n - self.binomial_inversion(n, q))
+        }
+    }
+
+    fn binomial_inversion(&mut self, n: u64, p: f64) -> u64 {
+        let n_f = n as f64;
+        let q = 1.0 - p;
+        let qn = (n_f * q.ln()).exp();
+        let np = n_f * p;
+        let bound = n_f.min(np + 10.0 * (np * q + 1.0).sqrt()) as u64;
+        let mut x = 0u64;
+        let mut px = qn;
+        let mut u = self.next_f64();
+        while u > px {
+            x += 1;
+            if x > bound {
+                x = 0;
+                px = qn;
+                u = self.next_f64();
+            } else {
+                u -= px;
+                px = ((n - x + 1) as f64 * p * px) / (x as f64 * q);
+            }
+        }
+        x
+    }
 }
 
 /// The legacy MT19937 behind numpy's global RandomState, seeded via init_genrand.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Mt19937 {
     key: [u32; 624],
     pos: usize,

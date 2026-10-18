@@ -199,11 +199,15 @@ impl CounterfactualGraph {
         for (a, b) in &graph.bidirected {
             link(a, b);
         }
-        for child in &graph.nodes {
-            let parents = graph.parents(child).into_iter().collect::<Vec<_>>();
-            for i in 0..parents.len() {
-                for j in i + 1..parents.len() {
-                    link(&parents[i], &parents[j]);
+        for district in graph.districts() {
+            let mut members = district.clone();
+            for node in &district {
+                members.extend(graph.parents(node));
+            }
+            let members = members.into_iter().collect::<Vec<_>>();
+            for i in 0..members.len() {
+                for j in i + 1..members.len() {
+                    link(&members[i], &members[j]);
                 }
             }
         }

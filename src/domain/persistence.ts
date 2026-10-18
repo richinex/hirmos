@@ -2,6 +2,9 @@ import { restoreMissingDagExploration } from './dagProvenance'
 import { powerRecordSchema, type PowerRecord } from './powerPlanning'
 import { surrogateRunSchema, surrogateRunMatchesProfile, type SurrogateRun } from './surrogateRun'
 import { swigAnalysisSchema, type SwigAnalysis } from './swig'
+import { decisionFrameSchema, type DecisionFrame } from './decisionFrame'
+import { decisionEvidenceSchema, type DecisionEvidence } from './decisionEvidence'
+import { decisionRecordSchema, type DecisionRecord } from './decisionRecord'
 import { z } from 'zod'
 import {
   predictorSyntheticConfigurationSchema,
@@ -98,6 +101,9 @@ export interface PersistedProject {
   readonly dagChecks: readonly DagCheckArtifact[]
   readonly interventionQueries: readonly InterventionQueryArtifact[]
   readonly swigAnalyses: readonly SwigAnalysis[]
+  readonly decisionFrames: readonly DecisionFrame[]
+  readonly decisionEvidence: readonly DecisionEvidence[]
+  readonly decisionRecords: readonly DecisionRecord[]
   readonly studyDraft: StudyDesignDraft
   readonly studies: readonly StudySpecification[]
   readonly identifications: readonly IdentificationArtifact[]
@@ -167,6 +173,9 @@ export function snapshotWorkflow(workflow: Workflow, savedAt: string): Persisted
         dagChecks: [],
         interventionQueries: [],
         swigAnalyses: [],
+        decisionFrames: [],
+        decisionEvidence: [],
+        decisionRecords: [],
         studyDraft: EMPTY_STUDY_DRAFT,
         studies: [],
         identifications: [],
@@ -214,6 +223,9 @@ export function snapshotWorkflow(workflow: Workflow, savedAt: string): Persisted
         dagChecks: workflow.dagChecks,
         interventionQueries: workflow.interventionQueries,
         swigAnalyses: workflow.swigAnalyses,
+        decisionFrames: workflow.decisionFrames,
+        decisionEvidence: workflow.decisionEvidence,
+        decisionRecords: workflow.decisionRecords,
         studyDraft: workflow.studyDraft,
         studies: workflow.studies,
         identifications: workflow.identifications,
@@ -346,6 +358,9 @@ const envelopeSchema = z.object({
   ),
   dagChecks: z.array(artifact).default([]),
   swigAnalyses: z.array(swigAnalysisSchema).default([]),
+  decisionFrames: z.array(decisionFrameSchema).default([]),
+  decisionEvidence: z.array(decisionEvidenceSchema).default([]),
+  decisionRecords: z.array(decisionRecordSchema).default([]),
   interventionQueries: z
     .array(
       artifact.superRefine((value, ctx) => {

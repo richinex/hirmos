@@ -452,7 +452,7 @@ impl Admg {
         }
     }
 
-    fn subgraph(&self, keep: &BTreeSet<Variable>) -> Self {
+    pub(crate) fn subgraph(&self, keep: &BTreeSet<Variable>) -> Self {
         Self {
             nodes: self.nodes.intersection(keep).cloned().collect(),
             directed: self
@@ -474,7 +474,7 @@ impl Admg {
         self.subgraph(&self.nodes.difference(removed).cloned().collect())
     }
 
-    fn without_incoming(&self, targets: &BTreeSet<Variable>) -> Self {
+    pub(crate) fn without_incoming(&self, targets: &BTreeSet<Variable>) -> Self {
         Self {
             nodes: self.nodes.clone(),
             directed: self
@@ -492,7 +492,7 @@ impl Admg {
         }
     }
 
-    fn without_outgoing(&self, sources: &BTreeSet<Variable>) -> Self {
+    pub(crate) fn without_outgoing(&self, sources: &BTreeSet<Variable>) -> Self {
         Self {
             nodes: self.nodes.clone(),
             directed: self
@@ -506,10 +506,10 @@ impl Admg {
         }
     }
 
-    /// Match y0's ADMG separation check: retain ancestors of the named variables,
-    /// moralize directed co-parents, disorient all edge types, remove the conditions,
-    /// and test undirected reachability.
-    fn are_d_separated(
+    /// m-separation: retain ancestors of the named variables, join every district and its
+    /// parents into a clique, disorient all edge types, remove the conditions, and test
+    /// undirected reachability.
+    pub fn are_d_separated(
         &self,
         left: &Variable,
         right: &Variable,
@@ -538,15 +538,18 @@ impl Admg {
         for (left, right) in &graph.bidirected {
             link(left, right);
         }
-        for child in &graph.nodes {
-            let parents = graph
+        for district in graph.districts() {
+            let members = graph
                 .directed
                 .iter()
-                .filter_map(|(source, target)| (target == child).then_some(source))
+                .filter_map(|(source, target)| district.contains(target).then_some(source))
+                .chain(&district)
+                .collect::<BTreeSet<_>>()
+                .into_iter()
                 .collect::<Vec<_>>();
-            for left_index in 0..parents.len() {
-                for right_index in left_index + 1..parents.len() {
-                    link(parents[left_index], parents[right_index]);
+            for left_index in 0..members.len() {
+                for right_index in left_index + 1..members.len() {
+                    link(members[left_index], members[right_index]);
                 }
             }
         }
@@ -571,7 +574,7 @@ impl Admg {
         true
     }
 
-    fn ancestors_inclusive(&self, targets: &BTreeSet<Variable>) -> BTreeSet<Variable> {
+    pub(crate) fn ancestors_inclusive(&self, targets: &BTreeSet<Variable>) -> BTreeSet<Variable> {
         let mut ancestors = targets.clone();
         let mut queue: VecDeque<_> = targets.iter().cloned().collect();
         while let Some(node) = queue.pop_front() {

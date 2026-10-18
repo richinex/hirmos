@@ -17,7 +17,7 @@ GNU General Public License, version 3 — TIGRAMITE, and Hirmos itself
 The full text is the LICENSE file at the repository root.
 
 ================================================================================
-BSD-3-Clause — statsmodels, SciPy, Cephes, L-BFGS-B v3.0, NumPy
+BSD-3-Clause — statsmodels, SciPy, Cephes, L-BFGS-B v3.0, NumPy, PyMDPtoolbox
 ================================================================================
 
 Copyright (c) <holders named in NOTICE>. All rights reserved.
@@ -119,7 +119,8 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <https://unlicense.org>
 
 ================================================================================
-Apache License 2.0 — CausalNex, nalgebra, nalgebra-macros, simba, approx
+Apache License 2.0 — CausalNex, Causal-RL, Causal-Gymnasium, Open Bandit Pipeline, Minigrid, nalgebra, nalgebra-macros,
+  simba, approx
 ================================================================================
 
 

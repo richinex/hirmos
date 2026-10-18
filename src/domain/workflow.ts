@@ -3,6 +3,9 @@ import { existingStudyRecord } from './studyRecords'
 import type { PowerRecord } from './powerPlanning'
 import { surrogateRunMatchesProfile, type SurrogateRun, type SurrogateRunId } from './surrogateRun'
 import type { SwigAnalysis } from './swig'
+import type { DecisionFrame } from './decisionFrame'
+import type { DecisionEvidence } from './decisionEvidence'
+import type { DecisionRecord } from './decisionRecord'
 import { deleteArtifact, type DeletionTarget } from './artifactLifecycle'
 import { assertNever, brand, err, ok, type Brand, type NonEmptyArray, type Result } from './dop'
 import type { DatasetProfile, DatasetProfileProblem, SourcePersistence } from './dataset'
@@ -153,6 +156,12 @@ export type Workflow =
       /** Do-queries asked of the graphs above; each records the revision it was asked of. */
       readonly interventionQueries: readonly InterventionQueryArtifact[]
       readonly swigAnalyses: readonly SwigAnalysis[]
+      /** Decisions framed on the graphs above; each records the revision it was framed on. */
+      readonly decisionFrames: readonly DecisionFrame[]
+      /** Data checks of the framed decisions, each against the prepared dataset it read. */
+      readonly decisionEvidence: readonly DecisionEvidence[]
+      /** Decisions recorded from the evidence runs above, with what was known when each was made. */
+      readonly decisionRecords: readonly DecisionRecord[]
       /** The treatment and outcome being bound, shared by the DAG Workspace and Study Design. */
       readonly studyDraft: StudyDesignDraft
       readonly studies: readonly StudySpecification[]
@@ -236,6 +245,12 @@ export type WorkflowEvent =
   | { readonly type: 'intervention-query-created'; readonly query: InterventionQueryArtifact }
   | { readonly type: 'swig-analysis-created'; readonly analysis: SwigAnalysis }
   | { readonly type: 'swig-analysis-deleted'; readonly id: SwigAnalysis['id'] }
+  | { readonly type: 'decision-frame-created'; readonly frame: DecisionFrame }
+  | { readonly type: 'decision-frame-deleted'; readonly id: DecisionFrame['id'] }
+  | { readonly type: 'decision-evidence-created'; readonly evidence: DecisionEvidence }
+  | { readonly type: 'decision-evidence-deleted'; readonly id: DecisionEvidence['id'] }
+  | { readonly type: 'decision-record-created'; readonly record: DecisionRecord }
+  | { readonly type: 'decision-record-deleted'; readonly id: DecisionRecord['id'] }
   | { readonly type: 'intervention-query-deleted'; readonly query: InterventionQueryArtifact['id'] }
   | { readonly type: 'power-planning-recorded'; readonly record: PowerRecord }
   | { readonly type: 'study-draft-changed'; readonly draft: StudyDesignDraft }
@@ -447,6 +462,9 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
           dagChecks: snapshot.dagChecks,
           interventionQueries: snapshot.interventionQueries,
           swigAnalyses: snapshot.swigAnalyses,
+          decisionFrames: snapshot.decisionFrames,
+          decisionEvidence: snapshot.decisionEvidence,
+          decisionRecords: snapshot.decisionRecords,
           studyDraft: snapshot.studyDraft,
           studies: snapshot.studies,
           identifications: snapshot.identifications,
@@ -556,6 +574,9 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
           dagChecks: [],
           interventionQueries: [],
           swigAnalyses: [],
+          decisionFrames: [],
+          decisionEvidence: [],
+          decisionRecords: [],
           studyDraft: EMPTY_STUDY_DRAFT,
           studies: [],
           identifications: [],
@@ -637,6 +658,9 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
           dagChecks: [],
           interventionQueries: [],
           swigAnalyses: [],
+          decisionFrames: [],
+          decisionEvidence: [],
+          decisionRecords: [],
           studyDraft: EMPTY_STUDY_DRAFT,
           studies: [],
           identifications: [],
@@ -796,6 +820,44 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
       ) {
         return { ...state, swigAnalyses: [...state.swigAnalyses, event.analysis] }
       }
+      if (
+        event.type === 'decision-frame-created' &&
+        state.dagDocuments.some(
+          (document) =>
+            document.id === event.frame.dagDocument &&
+            document.current.id === event.frame.dagRevision,
+        )
+      )
+        return { ...state, decisionFrames: [...state.decisionFrames, event.frame] }
+      if (event.type === 'decision-frame-deleted')
+        return {
+          ...state,
+          decisionFrames: state.decisionFrames.filter((frame) => frame.id !== event.id),
+          decisionEvidence: state.decisionEvidence.filter((run) => run.frame !== event.id),
+          decisionRecords: state.decisionRecords.filter((record) => record.frame !== event.id),
+        }
+      if (
+        event.type === 'decision-evidence-created' &&
+        event.evidence.prepared === state.prepared?.id &&
+        state.decisionFrames.some((frame) => frame.id === event.evidence.frame)
+      )
+        return { ...state, decisionEvidence: [...state.decisionEvidence, event.evidence] }
+      if (event.type === 'decision-evidence-deleted')
+        return {
+          ...state,
+          decisionEvidence: state.decisionEvidence.filter((run) => run.id !== event.id),
+          decisionRecords: state.decisionRecords.filter((record) => record.evidence !== event.id),
+        }
+      if (
+        event.type === 'decision-record-created' &&
+        state.decisionEvidence.some((run) => run.id === event.record.evidence)
+      )
+        return { ...state, decisionRecords: [...state.decisionRecords, event.record] }
+      if (event.type === 'decision-record-deleted')
+        return {
+          ...state,
+          decisionRecords: state.decisionRecords.filter((record) => record.id !== event.id),
+        }
       if (event.type === 'swig-analysis-deleted')
         return {
           ...state,

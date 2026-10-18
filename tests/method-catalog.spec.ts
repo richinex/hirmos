@@ -30,7 +30,7 @@ test('requires sourced caveats for every registered method', async ({ page }, te
   ])
   const parsed = z.array(z.object({
     id: z.string().min(1),
-    family: z.enum(['diagnostic', 'discovery', 'identification', 'estimation', 'refuter', 'counterfactual']),
+    family: z.enum(['diagnostic', 'discovery', 'identification', 'estimation', 'refuter', 'counterfactual', 'decision']),
     caveats: z.array(z.object({
       id: z.string().min(1),
       category: z.string().min(1),
@@ -48,6 +48,11 @@ test('requires sourced caveats for every registered method', async ({ page }, te
     'count-scan-stable-recursion',
   ])
   expect(parsed.data.map((method) => method.id)).toEqual([
+    'sequential-backdoor-check',
+    'natural-bounds',
+    'logged-propensity-weighting',
+    'bounded-learning-replay',
+    'behaviour-cloning',
     'sharp-rd',
     'sharp-rd-design',
     'adf',

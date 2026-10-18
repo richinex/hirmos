@@ -919,6 +919,7 @@ export function EstimationPanel({
   const categoricalChecklist =
     selectedEstimatorIsVisible && expandsDesign(state.estimator) && encodingVariables.length > 0 ? (
       <ColumnChecklist
+        width="max-w-md"
         title="Categorical covariates"
         help="Tick the covariates whose values are categories rather than quantities. A ticked covariate becomes one column per level instead of one numeric column."
         columns={encodingVariables.map((variable) => ({

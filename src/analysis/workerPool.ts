@@ -1,3 +1,11 @@
+import { err, ok, type Result } from '@/domain/dop'
+import {
+  parseAnalysisWorkerEvent,
+  type AnalysisWorkerCommand,
+  type AnalysisWorkerEvent,
+  type AnalysisWorkerProblem,
+} from '@/workers/analysisProtocol'
+
 /**
  * A pool of analysis workers for work that splits into independent pieces.
  *
@@ -75,4 +83,77 @@ export function computeMaxWorkers(): number {
   const availableMegabytes = (deviceMemoryGb ?? 4) * 1024 - BROWSER_OVERHEAD_MEGABYTES
   const byMemory = Math.floor(availableMegabytes / WORKER_MEGABYTES)
   return Math.max(FEWEST, Math.min(Math.min(byCores, byMemory), MOST))
+}
+
+/**
+ * Send one command to a pooled worker and settle with the result event of `kind`, a failure, or
+ * cancellation. Progress events are ignored, and the worker is terminated if the scope aborts.
+ */
+export function runOnWorker<Kind extends AnalysisWorkerEvent['kind']>(
+  worker: Worker,
+  command: AnalysisWorkerCommand,
+  kind: Kind,
+  transfer: readonly Transferable[],
+  signal: AbortSignal,
+): Promise<Result<Extract<AnalysisWorkerEvent, { readonly kind: Kind }>, AnalysisWorkerProblem>> {
+  return new Promise((resolve) => {
+    const settle = (
+      outcome: Result<Extract<AnalysisWorkerEvent, { readonly kind: Kind }>, AnalysisWorkerProblem>,
+    ) => {
+      signal.removeEventListener('abort', abort)
+      worker.onmessage = null
+      worker.onerror = null
+      resolve(outcome)
+    }
+    const abort = () => {
+      worker.terminate()
+      settle(err({ kind: 'analysis-cancelled', detail: 'The analysis run was cancelled.' }))
+    }
+    signal.addEventListener('abort', abort, { once: true })
+    if (signal.aborted) {
+      abort()
+      return
+    }
+    worker.onmessage = (message: MessageEvent<unknown>) => {
+      const parsed = parseAnalysisWorkerEvent(message.data)
+      if (!parsed.ok) {
+        settle(err({ kind: 'worker-protocol-failed', detail: parsed.error.detail }))
+        return
+      }
+      const event = parsed.value
+      if (event.kind === 'protocol-failed') {
+        settle(err({ kind: 'worker-protocol-failed', detail: event.detail }))
+        return
+      }
+      if (event.kind === 'analysis-progress' || event.request !== command.request) return
+      if (event.kind === 'analysis-failed') {
+        settle(err(event.problem))
+        return
+      }
+      if (event.kind === kind) {
+        settle(ok(event as Extract<AnalysisWorkerEvent, { readonly kind: Kind }>))
+        return
+      }
+      settle(err({ kind: 'worker-protocol-failed', detail: `The worker returned ${event.kind}.` }))
+    }
+    worker.onerror = (event) => {
+      event.preventDefault()
+      settle(
+        err({
+          kind: 'worker-unavailable',
+          detail: event.message || 'A pooled worker stopped unexpectedly.',
+        }),
+      )
+    }
+    try {
+      worker.postMessage(command, [...transfer])
+    } catch (cause: unknown) {
+      settle(
+        err({
+          kind: 'worker-unavailable',
+          detail: cause instanceof Error ? cause.message : String(cause),
+        }),
+      )
+    }
+  })
 }

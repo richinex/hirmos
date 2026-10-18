@@ -54,6 +54,7 @@ pub mod pc_stable;
 pub mod pcmci;
 pub mod pcmciplus;
 pub mod redundancy;
+pub mod reinforcement;
 pub mod stationarity;
 pub mod survival;
 pub mod tsdiag;

@@ -2,6 +2,9 @@ import type { Workflow } from './workflow'
 import type { DagDocumentId } from './dag'
 import { estimandSentence, type StudySpecification } from './study'
 import { groupSwigAnalyses, swigGraphTitle, type SwigAnalysis } from './swig'
+import { decisionFrameTitle, type DecisionFrame } from './decisionFrame'
+import type { DecisionEvidence } from './decisionEvidence'
+import type { DecisionRecord } from './decisionRecord'
 import type { DagCheckArtifact } from './dagValidation'
 import type { RootCauseCheckRecord } from './rootCauseAnalysis'
 import { assertNever, isNonEmpty, type NonEmptyArray } from './dop'
@@ -13,6 +16,9 @@ export type DeletionTarget =
   | { readonly kind: 'model-check'; readonly id: RootCauseCheckRecord['id'] }
   /** A saved intervention graph together with the separation checks run on it. */
   | { readonly kind: 'swig-graph'; readonly id: SwigAnalysis['id'] }
+  | { readonly kind: 'decision-frame'; readonly id: DecisionFrame['id'] }
+  | { readonly kind: 'decision-evidence'; readonly id: DecisionEvidence['id'] }
+  | { readonly kind: 'decision-record'; readonly id: DecisionRecord['id'] }
 
 export interface DeletionReference {
   readonly id: string
@@ -118,6 +124,16 @@ export function assessArtifactDeletion(state: Workflow, target: DeletionTarget):
           location: 'DAG workspace, SWIG, Saved graphs',
           removable: { kind: 'swig-graph', id: entry.graph.id },
         })
+      for (const frame of state.decisionFrames) {
+        if (frame.dagDocument === target.id)
+          references.push({
+            id: frame.id,
+            createdAt: frame.createdAt,
+            label: decisionFrameTitle(frame),
+            location: 'Decision lab, History',
+            removable: { kind: 'decision-frame', id: frame.id },
+          })
+      }
       const groups = [
         { records: state.rootCause.runs, label: 'Causal model analysis' },
         { records: state.rootCause.effects, label: 'Intervention effect' },
@@ -193,6 +209,46 @@ export function assessArtifactDeletion(state: Workflow, target: DeletionTarget):
                 : 'This permanently removes the saved graph and the separation checks run on it. The DAG remains unchanged.',
           }
     }
+    case 'decision-frame': {
+      const frame = state.decisionFrames.find((item) => item.id === target.id)
+      return frame === undefined
+        ? { kind: 'missing' }
+        : {
+            kind: 'ready',
+            name: decisionFrameTitle(frame),
+            createdAt: frame.createdAt,
+            consequence: state.decisionRecords.some((record) => record.frame === frame.id)
+              ? 'This permanently removes the framed decision, its checks, its evidence runs and the decisions recorded from them. The DAG remains unchanged.'
+              : state.decisionEvidence.some((run) => run.frame === frame.id)
+                ? 'This permanently removes the framed decision, its checks and its evidence runs. The DAG remains unchanged.'
+                : 'This permanently removes the framed decision and its checks. The DAG remains unchanged.',
+          }
+    }
+    case 'decision-evidence': {
+      const run = state.decisionEvidence.find((item) => item.id === target.id)
+      return run === undefined
+        ? { kind: 'missing' }
+        : {
+            kind: 'ready',
+            name: `${run.action.name} for ${run.outcome.name}`,
+            createdAt: run.createdAt,
+            consequence: state.decisionRecords.some((record) => record.evidence === run.id)
+              ? 'This permanently removes the evidence run and the decisions recorded from it. The framed decision remains unchanged.'
+              : 'This permanently removes the evidence run. The framed decision remains unchanged.',
+          }
+    }
+    case 'decision-record': {
+      const record = state.decisionRecords.find((item) => item.id === target.id)
+      return record === undefined
+        ? { kind: 'missing' }
+        : {
+            kind: 'ready',
+            name: record.plan,
+            createdAt: record.createdAt,
+            consequence:
+              'This permanently removes the recorded decision. The evidence run remains unchanged.',
+          }
+    }
     default:
       return assertNever(target)
   }
@@ -245,6 +301,24 @@ export function deleteArtifact(
         swigAnalyses: state.swigAnalyses.filter((record) => !removed.has(record.id)),
       }
     }
+    case 'decision-frame':
+      return {
+        ...state,
+        decisionFrames: state.decisionFrames.filter((frame) => frame.id !== target.id),
+        decisionEvidence: state.decisionEvidence.filter((run) => run.frame !== target.id),
+        decisionRecords: state.decisionRecords.filter((record) => record.frame !== target.id),
+      }
+    case 'decision-evidence':
+      return {
+        ...state,
+        decisionEvidence: state.decisionEvidence.filter((run) => run.id !== target.id),
+        decisionRecords: state.decisionRecords.filter((record) => record.evidence !== target.id),
+      }
+    case 'decision-record':
+      return {
+        ...state,
+        decisionRecords: state.decisionRecords.filter((record) => record.id !== target.id),
+      }
     default:
       return assertNever(target)
   }

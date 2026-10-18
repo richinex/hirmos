@@ -376,7 +376,6 @@ button:not([role='combobox']):not(:disabled):not([aria-disabled='true']):active,
 
 /* The console window quotes macOS Terminal: its title bar, traffic lights and the "Basic" profile on paper,
    the "Pro" profile in the dark. Apple's values, kept together here and in SqlPreparationWorkspace.tsx. */
-.mac-terminal { box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.12); }
 .mac-terminal-bar { background: linear-gradient(#E8E8E8, #D4D4D4); border-bottom: 1px solid #B6B6B6; }
 .mac-terminal-title { color: #4D4D4D; font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif; }
 .mac-terminal-body { background: var(--color-stage); }
