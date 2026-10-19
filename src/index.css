@@ -51,7 +51,7 @@
       no worn edges.
 
    The two faces of the palette live in themes.css under :root[data-theme=...], with a pre-paint boot
-   script in index.html. Light is the default. */
+   script in index.html. Paper is the default. */
 
 @theme {
   --font-sans: Calibri, Carlito, Arial, sans-serif;

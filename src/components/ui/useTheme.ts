@@ -51,7 +51,7 @@ const subscribeOsTheme = (notify: () => void): (() => void) => {
 }
 
 /**
- * The theme lives on `<html data-theme>`, which themes.css keys off. Light is the default; the stored
+ * The theme lives on `<html data-theme>`, which themes.css keys off. Paper is the default; the stored
  * choice may be 'system', in which case a media-query listener re-resolves on change. `data-theme`
  * always carries a concrete theme.
  */
@@ -69,7 +69,7 @@ export function useTheme(): {
     } catch {
       /* private mode */
     }
-    return 'light'
+    return 'paper'
   })
   const osTheme = useSyncExternalStore(subscribeOsTheme, systemTheme, () => 'light' as ThemeName)
   const theme: ThemeName = choice === 'system' ? osTheme : choice

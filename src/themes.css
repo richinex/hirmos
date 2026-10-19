@@ -2,7 +2,7 @@
    not use, because no slide colour passes their contrast floor. Every text colour measures at least 4.5:1
    on every ground it sits on. Variables are named for what they do, never for their colour.
 
-   Light is the default; dark keeps the same roles at the same contrast, and paper restates them in the handwired colours. */
+   Paper is the default and restates the roles in the handwired colours; light and dark keep the same roles at the same contrast. */
 :root[data-theme="light"] {
   color-scheme: light;
   --color-stage: #D6DCE5;        /* the canvas: slate at 20% */

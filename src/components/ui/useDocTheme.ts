@@ -29,8 +29,8 @@ function subscribe(notify: () => void): () => void {
   }
 }
 
-const getSnapshot = (): string => document.documentElement.dataset.theme ?? 'light'
-const getServerSnapshot = (): string => 'light'
+const getSnapshot = (): string => document.documentElement.dataset.theme ?? 'paper'
+const getServerSnapshot = (): string => 'paper'
 
 export function useDocTheme(): string {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)

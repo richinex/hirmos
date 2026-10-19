@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="paper">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     <link rel="icon" type="image/svg+xml" href="/hirmos.svg?v=directed-h" />
-    <meta name="theme-color" content="#44546A" />
+    <meta name="theme-color" content="#DCD2C1" />
     <title>Hirmos - causal inference app</title>
     <meta name="description" content="Prepare data, examine discovery evidence, specify and validate a DAG, identify an effect, and compare causal estimates in one local-first browser workbench." />
     <script>
@@ -12,7 +12,7 @@
       try {
         var t = localStorage.getItem('hirmos-theme')
         if (t === 'system') t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-        if (t !== 'dark' && t !== 'paper') t = 'light'
+        if (t !== 'dark' && t !== 'light') t = 'paper'
         document.documentElement.dataset.theme = t
       } catch (e) {}
     </script>
