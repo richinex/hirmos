@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils'
 import type { ThemeChoice } from '@/components/ui/useTheme'
 
-/** One ring whose fill carries the state: empty for light, half for system, solid for dark. */
+/** One ring whose fill carries the state: empty for light, a dot for paper, half for system, solid for dark. */
 export function ThemeMark({
   choice,
   size = 16,
@@ -30,6 +30,7 @@ export function ThemeMark({
           stroke="none"
         />
       ) : null}
+      {choice === 'paper' ? <circle cx="8" cy="8" r={2.2} fill="currentColor" stroke="none" /> : null}
       {choice === 'dark' ? (
         <circle cx="8" cy="8" r={radius} fill="currentColor" stroke="none" />
       ) : null}

@@ -29,6 +29,7 @@
 .landing-primary:hover { color: var(--color-signal-ink); background-color: var(--color-signal-hover); }
 .landing-secondary { line-height: calc(2.75rem - 4px); border: 2px solid var(--color-rail); background-color: var(--color-well); color: var(--color-ink); }
 .landing-secondary:hover { color: var(--color-ink); background-color: var(--color-raised); }
+:root[data-theme="paper"] .landing-secondary { border-color: var(--color-control); }
 .landing-wordmark, .landing-primary, .landing-secondary { text-decoration: none; }
 
 /* Each drawer's tab sits further along than the last, the way a row of folders is cut. */

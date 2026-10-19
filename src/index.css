@@ -469,7 +469,7 @@ button:not([role='combobox']):not(:disabled):not([aria-disabled='true']):active,
   width: 14px;
   background: linear-gradient(90deg, transparent, color-mix(in srgb, white 75%, transparent));
 }
-:root[data-theme="light"] .bar-live::after {
+:root:is([data-theme="light"], [data-theme="paper"]) .bar-live::after {
   background: linear-gradient(90deg, transparent, color-mix(in srgb, white 75%, transparent), transparent);
 }
 @media (prefers-reduced-motion: reduce) { .bar-live::after { animation: none; opacity: 0; } }

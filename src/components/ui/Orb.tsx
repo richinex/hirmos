@@ -8,7 +8,7 @@ const subscribeTheme = (notify: () => void): (() => void) => {
   return () => observer.disconnect()
 }
 
-const isDarkTheme = (): boolean => document.documentElement.dataset.theme !== 'light'
+const isDarkTheme = (): boolean => document.documentElement.dataset.theme === 'dark'
 
 export function Orb({
   state,

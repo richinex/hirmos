@@ -1,17 +1,18 @@
 import { useLayoutEffect, useState, useSyncExternalStore } from 'react'
 import { flushSync } from 'react-dom'
 
-export type ThemeName = 'light' | 'dark'
+export type ThemeName = 'light' | 'dark' | 'paper'
 
 /** What the user picked: a concrete theme, or 'system' (follow the OS, live). */
 export type ThemeChoice = ThemeName | 'system'
 
 const KEY = 'hirmos-theme'
-export const THEMES: readonly ThemeName[] = ['light', 'dark']
+export const THEMES: readonly ThemeName[] = ['light', 'dark', 'paper']
 const CYCLE: readonly ThemeChoice[] = [...THEMES, 'system']
 export const THEME_LABELS: Record<ThemeChoice, string> = {
   light: 'Light',
   dark: 'Dark',
+  paper: 'Paper',
   system: 'System',
 }
 

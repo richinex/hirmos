@@ -2,7 +2,7 @@
    not use, because no slide colour passes their contrast floor. Every text colour measures at least 4.5:1
    on every ground it sits on. Variables are named for what they do, never for their colour.
 
-   Two faces of the same palette. Light is the default; dark keeps the same roles at the same contrast. */
+   Light is the default; dark keeps the same roles at the same contrast, and paper restates them in the handwired colours. */
 :root[data-theme="light"] {
   color-scheme: light;
   --color-stage: #D6DCE5;        /* the canvas: slate at 20% */
@@ -100,4 +100,55 @@
   --shadow-track: inset 0 1px 3px rgb(0 0 0 / .35), inset 0 0 0 1px rgb(0 0 0 / .2);
   --shadow-knob: 0 0 0 1px rgb(0 0 0 / .2), 0 1px 2px rgb(0 0 0 / .35), 0 3px 8px -2px rgb(0 0 0 / .4), inset 0 1px 0 var(--color-highlight);
   --gradient-knob: linear-gradient(to bottom, rgb(255 255 255 / .2), rgb(255 255 255 / 0));
+}
+/* Paper: the handwired palette of paper, ink and one copper accent, with its cloth-wire colours for status.
+   The rail and the folders are its desk colour with ink text. Washes are flattened onto the sheet, and the
+   selected row, the rail's faint text and its green and red are stepped a little toward the ink so every
+   text colour holds 4.5:1 on its ground. */
+:root[data-theme="paper"] {
+  color-scheme: light;
+  --color-stage: #F3EEE4;        /* the paper */
+  --color-panel: #FFFDF8;        /* a sheet on the paper */
+  --color-column: #FFFDF8;
+  --color-well: #FFFDF8;
+  --color-raised: #F5EAE0;       /* the copper wash on a sheet */
+  --color-line: #DCD2C4;
+  --color-hair: #CBBFAE;
+  --color-edge: #DFDBD4;
+  --color-control: #72675C;      /* an input boundary: 5.4:1 on the well */
+  --color-ink: #1E1A16;
+  --color-bone: #5F564D;
+  --color-muted: #5F564D;
+  --color-faint: #72675C;
+  --color-dim: #CBBFAE;
+  --color-signal: #A64D1D;       /* copper, under paper-coloured text */
+  --color-signal-ink: #FFFDF8;
+  --color-signal-hover: #92451C;
+  --color-signal-line: #D3A58B;
+  --color-signal-text: #A64D1D;
+  --color-link: #A64D1D;
+  --color-ok: #2E6A4C;
+  --color-info: #33589E;
+  --color-warn: #8A6412;
+  --color-danger: #B3261E;
+  --color-highlight: rgba(255, 253, 248, 0.5);
+  --color-track: #F3F0EB;
+  --color-knob: #FFFDF8;
+  --color-rail: #DCD2C1;         /* the desk */
+  --color-rail-active: #CBBFAE;
+  --color-rail-ink: #1E1A16;
+  --color-rail-faint: #564E45;
+  --color-rail-dim: #72675C;
+  --color-rail-signal: #A64D1D;
+  --color-rail-ok: #2D6649;
+  --color-rail-info: #33589E;
+  --color-rail-danger: #AD261E;
+  --color-tab: #E8E0D3;          /* halfway between the paper and the desk */
+  --color-tab-ink: #1E1A16;
+  --color-tab-hover: #E2D9CA;
+  --shadow-lift: 0 1px 2px rgb(52 38 24 / .07), 0 2px 8px rgb(52 38 24 / .05);
+  --shadow-float: 0 2px 4px rgb(52 38 24 / .12), 0 24px 48px rgb(52 38 24 / .18);
+  --shadow-track: inset 0 1px 2px rgb(52 38 24 / .12), inset 0 0 0 1px rgb(52 38 24 / .05);
+  --shadow-knob: 0 0 0 1px rgb(52 38 24 / .08), 0 1px 2px rgb(52 38 24 / .14), 0 3px 8px -2px rgb(52 38 24 / .12), inset 0 1px 0 var(--color-highlight);
+  --gradient-knob: linear-gradient(to bottom, rgb(255 253 248 / .5), rgb(255 253 248 / 0));
 }

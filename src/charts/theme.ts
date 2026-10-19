@@ -50,6 +50,9 @@ export const LIGHT_CATEGORICAL_RAMP = [
   '#949494',
 ] as const
 
+/** The handwired chart colours in their own order: copper, indigo, ochre, plum, so copper and ochre never sit side by side. */
+export const PAPER_CATEGORICAL_RAMP = ['#A64D1D', '#33589E', '#8A6412', '#7A3355'] as const
+
 /** Pass the category's original position, before filtering, paging or sorting. */
 export const seriesColour = (theme: ChartTheme, index: number): string =>
   theme.categorical[index % theme.categorical.length] ?? theme.ink
@@ -114,7 +117,12 @@ export function readChartTheme(): ChartTheme {
     ok: colour('--color-ok', FALLBACK.ok),
     warn: colour('--color-warn', FALLBACK.warn),
     danger: colour('--color-danger', FALLBACK.danger),
-    categorical: root.colorScheme === 'light' ? LIGHT_CATEGORICAL_RAMP : CATEGORICAL_RAMP,
+    categorical:
+      name === 'paper'
+        ? PAPER_CATEGORICAL_RAMP
+        : root.colorScheme === 'light'
+          ? LIGHT_CATEGORICAL_RAMP
+          : CATEGORICAL_RAMP,
     font: colour('--font-sans', FALLBACK.font),
     mono: colour('--font-mono', FALLBACK.mono),
     labelSize: lengthPixels(root, '--text-label', FALLBACK.labelSize),

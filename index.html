@@ -12,7 +12,7 @@
       try {
         var t = localStorage.getItem('hirmos-theme')
         if (t === 'system') t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-        if (t !== 'dark') t = 'light'
+        if (t !== 'dark' && t !== 'paper') t = 'light'
         document.documentElement.dataset.theme = t
       } catch (e) {}
     </script>
