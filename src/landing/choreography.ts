@@ -1,8 +1,7 @@
 import { animate, cubicBezier, stagger, utils } from 'animejs'
 
 /**
- * The landing page's motion, in the house register: one ease-out for everything, every reveal once,
- * nothing that loops except the dashed evidence links. Durations come from the landing's motion tokens in
+ * The landing page's motion, in the house register: one ease-out for everything, every reveal once. Durations come from the landing's motion tokens in
  * the stylesheet. The hero is not touched: its word reveal is CSS and has painted before this runs. Under reduced motion nothing here runs and the page shows its final
  * state, because the stylesheet never hides content on its own.
  */
@@ -18,29 +17,12 @@ const tokenMs = (name: string, fallback: number): number => {
 const groups: readonly { readonly selector: string; readonly children: string }[] = [
   { selector: '.workflow-section .section-intro', children: ':scope > *' },
   { selector: '.workflow-list', children: ':scope > li' },
-  {
-    selector: '.feature-section--evidence',
-    children: ':scope > .feature-copy > *, :scope > .evidence-figure',
-  },
-  {
-    selector: '.feature-section--identify',
-    children: ':scope > .backdoor-figure, :scope > .feature-copy > *',
-  },
-  { selector: '.structures-section .section-intro', children: ':scope > *' },
-  { selector: '.structure-grid', children: ':scope > article' },
+  { selector: '.landing-folder-copy', children: ':scope > *' },
 ]
-
-const drawOn = (path: SVGPathElement, duration: number, delay: number): void => {
-  const length = path.getTotalLength()
-  path.style.strokeDasharray = `${length}`
-  path.style.strokeDashoffset = `${length}`
-  animate(path, { strokeDashoffset: 0, duration, delay, ease: EASE })
-}
 
 export function choreographLanding(root: HTMLElement): () => void {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return () => {}
   const reveal = tokenMs('--motion-reveal', 640)
-  const draw = tokenMs('--motion-draw', 900)
   const step = tokenMs('--motion-stagger', 70)
 
   const observer = new IntersectionObserver(
@@ -59,10 +41,6 @@ export function choreographLanding(root: HTMLElement): () => void {
           delay: stagger(step),
           ease: EASE,
         })
-        for (const path of group.querySelectorAll<SVGPathElement>(
-          '.backdoor-edge--signal, .dag-link--signal',
-        ))
-          drawOn(path, draw, 260)
       }
     },
     { rootMargin: '0px 0px -12% 0px', threshold: 0.05 },

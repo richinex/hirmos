@@ -46,7 +46,7 @@ const EDGES: readonly GraphEdge[] = [
   { from: 'X', to: 'Y', emphasis: 'effect', bend: -0.34 },
 ] as const
 
-const NODE_RADIUS = 0.225
+const NODE_RADIUS = 0.26
 const SEGMENTS = 48
 
 const point = ([x, y, z]: Point): THREE.Vector3 => new THREE.Vector3(x, y, z)
@@ -76,14 +76,15 @@ const random = (() => {
   }
 })()
 
-const MONO = `'Fira Code Variable', 'Fira Code', ui-monospace, monospace`
+const GLYPH_FONT = `'Arial Black', 'Archivo Black', Arial, sans-serif`
+const CAPTION_FONT = `Calibri, Carlito, Arial, sans-serif`
 
-/** A label drawn on a canvas in the house mono. Call `redraw` once the face has loaded. */
+/** A label drawn on a canvas in the given font. Call `redraw` once the face has loaded. */
 function textSprite(
   text: string,
   colour: THREE.Color,
   width: number,
-  fontSize: number,
+  font: string,
 ): THREE.Sprite & { redraw: () => void } {
   const canvas = document.createElement('canvas')
   canvas.width = 512
@@ -93,7 +94,7 @@ function textSprite(
     if (context === null) return
     context.clearRect(0, 0, canvas.width, canvas.height)
     context.fillStyle = `#${colour.getHexString()}`
-    context.font = `500 ${fontSize}px ${MONO}`
+    context.font = font
     context.textAlign = 'center'
     context.textBaseline = 'middle'
     context.fillText(text, canvas.width / 2, canvas.height / 2)
@@ -103,7 +104,7 @@ function textSprite(
   texture.colorSpace = THREE.SRGBColorSpace
   texture.minFilter = THREE.LinearFilter
   const sprite = new THREE.Sprite(
-    new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false }),
+    new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false, toneMapped: false }),
   )
   sprite.scale.set(width, width * (canvas.height / canvas.width), 1)
   return Object.assign(sprite, {
@@ -167,25 +168,25 @@ const gutter = (width: number) => Math.min(48, Math.max(16, 0.03077 * width + 3.
 
 /**
  * Where the graph may sit, in the scene's own pixels. Beside the copy its centre is level with the centre
- * of the headline and actions, and its height is what that centre allows on both sides; on a narrow
- * screen it sits between the header and the headline.
+ * of the headline and any actions in the band, and its height is what that centre allows on both sides;
+ * on a narrow screen it sits between the band's top and the headline.
  */
 function stageArea(element: HTMLElement) {
   const band = element.closest('.landing-band')
   const headline = band?.querySelector('.landing-headline')
-  const actions = band?.querySelector('.landing-actions')
-  const header = band?.querySelector('.landing-header__row')
-  if (!band || !headline || !actions || !header) return null
+  if (!band || !headline) return null
+  const actions = band.querySelector('.landing-actions')
   const frame = element.getBoundingClientRect()
   const text = headline.getBoundingClientRect()
-  const buttons = [...actions.children].map((child) => child.getBoundingClientRect())
-  const top = header.getBoundingClientRect().bottom - frame.top
+  const boxes = [text, ...[...(actions?.children ?? [])].map((child) => child.getBoundingClientRect())]
+  const top = 0
   const g = gutter(frame.width)
+  const v = Math.min(g, 20)
   if (frame.width < 900)
-    return { left: g, top: top + g, right: frame.width - g, bottom: text.top - frame.top - g }
-  const copyRight = Math.max(text.right, ...buttons.map((box) => box.right)) - frame.left
-  const centre = (text.top + Math.max(...buttons.map((box) => box.bottom))) / 2 - frame.top
-  const half = Math.min(centre - (top + g), frame.height - g - centre)
+    return { left: g, top: top + v, right: frame.width - g, bottom: text.top - frame.top - v }
+  const copyRight = Math.max(...boxes.map((box) => box.right)) - frame.left
+  const centre = (text.top + Math.max(...boxes.map((box) => box.bottom))) / 2 - frame.top
+  const half = Math.min(centre - (top + v), frame.height - v - centre)
   return { left: copyRight + g, top: centre - half, right: frame.width - g, bottom: centre + half }
 }
 
@@ -204,8 +205,9 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
     const stage = colourToken(style, '--color-stage', '#0A0A0B')
     const ink = colourToken(style, '--color-ink', '#E6E3DC')
     const bone = colourToken(style, '--color-bone', '#B8B5AE')
-    const muted = colourToken(style, '--color-muted', '#8C8A85')
     const signal = colourToken(style, '--color-signal', '#E4501F')
+    const outcome = colourToken(style, '--color-signal-line', '#F4B183')
+    const deepInk = colourToken(style, '--color-signal-ink', '#222A35')
     const dark = stage.getHSL({ h: 0, s: 0, l: 0 }).l < 0.5
     const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     const compact = window.matchMedia('(max-width: 900px)').matches
@@ -241,7 +243,7 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
     const composer = !compact && !still && dark ? new EffectComposer(renderer) : null
     if (composer !== null) {
       composer.addPass(new RenderPass(scene, camera))
-      composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.42, 0.5, 0.72))
+      composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.25, 0.5, 0.9))
       composer.addPass(new OutputPass())
     }
 
@@ -314,24 +316,27 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
       const group = new THREE.Group()
       group.position.copy(nodePositions.get(node.id) ?? new THREE.Vector3())
       const live = node.id === 'X' || node.id === 'Y'
+      const fill = node.id === 'X' ? signal : node.id === 'Y' ? outcome : bone
       const disc = new THREE.Mesh(
         new THREE.CircleGeometry(NODE_RADIUS, 64),
-        new THREE.MeshBasicMaterial({ color: stage.clone().lerp(ink, dark ? 0.06 : 0.02) }),
+        new THREE.MeshBasicMaterial({ color: fill, toneMapped: false }),
       )
       const ring = new THREE.Mesh(
-        new THREE.RingGeometry(NODE_RADIUS, NODE_RADIUS + 0.018, 96),
+        new THREE.RingGeometry(NODE_RADIUS + 0.035, NODE_RADIUS + 0.06, 96),
         new THREE.MeshBasicMaterial({
           color: live ? signal : bone,
           transparent: true,
           opacity: live ? 0.95 : 0.8,
+          toneMapped: false,
         }),
       )
       ring.position.z = 0.002
-      const glyph = textSprite(node.id, live ? signal : ink, 0.4, 118)
+      const glyphInk = fill.getHSL({ h: 0, s: 0, l: 0 }, THREE.SRGBColorSpace).l > 0.45 ? deepInk : ink
+      const glyph = textSprite(node.id, glyphInk, 0.66, `900 104px ${GLYPH_FONT}`)
       glyph.position.z = 0.03
-      const caption = textSprite(node.caption, muted, 1.15, 26)
+      const caption = textSprite(node.caption, bone, 1.3, `700 38px ${CAPTION_FONT}`)
       labels.push(glyph, caption)
-      caption.position.set(0, -(NODE_RADIUS + 0.22), 0.03)
+      caption.position.set(0, -(NODE_RADIUS + 0.27), 0.03)
       group.add(disc, ring, glyph, caption)
       group.scale.setScalar(0)
       group.userData = {
@@ -363,9 +368,9 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
       const effect = edge.emphasis === 'effect'
       const material = new LineMaterial({
         color: (effect ? signal : bone).getHex(),
-        linewidth: effect ? 2.6 : 1.8,
+        linewidth: effect ? 4 : 2.4,
         transparent: true,
-        opacity: effect ? 0.95 : dark ? 0.6 : 0.8,
+        opacity: effect ? 1 : 0.9,
         resolution: lineResolution,
         worldUnits: false,
       })
@@ -482,7 +487,10 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
     place()
     // The labels and the copy's measured box both depend on the faces, so both settle once they load.
     let disposed = false
-    void document.fonts.load(`500 118px ${MONO}`).then(() => {
+    void Promise.all([
+      document.fonts.load(`900 104px ${GLYPH_FONT}`),
+      document.fonts.load(`700 38px ${CAPTION_FONT}`),
+    ]).then(() => {
       if (disposed) return
       labels.forEach((label) => label.redraw())
       place()

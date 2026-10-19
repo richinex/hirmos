@@ -46,10 +46,9 @@
       margin is rem. One rhythm unit is 1.5rem (24px). Sizes come from a modular scale, 1.2 on a phone and
       1.333 from 720px up, so a headline grows with the format while the reading size stays put.
 
-   6. TEXTURE IS CLEAN AND GRAINY. A subtle noise and a radial gradient on the band so a large flat blue
-      reads as a surface lit from above; a one-pixel top highlight and a faint gradient on a filled
-      button, so it is lit the same way; a double shadow (`.float`) under a surface that leaves the
-      plane. Nothing else: no bevels, no diagonals, no worn edges.
+   6. TEXTURE IS FLAT. A one-pixel top highlight and a faint gradient on a filled button, and a double
+      shadow (`.float`) under a surface that leaves the plane. Nothing else: no bevels, no diagonals,
+      no worn edges.
 
    The two faces of the palette live in themes.css under :root[data-theme=...], with a pre-paint boot
    script in index.html. Light is the default. */
@@ -501,14 +500,6 @@ button[aria-busy="true"]::after {
 .float { box-shadow: var(--shadow-float), inset 0 1px 0 var(--color-highlight); }
 /* Non-interactive texture: a faint 45° hatch says "not usable here" as a pattern, not a colour. */
 .hatch { background-image: repeating-linear-gradient(45deg, color-mix(in oklab, var(--color-muted) 14%, transparent) 0 2px, transparent 2px 9px); }
-/* The band's grain: a pattern of tiny translucent dots, generated as an SVG tile, over a radial gradient
-   that lights the band from the top centre. Applied to the rail and the header; `.band-texture` carries
-   only the images, the ground colour comes from the element. */
-.band-texture {
-  background-image:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
-    radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--color-rail-active) 45%, var(--color-rail)), var(--color-rail));
-}
 
 /* Reduced motion removes MOVEMENT, not feedback.
    WCAG 2.3.3 is about motion animation: things that travel, scale, spin or slide. A colour change on

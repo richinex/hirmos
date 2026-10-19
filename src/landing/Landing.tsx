@@ -1,10 +1,14 @@
 import { Fragment, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { HirmosMark } from '@/components/HirmosMark'
+import { Icon } from '@/components/Icon'
 import { SourceNotice } from '@/components/SourceNotice'
 import { InternalLink } from '@/components/ui/InternalLink'
 import { SHIPPED_EXAMPLES } from '@/domain/example'
-import { chapterPath } from '@/domain/navigation'
+import { CHAPTER_METADATA, chapterPath, type ChapterId } from '@/domain/navigation'
 import { choreographLanding } from './choreography'
+import { DeskReplay } from './DeskReplay'
+import { EstimateReplay } from './EstimateReplay'
+import { IdentifyReplay } from './IdentifyReplay'
 import type { HirmosGraph } from './HirmosGraph'
 
 // Fetched with the page and mounted the moment it arrives. Not React.lazy: a Suspense boundary holds
@@ -14,8 +18,8 @@ const graphChunk = import('./HirmosGraph')
 // The textbook example, opened with its bundled data at its graph.
 const NSW_EXAMPLE = SHIPPED_EXAMPLES.find((example) => example.sourceName === 'lalonde.csv')
 
-/** The hero headline, one slot per word so the reveal is markup, not a script. */
-const HEADLINE = 'A scratchpad for causal inference.'.split(' ')
+/** The hero headline, one slot per phrase so the reveal is markup, not a script; a slot never breaks. */
+const HEADLINE = ['The causal inference', 'app'] as const
 
 const WORKFLOW = [
   {
@@ -68,163 +72,14 @@ function Scene() {
   )
 }
 
-function BackdoorFigure() {
+/** A chapter's tab as the workbench draws it: the chapter's icon and its short name. */
+function ChapterTab({ chapter }: { readonly chapter: ChapterId }) {
+  const { icon, shortName } = CHAPTER_METADATA[chapter]
   return (
-    <svg
-      className="backdoor-figure"
-      viewBox="0 0 620 280"
-      role="img"
-      aria-labelledby="backdoor-title backdoor-desc"
-    >
-      <title id="backdoor-title">A treatment, outcome, and common cause</title>
-      <desc id="backdoor-desc">
-        The common cause points to treatment and outcome. Treatment also points to outcome.
-        Conditioning on the common cause closes the back-door path.
-      </desc>
-      <defs>
-        <marker
-          id="landing-arrow"
-          markerWidth="8"
-          markerHeight="8"
-          refX="7"
-          refY="4"
-          orient="auto"
-          markerUnits="strokeWidth"
-        >
-          <path d="M0,0 L8,4 L0,8 Z" className="backdoor-arrow" />
-        </marker>
-      </defs>
-      <path
-        className="backdoor-edge backdoor-edge--muted"
-        d="M305 72 C245 94 201 125 166 179"
-        markerEnd="url(#landing-arrow)"
-      />
-      <path
-        className="backdoor-edge backdoor-edge--muted"
-        d="M321 72 C382 94 432 126 466 179"
-        markerEnd="url(#landing-arrow)"
-      />
-      <path
-        className="backdoor-edge backdoor-edge--signal"
-        d="M203 211 C278 236 362 236 436 211"
-        markerEnd="url(#landing-arrow)"
-      />
-      <g className="backdoor-node">
-        <circle cx="313" cy="54" r="30" />
-        <text x="313" y="60">
-          C
-        </text>
-      </g>
-      <g className="backdoor-node">
-        <circle cx="150" cy="207" r="34" />
-        <text x="150" y="213">
-          X
-        </text>
-      </g>
-      <g className="backdoor-node">
-        <circle cx="470" cy="207" r="34" />
-        <text x="470" y="213">
-          Y
-        </text>
-      </g>
-      <text className="backdoor-label" x="313" y="17">
-        common cause
-      </text>
-      <text className="backdoor-label" x="150" y="262">
-        treatment
-      </text>
-      <text className="backdoor-label" x="470" y="262">
-        outcome
-      </text>
-    </svg>
-  )
-}
-
-function EvidenceFigure() {
-  return (
-    <div
-      className="evidence-figure"
-      aria-label="Discovery evidence remains separate from the authored DAG"
-    >
-      <section>
-        <header>
-          <span>Discovery evidence</span>
-          <small>candidate relations</small>
-        </header>
-        <svg viewBox="0 0 300 220" aria-hidden="true">
-          <path className="evidence-link evidence-link--one" d="M55 59 C115 25 176 43 239 86" />
-          <path className="evidence-link evidence-link--two" d="M59 62 C104 118 169 151 246 153" />
-          <path className="evidence-link evidence-link--three" d="M93 174 C130 125 167 99 236 88" />
-          <circle cx="52" cy="58" r="25" />
-          <circle cx="88" cy="177" r="25" />
-          <circle cx="243" cy="87" r="25" />
-          <circle cx="247" cy="154" r="25" />
-          <text x="52" y="63">
-            A
-          </text>
-          <text x="88" y="182">
-            B
-          </text>
-          <text x="243" y="92">
-            C
-          </text>
-          <text x="247" y="159">
-            D
-          </text>
-        </svg>
-      </section>
-      <div className="evidence-divider" aria-hidden="true">
-        <span>inform</span>
-        <b>→</b>
-      </div>
-      <section>
-        <header>
-          <span>Authored DAG</span>
-          <small>stated assumptions</small>
-        </header>
-        <svg viewBox="0 0 300 220" aria-hidden="true">
-          <defs>
-            <marker
-              id="evidence-arrow"
-              markerWidth="8"
-              markerHeight="8"
-              refX="7"
-              refY="4"
-              orient="auto"
-            >
-              <path d="M0 0L8 4L0 8Z" />
-            </marker>
-          </defs>
-          <path
-            className="dag-link"
-            d="M66 65 C104 72 135 87 165 104"
-            markerEnd="url(#evidence-arrow)"
-          />
-          <path
-            className="dag-link"
-            d="M183 111 C217 117 233 130 242 150"
-            markerEnd="url(#evidence-arrow)"
-          />
-          <path
-            className="dag-link dag-link--signal"
-            d="M68 68 C113 122 167 151 227 159"
-            markerEnd="url(#evidence-arrow)"
-          />
-          <circle cx="52" cy="58" r="25" />
-          <circle cx="179" cy="106" r="25" />
-          <circle cx="247" cy="163" r="25" />
-          <text x="52" y="63">
-            A
-          </text>
-          <text x="179" y="111">
-            C
-          </text>
-          <text x="247" y="168">
-            D
-          </text>
-        </svg>
-      </section>
-    </div>
+    <p className="landing-tab">
+      <Icon name={icon} size={18} fill />
+      {shortName}
+    </p>
   )
 }
 
@@ -234,165 +89,124 @@ export function Landing() {
     document.title = 'Hirmos - causal inference app'
     return root.current === null ? undefined : choreographLanding(root.current)
   }, [])
+  useEffect(() => {
+    const element = root.current
+    if (element === null) return
+    const mark = () => element.style.setProperty('--scrolled', window.scrollY > 4 ? '1' : '0')
+    mark()
+    window.addEventListener('scroll', mark, { passive: true })
+    return () => window.removeEventListener('scroll', mark)
+  }, [])
   return (
     <main ref={root} className="landing-root">
-      {/* The band: header and hero on the blue. The scene fills the band behind the copy and takes the
-          band's tokens, so the observations and the graph draw in the band's ink on the band's ground. */}
-      <div className="landing-band band-texture">
-        <Scene />
-        <div className="landing-scrim" aria-hidden="true" />
-        <header className="landing-header">
-          <div className="landing-width landing-header__row">
-            <InternalLink className="landing-wordmark" href="/" aria-label="Hirmos home">
-              <HirmosMark className="landing-mark" size={28} />
-              <span>hirmos</span>
-            </InternalLink>
-          </div>
-        </header>
+      <header className="landing-width landing-top">
+        <InternalLink className="landing-wordmark" href="/" aria-label="Hirmos home">
+          <HirmosMark className="landing-mark" size={28} />
+          <span>hirmos</span>
+        </InternalLink>
+      </header>
 
-        <div className="landing-width landing-hero-shell">
-          <section className="landing-hero-copy" aria-labelledby="landing-title">
-            <h1 id="landing-title" className="landing-headline">
-              {HEADLINE.map((word, index) => (
-                <Fragment key={word}>
-                  <span className="landing-slot" style={{ '--slot': index } as CSSProperties}>
-                    <span className="landing-slot-word">{word}</span>
-                  </span>
-                  {index + 1 < HEADLINE.length ? ' ' : null}
-                </Fragment>
-              ))}
-            </h1>
-            <div className="landing-actions">
-              <InternalLink className="landing-primary" href="/app">
-                Start an analysis
-              </InternalLink>
-              {NSW_EXAMPLE !== undefined && (
-                <InternalLink className="landing-secondary" href={chapterPath('dag', NSW_EXAMPLE.id)}>
-                  Open the NSW example
-                </InternalLink>
-              )}
+      <div className="landing-width landing-drawers">
+        <section id="workflow" className="landing-drawer" aria-labelledby="landing-title">
+          <div className="landing-folder">
+            <div className="landing-band">
+              <Scene />
+              <div className="landing-scrim" aria-hidden="true" />
+              <div className="landing-hero-copy">
+                <h1 id="landing-title" className="landing-headline">
+                  {HEADLINE.map((word, index) => (
+                    <Fragment key={word}>
+                      <span className="landing-slot" style={{ '--slot': index } as CSSProperties}>
+                        <span className="landing-slot-word">{word}</span>
+                      </span>
+                      {index + 1 < HEADLINE.length ? ' ' : null}
+                    </Fragment>
+                  ))}
+                </h1>
+              </div>
             </div>
-          </section>
-        </div>
-      </div>
-
-      <div className="landing-content">
-        <section
-          id="workflow"
-          className="landing-width workflow-section"
-          aria-labelledby="workflow-title"
-        >
-          <div className="section-intro">
-            <p className="landing-eyebrow">The workbench</p>
-            <h2 id="workflow-title">Go from raw data to causal estimate in six steps</h2>
-            <p>Hirmos provides a versioned artifact at each stage of the analysis.</p>
-          </div>
-          <ol className="workflow-list">
-            {WORKFLOW.map((step) => (
-              <li key={step.number}>
-                <span>{step.number}</span>
-                <div>
-                  <h3>{step.title}</h3>
-                  <p>{step.copy}</p>
+            <section className="landing-sheet workflow-section" aria-labelledby="workflow-title">
+              <div className="section-intro">
+                <h2 id="workflow-title">Go from raw data to causal estimate in six steps</h2>
+                <div className="landing-actions">
+                  <InternalLink className="landing-primary" href="/app">
+                    Start an analysis
+                  </InternalLink>
+                  {NSW_EXAMPLE === undefined ? null : (
+                    <InternalLink
+                      className="landing-secondary"
+                      href={chapterPath('dag', NSW_EXAMPLE.id)}
+                    >
+                      Open the NSW example
+                    </InternalLink>
+                  )}
                 </div>
-              </li>
-            ))}
-          </ol>
-        </section>
-
-        <section
-          id="graph"
-          className="landing-width feature-section feature-section--evidence"
-          aria-labelledby="evidence-title"
-        >
-          <div className="feature-copy">
-            <p className="landing-eyebrow">Discovery and specification</p>
-            <h2 id="evidence-title">Compare discovery results with the causal model</h2>
-            <p>
-              Discovery methods report candidate contemporaneous and lagged relations. Hirmos
-              displays these results beside the editable DAG. Graph revisions record which arrows
-              enter the model.
-            </p>
-            <ul className="feature-points">
-              <li>compare results from more than one discovery method</li>
-              <li>inspect lag marks and uncertainty</li>
-              <li>check cycles, temporal order, and edge grammar</li>
-            </ul>
+              </div>
+              <ol className="workflow-list">
+                {WORKFLOW.map((step) => (
+                  <li key={step.number}>
+                    <span>{step.number}</span>
+                    <h3>{step.title}</h3>
+                    <p>{step.copy}</p>
+                  </li>
+                ))}
+              </ol>
+            </section>
           </div>
-          <EvidenceFigure />
         </section>
 
-        <section
-          id="identification"
-          className="landing-width feature-section feature-section--identify"
-          aria-labelledby="identify-title"
-        >
-          <BackdoorFigure />
-          <div className="feature-copy">
-            <p className="landing-eyebrow">Identification before estimation</p>
-            <h2 id="identify-title">Check the adjustment set before estimation</h2>
-            <p>
-              Hirmos checks whether the recorded DAG supplies a measured back-door adjustment set.
-              It reports the selected set, mediators, colliders, and open paths, and states which
-              identification strategies were not assessed.
-            </p>
-            <div className="adjustment-record">
-              <span>Requested effect</span>
-              <b>X → Y</b>
-              <span>Valid adjustment set</span>
-              <b>{'{ C }'}</b>
-              <span>Identification</span>
-              <b className="record-ok">Back-door criterion satisfied</b>
+        <section id="identification" className="landing-drawer" aria-labelledby="identify-title">
+          <ChapterTab chapter="study" />
+          <div className="landing-folder landing-folder--story">
+            <div className="landing-folder-copy">
+              <h2 id="identify-title" className="landing-folder-title">
+                Check the adjustment set before estimation
+              </h2>
+              <p>
+                Hirmos checks whether the recorded DAG supplies a measured back-door adjustment set.
+                It reports the selected set, mediators, colliders, and open paths, and states which
+                identification strategies were not assessed.
+              </p>
+            </div>
+            <div className="landing-sheet landing-story">
+              {NSW_EXAMPLE === undefined ? null : <p className="replay-example">{NSW_EXAMPLE.name}</p>}
+              <IdentifyReplay />
             </div>
           </div>
         </section>
 
-        <section
-          id="structures"
-          className="landing-width structures-section"
-          aria-labelledby="structures-title"
-        >
-          <div className="section-intro">
-            <p className="landing-eyebrow">Observation structures</p>
-            <h2 id="structures-title">Choose the correct observation structure</h2>
-            <p>
-              The observation structure records temporal order, repeated units, or independent
-              observations. This determines method eligibility.
-            </p>
-          </div>
-          <div className="structure-grid">
-            <article>
-              <span className="structure-art structure-art--series" aria-hidden="true" />
-              <h3>Time series</h3>
+        <section id="estimate" className="landing-drawer" aria-labelledby="estimate-title">
+          <ChapterTab chapter="estimation" />
+          <div className="landing-folder landing-folder--story landing-folder--flip">
+            <div className="landing-folder-copy">
+              <h2 id="estimate-title" className="landing-folder-title">
+                Choose an estimator for the identified effect and run the analysis
+              </h2>
               <p>
-                Set regular or irregular time, lags, stationarity evidence, breaks, and time-aware
-                discovery.
+                Identification determines how to express the causal question using observed data.
+                Estimation applies a statistical method to that expression.
               </p>
-            </article>
-            <article>
-              <span className="structure-art structure-art--panel" aria-hidden="true" />
-              <h3>Panel</h3>
-              <p>
-                Set unit and time keys for difference-in-differences, synthetic control, and
-                synthetic DID.
-              </p>
-            </article>
-            <article>
-              <span className="structure-art structure-art--cross" aria-hidden="true" />
-              <h3>Cross-sectional</h3>
-              <p>Use independent observations for DAG identification and compatible estimators.</p>
-            </article>
+            </div>
+            <div className="landing-sheet landing-story">
+              {NSW_EXAMPLE === undefined ? null : <p className="replay-example">{NSW_EXAMPLE.name}</p>}
+              <EstimateReplay />
+            </div>
           </div>
         </section>
-
-        <footer className="landing-width landing-footer">
-          <InternalLink className="landing-wordmark" href="/">
-            <HirmosMark className="landing-mark" />
-            <span>hirmos</span>
-          </InternalLink>
-          <SourceNotice />
-        </footer>
+        <section id="results" className="landing-drawer" aria-label="Results">
+          <ChapterTab chapter="results" />
+          <div className="landing-folder">
+            <div className="landing-sheet landing-story">
+              {NSW_EXAMPLE === undefined ? null : <p className="replay-example">{NSW_EXAMPLE.name}</p>}
+              <DeskReplay />
+            </div>
+          </div>
+        </section>
       </div>
+
+      <footer className="landing-width landing-footer">
+        <SourceNotice />
+      </footer>
     </main>
   )
 }
