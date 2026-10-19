@@ -12,6 +12,7 @@ import { useId, useRef, useState } from 'react'
 import { useJob } from '@/analysis/JobsProvider'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
+import { CHAPTER_HEADS } from '@/components/shell/chapterFrames'
 import { Select } from '@/components/ui/Select'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { ActionRow } from './ActionRow'
@@ -717,15 +718,9 @@ export function RootCausePanel(props: Props) {
         >
           <div>
             <ChapterHeading id="root-cause-title" className="mb-2">
-              Causal model analysis
+              {CHAPTER_HEADS['root-cause'].title}
             </ChapterHeading>
-            <p className={chapterIntro}>
-              A causal model encodes assumptions about how variables influence one another and the
-              mechanisms that generate their values. It distinguishes between observing a value and
-              intervening to set a value. In this section, we fit the mechanisms to the data and
-              examine how interventions or changes propagate through the system. The results depend
-              on the graph structure, the fitted mechanisms, and the underlying assumptions.
-            </p>
+            <p className={chapterIntro}>{CHAPTER_HEADS['root-cause'].intro}</p>
           </div>
           {!graph.ok ? (
             <section

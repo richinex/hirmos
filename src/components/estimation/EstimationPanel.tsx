@@ -16,6 +16,7 @@ import { MethodCaveats } from '@/components/MethodCaveats'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { Alert } from '@/components/ui/Alert'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
+import { CHAPTER_HEADS } from '@/components/shell/chapterFrames'
 import { ColumnChecklist } from '@/components/ui/ColumnChecklist'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { MetricGrid, MetricTile } from '@/components/ui/figures'
@@ -1336,19 +1337,14 @@ export function EstimationPanel({
       <div>
         <div className="mb-2 flex items-center gap-1.5">
           <ChapterHeading id="estimation-title" className="mb-0">
-            Estimation
+            {CHAPTER_HEADS.estimation.title}
           </ChapterHeading>
           <ParameterHelp
             label="Estimation"
             help="Choose an estimator for the identified effect and run the analysis."
           />
         </div>
-        <p className={chapterIntro}>
-          Identification determines how to express the causal question using observed data.
-          Estimation applies a statistical method to that expression. In this section, you choose a
-          compatible estimator and examine the effect estimate, its uncertainty, and the
-          method-specific diagnostics.
-        </p>
+        <p className={chapterIntro}>{CHAPTER_HEADS.estimation.intro}</p>
       </div>
 
       {/* The selected method is named in the requirements panel, not above the choice that selects it. */}

@@ -433,12 +433,18 @@ button:not([role='combobox']):not(:disabled):not([aria-disabled='true']):active,
    The sweep is 1.4s and linear, not the 0.9s house loop: it is a travelling highlight rather than a breath,
    and matching it to the pulse would read as one stuttering motion instead of two calm ones. */
 @keyframes skeleton-sweep { from { background-position: 200% 0; } to { background-position: 0% 0; } }
-.skeleton {
+.skeleton, .skeleton-text, .chapter-sketch .workbench-pane-header h2 {
   background: linear-gradient(90deg, var(--color-line) 25%, var(--color-hair) 50%, var(--color-line) 75%);
   background-size: 200% 100%;
   animation: skeleton-sweep var(--motion-skeleton) linear infinite;
 }
-@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
+.skeleton-text, .chapter-sketch .workbench-pane-header h2 {
+  color: transparent;
+  border-radius: 4px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+@media (prefers-reduced-motion: reduce) { :is(.skeleton, .skeleton-text, .chapter-sketch .workbench-pane-header h2) { animation: none; } }
 
 /* A placeholder that resolves within the dwell never paints: the skeleton's promise is only made
    when the wait is real. The delay sits on the appearing state alone; removal is instant, so a

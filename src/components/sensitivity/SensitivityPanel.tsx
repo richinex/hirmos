@@ -6,6 +6,7 @@ import { ok, err } from '@/domain/dop'
 import { RunActions } from '@/components/ui/RunActions'
 import { RunDetails } from '@/components/ui/RunDetails'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
+import { CHAPTER_HEADS } from '@/components/shell/chapterFrames'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { RunFold } from '@/components/ui/RunFold'
@@ -905,14 +906,9 @@ function LegacySensitivityPanel({
     <section aria-labelledby="sensitivity-title" className="@container/panel flex flex-col gap-5">
       <div>
         <ChapterHeading id="sensitivity-title" className="mb-2">
-          Sensitivity
+          {CHAPTER_HEADS.sensitivity.title}
         </ChapterHeading>
-        <p className={chapterIntro}>
-          A sensitivity analysis examines how an estimate changes when a specified part of the
-          analysis is perturbed. In this section, apply procedures supported by the selected
-          estimator and interpret each result against that procedure's reference value. Please note
-          that stability under one perturbation does not assess the remaining assumptions.
-        </p>
+        <p className={chapterIntro}>{CHAPTER_HEADS.sensitivity.intro}</p>
       </div>
 
       <section className={panel('p-(--panel-space)')} aria-label="Sensitivity setup">

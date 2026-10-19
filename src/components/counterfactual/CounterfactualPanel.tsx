@@ -3,6 +3,7 @@ import { RunActions } from '@/components/ui/RunActions'
 import { RunDetails } from '@/components/ui/RunDetails'
 import { Metadata } from '@/components/ui/Metadata'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
+import { CHAPTER_HEADS } from '@/components/shell/chapterFrames'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { RunFold } from '@/components/ui/RunFold'
@@ -941,15 +942,9 @@ export function CounterfactualPanel({
     >
       <div>
         <ChapterHeading id="counterfactual-title" className="mb-2">
-          Counterfactuals
+          {CHAPTER_HEADS.counterfactual.title}
         </ChapterHeading>
-        <p className={chapterIntro}>
-          Counterfactual reasoning examines what would have occurred if an action or condition had
-          differed, given the actual outcome. It involves considering a parallel scenario for the
-          same individual, unit, or system. In this context, a causal model is used to estimate the
-          counterfactual outcome. The result depends on the chosen model and its underlying
-          assumptions.
-        </p>
+        <p className={chapterIntro}>{CHAPTER_HEADS.counterfactual.intro}</p>
       </div>
       <section className={panel('p-(--panel-space)')} aria-label="Structural counterfactual">
         {identified.length === 0 ? (

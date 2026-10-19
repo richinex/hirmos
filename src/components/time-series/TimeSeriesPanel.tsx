@@ -5,10 +5,17 @@ import { useWorkflow } from '@/components/WorkflowProvider'
 import { useTimeSeriesDraft } from './useTimeSeriesDraft'
 import type { LongRunDraft, TimeSeriesDraft } from '@/domain/timeSeriesDraft'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
+import { CHAPTER_HEADS } from '@/components/shell/chapterFrames'
 import { useJob } from '@/analysis/JobsProvider'
 import { useRecordedAnalysis } from '@/assistant/useRecordedAnalysis'
 import { useWorkspaceConfiguration } from '@/assistant/workspaceConfiguration'
-import { longRunDraftSchema, timeSeriesAnalysisSchema, timeSeriesAnalysisLabels, checkSettingsColumns, seriesDraftSettings } from '@/domain/timeSeriesWorkspaceSettings'
+import {
+  longRunDraftSchema,
+  timeSeriesAnalysisSchema,
+  timeSeriesAnalysisLabels,
+  checkSettingsColumns,
+  seriesDraftSettings,
+} from '@/domain/timeSeriesWorkspaceSettings'
 import { err, ok } from '@/domain/dop'
 import { timeSeriesSummary, TIME_SERIES_SUMMARY } from '@/assistant/analysisSummaries'
 import { JobNotice } from '@/components/ui/JobNotice'
@@ -72,11 +79,8 @@ type Props = TimeSeriesPanelProps
 export function TimeSeriesHeading() {
   return (
     <div>
-      <ChapterHeading className="mb-2">Time-series analysis</ChapterHeading>
-      <p className={chapterIntroSingle}>
-        Analyse how observations change over time and how current values relate to earlier values.
-        Estimate short-run dynamics and long-run relationships between series.
-      </p>
+      <ChapterHeading className="mb-2">{CHAPTER_HEADS['time-series'].title}</ChapterHeading>
+      <p className={chapterIntroSingle}>{CHAPTER_HEADS['time-series'].intro}</p>
     </div>
   )
 }
@@ -106,14 +110,41 @@ function LongRunModel({
     change(props.prepared.id, { type: 'long-run', field: 'forecastSteps', value, model })
   const session = useJob(`time-series:${model}`)
   const { job } = session
-  useWorkspaceConfiguration(`series-${model}`, props.prepared.id, job.kind === 'running' || session.blocked ? null : {
-    title: model.toUpperCase(), current: draft, schema: longRunDraftSchema, columns,
-    describe: next => seriesDraftSettings(model === 'vecm' ? { selected: next.selected, maxLag: next.maxLag, deterministic: next.deterministic, significance: next.significance, forecastSteps: next.forecastSteps } : { selected: next.selected, maxLag: next.maxLag, terms: next.terms }, columns),
-    validate: next => next.selected.length < 2 || (model === 'ardl' && next.selected.length !== 2)
-      ? err(model === 'ardl' ? 'Choose one outcome and one predictor.' : 'Choose at least two series.')
-      : checkSettingsColumns(next, next.selected, columns),
-    configure: value => change(props.prepared.id, { type: 'long-run-settings', model, value }),
-  })
+  useWorkspaceConfiguration(
+    `series-${model}`,
+    props.prepared.id,
+    job.kind === 'running' || session.blocked
+      ? null
+      : {
+          title: model.toUpperCase(),
+          current: draft,
+          schema: longRunDraftSchema,
+          columns,
+          describe: (next) =>
+            seriesDraftSettings(
+              model === 'vecm'
+                ? {
+                    selected: next.selected,
+                    maxLag: next.maxLag,
+                    deterministic: next.deterministic,
+                    significance: next.significance,
+                    forecastSteps: next.forecastSteps,
+                  }
+                : { selected: next.selected, maxLag: next.maxLag, terms: next.terms },
+              columns,
+            ),
+          validate: (next) =>
+            next.selected.length < 2 || (model === 'ardl' && next.selected.length !== 2)
+              ? err(
+                  model === 'ardl'
+                    ? 'Choose one outcome and one predictor.'
+                    : 'Choose at least two series.',
+                )
+              : checkSettingsColumns(next, next.selected, columns),
+          configure: (value) =>
+            change(props.prepared.id, { type: 'long-run-settings', model, value }),
+        },
+  )
   useRunActivity(
     props.onActivity,
     job.kind === 'running' ? { label: model.toUpperCase(), progress: null } : null,
@@ -487,12 +518,25 @@ function RegularTimeSeriesPanel(props: Props) {
   const setAnalysis = (analysis: TimeSeriesDraft['analysis']) =>
     change(props.prepared.id, { type: 'analysis', analysis })
   const [busy, setBusy] = useState(false)
-  useWorkspaceConfiguration('time-series-analysis', props.prepared.id, busy ? null : {
-    title: 'Time-series analysis', current: { analysis: analysis === 'panel-regression' ? 'regression' as const : analysis },
-    schema: timeSeriesAnalysisSchema, columns: [], validate: ok,
-    describe: next => [{ key: 'analysis', label: 'Analysis', value: timeSeriesAnalysisLabels[next.analysis] }],
-    configure: next => setAnalysis(next.analysis),
-  })
+  useWorkspaceConfiguration(
+    'time-series-analysis',
+    props.prepared.id,
+    busy
+      ? null
+      : {
+          title: 'Time-series analysis',
+          current: {
+            analysis: analysis === 'panel-regression' ? ('regression' as const) : analysis,
+          },
+          schema: timeSeriesAnalysisSchema,
+          columns: [],
+          validate: ok,
+          describe: (next) => [
+            { key: 'analysis', label: 'Analysis', value: timeSeriesAnalysisLabels[next.analysis] },
+          ],
+          configure: (next) => setAnalysis(next.analysis),
+        },
+  )
   const report = props.onActivity
   const onActivity = useCallback(
     (activity: RunActivity | null) => {

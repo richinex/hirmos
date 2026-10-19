@@ -1,10 +1,15 @@
 import { NumberInput } from '@/components/ui/NumberInput'
 import { useWorkspaceConfiguration } from '@/assistant/workspaceConfiguration'
-import { dagWorkspaceChoices, dagWorkspaceSettingsSchema, dagInspectorLabels } from '@/domain/dagWorkspaceSettings'
+import {
+  dagWorkspaceChoices,
+  dagWorkspaceSettingsSchema,
+  dagInspectorLabels,
+} from '@/domain/dagWorkspaceSettings'
 import { RunActions } from '@/components/ui/RunActions'
 import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { Metadata } from '@/components/ui/Metadata'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
+import { CHAPTER_HEADS } from '@/components/shell/chapterFrames'
 import { ParameterHelp } from '@/components/ui/ParameterLabel'
 import { Alert } from '@/components/ui/Alert'
 import { Select } from '@/components/ui/Select'
@@ -70,10 +75,7 @@ import {
   planDagImport,
   type DagImportPlanProblem,
 } from '@/domain/dagImport'
-import {
-  discoveryEvidenceReference,
-  type DiscoveryCandidate,
-} from '@/domain/dagEvidence'
+import { discoveryEvidenceReference, type DiscoveryCandidate } from '@/domain/dagEvidence'
 import {
   describeDagStructuralIssue,
   planDagImplications,
@@ -558,7 +560,12 @@ function PathList({
   )
   const status = (
     path: DagCausalFlow['paths'][number],
-  ): { readonly icon: string; readonly text: string; readonly note: string | null; readonly tone: string } => {
+  ): {
+    readonly icon: string
+    readonly text: string
+    readonly note: string | null
+    readonly tone: string
+  } => {
     switch (path.status.kind) {
       case 'causal':
         return { icon: 'check_circle', text: 'causal', note: null, tone: 'text-ok' }
@@ -636,9 +643,20 @@ function AdjustmentSentence({
 }) {
   const name = (node: DagNodeId) => nameOfDagNode(document, node)
   switch (flow.adjustment.kind) {
-    case 'pending': return <p className="m-0 text-body text-faint" role="status">Checking adjustment validity…</p>
-    case 'failed': return <p className="m-0 text-body text-warn">{flow.adjustment.detail}</p>
-    case 'unsupported': return <p className="m-0 text-body text-faint">Use the temporal effect analysis to check adjustment for a lagged graph.</p>
+    case 'pending':
+      return (
+        <p className="m-0 text-body text-faint" role="status">
+          Checking adjustment validity…
+        </p>
+      )
+    case 'failed':
+      return <p className="m-0 text-body text-warn">{flow.adjustment.detail}</p>
+    case 'unsupported':
+      return (
+        <p className="m-0 text-body text-faint">
+          Use the temporal effect analysis to check adjustment for a lagged graph.
+        </p>
+      )
     case 'unnecessary':
       return (
         <p data-adjustment="unnecessary" className="m-0 text-body text-faint">
@@ -763,16 +781,20 @@ function ValidationPanel({
             </p>
           )}
           <PathList document={document} flow={flow} />
-          {[...flow.roles.values()].some(role => role.kind === 'post-treatment') && (
+          {[...flow.roles.values()].some((role) => role.kind === 'post-treatment') && (
             <section aria-label="Post-treatment variables" className="mt-3 text-body text-muted">
               <h4 className="m-0 text-label text-faint">Post-treatment variables</h4>
               <dl className="m-0">
-                {[...flow.roles].map(([id, role]) => role.kind !== 'post-treatment' ? null : (
-                  <div key={id} className="mt-2">
-                    <dt className="text-ink">{nameOfDagNode(document, id)}: {roleWord(role)}</dt>
-                    <dd className="m-0">{roleDetail(role)}</dd>
-                  </div>
-                ))}
+                {[...flow.roles].map(([id, role]) =>
+                  role.kind !== 'post-treatment' ? null : (
+                    <div key={id} className="mt-2">
+                      <dt className="text-ink">
+                        {nameOfDagNode(document, id)}: {roleWord(role)}
+                      </dt>
+                      <dd className="m-0">{roleDetail(role)}</dd>
+                    </div>
+                  ),
+                )}
               </dl>
               <p className="mb-0 mt-2 text-label text-faint">
                 Each check concerns this variable alone, the total effect, and an unselected sample.
@@ -1151,8 +1173,15 @@ export function DagWorkspace({
   const [knownDocuments, setKnownDocuments] = useState(documents)
   if (knownDocuments !== documents) {
     setKnownDocuments(documents)
-    const added = documents.find(document => !knownDocuments.some(previous => previous.id === document.id))
-    if (added) dispatch({ type: 'document-created', document: added.id, latestRun: latestRunId(discoveryRuns) })
+    const added = documents.find(
+      (document) => !knownDocuments.some((previous) => previous.id === document.id),
+    )
+    if (added)
+      dispatch({
+        type: 'document-created',
+        document: added.id,
+        latestRun: latestRunId(discoveryRuns),
+      })
   }
 
   // Deletion may remove the selected document while the workspace remains mounted.
@@ -1461,14 +1490,9 @@ export function DagWorkspace({
     <div className="mb-3">
       <div>
         <ChapterHeading id="dag-workspace-title" className="mb-2">
-          DAG workspace
+          {CHAPTER_HEADS.dag.title}
         </ChapterHeading>
-        <p className={chapterIntro}>
-          A directed acyclic graph (DAG) represents assumptions about how data is generated. Nodes
-          represent variables, and each arrow states an assumed direct causal relationship. In this
-          section, build the graph for your causal question and record the reason for each arrow.
-          Discovery results can contribute evidence, but they do not determine the graph.
-        </p>
+        <p className={chapterIntro}>{CHAPTER_HEADS.dag.intro}</p>
       </div>
     </div>
   )
@@ -2246,7 +2270,12 @@ export function DagWorkspace({
   return (
     <WorkbenchLayout
       id="dag"
-      stage={<>{adjustmentProblem !== null && <Alert tone="danger">{adjustmentProblem}</Alert>}{stage}</>}
+      stage={
+        <>
+          {adjustmentProblem !== null && <Alert tone="danger">{adjustmentProblem}</Alert>}
+          {stage}
+        </>
+      }
       stageScroll
       inspector={{
         title: 'Inspector',

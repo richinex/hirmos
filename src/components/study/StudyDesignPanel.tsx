@@ -10,6 +10,7 @@ import { RunActions } from '@/components/ui/RunActions'
 import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { Metadata } from '@/components/ui/Metadata'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
+import { CHAPTER_HEADS } from '@/components/shell/chapterFrames'
 import { RunFold } from '@/components/ui/RunFold'
 import { RunMeta } from '@/components/ui/RunMeta'
 import { Select } from '@/components/ui/Select'
@@ -992,14 +993,9 @@ export function StudyDesignPanel({
     <section aria-labelledby="study-title" className="@container/panel flex flex-col gap-5">
       <div>
         <ChapterHeading id="study-title" className="mb-2">
-          Study design
+          {CHAPTER_HEADS.study.title}
         </ChapterHeading>
-        <p className={chapterIntro}>
-          A causal question specifies the treatment, outcome, intervention contrast, effect measure,
-          and target population. In this section, you represent the data-generating process with a
-          DAG, enumerate measured back-door adjustment sets, and run the ID algorithm to determine
-          whether the interventional distribution can be written using observed probabilities.
-        </p>
+        <p className={chapterIntro}>{CHAPTER_HEADS.study.intro}</p>
       </div>
 
       <CausalHierarchy />

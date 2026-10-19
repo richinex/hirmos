@@ -33,6 +33,7 @@ import { useRunActivity } from '@/lib/useRunActivity'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { StudyGraphCanvas } from '@/components/dag/StudyGraphCanvas'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
+import { CHAPTER_HEADS } from '@/components/shell/chapterFrames'
 import { SettingsStep } from '@/components/ui/SettingsStep'
 import { Select } from '@/components/ui/Select'
 import { ColumnChecklist } from '@/components/ui/ColumnChecklist'
@@ -214,20 +215,14 @@ export function DecisionWorkspace({
       <div>
         <div className="mb-2 flex items-center gap-1.5">
           <ChapterHeading id="decisions-title" className="mb-0">
-            Decision lab
+            {CHAPTER_HEADS.decisions.title}
           </ChapterHeading>
           <ParameterHelp
             label="Decision lab"
             help="Frame a decision on a causal graph, check whether recorded data identify its value, and test it against the data."
           />
         </div>
-        <p className={chapterIntro}>
-          A policy sets the action to take at each decision, using only what is known when the
-          decision is made. In this section, you mark the decisions on a causal graph in the order
-          they are made, choose what each decision may read, and choose the objective. The checks
-          report whether recorded data identify the value of every such policy. You can then compare
-          what the log says about each action with its natural bounds and with randomised rows.
-        </p>
+        <p className={chapterIntro}>{CHAPTER_HEADS.decisions.intro}</p>
       </div>
       <section aria-label="Frame the decision">
         {documents.length === 0 ? (

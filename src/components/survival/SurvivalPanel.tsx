@@ -2,6 +2,7 @@ import { NumberInput } from '@/components/ui/NumberInput'
 import { RunActions } from '@/components/ui/RunActions'
 import { Metadata } from '@/components/ui/Metadata'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
+import { CHAPTER_HEADS } from '@/components/shell/chapterFrames'
 import { SelectionActions } from '@/components/ui/SelectionActions'
 import { useMemo, useState } from 'react'
 import { useWorkflow } from '@/components/WorkflowProvider'
@@ -310,10 +311,16 @@ const validateDraft = (
     const source = sourceColumns.find((column) => column.id === unavailable)
     if (!source) return invalid('A selected column is no longer in the source dataset.')
     if (!isNumericDuckDbType(source.duckdbType))
-      return invalid(`“${source.name}” is not numeric. This survival input requires a numeric column.`)
+      return invalid(
+        `“${source.name}” is not numeric. This survival input requires a numeric column.`,
+      )
     if (!preparedColumns.includes(source.id))
-      return invalid(`“${source.name}” is not included in the prepared dataset. Include it during data preparation before using it here.`)
-    return invalid(`“${source.name}” is not numeric. This survival input requires a numeric column.`)
+      return invalid(
+        `“${source.name}” is not included in the prepared dataset. Include it during data preparation before using it here.`,
+      )
+    return invalid(
+      `“${source.name}” is not numeric. This survival input requires a numeric column.`,
+    )
   }
   const transitionsOrProblem = (
     transitions: readonly TransitionDraft[],
@@ -1371,7 +1378,10 @@ function RowFrequencyControls({
         value={value.kind}
         onChange={selectKind}
         options={[
-          { value: 'one-observation-per-row', label: rowFrequencyLabels['one-observation-per-row'] },
+          {
+            value: 'one-observation-per-row',
+            label: rowFrequencyLabels['one-observation-per-row'],
+          },
           { value: 'frequency-column', label: rowFrequencyLabels['frequency-column'] },
         ]}
       />
@@ -1564,7 +1574,12 @@ export function SurvivalPanel({
     [prepared.columns, profile.columns],
   )
   const sourceColumns = useMemo(
-    () => profile.columns.map((column) => ({ id: column.id, name: column.name, duckdbType: column.duckdbType })),
+    () =>
+      profile.columns.map((column) => ({
+        id: column.id,
+        name: column.name,
+        duckdbType: column.duckdbType,
+      })),
     [profile.columns],
   )
   const draft = useWorkflow((state) =>
@@ -1582,16 +1597,24 @@ export function SurvivalPanel({
   )
   if (draft === null) throw new Error('Survival settings require the current prepared dataset.')
 
-  useWorkspaceConfiguration('survival', prepared.id, job.kind === 'running' || session.blocked ? null : {
-    title: 'Survival', current: draft, columns: sourceColumns,
-    describe: (next) => survivalSettings(next, sourceColumns),
-    schema: survivalConfigurationSchema(sourceColumns),
-    validate: (next) => {
-      const result = validateDraft(next, columns, sourceColumns, prepared.columns)
-      return result.ok ? ok(next) : err(result.error.detail)
-    },
-    configure,
-  })
+  useWorkspaceConfiguration(
+    'survival',
+    prepared.id,
+    job.kind === 'running' || session.blocked
+      ? null
+      : {
+          title: 'Survival',
+          current: draft,
+          columns: sourceColumns,
+          describe: (next) => survivalSettings(next, sourceColumns),
+          schema: survivalConfigurationSchema(sourceColumns),
+          validate: (next) => {
+            const result = validateDraft(next, columns, sourceColumns, prepared.columns)
+            return result.ok ? ok(next) : err(result.error.detail)
+          },
+          configure,
+        },
+  )
 
   useRecordedAnalysis({
     key: 'survival',
@@ -3647,7 +3670,10 @@ export function SurvivalPanel({
                 onChange={chooseInput}
                 options={[
                   { value: 'prepared-rows', label: multiStateInputLabels['prepared-rows'] },
-                  { value: 'longitudinal-states', label: multiStateInputLabels['longitudinal-states'] },
+                  {
+                    value: 'longitudinal-states',
+                    label: multiStateInputLabels['longitudinal-states'],
+                  },
                   { value: 'wide-events', label: multiStateInputLabels['wide-events'] },
                 ]}
               />
@@ -3777,15 +3803,9 @@ export function SurvivalPanel({
     <section aria-labelledby="survival-title" className="@container/panel flex flex-col gap-5">
       <div>
         <ChapterHeading id="survival-title" className="mb-2">
-          Survival analysis
+          {CHAPTER_HEADS.survival.title}
         </ChapterHeading>
-        <p className={chapterIntro}>
-          Use survival analysis when the outcome is the time until an event. Fit an event-time
-          distribution, compare two observed groups during follow-up, or estimate transitions
-          between states. A row with no observed event by the end of follow-up is right-censored at
-          its recorded duration. These analyses do not require a DAG and are not added to the
-          causal-estimation ledger.
-        </p>
+        <p className={chapterIntro}>{CHAPTER_HEADS.survival.intro}</p>
       </div>
 
       <section className={panel('p-(--panel-space)')} aria-label="Survival setup">

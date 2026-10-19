@@ -29,6 +29,7 @@ import { DataDropZone } from '@/components/data/DataDropZone'
 import { AppShell } from '@/components/shell/AppShell'
 import { ChapterBoundary } from '@/components/shell/ChapterBoundary'
 import { ChapterSkeleton } from '@/components/shell/ChapterSkeleton'
+import { chapterFrame } from '@/components/shell/chapterFrames'
 import { ChapterNav, type ChapterEntry, type ChapterStatus } from '@/components/shell/ChapterNav'
 import { ChapterTabs } from '@/components/shell/ChapterTabs'
 import { HirmosMark } from '@/components/HirmosMark'
@@ -1102,7 +1103,11 @@ function App() {
     </>
   )
 
+  const openingProject =
+    (workflow.kind === 'awaiting-project' && requestedProject !== null) ||
+    (workflow.kind === 'awaiting-data' && reopening)
   const fullBleed =
+    (openingProject && chapterFrame(requestedChapter).kind !== 'page') ||
     workflow.kind === 'pipeline-opened' ||
     workflow.kind === 'sql-inputs-chosen' ||
     (profiled !== null &&
@@ -1203,9 +1208,8 @@ function App() {
                   {editorProblem}
                 </p>
               )}
-              {((workflow.kind === 'awaiting-project' && requestedProject !== null) ||
-                (workflow.kind === 'awaiting-data' && reopening)) && (
-                <ChapterSkeleton label="Opening the project…" />
+              {openingProject && (
+                <ChapterSkeleton label="Opening the project…" chapter={requestedChapter} />
               )}
               {workflow.kind === 'awaiting-project' && requestedProject === null && (
                 <section className="projects-dashboard w-full" aria-labelledby="new-analysis-title">
@@ -1856,7 +1860,9 @@ function App() {
                     )}
                   {activeChapter === 'dag' && workflow.prepared !== null && (
                     <ChapterBoundary key={activeChapter} chapter={activeName}>
-                      <Suspense fallback={<ChapterSkeleton label="Loading DAG editor…" />}>
+                      <Suspense
+                        fallback={<ChapterSkeleton label="Loading DAG editor…" chapter="dag" />}
+                      >
                         <DagWorkspace
                           onDeleteDocument={(id) => setDeletionTarget({ kind: 'dag', id })}
                           swigAnalyses={workflow.swigAnalyses}
@@ -1904,7 +1910,12 @@ function App() {
                   {activeChapter === 'root-cause' && workflow.prepared !== null && (
                     <ChapterBoundary key={activeChapter} chapter={activeName}>
                       <Suspense
-                        fallback={<ChapterSkeleton label="Loading causal model analysis…" />}
+                        fallback={
+                          <ChapterSkeleton
+                            label="Loading causal model analysis…"
+                            chapter="root-cause"
+                          />
+                        }
                       >
                         <RootCausePanel
                           key={`${workflow.prepared.id}:${workflow.rootCause.selection?.dagRevision ?? ''}`}
@@ -1931,7 +1942,9 @@ function App() {
                   )}
                   {activeChapter === 'study' && workflow.prepared !== null && (
                     <ChapterBoundary key={activeChapter} chapter={activeName}>
-                      <Suspense fallback={<ChapterSkeleton label="Loading study design…" />}>
+                      <Suspense
+                        fallback={<ChapterSkeleton label="Loading study design…" chapter="study" />}
+                      >
                         <StudyDesignPanel
                           onDeleteStudy={(id) => setDeletionTarget({ kind: 'study', id })}
                           onActivity={reportActivity.study}
@@ -1955,7 +1968,11 @@ function App() {
                   )}
                   {activeChapter === 'estimation' && workflow.prepared !== null && (
                     <ChapterBoundary key={activeChapter} chapter={activeName}>
-                      <Suspense fallback={<ChapterSkeleton label="Loading estimation…" />}>
+                      <Suspense
+                        fallback={
+                          <ChapterSkeleton label="Loading estimation…" chapter="estimation" />
+                        }
+                      >
                         <EstimationPanel
                           onActivity={reportActivity.estimation}
                           key={workflow.prepared.id}
@@ -1987,7 +2004,11 @@ function App() {
                   )}
                   {activeChapter === 'sensitivity' && workflow.prepared !== null && (
                     <ChapterBoundary key={activeChapter} chapter={activeName}>
-                      <Suspense fallback={<ChapterSkeleton label="Loading sensitivity…" />}>
+                      <Suspense
+                        fallback={
+                          <ChapterSkeleton label="Loading sensitivity…" chapter="sensitivity" />
+                        }
+                      >
                         <SensitivityPanel
                           onActivity={reportActivity.sensitivity}
                           designRuns={workflow.timeSeriesRuns}
@@ -2006,7 +2027,14 @@ function App() {
                   )}
                   {activeChapter === 'counterfactual' && workflow.prepared !== null && (
                     <ChapterBoundary key={activeChapter} chapter={activeName}>
-                      <Suspense fallback={<ChapterSkeleton label="Loading counterfactuals…" />}>
+                      <Suspense
+                        fallback={
+                          <ChapterSkeleton
+                            label="Loading counterfactuals…"
+                            chapter="counterfactual"
+                          />
+                        }
+                      >
                         <CounterfactualPanel
                           onActivity={reportActivity.counterfactual}
                           key={workflow.prepared.id}
@@ -2027,7 +2055,11 @@ function App() {
                   )}
                   {activeChapter === 'decisions' && workflow.prepared !== null && (
                     <ChapterBoundary key={activeChapter} chapter={activeName}>
-                      <Suspense fallback={<ChapterSkeleton label="Loading the decision lab…" />}>
+                      <Suspense
+                        fallback={
+                          <ChapterSkeleton label="Loading the decision lab…" chapter="decisions" />
+                        }
+                      >
                         <DecisionWorkspace
                           key={workflow.prepared.id}
                           onActivity={reportActivity.decisions}
@@ -2061,7 +2093,12 @@ function App() {
                   {activeChapter === 'time-series' && workflow.prepared !== null && (
                     <ChapterBoundary chapter="Time-series analysis">
                       <Suspense
-                        fallback={<ChapterSkeleton label="Loading time-series analysis…" />}
+                        fallback={
+                          <ChapterSkeleton
+                            label="Loading time-series analysis…"
+                            chapter="time-series"
+                          />
+                        }
                       >
                         <TimeSeriesPanel
                           key={workflow.prepared.id}
@@ -2087,7 +2124,11 @@ function App() {
                   )}
                   {activeChapter === 'survival' && workflow.prepared !== null && (
                     <ChapterBoundary key={activeChapter} chapter={activeName}>
-                      <Suspense fallback={<ChapterSkeleton label="Loading survival analysis…" />}>
+                      <Suspense
+                        fallback={
+                          <ChapterSkeleton label="Loading survival analysis…" chapter="survival" />
+                        }
+                      >
                         <SurvivalPanel
                           key={workflow.prepared.id}
                           source={workflow.source}
@@ -2103,7 +2144,9 @@ function App() {
                   )}
                   {activeChapter === 'results' && workflow.prepared !== null && (
                     <ChapterBoundary key={activeChapter} chapter={activeName}>
-                      <Suspense fallback={<ChapterSkeleton label="Loading results…" />}>
+                      <Suspense
+                        fallback={<ChapterSkeleton label="Loading results…" chapter="results" />}
+                      >
                         <ResultsPanel
                           key={workflow.prepared.id}
                           project={workflow.project.id}
