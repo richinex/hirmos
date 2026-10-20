@@ -126,6 +126,61 @@ const digits = (value: number, decimals: number, locale: string): string =>
 
 const exactText = (value: number): string => String(value)
 
+const SCIENTIFIC_BELOW = 0.001
+const NARROW_NO_BREAK_SPACE = ' '
+const SUPERSCRIPTS: Record<string, string> = {
+  '-': '⁻',
+  '0': '⁰',
+  '1': '¹',
+  '2': '²',
+  '3': '³',
+  '4': '⁴',
+  '5': '⁵',
+  '6': '⁶',
+  '7': '⁷',
+  '8': '⁸',
+  '9': '⁹',
+}
+
+const tiny = (value: number): boolean =>
+  value !== 0 && Number.isFinite(value) && Number(Math.abs(value).toPrecision(3)) < SCIENTIFIC_BELOW
+
+const significantFor = (value: number, precision: Precision): number => {
+  const magnitude = Math.floor(Math.log10(Math.abs(value)))
+  const clamp = (count: number) => Math.max(1, Math.min(6, count))
+  switch (precision.kind) {
+    case 'significant':
+      return precision.digits
+    case 'decimals':
+      return clamp(magnitude + precision.places + 1)
+    case 'ruleOfFour':
+      return Math.abs(value) / 10 ** magnitude >= 4 ? 2 : 3
+    case 'matchSe': {
+      const se = Math.abs(precision.se)
+      if (!Number.isFinite(se) || se === 0) return 3
+      return clamp(magnitude - Math.floor(Math.log10(se)) + 2)
+    }
+    default:
+      return assertNever(precision)
+  }
+}
+
+const powerOfTen = (
+  value: number,
+  significant: number,
+): { readonly text: string; readonly srText: string } => {
+  if (value === 0) return { text: '0', srText: '0' }
+  const [mantissa = '', exponent = ''] = Math.abs(value)
+    .toExponential(significant - 1)
+    .split('e')
+  const power = Number(exponent)
+  const superscript = [...String(power)].map((character) => SUPERSCRIPTS[character]).join('')
+  return {
+    text: `${mantissa}${NARROW_NO_BREAK_SPACE}×${NARROW_NO_BREAK_SPACE}10${superscript}`,
+    srText: `${mantissa} times 10 to the power ${power < 0 ? 'minus ' : ''}${Math.abs(power)}`,
+  }
+}
+
 const scaleUnit = (
   scale: EffectScale,
 ): { readonly text: string; readonly attached: boolean; readonly sr: string } => {
@@ -190,15 +245,26 @@ export function formatEstimate(
   if (!Number.isFinite(value)) return formatAbsent('unavailable')
   const locale = opts.locale ?? defaultLocale()
   const shown = displayValue(value, scale)
-  const decimals = decimalsFor(shown, opts.precision ?? defaultPrecision(scale))
   const unit = scaleUnit(scale)
+  const srUnit = unit.sr.length > 0 ? ` ${unit.sr}` : ''
+  if (opts.precision?.kind !== 'decimals' && tiny(shown)) {
+    const figure = powerOfTen(
+      shown,
+      significantFor(shown, opts.precision ?? defaultPrecision(scale)),
+    )
+    return assemble(
+      [signPart(shown), { kind: 'digits', text: figure.text }, ...unitParts(unit)],
+      exactText(value),
+      `${scalePrefix(scale)}${srSign(shown)}${figure.srText}${srUnit}`.trim(),
+    )
+  }
+  const decimals = decimalsFor(shown, opts.precision ?? defaultPrecision(scale))
   const signed = settled(shown, decimals)
   const parts: NumberPart[] = [
     signPart(signed),
     { kind: 'digits', text: digits(shown, decimals, locale) },
     ...unitParts(unit),
   ]
-  const srUnit = unit.sr.length > 0 ? ` ${unit.sr}` : ''
   return assemble(
     parts,
     exactText(value),
@@ -221,6 +287,17 @@ export function formatInterval(
 } {
   const locale = opts.locale ?? defaultLocale()
   const shown = displayValue(estimate, scale)
+  const level = `${Math.round(type.level * 100)}%`
+  const typeLabel =
+    type.kind === 'confidence'
+      ? `${level} CI`
+      : `${level} ${type.summary === 'HDI' ? 'HDI' : 'CrI'}`
+  const srType =
+    type.kind === 'confidence'
+      ? `${level} confidence interval`
+      : `${level} ${type.summary === 'HDI' ? 'highest density interval' : 'credible interval'}`
+  const unit = scaleUnit(scale)
+  const srUnit = unit.sr.length > 0 ? ` ${unit.sr}` : ''
   // Without an explicit precision the decimals follow the interval's width, so the bounds show one or two
   // significant figures of uncertainty rather than the point estimate's own digits.
   const halfWidth = displayValue(Math.abs(upper - lower), scale) / 3.92
@@ -229,18 +306,44 @@ export function formatInterval(
     (Number.isFinite(halfWidth) && halfWidth > 0
       ? { kind: 'matchSe', se: halfWidth }
       : defaultPrecision(scale))
+  const largest = Math.max(
+    Math.abs(shown),
+    Math.abs(displayValue(lower, scale)),
+    Math.abs(displayValue(upper, scale)),
+  )
+  if (opts.precision?.kind !== 'decimals' && tiny(largest)) {
+    const figure = (value: number) => {
+      const shownValue = displayValue(value, scale)
+      const written = powerOfTen(shownValue, significantFor(shownValue, precision))
+      return {
+        text: `${shownValue < 0 ? MINUS : ''}${written.text}`,
+        srText: `${srSign(shownValue)}${written.srText}`,
+      }
+    }
+    const bounds = { lower: figure(lower).text, upper: figure(upper).text }
+    const srInterval = `${srType} ${figure(lower).srText} to ${figure(upper).srText}`
+    return {
+      ...assemble(
+        [
+          signPart(shown),
+          { kind: 'digits', text: figure(estimate).text.replace(MINUS, '') },
+          ...unitParts(unit),
+          { kind: 'qualifier', text: ` [${bounds.lower}, ${bounds.upper}] ${typeLabel}` },
+        ],
+        `${exactText(estimate)} [${exactText(lower)}, ${exactText(upper)}]`,
+        `${scalePrefix(scale)}${figure(estimate).srText}${srUnit}, ${srInterval}`.trim(),
+      ),
+      bounds,
+      typeLabel,
+      srInterval,
+    }
+  }
   const decimals = decimalsFor(shown, precision)
-  const unit = scaleUnit(scale)
   const bound = (value: number): string => {
     const shownBound = settled(displayValue(value, scale), decimals)
     return `${shownBound < 0 ? MINUS : ''}${digits(shownBound, decimals, locale)}`
   }
   const signed = settled(shown, decimals)
-  const level = `${Math.round(type.level * 100)}%`
-  const typeLabel =
-    type.kind === 'confidence'
-      ? `${level} CI`
-      : `${level} ${type.summary === 'HDI' ? 'HDI' : 'CrI'}`
   const bounds = { lower: bound(lower), upper: bound(upper) }
   const parts: NumberPart[] = [
     signPart(signed),
@@ -248,14 +351,9 @@ export function formatInterval(
     ...unitParts(unit),
     { kind: 'qualifier', text: ` [${bounds.lower}, ${bounds.upper}] ${typeLabel}` },
   ]
-  const srType =
-    type.kind === 'confidence'
-      ? `${level} confidence interval`
-      : `${level} ${type.summary === 'HDI' ? 'highest density interval' : 'credible interval'}`
   const srBound = (value: number) =>
     `${srSign(settled(displayValue(value, scale), decimals))}${digits(displayValue(value, scale), decimals, 'en-GB')}`
   const srInterval = `${srType} ${srBound(lower)} to ${srBound(upper)}`
-  const srUnit = unit.sr.length > 0 ? ` ${unit.sr}` : ''
   return {
     ...assemble(
       parts,
@@ -501,6 +599,14 @@ export function formatStatistic(
   if (!Number.isFinite(value)) return formatAbsent('unavailable')
   const locale = opts.locale ?? defaultLocale()
   const rule = STATISTIC_DECIMALS[kind]
+  if (rule === 'significant' && tiny(value)) {
+    const figure = powerOfTen(value, 3)
+    return assemble(
+      [signPart(value), { kind: 'digits', text: figure.text }],
+      exactText(value),
+      `${srSign(value)}${figure.srText}`,
+    )
+  }
   const decimals =
     rule === 'significant'
       ? Number.isInteger(value) && Math.abs(value) >= 100

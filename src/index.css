@@ -70,14 +70,14 @@
      text-ink). Both faces of the palette are restated in themes.css under :root[data-theme]; a utility
      compiles to var(--color-*) and takes the face that is live. */
   --color-stage: #D6DCE5;        /* the canvas: slate at 20% */
-  --color-panel: #F2F2F2;        /* a lit block on the canvas */
-  --color-column: #F2F2F2;       /* the bottom pane's ground */
-  --color-well: #FFFFFF;         /* an inset field */
+  --color-panel: #F0F2F6;        /* a lit block on the canvas */
+  --color-column: #F0F2F6;       /* the bottom pane's ground */
+  --color-well: #FAFCFE;         /* an inset field */
   --color-raised: #D6DCE5;       /* a selected row or chip */
   --color-line: #D6DCE5;         /* a divider */
   --color-hair: #ACB9CA;         /* a control border */
   --color-edge: #8497B0;         /* an emphasised border */
-  --color-control: #7F7F7F;      /* an input boundary: 3:1 on the well */
+  --color-control: #78808B;      /* an input boundary: 3:1 on the well */
   --color-ink: #222A35;
   --color-bone: #333F50;
   --color-muted: #333F50;
@@ -95,10 +95,10 @@
   --color-danger: #8B0304;
   --color-highlight: rgba(255, 255, 255, 0.35);
   --color-track: #D6DCE5;
-  --color-knob: #FFFFFF;
+  --color-knob: #FAFCFE;
   --color-rail: #44546A;
   --color-rail-active: #333F50;
-  --color-rail-ink: #FFFFFF;
+  --color-rail-ink: #F7FAFE;
   --color-rail-faint: #D6DCE5;
   --color-rail-dim: #8497B0;
   --color-rail-signal: #F4B183;

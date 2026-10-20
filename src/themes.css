@@ -6,14 +6,14 @@
 :root[data-theme="light"] {
   color-scheme: light;
   --color-stage: #D6DCE5;        /* the canvas: slate at 20% */
-  --color-panel: #F2F2F2;        /* a lit block on the canvas */
-  --color-column: #F2F2F2;       /* the bottom pane's ground */
-  --color-well: #FFFFFF;         /* an inset field */
+  --color-panel: #F0F2F6;        /* a lit block on the canvas */
+  --color-column: #F0F2F6;       /* the bottom pane's ground */
+  --color-well: #FAFCFE;         /* an inset field */
   --color-raised: #D6DCE5;       /* a selected row or chip */
   --color-line: #D6DCE5;         /* a divider */
   --color-hair: #ACB9CA;         /* a control border */
   --color-edge: #8497B0;         /* an emphasised border */
-  --color-control: #7F7F7F;      /* an input boundary: 3:1 on the well */
+  --color-control: #78808B;      /* an input boundary: 3:1 on the well */
   --color-ink: #222A35;
   --color-bone: #333F50;
   --color-muted: #333F50;
@@ -31,11 +31,11 @@
   --color-danger: #8B0304;
   --color-highlight: rgba(255, 255, 255, 0.35);
   --color-track: #D6DCE5;        /* a segmented control's track, pressed into the panel */
-  --color-knob: #FFFFFF;         /* the knob on a track, lit from above */
+  --color-knob: #FAFCFE;         /* the knob on a track, lit from above */
   /* The band: the rail and the header. */
   --color-rail: #44546A;
   --color-rail-active: #333F50;
-  --color-rail-ink: #FFFFFF;
+  --color-rail-ink: #F7FAFE;
   --color-rail-faint: #D6DCE5;
   --color-rail-dim: #8497B0;
   --color-rail-signal: #F4B183;
@@ -65,10 +65,10 @@
   --color-hair: #44546A;
   --color-edge: #8497B0;
   --color-control: #8497B0;
-  --color-ink: #FFFFFF;
-  --color-bone: #F2F2F2;
+  --color-ink: #F7FAFE;
+  --color-bone: #F0F2F6;
   --color-muted: #D6DCE5;
-  --color-faint: #C9C9C9;
+  --color-faint: #C4CAD1;
   --color-dim: #44546A;
   --color-signal: #ED7D31;
   --color-signal-ink: #222A35;
@@ -85,7 +85,7 @@
   --color-knob: #44546A;         /* dark enough that the faintest text still holds 4.5:1 on it */
   --color-rail: #44546A;
   --color-rail-active: #333F50;
-  --color-rail-ink: #FFFFFF;
+  --color-rail-ink: #F7FAFE;
   --color-rail-faint: #D6DCE5;
   --color-rail-dim: #8497B0;
   --color-rail-signal: #F4B183;

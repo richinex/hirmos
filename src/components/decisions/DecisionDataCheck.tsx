@@ -134,12 +134,6 @@ export function DecisionDataCheck({
   const running = session.job.kind === 'running'
   const columns = decisionColumns(frame, document)
   const numeric = profile.columns.filter((column) => isNumericDuckDbType(column.duckdbType))
-  const runLabel = `Run ${listWords([
-    'natural bounds',
-    ...(draft.learning ? ['learning replay'] : []),
-    ...(draft.copy ? ['behaviour cloning'] : []),
-    ...(draft.propensity === '' ? [] : ['propensity weighting']),
-  ])}`
   const usable = prepared.kind === 'prepared-cross-section' && prepared.resolution.kind === 'none'
 
   async function check() {
@@ -561,7 +555,7 @@ export function DecisionDataCheck({
           <RunActions
             running={running}
             onCancel={session.cancel}
-            orbLabel={`${runLabel.charAt(4).toUpperCase()}${runLabel.slice(5)} running`}
+            orbLabel="Policy evaluation running"
           >
             <button
               type="button"
@@ -569,7 +563,7 @@ export function DecisionDataCheck({
               disabled={running || session.blocked}
               onClick={() => void check()}
             >
-              {runLabel}
+              Evaluate policies
             </button>
           </RunActions>
           <JobNotice job={session.job} />
@@ -717,13 +711,7 @@ export function EvidenceResult({
           result.actions.map((action) => action.value),
         )
   const title = `${run.action.name} for ${run.outcome.name}`
-  const methods = [
-    'Natural bounds',
-    ...(result.learning === null ? [] : ['learning replay']),
-    ...(run.imitation === null ? [] : ['behaviour cloning']),
-    ...(scoring === null ? [] : ['propensity weighting']),
-  ]
-  const stamp = <RunMeta>{[listWords(methods), formatTime(run.createdAt)]}</RunMeta>
+  const stamp = <RunMeta>{['Policy evaluation', formatTime(run.createdAt)]}</RunMeta>
   const counts = (
     <p className={num('mb-0 mt-1 text-body text-bone')}>
       <Metadata>

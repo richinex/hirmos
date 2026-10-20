@@ -386,8 +386,7 @@ export function DecisionWorkspace({
           </h2>
           {currentEvidence === null ? (
             <p className="m-0 text-body text-muted">
-              Run natural bounds to compare what the log says about each action with randomised
-              rows.
+              Evaluate policies to compare what the log says about each action with randomised rows.
             </p>
           ) : (
             <EvidenceResult run={currentEvidence} current />

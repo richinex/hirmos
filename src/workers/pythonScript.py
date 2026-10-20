@@ -1,4 +1,4 @@
-"""Run preparation scripts with nullable pandas inputs and Arrow transport."""
+"""Run preparation scripts with pandas inputs and Arrow transport."""
 
 import contextlib
 import io
@@ -43,6 +43,10 @@ def _read_input(path):
             values = pa.chunked_array([chunk.storage.cast(pa.bool_()) for chunk in table.column(index).chunks], type=pa.bool_())
             table = table.set_column(index, field.name, values)
     frame = table.to_pandas(types_mapper=_pandas_type)
+    for index, field in enumerate(table.schema):
+        primitive = pa.types.is_integer(field.type) or pa.types.is_floating(field.type) or pa.types.is_boolean(field.type)
+        if primitive and field.type in _PANDAS_TYPES and table.column(index).null_count == 0:
+            frame[field.name] = frame[field.name].to_numpy(dtype=_PANDAS_TYPES[field.type].numpy_dtype)
     # Nullable pandas conversion treats valid NaNs as missing. Only these special
     # floating columns retain Arrow storage, which keeps NaN distinct from null.
     for index, field in enumerate(table.schema):
