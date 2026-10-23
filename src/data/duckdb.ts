@@ -6,10 +6,17 @@ import {
   dialectRecord,
   fileRelation,
   layoutFromSniff,
-  profileRelation,
+  profileLayout,
   type RelationLayout,
 } from './fileRelation'
-import { profiledReading, type DialectRecord, type FileReading } from '@/domain/fileReading'
+import {
+  fileReading,
+  profiledReading,
+  type DialectRecord,
+  type FileReading,
+} from '@/domain/fileReading'
+import { keptDecision } from '@/domain/keptInput'
+import { attachKept, keptRelation } from './keptInputs'
 import { inspectCalendar } from './calendar'
 import {
   timestampSql,
@@ -367,14 +374,17 @@ const SNIFFED_FIELDS = [
 ]
 
 /** Asks DuckDB once for a delimited file's dialect and column types over the whole file, honouring declared types. */
+export type SniffSample = 'default' | 'whole-file'
+
 export async function detectLayout(
   connection: duckdb.AsyncDuckDBConnection,
   reading: FileReading,
   path: string,
+  sample: SniffSample = 'whole-file',
 ): Promise<RelationLayout> {
   try {
     const sniffed = await connection.query(
-      `SELECT ${SNIFFED_FIELDS.join(', ')} FROM sniff_csv(${sqlString(path)}, header = true, sample_size = -1${declaredTypesOption(reading)})`,
+      `SELECT ${SNIFFED_FIELDS.join(', ')} FROM sniff_csv(${sqlString(path)}, header = true${sample === 'whole-file' ? ', sample_size = -1' : ''}${declaredTypesOption(reading)})`,
     )
     const columns = sniffed.getChild('Columns')?.get(0) as
       { readonly length: number; get(index: number): { toJSON(): unknown } } | null | undefined
@@ -388,6 +398,69 @@ export async function detectLayout(
   } catch {
     return DETECT
   }
+}
+
+interface OpenedRelation {
+  readonly relation: string
+  readonly dialect: DialectRecord
+  readonly close: () => Promise<void>
+}
+
+const verifiedSource =
+  <Problem>(
+    source: SelectedSource,
+    profile: DatasetProfile,
+    failure: (detail: string) => Problem,
+    changed: (expected: SourceFingerprint, actual: SourceFingerprint) => Problem,
+  ) =>
+  async (): Promise<Result<SourceFingerprint, Problem>> => {
+    const fingerprint = await fingerprintFile(source.file)
+    if (!fingerprint.ok) return err(failure(fingerprint.error.detail))
+    if (fingerprint.value !== profile.source.fingerprint)
+      return err(changed(profile.source.fingerprint, fingerprint.value))
+    return ok(fingerprint.value)
+  }
+
+async function openRelation<Problem>(
+  running: DuckDbEngine,
+  file: File,
+  reading: FileReading,
+  expected: SourceFingerprint,
+  verify: () => Promise<Result<SourceFingerprint, Problem>>,
+  failure: (detail: string) => Problem,
+  layout: (path: string) => Promise<RelationLayout>,
+  textColumn?: string,
+): Promise<Result<OpenedRelation, Problem>> {
+  const decision = keptDecision(expected, reading, textColumn)
+  if (decision.kind === 'keep') {
+    const attached = await attachKept(running, decision.name, expected)
+    if (attached.ok) return ok({ ...attached.value, close: async () => {} })
+  }
+  const verified = await verify()
+  if (!verified.ok) return verified
+  if (decision.kind === 'keep') {
+    const kept = await keptRelation(running, decision.name, file, reading, verified.value)
+    if (kept.ok) return ok({ ...kept.value, close: async () => {} })
+  }
+  const path = `hirmos-${crypto.randomUUID()}.${reading.format}`
+  try {
+    await running.db.registerFileHandle(
+      path,
+      file,
+      duckdb.DuckDBDataProtocol.BROWSER_FILEREADER,
+      true,
+    )
+  } catch (cause) {
+    return err(failure(detailOf(cause)))
+  }
+  const known = await layout(path)
+  return ok({
+    relation: fileRelation(reading, path, textColumn, known),
+    dialect: dialectRecord(known),
+    close: async () => {
+      await running.db.dropFile(path)
+    },
+  })
 }
 
 /** Canonical CSV/TSV/Parquet profile. DuckDB reads from the browser File handle. Arrow vectors are
@@ -405,32 +478,35 @@ export async function profileSource(
     return err({ kind: 'engine-unavailable', detail: detailOf(cause) })
   }
 
-  const registeredPath = `hirmos-${crypto.randomUUID()}.${source.format}`
-  try {
-    await running.db.registerFileHandle(
-      registeredPath,
-      source.file,
-      duckdb.DuckDBDataProtocol.BROWSER_FILEREADER,
-      true,
-    )
-  } catch (cause) {
-    return err({ kind: 'registration-failed', detail: detailOf(cause) })
-  }
-
   let connection: duckdb.AsyncDuckDBConnection | null = null
+  let opened: OpenedRelation | null = null
   let outcome: Result<DatasetProfile, DatasetProfileProblem>
   try {
-    connection = await running.db.connect()
-    const layout =
-      source.format === 'parquet' ? DETECT : await detectLayout(connection, source, registeredPath)
-    outcome = await readProfile(
-      connection,
-      fileRelation(source, registeredPath, undefined, layout),
-      source,
+    const live = await running.db.connect()
+    connection = live
+    const relation = await openRelation<DatasetProfileProblem>(
+      running,
+      source.file,
+      fileReading(source),
       fingerprint.value,
-      running.version,
-      dialectRecord(layout),
+      async () => fingerprint,
+      (detail) => ({ kind: 'registration-failed', detail }),
+      (path) =>
+        source.format === 'parquet' ? Promise.resolve(DETECT) : detectLayout(live, source, path),
     )
+    if (relation.ok) {
+      opened = relation.value
+      outcome = await readProfile(
+        live,
+        opened.relation,
+        source,
+        fingerprint.value,
+        running.version,
+        opened.dialect,
+      )
+    } else {
+      outcome = relation
+    }
   } catch (cause) {
     outcome = err({ kind: 'parse-failed', detail: detailOf(cause) })
   }
@@ -444,7 +520,7 @@ export async function profileSource(
     }
   }
   try {
-    await running.db.dropFile(registeredPath)
+    await opened?.close()
   } catch (cause) {
     cleanupFailures.push(`source handle: ${detailOf(cause)}`)
   }
@@ -838,23 +914,16 @@ const firstDuplicate = (requested: readonly ColumnId[]): ColumnId | null => {
   return null
 }
 
-async function verifiedPanelSource(
-  source: SelectedSource,
-  profile: DatasetProfile,
-): Promise<Result<DuckDbEngine, PanelDataProblem>> {
-  const fingerprint = await fingerprintFile(source.file)
-  if (!fingerprint.ok) return err({ kind: 'panel-data-failed', detail: fingerprint.error.detail })
-  if (fingerprint.value !== profile.source.fingerprint) {
-    return err({
-      kind: 'source-changed',
-      expected: profile.source.fingerprint,
-      actual: fingerprint.value,
-    })
-  }
+const panelFailure = (detail: string): PanelDataProblem => ({ kind: 'panel-data-failed', detail })
+
+const sourceChanged = (expected: SourceFingerprint, actual: SourceFingerprint) =>
+  ({ kind: 'source-changed', expected, actual }) as const
+
+async function verifiedPanelSource(): Promise<Result<DuckDbEngine, PanelDataProblem>> {
   try {
     return ok(await engine())
   } catch (cause) {
-    return err({ kind: 'panel-data-failed', detail: detailOf(cause) })
+    return err(panelFailure(detailOf(cause)))
   }
 }
 
@@ -873,20 +942,19 @@ export async function inspectPanelStructure(
   if (!boundTime.ok) return boundTime
   const unitColumn = boundUnit.value
   const timeColumn = boundTime.value
-  const running = await verifiedPanelSource(source, profile)
+  const running = await verifiedPanelSource()
   if (!running.ok) return running
-  const registeredPath = `hirmos-${crypto.randomUUID()}.${source.format}`
-  try {
-    await running.value.db.registerFileHandle(
-      registeredPath,
-      source.file,
-      duckdb.DuckDBDataProtocol.BROWSER_FILEREADER,
-      true,
-    )
-  } catch (cause) {
-    return err({ kind: 'panel-data-failed', detail: detailOf(cause) })
-  }
-  const relation = profileRelation(profile, registeredPath)
+  const opened = await openRelation<PanelDataProblem>(
+    running.value,
+    source.file,
+    fileReading(profile.source),
+    profile.source.fingerprint,
+    verifiedSource(source, profile, panelFailure, sourceChanged),
+    panelFailure,
+    async () => profileLayout(profile),
+  )
+  if (!opened.ok) return opened
+  const relation = opened.value.relation
   const unit = sqlIdentifier(unitColumn.name)
   const time = sqlIdentifier(timeColumn.name)
   let connection: duckdb.AsyncDuckDBConnection | null = null
@@ -937,7 +1005,7 @@ export async function inspectPanelStructure(
   }
   try {
     if (connection !== null) await connection.close()
-    await running.value.db.dropFile(registeredPath)
+    await opened.value.close()
   } catch (cause) {
     return err({ kind: 'panel-data-failed', detail: `Panel cleanup failed: ${detailOf(cause)}` })
   }
@@ -958,20 +1026,19 @@ export async function materializePanelKeys(
   if (!boundTime.ok) return boundTime
   const unitColumn = boundUnit.value
   const timeColumn = boundTime.value
-  const running = await verifiedPanelSource(source, profile)
+  const running = await verifiedPanelSource()
   if (!running.ok) return running
-  const registeredPath = `hirmos-${crypto.randomUUID()}.${source.format}`
-  try {
-    await running.value.db.registerFileHandle(
-      registeredPath,
-      source.file,
-      duckdb.DuckDBDataProtocol.BROWSER_FILEREADER,
-      true,
-    )
-  } catch (cause) {
-    return err({ kind: 'panel-data-failed', detail: detailOf(cause) })
-  }
-  const relation = profileRelation(profile, registeredPath)
+  const opened = await openRelation<PanelDataProblem>(
+    running.value,
+    source.file,
+    fileReading(profile.source),
+    profile.source.fingerprint,
+    verifiedSource(source, profile, panelFailure, sourceChanged),
+    panelFailure,
+    async () => profileLayout(profile),
+  )
+  if (!opened.ok) return opened
+  const relation = opened.value.relation
   const unit = sqlIdentifier(unitColumn.name)
   const time = sqlIdentifier(timeColumn.name)
   let connection: duckdb.AsyncDuckDBConnection | null = null
@@ -1049,7 +1116,7 @@ export async function materializePanelKeys(
   }
   try {
     if (connection !== null) await connection.close()
-    await running.value.db.dropFile(registeredPath)
+    await opened.value.close()
   } catch (cause) {
     return err({ kind: 'panel-data-failed', detail: `Panel cleanup failed: ${detailOf(cause)}` })
   }
@@ -1100,20 +1167,19 @@ export async function materializePanelLong(
     if (!isNumericDuckDbType(column.duckdbType))
       return err({ kind: 'non-numeric-column', name: column.name, duckdbType: column.duckdbType })
   }
-  const running = await verifiedPanelSource(source, profile)
+  const running = await verifiedPanelSource()
   if (!running.ok) return running
-  const registeredPath = `hirmos-${crypto.randomUUID()}.${source.format}`
-  try {
-    await running.value.db.registerFileHandle(
-      registeredPath,
-      source.file,
-      duckdb.DuckDBDataProtocol.BROWSER_FILEREADER,
-      true,
-    )
-  } catch (cause) {
-    return err({ kind: 'panel-data-failed', detail: detailOf(cause) })
-  }
-  const relation = profileRelation(profile, registeredPath)
+  const opened = await openRelation<PanelDataProblem>(
+    running.value,
+    source.file,
+    fileReading(profile.source),
+    profile.source.fingerprint,
+    verifiedSource(source, profile, panelFailure, sourceChanged),
+    panelFailure,
+    async () => profileLayout(profile),
+  )
+  if (!opened.ok) return opened
+  const relation = opened.value.relation
   const unit = sqlIdentifier(unitColumn.name)
   const time = sqlIdentifier(timeColumn.name)
   const numericProjection = numericColumns
@@ -1221,7 +1287,7 @@ export async function materializePanelLong(
   }
   try {
     if (connection !== null) await connection.close()
-    await running.value.db.dropFile(registeredPath)
+    await opened.value.close()
   } catch (cause) {
     return err({ kind: 'panel-data-failed', detail: `Panel cleanup failed: ${detailOf(cause)}` })
   }
@@ -1246,37 +1312,30 @@ export async function profileColumn(
   profile: DatasetProfile,
   requestedColumnId: string,
 ): Promise<Result<ColumnProfile, ColumnProfileProblem>> {
-  const fingerprint = await fingerprintFile(source.file)
-  if (!fingerprint.ok)
-    return err({ kind: 'column-profile-failed', detail: fingerprint.error.detail })
-  if (fingerprint.value !== profile.source.fingerprint) {
-    return err({
-      kind: 'source-changed',
-      expected: profile.source.fingerprint,
-      actual: fingerprint.value,
-    })
-  }
   const column = profile.columns.find((candidate) => candidate.id === requestedColumnId)
   if (!column) return err({ kind: 'column-not-found', id: requestedColumnId })
 
+  const columnFailure = (detail: string): ColumnProfileProblem => ({
+    kind: 'column-profile-failed',
+    detail,
+  })
   let running: DuckDbEngine
   try {
     running = await engine()
   } catch (cause) {
-    return err({ kind: 'column-profile-failed', detail: detailOf(cause) })
+    return err(columnFailure(detailOf(cause)))
   }
-  const registeredPath = `hirmos-${crypto.randomUUID()}.${source.format}`
-  try {
-    await running.db.registerFileHandle(
-      registeredPath,
-      source.file,
-      duckdb.DuckDBDataProtocol.BROWSER_FILEREADER,
-      true,
-    )
-  } catch (cause) {
-    return err({ kind: 'column-profile-failed', detail: detailOf(cause) })
-  }
-  const relation = profileRelation(profile, registeredPath)
+  const opened = await openRelation<ColumnProfileProblem>(
+    running,
+    source.file,
+    fileReading(profile.source),
+    profile.source.fingerprint,
+    verifiedSource(source, profile, columnFailure, sourceChanged),
+    columnFailure,
+    async () => profileLayout(profile),
+  )
+  if (!opened.ok) return opened
+  const relation = opened.value.relation
   const name = sqlIdentifier(column.name)
 
   let connection: duckdb.AsyncDuckDBConnection | null = null
@@ -1398,7 +1457,7 @@ export async function profileColumn(
     }
   }
   try {
-    await running.db.dropFile(registeredPath)
+    await opened.value.close()
   } catch (cause) {
     cleanupFailures.push(`source handle: ${detailOf(cause)}`)
   }
@@ -1419,28 +1478,23 @@ async function withSource<Value, Problem>(
   ) => Promise<Result<Value, Problem>>,
   textColumn?: string,
 ): Promise<Result<Value, Problem>> {
-  const fingerprint = await fingerprintFile(source.file)
-  if (!fingerprint.ok) return err(failure(fingerprint.error.detail))
-  if (fingerprint.value !== profile.source.fingerprint)
-    return err(changed(profile.source.fingerprint, fingerprint.value))
   let running: DuckDbEngine
   try {
     running = await engine()
   } catch (cause) {
     return err(failure(detailOf(cause)))
   }
-  const registeredPath = `hirmos-${crypto.randomUUID()}.${source.format}`
-  try {
-    await running.db.registerFileHandle(
-      registeredPath,
-      source.file,
-      duckdb.DuckDBDataProtocol.BROWSER_FILEREADER,
-      true,
-    )
-  } catch (cause) {
-    return err(failure(detailOf(cause)))
-  }
-  const relation = profileRelation(profile, registeredPath, textColumn)
+  const opened = await openRelation<Problem>(
+    running,
+    source.file,
+    fileReading(profile.source),
+    profile.source.fingerprint,
+    verifiedSource(source, profile, failure, changed),
+    failure,
+    async () => profileLayout(profile),
+    textColumn,
+  )
+  if (!opened.ok) return opened
   let connection: duckdb.AsyncDuckDBConnection | null = null
   let outcome: Result<Value, Problem>
   try {
@@ -1448,13 +1502,13 @@ async function withSource<Value, Problem>(
     // TimeZone is connection-local: the startup connection's setting does not carry over.
     // Interpret unzoned calendar input in UTC while preserving explicitly supplied zones.
     await connection.query("SET TimeZone = 'UTC'")
-    outcome = await work(connection, relation)
+    outcome = await work(connection, opened.value.relation)
   } catch (cause) {
     outcome = err(failure(detailOf(cause)))
   }
   try {
     await connection?.close()
-    await running.db.dropFile(registeredPath)
+    await opened.value.close()
   } catch (cause) {
     return err(failure(`cleanup: ${detailOf(cause)}`))
   }
@@ -1476,15 +1530,16 @@ export async function summarizeRelation(
   rowCount: number,
   categoryColumn?: import('@/domain/dataset').ColumnId,
 ): Promise<Result<readonly ColumnSummary[], DatasetSummaryProblem>> {
-  const summarized = await connection.query(`SUMMARIZE SELECT * FROM ${relation}`)
-  const names = summarized.getChild('column_name')
-  const mins = summarized.getChild('min')
-  const maxes = summarized.getChild('max')
-  const uniques = summarized.getChild('approx_unique')
-  const counts = summarized.getChild('count')
-  const byName = new Map<string, number>()
-  for (let index = 0; index < summarized.numRows; index += 1)
-    byName.set(String(names?.get(index)), index)
+  const summarized = await connection.query(
+    `SELECT ${columns
+      .map((column, index) => {
+        const name = sqlIdentifier(column.name)
+        return `min(${name})::VARCHAR AS ${sqlIdentifier(`min_${index}`)}, max(${name})::VARCHAR AS ${sqlIdentifier(`max_${index}`)}, count(${name}) AS ${sqlIdentifier(`count_${index}`)}, approx_count_distinct(${name}) AS ${sqlIdentifier(`unique_${index}`)}`
+      })
+      .join(', ')} FROM ${relation}`,
+  )
+  const statistic = (field: string, index: number): unknown =>
+    summarized.getChild(`${field}_${index}`)?.get(0)
   // `approx_unique` can exceed the row count on small files; below the threshold the exact count is cheap.
   const exact =
     rowCount <= EXACT_DISTINCT_ROWS
@@ -1497,20 +1552,14 @@ export async function summarizeRelation(
   for (const column of columns.filter(
     (c) => categoryColumn === undefined || c.id === categoryColumn,
   )) {
-    const row = byName.get(column.name)
-    if (row === undefined)
-      return err({
-        kind: 'summary-failed',
-        detail: `SUMMARIZE returned no row for ${column.name}.`,
-      })
-    const present = scalarNumber(counts?.get(row) ?? 0, 'count')
     const columnIndex = columns.indexOf(column)
+    const present = scalarNumber(statistic('count', columnIndex) ?? 0, 'count')
     const distinctCount =
       exact !== null
         ? scalarNumber(exact.getChild(`d_${columnIndex}`)?.get(0) ?? 0, 'distinct count')
-        : Math.min(present, scalarNumber(uniques?.get(row) ?? 0, 'distinct count'))
-    const minRaw = mins?.get(row)
-    const maxRaw = maxes?.get(row)
+        : Math.min(present, scalarNumber(statistic('unique', columnIndex) ?? 0, 'distinct count'))
+    const minRaw = statistic('min', columnIndex)
+    const maxRaw = statistic('max', columnIndex)
     const min = minRaw === null || minRaw === undefined ? null : String(minRaw)
     const max = maxRaw === null || maxRaw === undefined ? null : String(maxRaw)
     const name = sqlIdentifier(column.name)

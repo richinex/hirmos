@@ -231,7 +231,7 @@ function SqlEditor({
         Prepare with SQL
       </ChapterHeading>
       {recovery}
-      <div className="mac-terminal flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="mac-terminal relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <div className="mac-terminal-bar relative flex h-7 shrink-0 select-none items-center px-2">
           <span className="flex gap-2" aria-hidden>
             <i className="size-3 rounded-full bg-[#FF5F57]" />
@@ -260,12 +260,18 @@ function SqlEditor({
           className="sql-console mac-terminal-body min-h-0 flex-1 min-w-0 overflow-hidden px-2 pt-2 pb-4"
           aria-label="SQL console"
         />
+        {state.kind === 'opening' && (
+          <div
+            role="status"
+            aria-label="Opening the SQL console"
+            className="hold-appear absolute inset-x-2 top-9 flex flex-col gap-2"
+          >
+            <div className="skeleton h-3 w-44 max-w-full rounded" />
+            <div className="skeleton h-3 w-64 max-w-full rounded" />
+            <div className="skeleton h-3 w-16 rounded" />
+          </div>
+        )}
       </div>
-      {state.kind === 'opening' && (
-        <p role="status" className={cn(fieldHint, 'mx-3 my-2')}>
-          Opening the SQL console…
-        </p>
-      )}
       {cancellation.kind === 'reported' && (
         <div className="mx-3 my-2">
           <Alert tone="info">{cancellation.message}</Alert>

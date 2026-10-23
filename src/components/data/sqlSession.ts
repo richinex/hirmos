@@ -4,6 +4,7 @@ import type { Terminal } from 'xterm'
 import { tableFromIPC } from 'apache-arrow'
 import { assertNever, isNonEmpty, type NonEmptyArray } from '@/domain/dop'
 import { PREPARED_VIEW, type SqlPreparationInput, type SqlViewName } from '@/domain/sqlPreparation'
+import { changesCatalog } from '@/domain/sqlStatement'
 import { selectSqlDerivedSource, type SelectedSource, type SqlResume } from '@/domain/workflow'
 import {
   cancelSqlPreparationQuery,
@@ -225,13 +226,13 @@ export function createSqlSession(inputs: readonly SqlPreparationInput[], resume:
     host = element
     mount?.append(element)
     void (async () => {
-      const opened = await openSqlPreparation(inputs, (running) => {
+      const opened = await openSqlPreparation(inputs, (running, sql) => {
         if (!valid(generation)) return
         store.setState({
           query: running ? 'running' : 'idle',
           ...(running ? { cancellation: { kind: 'idle' as const } } : {}),
         })
-        if (!running) void refresh()
+        if (!running && changesCatalog(sql)) void refresh()
       })
       if (!valid(generation)) {
         if (opened.ok) await closeSqlPreparation(opened.value)
@@ -454,10 +455,7 @@ export function createSqlSession(inputs: readonly SqlPreparationInput[], resume:
       if (valid(generation))
         store.setState({ scriptResult: { kind: 'failed', detail: String(cause) } })
     } finally {
-      if (valid(generation)) {
-        store.setState({ shell: { kind: 'ready', session: live } })
-        await refresh()
-      }
+      if (valid(generation)) store.setState({ shell: { kind: 'ready', session: live } })
     }
   }
   return {

@@ -63,20 +63,11 @@ export const fileRelation = (
   }
 }
 
-/** The table a profiled file holds, read with the dialect its profile recorded when it has one. */
-export const profileRelation = (
-  profile: DatasetProfile,
-  path: string,
-  textColumn?: string,
-): string =>
-  fileRelation(
-    profile.source,
-    path,
-    textColumn,
-    profile.source.format === 'parquet' || profile.source.dialect.kind === 'not-recorded'
-      ? DETECT
-      : { kind: 'known', dialect: profile.source.dialect.dialect, columns: profile.columns },
-  )
+/** The layout a profiled file is read with: the dialect its profile recorded when it has one. */
+export const profileLayout = (profile: DatasetProfile): RelationLayout =>
+  profile.source.format === 'parquet' || profile.source.dialect.kind === 'not-recorded'
+    ? DETECT
+    : { kind: 'known', dialect: profile.source.dialect.dialect, columns: profile.columns }
 
 /** The sniffer writes "(empty)" for a quote, escape or comment the file does not have. */
 const sniffedOptional = z.string().transform((value) => (value === '(empty)' ? '' : value))

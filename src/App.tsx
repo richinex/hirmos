@@ -102,6 +102,7 @@ import {
   removeCachedSource,
   sourceCacheAvailable,
 } from '@/data/sourceCache'
+import { removeKeptInputs, sweepKeptInputs } from '@/data/keptInputs'
 import {
   buildBundle,
   bundleFileName,
@@ -535,6 +536,15 @@ function App() {
   useEffect(() => {
     refreshSaved()
   }, [refreshSaved])
+  useEffect(() => {
+    void listProjects().then((headers) =>
+      sweepKeptInputs(
+        new Set(
+          headers.flatMap((header) => (header.cachedSource === null ? [] : [header.cachedSource])),
+        ),
+      ),
+    )
+  }, [])
   useEffect(() => subscribeStorageHealth(setStorageFailure), [])
   useEffect(() => {
     const snapshot = snapshotWorkflow(workflow, new Date().toISOString())
@@ -610,8 +620,10 @@ function App() {
     if (
       entry.cachedSource !== null &&
       !saved.some((other) => other.id !== entry.id && other.cachedSource === entry.cachedSource)
-    )
+    ) {
       await removeCachedSource(entry.cachedSource)
+      await removeKeptInputs(entry.cachedSource)
+    }
     refreshSaved()
   }
   const [cacheProblem, setCacheProblem] = useState<string | null>(null)

@@ -11,6 +11,8 @@ import {
   type DuckDbEngine,
 } from './duckdb'
 import { rememberInputFiles } from './inputFiles'
+import { keptRelation } from './keptInputs'
+import { keptDecision } from '@/domain/keptInput'
 import { exportDirectory, type SqlInputDescriptor } from '@/domain/sourceInputs'
 import { err, isNonEmpty, ok, type NonEmptyArray, type Result } from '@/domain/dop'
 import { selectSource, type SelectedSource } from '@/domain/workflow'
@@ -104,6 +106,18 @@ export async function registerInputs(
           ? input.path
           : `${namespace}-${input.fingerprint}.${input.format}`
       try {
+        const reading = input.format === 'duckdb-export-file' ? null : fileReading(input)
+        const decision = reading === null ? null : keptDecision(input.fingerprint, reading)
+        const kept =
+          reading !== null && decision?.kind === 'keep'
+            ? await keptRelation(engine, decision.name, input.file, reading, input.fingerprint)
+            : null
+        if (kept?.ok) {
+          await connection.query(
+            `CREATE OR REPLACE VIEW ${sqlIdentifier(input.alias)} AS SELECT * FROM ${kept.value.relation}`,
+          )
+          continue
+        }
         await engine.db.registerFileHandle(
           path,
           input.file,
@@ -302,14 +316,14 @@ const shellDatabase = (
   database: duckdb.AsyncDuckDB,
   connection: { current: number | null },
   lifecycle: { current: 'open' | 'closed' },
-  onQuery: (running: boolean) => void,
+  onQuery: (running: boolean, sql: string) => void,
 ): duckdb.AsyncDuckDB =>
   new Proxy(database, {
     get(target, property) {
       if (property === 'disconnect' && lifecycle.current === 'closed') return async () => {}
       if (property === 'runQuery') {
         return async (id: number, sql: string) => {
-          onQuery(true)
+          onQuery(true, sql)
           try {
             const live = new duckdb.AsyncDuckDBConnection(target, id)
             // DuckDB executes batches and returns their final statement's result.
@@ -319,7 +333,7 @@ const shellDatabase = (
             const writer = await RecordBatchStreamWriter.writeAll(reader)
             return await writer.toUint8Array()
           } finally {
-            onQuery(false)
+            onQuery(false, sql)
           }
         }
       }
@@ -337,7 +351,7 @@ const shellDatabase = (
 
 export async function openSqlPreparation(
   inputs: readonly SqlPreparationInput[],
-  onQuery: (running: boolean) => void = () => {},
+  onQuery: (running: boolean, sql: string) => void = () => {},
 ): Promise<Result<SqlPreparationSession, SqlPreparationProblem>> {
   let engine: DuckDbEngine
   try {
