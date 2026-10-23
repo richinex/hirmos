@@ -36,6 +36,12 @@ export default defineConfig({
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   // WebCola is CommonJS reached only through a lazily loaded module, so the dev server would otherwise find it mid-session and serve a stale copy.
   optimizeDeps: { include: ['webcola/dist/src/layout', 'ai', '@openrouter/ai-sdk-provider'] },
+  preview: {
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    },
+  },
   server: {
     port: 5179,
     strictPort: true,

@@ -37,7 +37,7 @@ function SqlFileButton({
   return (
     <button
       type="button"
-      className={button('outline', 'w-full')}
+      className={button('quiet')}
       disabled={disabled}
       onClick={() => {
         closePane()
@@ -85,7 +85,7 @@ function SqlOutputButton({
   return (
     <button
       type="button"
-      className={button('signal', 'mt-3 w-full')}
+      className={button('signal')}
       aria-busy={busy}
       disabled={disabled}
       onClick={() => void adopt()}
@@ -262,11 +262,15 @@ function SqlEditor({
         />
       </div>
       {state.kind === 'opening' && (
-        <p role="status" className={fieldHint}>
+        <p role="status" className={cn(fieldHint, 'mx-3 my-2')}>
           Opening the SQL console…
         </p>
       )}
-      {cancellation.kind === 'reported' && <Alert tone="info">{cancellation.message}</Alert>}
+      {cancellation.kind === 'reported' && (
+        <div className="mx-3 my-2">
+          <Alert tone="info">{cancellation.message}</Alert>
+        </div>
+      )}
       {scriptResult.kind === 'complete' && (
         <div className="mx-3 mb-3 shrink-0">
           <EvidenceTable
@@ -361,11 +365,46 @@ function SqlEditor({
           trigger: { label: 'Source', icon: 'database' },
           controls: <CloseSqlSource />,
           body: (
-            <div className="space-y-5">
-              <SqlFileButton
-                disabled={busy || session === null}
-                onOpen={() => scriptPicker.current?.click()}
-              />
+            <div className="@container/inspector space-y-5">
+              <div
+                role="group"
+                aria-label="SQL source actions"
+                className={cn(
+                  'grid gap-2',
+                  onCancelEditing === undefined
+                    ? 'grid-cols-1'
+                    : 'grid-cols-1 @sm/inspector:grid-cols-2',
+                )}
+              >
+                {onCancelEditing !== undefined && (
+                  <button
+                    type="button"
+                    className={button(
+                      'quiet',
+                      'text-danger hover:border-danger/50 hover:text-danger',
+                    )}
+                    onClick={onCancelEditing}
+                  >
+                    Cancel editing
+                  </button>
+                )}
+                <SqlOutputButton
+                  controller={controller}
+                  onPrepared={onPrepared}
+                  busy={state.kind === 'materializing'}
+                  disabled={
+                    busy || state.kind === 'failed-to-open' || outputView.kind !== 'available'
+                  }
+                />
+              </div>
+              {state.kind === 'materializing' && (
+                <p role="status" className={fieldHint}>
+                  Checking selected view…
+                </p>
+              )}
+              {problem !== null && (
+                <Alert tone="danger">{describeSqlPreparationProblem(problem)}</Alert>
+              )}
               {inputs.some((input) => input.format === 'duckdb-export-file') && (
                 <div>
                   <p className="m-0 text-body font-medium text-ink">Export files</p>
@@ -384,8 +423,7 @@ function SqlEditor({
               )}
               <SqlTables
                 catalog={catalog}
-                inputs={inputs}
-                selected={inspection.kind === 'none' ? null : inspection.relation.name}
+                inspection={inspection}
                 onInspect={(relation) => void inspect(relation)}
               />
 
@@ -431,22 +469,6 @@ function SqlEditor({
                     {describeSqlPreparationProblem(outputView.problem)}
                   </p>
                 )}
-                <SqlOutputButton
-                  controller={controller}
-                  onPrepared={onPrepared}
-                  busy={state.kind === 'materializing'}
-                  disabled={
-                    busy || state.kind === 'failed-to-open' || outputView.kind !== 'available'
-                  }
-                />
-                {state.kind === 'materializing' && (
-                  <p role="status" className={fieldHint}>
-                    Checking selected view…
-                  </p>
-                )}
-                {problem !== null && (
-                  <Alert tone="danger">{describeSqlPreparationProblem(problem)}</Alert>
-                )}
               </div>
 
               <details className="mb-4">
@@ -490,19 +512,15 @@ function SqlEditor({
                   </span>
                 </div>
               </details>
-              <div className="flex flex-col gap-2">
-                {onCancelEditing !== undefined && (
-                  <button
-                    type="button"
-                    className={button(
-                      'quiet',
-                      'text-danger hover:border-danger/50 hover:text-danger',
-                    )}
-                    onClick={onCancelEditing}
-                  >
-                    Cancel editing
-                  </button>
-                )}
+              <div
+                role="group"
+                aria-label="Files"
+                className="grid grid-cols-1 gap-2 @sm/inspector:grid-cols-2"
+              >
+                <SqlFileButton
+                  disabled={busy || session === null}
+                  onOpen={() => scriptPicker.current?.click()}
+                />
                 <button
                   type="button"
                   className={button('quiet')}

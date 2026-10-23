@@ -2,7 +2,7 @@ import { createStore } from 'zustand/vanilla'
 import type { PreparationDraft } from '@/data/preparationDraftStore'
 import type { Terminal } from 'xterm'
 import { tableFromIPC } from 'apache-arrow'
-import { isNonEmpty, type NonEmptyArray } from '@/domain/dop'
+import { assertNever, isNonEmpty, type NonEmptyArray } from '@/domain/dop'
 import { PREPARED_VIEW, type SqlPreparationInput, type SqlViewName } from '@/domain/sqlPreparation'
 import { selectSqlDerivedSource, type SelectedSource, type SqlResume } from '@/domain/workflow'
 import {
@@ -20,10 +20,12 @@ import {
   type SqlPreparationSession,
 } from '@/data/sqlPreparation'
 import {
-  sameRelation,
+  catalogEffect,
+  inspected,
+  inspecting as inspectingState,
+  type SqlCatalogState,
+  type SqlInspection,
   type SqlRelation,
-  type SqlRelationRows,
-  type SqlRelationSummary,
 } from '@/domain/sqlCatalog'
 import {
   bridgeSoftKeyboard,
@@ -71,29 +73,6 @@ type ScriptResult =
       readonly columns: readonly string[]
       readonly rows: readonly (readonly string[])[]
     }
-export type Catalog =
-  | { readonly kind: 'checking' }
-  | { readonly kind: 'listed'; readonly relations: readonly SqlRelation[] }
-  | { readonly kind: 'failed'; readonly problem: SqlPreparationProblem }
-type Summary =
-  | { readonly kind: 'idle' }
-  | { readonly kind: 'summarizing' }
-  | { readonly kind: 'summarized'; readonly byColumn: SqlRelationSummary }
-  | { readonly kind: 'failed'; readonly problem: SqlPreparationProblem }
-export type Inspection =
-  | { readonly kind: 'none' }
-  | { readonly kind: 'reading'; readonly relation: SqlRelation }
-  | {
-      readonly kind: 'read'
-      readonly relation: SqlRelation
-      readonly data: SqlRelationRows
-      readonly summary: Summary
-    }
-  | {
-      readonly kind: 'failed'
-      readonly relation: SqlRelation
-      readonly problem: SqlPreparationProblem
-    }
 interface State {
   readonly draft: Extract<PreparationDraft, { kind: 'sql' }> | null
   readonly query: 'idle' | 'running'
@@ -102,8 +81,8 @@ interface State {
   readonly shell: Shell
   readonly cancellation: Cancellation
   readonly output: Output
-  readonly catalog: Catalog
-  readonly inspection: Inspection
+  readonly catalog: SqlCatalogState
+  readonly inspection: SqlInspection
   readonly size: { readonly cols: number; readonly rows: number } | null
 }
 
@@ -142,18 +121,14 @@ export function createSqlSession(inputs: readonly SqlPreparationInput[], resume:
     const previous = store.getState().size
     if (previous?.cols !== size.cols || previous.rows !== size.rows) store.setState({ size })
   }
-  const inspect = async (relation: SqlRelation) => {
+  const inspect = async (relation: SqlRelation, inPlace = false) => {
     if (closed || session === null) return
     const generation = epoch
     const request = ++inspecting
-    store.setState({ inspection: { kind: 'reading', relation } })
+    store.setState({ inspection: inspectingState(store.getState().inspection, relation, inPlace) })
     const read = await readSqlRelation(session, relation)
     if (!valid(generation) || inspecting !== request) return
-    store.setState({
-      inspection: read.ok
-        ? { kind: 'read', relation, data: read.value, summary: { kind: 'idle' } }
-        : { kind: 'failed', relation, problem: read.error },
-    })
+    store.setState({ inspection: inspected(store.getState().inspection, relation, inPlace, read) })
   }
   const summarize = async () => {
     const inspection = store.getState().inspection
@@ -187,22 +162,21 @@ export function createSqlSession(inputs: readonly SqlPreparationInput[], resume:
       return
     }
     store.setState({ catalog: { kind: 'listed', relations: read.value } })
-    const inspection = store.getState().inspection
-    if (inspection.kind === 'none') {
-      const [first] = read.value
-      if (opened || first === undefined) return
-      opened = true
-      await inspect(first)
-      return
+    const effect = catalogEffect(store.getState().inspection, read.value, !opened)
+    opened = true
+    switch (effect.kind) {
+      case 'keep':
+        return
+      case 'clear':
+        inspecting++
+        store.setState({ inspection: { kind: 'none' } })
+        return
+      case 'read':
+        await inspect(effect.relation, effect.inPlace)
+        return
+      default:
+        return assertNever(effect)
     }
-    const current = read.value.find((relation) => relation.name === inspection.relation.name)
-    if (current === undefined) {
-      inspecting++
-      store.setState({ inspection: { kind: 'none' } })
-      return
-    }
-    if (inspection.kind !== 'reading' || !sameRelation(current, inspection.relation))
-      await inspect(current)
   }
   const refresh = async (prefer: SqlViewName | null = null) => {
     if (closed || session === null) return

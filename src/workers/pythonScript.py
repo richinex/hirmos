@@ -35,7 +35,9 @@ def _pandas_type(dtype):
 
 
 def _read_input(path):
-    table = ipc.open_file(path).read_all()
+    source = pa.memory_map(path)
+    reader = ipc.open_file(source) if source.read_at(6, 0) == b"ARROW1" else ipc.open_stream(source)
+    table = reader.read_all()
     # DuckDB's lossless export uses the canonical bool8 extension. Convert that
     # representation through Arrow before choosing pandas' nullable boolean type.
     for index, field in enumerate(table.schema):

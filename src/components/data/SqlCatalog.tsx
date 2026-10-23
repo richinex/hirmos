@@ -7,7 +7,6 @@ import {
   useReactTable,
   type SortingState,
 } from '@tanstack/react-table'
-import { Icon } from '@/components/Icon'
 import { Alert } from '@/components/ui/Alert'
 import { EvidenceTable, type EvidenceColumn } from '@/components/table/EvidenceTable'
 import {
@@ -21,141 +20,70 @@ import {
   countLine,
   useTableDensity,
 } from '@/components/table/primitives'
-import {
-  caption,
-  chip,
-  fieldHint,
-  iconControl,
-  literal,
-  num,
-  table as tableCn,
-  td,
-  tr,
-} from '@/components/ui/recipes'
+import { caption, chip, literal, num, table as tableCn, td, tr } from '@/components/ui/recipes'
 import { describeSqlPreparationProblem } from '@/data/sqlPreparation'
 import { isNumericDuckDbType, type ColumnId, type ColumnSummary } from '@/domain/dataset'
-import type { SqlPreparationInput } from '@/domain/sqlPreparation'
-import type { SqlRelation, SqlRelationRows } from '@/domain/sqlCatalog'
+import type {
+  SqlCatalogState,
+  SqlInspection,
+  SqlRelation,
+  SqlRelationRows,
+} from '@/domain/sqlCatalog'
 import { formatCount, formatPercent, formatStored, storedDigits } from '@/lib/format/number'
 import { cn } from '@/lib/utils'
 import { columnDecimals, PreviewCellText, sortableValue } from './previewCell'
 import { TypeGlyph } from './ReadAs'
-import type { Catalog, Inspection } from './sqlSession'
 
-function SqlTableItem({
-  relation,
-  fileName,
-  selected,
-  onInspect,
-}: {
-  readonly relation: SqlRelation
-  readonly fileName: string | null
-  readonly selected: boolean
-  readonly onInspect: (relation: SqlRelation) => void
-}) {
-  const [open, setOpen] = useState(false)
-  const columnsId = useId()
-  const count = formatCount(relation.columns.length, {
-    noun: relation.columns.length === 1 ? 'column' : 'columns',
-  })
-  return (
-    <li className="min-w-0">
-      <div className={cn('flex min-w-0 items-start gap-1 rounded-md', selected && 'bg-raised')}>
-        <button
-          type="button"
-          aria-expanded={open}
-          aria-controls={columnsId}
-          aria-label={`Columns of ${relation.name}`}
-          className={iconControl('quiet', 'mt-0.5 size-6 shrink-0')}
-          onClick={() => setOpen((current) => !current)}
-        >
-          <Icon name={open ? 'expand_more' : 'chevron_right'} size={16} />
-        </button>
-        <button
-          type="button"
-          aria-pressed={selected}
-          className="flex min-w-0 flex-1 items-start gap-2 py-1 pr-1 text-left"
-          onClick={() => onInspect(relation)}
-        >
-          <span className="min-w-0 flex-1">
-            <code className={literal('block truncate text-body text-ink')}>{relation.name}</code>
-            {fileName !== null && (
-              <span className={num('block truncate text-label text-faint')}>{fileName}</span>
-            )}
-          </span>
-          <span className={chip('shrink-0 text-faint')}>{relation.kind}</span>
-          <span className={num('w-6 shrink-0 text-right text-label text-faint')} title={count.text}>
-            <span aria-hidden>{relation.columns.length}</span>
-            <span className="sr-only">{count.text}</span>
-          </span>
-        </button>
-      </div>
-      {open && (
-        <ul
-          id={columnsId}
-          aria-label={`Columns of ${relation.name}`}
-          className="mb-1 ml-7 mt-0.5 list-none space-y-0.5 p-0"
-        >
-          {relation.columns.map((column) => (
-            <li key={column.id} className="flex min-w-0 items-baseline justify-between gap-3">
-              <code className={literal('min-w-0 truncate text-label text-muted')}>
-                {column.name}
-              </code>
-              <span className={literal('shrink-0 text-micro text-faint')}>{column.type}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </li>
-  )
-}
-
-/** The console's input files, tables and views, each with its columns, read from DuckDB's catalog. */
+/** The console's input files, tables and views; the selected one is shown in the preview. */
 export const SqlTables = memo(function SqlTables({
   catalog,
-  inputs,
-  selected,
+  inspection,
   onInspect,
 }: {
-  readonly catalog: Catalog
-  readonly inputs: readonly SqlPreparationInput[]
-  readonly selected: string | null
+  readonly catalog: SqlCatalogState
+  readonly inspection: SqlInspection
   readonly onInspect: (relation: SqlRelation) => void
 }) {
-  const files = useMemo(
-    () =>
-      new Map(
-        inputs
-          .filter((input) => input.format !== 'duckdb-export-file')
-          .map((input) => [input.alias as string, input.fileName]),
-      ),
-    [inputs],
-  )
+  const selected = inspection.kind === 'none' ? null : inspection.relation
   return (
-    <div>
-      <p className="m-0 text-body font-medium text-ink">Tables</p>
-      {catalog.kind === 'checking' && <p className={cn(fieldHint, 'mt-2')}>Listing the tables.</p>}
-      {catalog.kind === 'failed' && (
-        <p role="alert" className="mt-2 text-body text-danger">
-          {describeSqlPreparationProblem(catalog.problem)}
-        </p>
-      )}
-      {catalog.kind === 'listed' && catalog.relations.length === 0 && (
-        <p className={cn(fieldHint, 'mt-2')}>Create a table or view to see it here.</p>
-      )}
-      {catalog.kind === 'listed' && catalog.relations.length > 0 && (
-        <ul aria-label="Tables" className="mb-0 mt-2 list-none space-y-0.5 p-0">
-          {catalog.relations.map((relation) => (
-            <SqlTableItem
-              key={relation.name}
-              relation={relation}
-              fileName={relation.kind === 'input' ? (files.get(relation.name) ?? null) : null}
-              selected={relation.name === selected}
-              onInspect={onInspect}
-            />
-          ))}
-        </ul>
-      )}
+    <div className="flex flex-col gap-4">
+      <section aria-labelledby="sql-tables-title">
+        <h3 id="sql-tables-title" className="mb-2 mt-0 text-body font-medium text-ink">
+          Tables
+        </h3>
+        {catalog.kind === 'checking' && <p className={caption('m-0')}>Listing the tables.</p>}
+        {catalog.kind === 'failed' && (
+          <Alert tone="danger">{describeSqlPreparationProblem(catalog.problem)}</Alert>
+        )}
+        {catalog.kind === 'listed' && catalog.relations.length === 0 && (
+          <p className={caption('m-0')}>Create a table or view to see it here.</p>
+        )}
+        {catalog.kind === 'listed' && catalog.relations.length > 0 && (
+          <ul aria-label="Tables" className="m-0 list-none space-y-0.5 p-0">
+            {catalog.relations.map((relation) => {
+              const current = relation.name === selected?.name
+              return (
+                <li key={relation.name} className="min-w-0">
+                  <button
+                    type="button"
+                    aria-pressed={current}
+                    className={cn(
+                      'flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1 text-left transition-colors hover:bg-well',
+                      current && 'bg-raised',
+                    )}
+                    onClick={() => onInspect(relation)}
+                  >
+                    <code className={literal('min-w-0 flex-1 truncate text-body text-ink')}>
+                      {relation.name}
+                    </code>
+                    <span className={chip('shrink-0 text-faint')}>{relation.kind}</span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </section>
     </div>
   )
 })
@@ -217,7 +145,7 @@ function SqlRowsTable({
   )
 }
 
-type Summary = Extract<Inspection, { readonly kind: 'read' }>['summary']
+type Summary = Extract<SqlInspection, { readonly kind: 'read' }>['summary']
 
 interface SchemaRow {
   readonly id: ColumnId
@@ -498,7 +426,7 @@ export function SqlPreview({
   inspection,
   view,
 }: {
-  readonly inspection: Inspection
+  readonly inspection: SqlInspection
   readonly view: PreviewView
 }) {
   return (

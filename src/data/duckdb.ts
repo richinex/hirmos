@@ -18,8 +18,9 @@ import {
   type TimeSpacing,
 } from '@/domain/timeInterpretation'
 import { DUCKDB_PACKAGE_VERSION, DUCKDB_ENGINE_VERSION } from '@/domain/dataEngine'
-import duckdbEhWorker from '@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js?url'
-import duckdbMvpWorker from '@duckdb/duckdb-wasm/dist/duckdb-browser-mvp.worker.js?url'
+import duckdbBaseWorker from './engine/duckdb-browser-base.worker.js?url'
+import duckdbThreadsWorker from './engine/duckdb-browser-threads.worker.js?url'
+import duckdbThreadsPthreadWorker from './engine/duckdb-browser-threads.pthread.worker.js?url'
 import { fingerprintFile } from './fingerprint'
 import {
   assertNever,
@@ -73,9 +74,17 @@ const engineBinary = (file: string): string =>
   new URL(`/duckdb/${DUCKDB_PACKAGE_VERSION}/${file}`, self.location.origin).href
 
 const LOCAL_BUNDLES: duckdb.DuckDBBundles = {
-  mvp: { mainModule: engineBinary('duckdb-mvp.wasm'), mainWorker: duckdbMvpWorker },
-  eh: { mainModule: engineBinary('duckdb-eh.wasm'), mainWorker: duckdbEhWorker },
+  base: { mainModule: engineBinary('duckdb-base.wasm'), mainWorker: duckdbBaseWorker },
+  threads: {
+    mainModule: engineBinary('duckdb-threads.wasm'),
+    mainWorker: duckdbThreadsWorker,
+    pthreadWorker: duckdbThreadsPthreadWorker,
+  },
 }
+
+/** The threads bundle runs only on a cross-origin isolated page; the base bundle is single-threaded. */
+const threadsFor = (bundle: duckdb.DuckDBBundle): number =>
+  bundle.pthreadWorker === null ? 1 : Math.max(1, Math.min(8, navigator.hardwareConcurrency || 1))
 
 export interface DuckDbEngine {
   readonly db: duckdb.AsyncDuckDB
@@ -83,9 +92,6 @@ export interface DuckDbEngine {
 }
 
 let enginePromise: Promise<DuckDbEngine> | null = null
-
-const localExtensionRepository = (): string =>
-  new URL('/duckdb-extensions', self.location.origin).href.replace(/\/$/, '')
 
 const scalarBigInt = (value: unknown, label: string): bigint => {
   if (typeof value === 'bigint') return value
@@ -95,24 +101,18 @@ const scalarBigInt = (value: unknown, label: string): bigint => {
 
 async function configureOfflineEngine(db: duckdb.AsyncDuckDB, version: string): Promise<void> {
   if (version !== DUCKDB_ENGINE_VERSION) {
-    throw new Error(
-      `DuckDB engine ${version} does not match the self-hosted ${DUCKDB_ENGINE_VERSION} extensions.`,
-    )
+    throw new Error(`DuckDB engine ${version} is not the expected ${DUCKDB_ENGINE_VERSION}.`)
   }
 
   const connection = await db.connect()
   try {
-    const repository = sqlString(localExtensionRepository())
-    await connection.query(`SET custom_extension_repository = ${repository}`)
     await connection.query('SET allow_community_extensions = false')
     await connection.query('SET autoinstall_known_extensions = false')
     await connection.query('SET autoload_known_extensions = false')
-    await connection.query('LOAD parquet')
-    await connection.query('LOAD icu')
     await connection.query("SET TimeZone = 'UTC'")
 
     // This parses named-zone timestamps on both sides of Amsterdam's 2024 spring DST transition.
-    // If ICU is missing, mismatched, unsigned, or not actually loaded, engine startup is refused.
+    // If the built-in ICU extension is missing or not registered, engine startup is refused.
     const dst = await connection.query(`
       SELECT
         epoch(TIMESTAMPTZ '2024-03-31 00:30:00 Europe/Amsterdam')::BIGINT AS before_dst,
@@ -150,7 +150,7 @@ const startEngine = async ({
     await db.open({
       allowUnsignedExtensions: false,
       arrowLosslessConversion,
-      maximumThreads: 1,
+      maximumThreads: threadsFor(bundle),
     })
     const version = await db.getVersion()
     await configureOfflineEngine(db, version)

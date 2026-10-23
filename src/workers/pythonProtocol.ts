@@ -2,8 +2,8 @@ import { z } from 'zod'
 import { err, ok, type Result } from '@/domain/dop'
 
 /**
- * Send Arrow IPC files to Python and receive an Arrow IPC stream for the result.
- * The fixed format names prevent callers from confusing the two encodings.
+ * Send an Arrow IPC stream to Python and receive one for the result. The format name is
+ * explicit so a file encoding is never mistaken for a stream.
  */
 
 export const PYODIDE_VERSION = '314.0.6'
@@ -19,7 +19,7 @@ export type ScriptShape =
   { readonly kind: 'table' } | { readonly kind: 'value'; readonly column: string }
 
 export interface PythonInput {
-  readonly format: 'arrow-file'
+  readonly format: 'arrow-stream'
   readonly bytes: Uint8Array
 }
 export interface PythonOutput {

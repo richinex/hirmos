@@ -42,7 +42,7 @@ const arrowOf = async (
   connection: duckdb.AsyncDuckDBConnection,
   view: string,
 ): Promise<PythonInput> => ({
-  format: 'arrow-file',
+  format: 'arrow-stream',
   bytes: await connection.useUnsafe((bindings, id) =>
     bindings.runQuery(id, 'SELECT * FROM ' + identifier(view)),
   ),
