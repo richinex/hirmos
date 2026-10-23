@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import type { PreviewCell } from '@/domain/dataset'
+import type { EvidenceValue } from '@/components/table/EvidenceTable'
 import { assertNever } from '@/domain/dop'
 import { formatAbsent, storedDigits } from '@/lib/format/number'
 
@@ -77,3 +78,26 @@ export function PreviewCellText({
 
 export const isNumericCell = (cell: PreviewCell): boolean =>
   cell.kind === 'number' || cell.kind === 'integer'
+
+/** What a cell sorts and searches by: the number for figures, the text otherwise. */
+export const sortableValue = (cell: PreviewCell | undefined): EvidenceValue => {
+  if (cell === undefined) return ''
+  switch (cell.kind) {
+    case 'null':
+      return ''
+    case 'number':
+      return cell.value
+    case 'integer': {
+      const value = Number(cell.value)
+      return Number.isSafeInteger(value) ? value : cell.value
+    }
+    case 'boolean':
+      return cell.value ? 'true' : 'false'
+    case 'temporal':
+      return cell.value
+    case 'text':
+      return cell.value
+    default:
+      return assertNever(cell)
+  }
+}

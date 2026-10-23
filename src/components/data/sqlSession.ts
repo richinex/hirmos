@@ -12,10 +12,19 @@ import {
   listSqlPreparationViews,
   materializePreparedView,
   openSqlPreparation,
+  readSqlCatalog,
+  readSqlRelation,
   replayDefinitionsInShell,
+  summarizeSqlRelation,
   type SqlPreparationProblem,
   type SqlPreparationSession,
 } from '@/data/sqlPreparation'
+import {
+  sameRelation,
+  type SqlRelation,
+  type SqlRelationRows,
+  type SqlRelationSummary,
+} from '@/domain/sqlCatalog'
 import {
   bridgeSoftKeyboard,
   consoleTheme,
@@ -62,6 +71,29 @@ type ScriptResult =
       readonly columns: readonly string[]
       readonly rows: readonly (readonly string[])[]
     }
+export type Catalog =
+  | { readonly kind: 'checking' }
+  | { readonly kind: 'listed'; readonly relations: readonly SqlRelation[] }
+  | { readonly kind: 'failed'; readonly problem: SqlPreparationProblem }
+type Summary =
+  | { readonly kind: 'idle' }
+  | { readonly kind: 'summarizing' }
+  | { readonly kind: 'summarized'; readonly byColumn: SqlRelationSummary }
+  | { readonly kind: 'failed'; readonly problem: SqlPreparationProblem }
+export type Inspection =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'reading'; readonly relation: SqlRelation }
+  | {
+      readonly kind: 'read'
+      readonly relation: SqlRelation
+      readonly data: SqlRelationRows
+      readonly summary: Summary
+    }
+  | {
+      readonly kind: 'failed'
+      readonly relation: SqlRelation
+      readonly problem: SqlPreparationProblem
+    }
 interface State {
   readonly draft: Extract<PreparationDraft, { kind: 'sql' }> | null
   readonly query: 'idle' | 'running'
@@ -70,6 +102,8 @@ interface State {
   readonly shell: Shell
   readonly cancellation: Cancellation
   readonly output: Output
+  readonly catalog: Catalog
+  readonly inspection: Inspection
   readonly size: { readonly cols: number; readonly rows: number } | null
 }
 
@@ -83,12 +117,16 @@ export function createSqlSession(inputs: readonly SqlPreparationInput[], resume:
     shell: { kind: 'opening' },
     cancellation: { kind: 'idle' },
     output: { kind: 'checking' },
+    catalog: { kind: 'checking' },
+    inspection: { kind: 'none' },
     size: null,
   }))
   let reading = 0
   let closed = true
   let epoch = 0
   let listing = 0
+  let inspecting = 0
+  let opened = false
   let session: SqlPreparationSession | null = null
   let host: HTMLDivElement | null = null
   let mount: HTMLDivElement | null = null
@@ -104,10 +142,74 @@ export function createSqlSession(inputs: readonly SqlPreparationInput[], resume:
     const previous = store.getState().size
     if (previous?.cols !== size.cols || previous.rows !== size.rows) store.setState({ size })
   }
+  const inspect = async (relation: SqlRelation) => {
+    if (closed || session === null) return
+    const generation = epoch
+    const request = ++inspecting
+    store.setState({ inspection: { kind: 'reading', relation } })
+    const read = await readSqlRelation(session, relation)
+    if (!valid(generation) || inspecting !== request) return
+    store.setState({
+      inspection: read.ok
+        ? { kind: 'read', relation, data: read.value, summary: { kind: 'idle' } }
+        : { kind: 'failed', relation, problem: read.error },
+    })
+  }
+  const summarize = async () => {
+    const inspection = store.getState().inspection
+    if (closed || session === null || inspection.kind !== 'read') return
+    if (inspection.summary.kind !== 'idle') return
+    const generation = epoch
+    const request = inspecting
+    store.setState({ inspection: { ...inspection, summary: { kind: 'summarizing' } } })
+    const summarized = await summarizeSqlRelation(
+      session,
+      inspection.relation,
+      inspection.data.rowCount,
+    )
+    const current = store.getState().inspection
+    if (!valid(generation) || inspecting !== request || current.kind !== 'read') return
+    store.setState({
+      inspection: {
+        ...current,
+        summary: summarized.ok
+          ? { kind: 'summarized', byColumn: summarized.value }
+          : { kind: 'failed', problem: summarized.error },
+      },
+    })
+  }
+  const catalogue = async (generation: number) => {
+    if (session === null) return
+    const read = await readSqlCatalog(session)
+    if (!valid(generation)) return
+    if (!read.ok) {
+      store.setState({ catalog: { kind: 'failed', problem: read.error } })
+      return
+    }
+    store.setState({ catalog: { kind: 'listed', relations: read.value } })
+    const inspection = store.getState().inspection
+    if (inspection.kind === 'none') {
+      const [first] = read.value
+      if (opened || first === undefined) return
+      opened = true
+      await inspect(first)
+      return
+    }
+    const current = read.value.find((relation) => relation.name === inspection.relation.name)
+    if (current === undefined) {
+      inspecting++
+      store.setState({ inspection: { kind: 'none' } })
+      return
+    }
+    if (inspection.kind !== 'reading' || !sameRelation(current, inspection.relation))
+      await inspect(current)
+  }
   const refresh = async (prefer: SqlViewName | null = null) => {
     if (closed || session === null) return
     const generation = epoch
     const request = ++listing
+    await catalogue(generation)
+    if (!valid(generation) || listing !== request) return
     const listed = await listSqlPreparationViews(session)
     if (!valid(generation) || listing !== request) return
     if (!listed.ok) {
@@ -134,10 +236,13 @@ export function createSqlSession(inputs: readonly SqlPreparationInput[], resume:
   const open = () => {
     if (!closed) return
     closed = false
+    opened = false
     const generation = ++epoch
     store.setState({
       shell: { kind: 'opening' },
       output: { kind: 'checking' },
+      catalog: { kind: 'checking' },
+      inspection: { kind: 'none' },
       cancellation: { kind: 'idle' },
       size: null,
     })
@@ -147,11 +252,12 @@ export function createSqlSession(inputs: readonly SqlPreparationInput[], resume:
     mount?.append(element)
     void (async () => {
       const opened = await openSqlPreparation(inputs, (running) => {
-        if (valid(generation))
-          store.setState({
-            query: running ? 'running' : 'idle',
-            ...(running ? { cancellation: { kind: 'idle' as const } } : {}),
-          })
+        if (!valid(generation)) return
+        store.setState({
+          query: running ? 'running' : 'idle',
+          ...(running ? { cancellation: { kind: 'idle' as const } } : {}),
+        })
+        if (!running) void refresh()
       })
       if (!valid(generation)) {
         if (opened.ok) await closeSqlPreparation(opened.value)
@@ -212,6 +318,7 @@ export function createSqlSession(inputs: readonly SqlPreparationInput[], resume:
     epoch++
     reading++
     listing++
+    inspecting++
     observer?.disconnect()
     unwatch?.()
     unbridge?.()
@@ -232,6 +339,8 @@ export function createSqlSession(inputs: readonly SqlPreparationInput[], resume:
       query: 'idle',
       shell: { kind: 'opening' },
       output: { kind: 'checking' },
+      catalog: { kind: 'checking' },
+      inspection: { kind: 'none' },
       cancellation: { kind: 'idle' },
       size: null,
     })
@@ -383,6 +492,8 @@ export function createSqlSession(inputs: readonly SqlPreparationInput[], resume:
     dispose,
     attach,
     refresh,
+    inspect,
+    summarize,
     select,
     cancel,
     adopt,

@@ -156,7 +156,10 @@ export function TableShell({
         id={`${titleId}-body`}
         hidden={folded}
         ref={scrollRef}
-        className={cn('figure-strip panel-scroll relative min-h-0 overflow-auto', maxHeight)}
+        className={cn(
+          'figure-strip panel-scroll relative min-h-0 overflow-auto [&_tbody>tr:last-child]:border-b-transparent',
+          maxHeight,
+        )}
       >
         {children}
       </div>

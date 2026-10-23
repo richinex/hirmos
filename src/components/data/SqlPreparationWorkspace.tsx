@@ -3,7 +3,7 @@ import { usePreparationDraft } from './usePreparationDraft'
 import { useSqlTools } from '@/assistant/applicationTools'
 import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { WorkbenchLayout, useClosePane } from '@/components/shell/WorkbenchLayout'
 import { Alert } from '@/components/ui/Alert'
 import { Tooltip } from '@/components/ui/Tooltip'
@@ -16,11 +16,13 @@ import { Icon } from '@/components/Icon'
 import { Select } from '@/components/ui/Select'
 import { Dialog } from '@/components/ui/Dialog'
 import { EvidenceTable } from '@/components/table/EvidenceTable'
-import { button, field, fieldHint, iconControl, literal, num } from '@/components/ui/recipes'
+import { button, field, fieldHint, iconControl, literal } from '@/components/ui/recipes'
 import { cn } from '@/lib/utils'
 import { PREPARED_VIEW, type SqlPreparationInput } from '@/domain/sqlPreparation'
 import type { SelectedSource, SqlResume } from '@/domain/workflow'
 import { describeSqlPreparationProblem } from '@/data/sqlPreparation'
+import { SegmentedControl } from '@/components/ui/SegmentedControl'
+import { SqlPreview, SqlTables, type PreviewView } from './SqlCatalog'
 
 type CopyState = 'idle' | 'copied' | 'refused'
 
@@ -152,6 +154,14 @@ function SqlEditor({
   const outputView = useStore(controller.store, (state) => state.output)
   const size = useStore(controller.store, (state) => state.size)
   const query = useStore(controller.store, (state) => state.query)
+  const catalog = useStore(controller.store, (state) => state.catalog)
+  const inspection = useStore(controller.store, (state) => state.inspection)
+  const [previewView, setPreviewView] = useState<PreviewView>('schema')
+  const summaryIdle = inspection.kind === 'read' && inspection.summary.kind === 'idle'
+  useEffect(() => {
+    if (previewView === 'schema' && summaryIdle) void controller.summarize()
+  }, [controller, previewView, summaryIdle])
+  const inspect = controller.inspect
   const [copy, setCopy] = useState<CopyState>('idle')
   const copyStarter = async () => {
     try {
@@ -356,35 +366,28 @@ function SqlEditor({
                 disabled={busy || session === null}
                 onOpen={() => scriptPicker.current?.click()}
               />
-              {inputs.length > 0 && (
+              {inputs.some((input) => input.format === 'duckdb-export-file') && (
                 <div>
-                  <p className="m-0 text-body font-medium text-ink">
-                    {inputs.some((input) => input.format === 'duckdb-export-file')
-                      ? 'Export files'
-                      : 'Input tables'}
-                  </p>
+                  <p className="m-0 text-body font-medium text-ink">Export files</p>
                   <ul className="mb-4 mt-2 list-none space-y-2 p-0" aria-label="SQL inputs">
-                    {inputs.map((input) => (
-                      <li key={input.alias} className="min-w-0">
-                        {input.format === 'duckdb-export-file' ? (
+                    {inputs
+                      .filter((input) => input.format === 'duckdb-export-file')
+                      .map((input) => (
+                        <li key={input.alias} className="min-w-0">
                           <code className={literal('block truncate text-label text-muted')}>
                             {input.path}
                           </code>
-                        ) : (
-                          <>
-                            <code className={literal('block truncate text-body text-ink')}>
-                              {input.alias}
-                            </code>
-                            <span className={num('block truncate text-label text-faint')}>
-                              {input.fileName}
-                            </span>
-                          </>
-                        )}
-                      </li>
-                    ))}
+                        </li>
+                      ))}
                   </ul>
                 </div>
               )}
+              <SqlTables
+                catalog={catalog}
+                inputs={inputs}
+                selected={inspection.kind === 'none' ? null : inspection.relation.name}
+                onInspect={(relation) => void inspect(relation)}
+              />
 
               <div className="mb-4">
                 <div className="flex items-center justify-between gap-2">
@@ -511,6 +514,24 @@ function SqlEditor({
               </div>
             </div>
           ),
+        }}
+        bottom={{
+          title: 'Preview',
+          defaultSize: 220,
+          controls: (
+            <SegmentedControl
+              variant="line"
+              size="sm"
+              ariaLabel="Preview"
+              value={previewView}
+              onChange={setPreviewView}
+              options={[
+                { value: 'rows', label: 'Rows' },
+                { value: 'schema', label: 'Schema' },
+              ]}
+            />
+          ),
+          body: <SqlPreview inspection={inspection} view={previewView} />,
         }}
       />
     </>

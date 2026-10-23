@@ -1466,7 +1466,124 @@ const EXACT_DISTINCT_ROWS = 200_000
 const CATEGORY_LIMIT = 30
 const SUMMARY_BINS = 16
 
+export type SummaryColumn = Pick<PhysicalColumnProfile, 'id' | 'name' | 'duckdbType'>
+
 /** One `SUMMARIZE` pass for distinct counts and extremes, then a bucket query per numeric column and a value count per low-cardinality column. */
+export async function summarizeRelation(
+  connection: duckdb.AsyncDuckDBConnection,
+  relation: string,
+  columns: readonly SummaryColumn[],
+  rowCount: number,
+  categoryColumn?: import('@/domain/dataset').ColumnId,
+): Promise<Result<readonly ColumnSummary[], DatasetSummaryProblem>> {
+  const summarized = await connection.query(`SUMMARIZE SELECT * FROM ${relation}`)
+  const names = summarized.getChild('column_name')
+  const mins = summarized.getChild('min')
+  const maxes = summarized.getChild('max')
+  const uniques = summarized.getChild('approx_unique')
+  const counts = summarized.getChild('count')
+  const byName = new Map<string, number>()
+  for (let index = 0; index < summarized.numRows; index += 1)
+    byName.set(String(names?.get(index)), index)
+  // `approx_unique` can exceed the row count on small files; below the threshold the exact count is cheap.
+  const exact =
+    rowCount <= EXACT_DISTINCT_ROWS
+      ? await connection.query(
+          `SELECT ${columns.map((column, index) => `count(DISTINCT ${sqlIdentifier(column.name)})::UBIGINT AS ${sqlIdentifier(`d_${index}`)}`).join(', ')} FROM ${relation}`,
+        )
+      : null
+  const summaries: ColumnSummary[] = []
+  let histograms = 0
+  for (const column of columns.filter(
+    (c) => categoryColumn === undefined || c.id === categoryColumn,
+  )) {
+    const row = byName.get(column.name)
+    if (row === undefined)
+      return err({
+        kind: 'summary-failed',
+        detail: `SUMMARIZE returned no row for ${column.name}.`,
+      })
+    const present = scalarNumber(counts?.get(row) ?? 0, 'count')
+    const columnIndex = columns.indexOf(column)
+    const distinctCount =
+      exact !== null
+        ? scalarNumber(exact.getChild(`d_${columnIndex}`)?.get(0) ?? 0, 'distinct count')
+        : Math.min(present, scalarNumber(uniques?.get(row) ?? 0, 'distinct count'))
+    const minRaw = mins?.get(row)
+    const maxRaw = maxes?.get(row)
+    const min = minRaw === null || minRaw === undefined ? null : String(minRaw)
+    const max = maxRaw === null || maxRaw === undefined ? null : String(maxRaw)
+    const name = sqlIdentifier(column.name)
+    let histogram: ColumnSummary['histogram'] = null
+    let categories: ColumnSummary['categories'] = null
+    if (
+      isNumericDuckDbType(column.duckdbType) &&
+      present > 0 &&
+      histograms < MAX_SUMMARY_HISTOGRAMS
+    ) {
+      histograms += 1
+      const minimum = Number(min)
+      const maximum = Number(max)
+      if (Number.isFinite(minimum) && Number.isFinite(maximum)) {
+        const bins =
+          minimum === maximum
+            ? 1
+            : Math.max(
+                1,
+                Math.min(distinctCount, SUMMARY_BINS, Math.max(4, Math.ceil(Math.sqrt(present)))),
+              )
+        const width = (maximum - minimum) / bins
+        const binCounts = new Array<number>(bins).fill(0)
+        if (bins === 1) {
+          binCounts[0] = present
+        } else {
+          const buckets = await connection.query(`
+            SELECT least(greatest(floor((CAST(${name} AS DOUBLE) - ${minimum}) / ${width}), 0), ${bins - 1})::INTEGER AS bucket, count(*) AS n
+            FROM ${relation}
+            WHERE ${name} IS NOT NULL
+            GROUP BY bucket
+          `)
+          const bucketVector = buckets.getChild('bucket')
+          const countVector = buckets.getChild('n')
+          for (let index = 0; index < buckets.numRows; index += 1) {
+            binCounts[scalarNumber(bucketVector?.get(index), 'bucket')] = scalarNumber(
+              countVector?.get(index),
+              'bucket count',
+            )
+          }
+        }
+        histogram = {
+          edges: Array.from({ length: bins + 1 }, (_, index) =>
+            index === bins ? maximum : minimum + width * index,
+          ),
+          counts: binCounts,
+        }
+      }
+    } else if (
+      !isNumericDuckDbType(column.duckdbType) &&
+      present > 0 &&
+      (distinctCount <= CATEGORY_LIMIT || column.id === categoryColumn)
+    ) {
+      const top = await connection.query(`
+        SELECT CAST(${name} AS VARCHAR) AS value, count(*) AS n
+        FROM ${relation}
+        WHERE ${name} IS NOT NULL
+        GROUP BY value
+        ORDER BY n DESC, value ASC
+        ${column.id === categoryColumn ? '' : `LIMIT ${CATEGORY_LIMIT}`}
+      `)
+      const valueVector = top.getChild('value')
+      const countVector = top.getChild('n')
+      categories = Array.from({ length: top.numRows }, (_, index) => ({
+        value: String(valueVector?.get(index)),
+        count: scalarNumber(countVector?.get(index), 'value count'),
+      }))
+    }
+    summaries.push({ column: column.id, distinctCount, min, max, histogram, categories })
+  }
+  return ok(summaries)
+}
+
 export async function summarizeColumns(
   source: SelectedSource,
   profile: DatasetProfile,
@@ -1478,116 +1595,20 @@ export async function summarizeColumns(
     (detail) => ({ kind: 'summary-failed', detail }),
     (expected, actual) => ({ kind: 'source-changed', expected, actual }),
     async (connection, relation) => {
-      const summarized = await connection.query(`SUMMARIZE SELECT * FROM ${relation}`)
-      const names = summarized.getChild('column_name')
-      const mins = summarized.getChild('min')
-      const maxes = summarized.getChild('max')
-      const uniques = summarized.getChild('approx_unique')
-      const counts = summarized.getChild('count')
-      const byName = new Map<string, number>()
-      for (let index = 0; index < summarized.numRows; index += 1)
-        byName.set(String(names?.get(index)), index)
-      // `approx_unique` can exceed the row count on small files; below the threshold the exact count is cheap.
-      const exact =
-        profile.rowCount <= EXACT_DISTINCT_ROWS
-          ? await connection.query(
-              `SELECT ${profile.columns.map((column, index) => `count(DISTINCT ${sqlIdentifier(column.name)})::UBIGINT AS ${sqlIdentifier(`d_${index}`)}`).join(', ')} FROM ${relation}`,
-            )
-          : null
-      const columns: ColumnSummary[] = []
-      let histograms = 0
-      for (const column of profile.columns.filter(
-        (c) => categoryColumn === undefined || c.id === categoryColumn,
-      )) {
-        const row = byName.get(column.name)
-        if (row === undefined)
-          return err({
-            kind: 'summary-failed',
-            detail: `SUMMARIZE returned no row for ${column.name}.`,
+      const columns = await summarizeRelation(
+        connection,
+        relation,
+        profile.columns,
+        profile.rowCount,
+        categoryColumn,
+      )
+      return columns.ok
+        ? ok({
+            kind: 'dataset-summary',
+            sourceFingerprint: profile.source.fingerprint,
+            columns: [...columns.value],
           })
-        const present = scalarNumber(counts?.get(row) ?? 0, 'count')
-        const columnIndex = profile.columns.indexOf(column)
-        const distinctCount =
-          exact !== null
-            ? scalarNumber(exact.getChild(`d_${columnIndex}`)?.get(0) ?? 0, 'distinct count')
-            : Math.min(present, scalarNumber(uniques?.get(row) ?? 0, 'distinct count'))
-        const minRaw = mins?.get(row)
-        const maxRaw = maxes?.get(row)
-        const min = minRaw === null || minRaw === undefined ? null : String(minRaw)
-        const max = maxRaw === null || maxRaw === undefined ? null : String(maxRaw)
-        const name = sqlIdentifier(column.name)
-        let histogram: ColumnSummary['histogram'] = null
-        let categories: ColumnSummary['categories'] = null
-        if (
-          isNumericDuckDbType(column.duckdbType) &&
-          present > 0 &&
-          histograms < MAX_SUMMARY_HISTOGRAMS
-        ) {
-          histograms += 1
-          const minimum = Number(min)
-          const maximum = Number(max)
-          if (Number.isFinite(minimum) && Number.isFinite(maximum)) {
-            const bins =
-              minimum === maximum
-                ? 1
-                : Math.max(
-                    1,
-                    Math.min(
-                      distinctCount,
-                      SUMMARY_BINS,
-                      Math.max(4, Math.ceil(Math.sqrt(present))),
-                    ),
-                  )
-            const width = (maximum - minimum) / bins
-            const binCounts = new Array<number>(bins).fill(0)
-            if (bins === 1) {
-              binCounts[0] = present
-            } else {
-              const buckets = await connection.query(`
-                SELECT least(greatest(floor((CAST(${name} AS DOUBLE) - ${minimum}) / ${width}), 0), ${bins - 1})::INTEGER AS bucket, count(*) AS n
-                FROM ${relation}
-                WHERE ${name} IS NOT NULL
-                GROUP BY bucket
-              `)
-              const bucketVector = buckets.getChild('bucket')
-              const countVector = buckets.getChild('n')
-              for (let index = 0; index < buckets.numRows; index += 1) {
-                binCounts[scalarNumber(bucketVector?.get(index), 'bucket')] = scalarNumber(
-                  countVector?.get(index),
-                  'bucket count',
-                )
-              }
-            }
-            histogram = {
-              edges: Array.from({ length: bins + 1 }, (_, index) =>
-                index === bins ? maximum : minimum + width * index,
-              ),
-              counts: binCounts,
-            }
-          }
-        } else if (
-          !isNumericDuckDbType(column.duckdbType) &&
-          present > 0 &&
-          (distinctCount <= CATEGORY_LIMIT || column.id === categoryColumn)
-        ) {
-          const top = await connection.query(`
-            SELECT CAST(${name} AS VARCHAR) AS value, count(*) AS n
-            FROM ${relation}
-            WHERE ${name} IS NOT NULL
-            GROUP BY value
-            ORDER BY n DESC, value ASC
-            ${column.id === categoryColumn ? '' : `LIMIT ${CATEGORY_LIMIT}`}
-          `)
-          const valueVector = top.getChild('value')
-          const countVector = top.getChild('n')
-          categories = Array.from({ length: top.numRows }, (_, index) => ({
-            value: String(valueVector?.get(index)),
-            count: scalarNumber(countVector?.get(index), 'value count'),
-          }))
-        }
-        columns.push({ column: column.id, distinctCount, min, max, histogram, categories })
-      }
-      return ok({ kind: 'dataset-summary', sourceFingerprint: profile.source.fingerprint, columns })
+        : columns
     },
   )
 }

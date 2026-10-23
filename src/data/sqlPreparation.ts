@@ -3,7 +3,13 @@ import { RecordBatchFileWriter } from 'apache-arrow'
 import { fingerprintFile } from './fingerprint'
 import { DETECT, fileRelation } from './fileRelation'
 import { declareColumn, fileReading, type DeclaredType } from '@/domain/fileReading'
-import { detectLayout, isolatedDuckDbEngine, type DuckDbEngine } from './duckdb'
+import {
+  detectLayout,
+  isolatedDuckDbEngine,
+  previewCell,
+  summarizeRelation,
+  type DuckDbEngine,
+} from './duckdb'
 import { rememberInputFiles } from './inputFiles'
 import { exportDirectory, type SqlInputDescriptor } from '@/domain/sourceInputs'
 import { err, isNonEmpty, ok, type NonEmptyArray, type Result } from '@/domain/dop'
@@ -15,6 +21,14 @@ import {
   type SqlPreparationInput,
   type SqlViewName,
 } from '@/domain/sqlPreparation'
+import {
+  sqlCatalog,
+  type SqlCatalogRow,
+  type SqlRelation,
+  type SqlRelationName,
+  type SqlRelationRows,
+  type SqlRelationSummary,
+} from '@/domain/sqlCatalog'
 
 export type SqlPreparationProblem =
   | { readonly kind: 'no-input-files' }
@@ -27,6 +41,17 @@ export type SqlPreparationProblem =
       readonly detail: string
     }
   | { readonly kind: 'view-list-failed'; readonly detail: string }
+  | { readonly kind: 'catalog-failed'; readonly detail: string }
+  | {
+      readonly kind: 'relation-read-failed'
+      readonly relation: SqlRelationName
+      readonly detail: string
+    }
+  | {
+      readonly kind: 'relation-summary-failed'
+      readonly relation: SqlRelationName
+      readonly detail: string
+    }
   | { readonly kind: 'prepared-view-missing'; readonly viewName: string }
   | { readonly kind: 'prepared-view-invalid'; readonly detail: string }
   | { readonly kind: 'prepared-view-empty' }
@@ -413,6 +438,148 @@ export async function listSqlPreparationViews(
   return definitions.ok ? ok(definitions.value.map((definition) => definition.name)) : definitions
 }
 
+const catalogRows = (
+  table: Awaited<ReturnType<duckdb.AsyncDuckDBConnection['query']>>,
+): Result<readonly SqlCatalogRow[], SqlPreparationProblem> => {
+  const rows: SqlCatalogRow[] = []
+  for (let row = 0; row < table.numRows; row += 1) {
+    const relation = table.getChild('relation')?.get(row)
+    const view = table.getChild('is_view')?.get(row)
+    const column = table.getChild('column_name')?.get(row)
+    const type = table.getChild('column_type')?.get(row)
+    if (
+      typeof relation !== 'string' ||
+      typeof view !== 'boolean' ||
+      typeof column !== 'string' ||
+      typeof type !== 'string'
+    )
+      return err({ kind: 'catalog-failed', detail: 'DuckDB returned an invalid column entry.' })
+    rows.push({ relation, view, column, type })
+  }
+  return ok(rows)
+}
+
+/** Every table and view in the console's database, with its columns, read from DuckDB's catalog. */
+export async function readSqlCatalog(
+  session: SqlPreparationSession,
+): Promise<Result<readonly SqlRelation[], SqlPreparationProblem>> {
+  const connection = await session.database.connect()
+  try {
+    const table = await connection.query(`
+      SELECT
+        c.table_name AS relation,
+        v.view_name IS NOT NULL AS is_view,
+        c.column_name AS column_name,
+        c.data_type AS column_type
+      FROM duckdb_columns() c
+      LEFT JOIN duckdb_views() v
+        ON v.database_name = c.database_name
+        AND v.schema_name = c.schema_name
+        AND v.view_name = c.table_name
+      WHERE c.database_name = current_database() AND c.schema_name = 'main' AND NOT c.internal
+      ORDER BY c.table_oid, c.column_index
+    `)
+    const rows = catalogRows(table)
+    if (!rows.ok) return rows
+    const inputs = new Set(
+      session.inputs
+        .filter((input) => input.format !== 'duckdb-export-file')
+        .map((input) => input.alias as string),
+    )
+    return ok(sqlCatalog(rows.value, inputs))
+  } catch (cause) {
+    return err({ kind: 'catalog-failed', detail: detailOf(cause) })
+  } finally {
+    await connection.close()
+  }
+}
+
+const RELATION_PREVIEW_ROWS = 100
+
+/** The relation's row count and its first rows, each cell read as the data preview reads it. */
+export async function readSqlRelation(
+  session: SqlPreparationSession,
+  relation: SqlRelation,
+): Promise<Result<SqlRelationRows, SqlPreparationProblem>> {
+  const connection = await session.database.connect()
+  const name = sqlIdentifier(relation.name)
+  try {
+    const counted = await connection.query(
+      `SELECT count(*)::UBIGINT AS n, ${relation.columns
+        .map(
+          (column, index) =>
+            `(count(*) - count(${sqlIdentifier(column.name)}))::UBIGINT AS ${sqlIdentifier(`null_${index}`)}`,
+        )
+        .join(', ')} FROM ${name}`,
+    )
+    const rowCount = scalarCount(counted.getChild('n')?.get(0))
+    const nullCounts = relation.columns.map((column, index) => ({
+      column: column.id,
+      count: scalarCount(counted.getChild(`null_${index}`)?.get(0)),
+    }))
+    if (!rowCount.ok || nullCounts.some((entry) => !entry.count.ok))
+      return err({
+        kind: 'relation-read-failed',
+        relation: relation.name,
+        detail: 'DuckDB returned an invalid row count.',
+      })
+    const table = await connection.query(`SELECT * FROM ${name} LIMIT ${RELATION_PREVIEW_ROWS}`)
+    const rows = Array.from({ length: table.numRows }, (_, row) =>
+      relation.columns.map((column, index) =>
+        previewCell(table.getChildAt(index)?.get(row), column.type),
+      ),
+    )
+    return ok({
+      rowCount: rowCount.value,
+      nullCounts: new Map(
+        nullCounts.flatMap((entry) => (entry.count.ok ? [[entry.column, entry.count.value]] : [])),
+      ),
+      rows,
+    })
+  } catch (cause) {
+    return err({ kind: 'relation-read-failed', relation: relation.name, detail: detailOf(cause) })
+  } finally {
+    await connection.close()
+  }
+}
+
+/** The relation's column summaries, as the data inspector's schema table shows them. */
+export async function summarizeSqlRelation(
+  session: SqlPreparationSession,
+  relation: SqlRelation,
+  rowCount: number,
+): Promise<Result<SqlRelationSummary, SqlPreparationProblem>> {
+  const connection = await session.database.connect()
+  try {
+    const summaries = await summarizeRelation(
+      connection,
+      sqlIdentifier(relation.name),
+      relation.columns.map((column) => ({
+        id: column.id,
+        name: column.name,
+        duckdbType: column.type,
+      })),
+      rowCount,
+    )
+    if (!summaries.ok)
+      return err({
+        kind: 'relation-summary-failed',
+        relation: relation.name,
+        detail:
+          summaries.error.kind === 'summary-failed' ? summaries.error.detail : summaries.error.kind,
+      })
+    return ok(new Map(summaries.value.map((summary) => [summary.column, summary])))
+  } catch (cause) {
+    return err({
+      kind: 'relation-summary-failed',
+      relation: relation.name,
+      detail: detailOf(cause),
+    })
+  } finally {
+    await connection.close()
+  }
+}
+
 /**
  * The output view's columns, row count and Parquet bytes, read on an open connection whose views are
  * in place. Shared by the SQL path, which rebuilds its views first, and the pipeline path, which has
@@ -586,6 +753,12 @@ export function describeSqlPreparationProblem(problem: SqlPreparationProblem): s
       return `${problem.fileName} could not be registered: ${problem.detail}`
     case 'view-list-failed':
       return `The SQL views could not be listed: ${problem.detail}`
+    case 'catalog-failed':
+      return `The tables could not be listed: ${problem.detail}`
+    case 'relation-read-failed':
+      return `The rows of ${problem.relation} could not be read: ${problem.detail}`
+    case 'relation-summary-failed':
+      return `The columns of ${problem.relation} could not be summarised: ${problem.detail}`
     case 'prepared-view-missing':
       return `The selected view ${problem.viewName} no longer exists. Refresh the view list and choose another.`
     case 'prepared-view-invalid':

@@ -33,12 +33,8 @@ import { createPipelineSession, type PipelineController } from './pipelineSessio
 import { formatBytes, formatCount } from '@/lib/format/number'
 import { useIsMobile } from '@/lib/useMediaQuery'
 import { cn } from '@/lib/utils'
-import {
-  EvidenceTable,
-  type EvidenceColumn,
-  type EvidenceValue,
-} from '@/components/table/EvidenceTable'
-import { columnDecimals, PreviewCellText } from '../previewCell'
+import { EvidenceTable, type EvidenceColumn } from '@/components/table/EvidenceTable'
+import { columnDecimals, PreviewCellText, sortableValue } from '../previewCell'
 import { BlockSettings, blockSqlText, preloadPythonEditor } from './BlockSettings'
 import { usePythonRun } from './usePythonRun'
 import { BLOCK_DRAG_TYPE, blockIcon, PALETTE_GROUPS, type PaletteKind } from './blockIcons'
@@ -78,29 +74,6 @@ const previewNotice = (outcome: BlockOutcome | undefined, nothingSelected: boole
       return 'No rows to show yet.'
     default:
       return assertNever(outcome)
-  }
-}
-
-/** What a cell sorts and searches by: the number for figures, the text otherwise. */
-const sortableValue = (cell: PreviewCell | undefined): EvidenceValue => {
-  if (cell === undefined) return ''
-  switch (cell.kind) {
-    case 'null':
-      return ''
-    case 'number':
-      return cell.value
-    case 'integer': {
-      const value = Number(cell.value)
-      return Number.isSafeInteger(value) ? value : cell.value
-    }
-    case 'boolean':
-      return cell.value ? 'true' : 'false'
-    case 'temporal':
-      return cell.value
-    case 'text':
-      return cell.value
-    default:
-      return assertNever(cell)
   }
 }
 
