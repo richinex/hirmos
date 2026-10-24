@@ -163,7 +163,18 @@ export const bridgeSoftKeyboard = (terminal: Terminal): (() => void) => {
       replaying = false
     }
   })
-  return () => subscription.dispose()
+  // A key the shell consumes never reaches xterm's own handling, which is where xterm empties its
+  // textarea, so the text of every consumed key stays in it. xterm's composition helper reads a dead
+  // key's result out of that textarea by position, and stale text ahead of it comes out as data.
+  const textarea = terminal.textarea
+  const settle = (event: Event) => {
+    if (!(event as InputEvent).isComposing && textarea !== undefined) textarea.value = ''
+  }
+  textarea?.addEventListener('input', settle)
+  return () => {
+    subscription.dispose()
+    textarea?.removeEventListener('input', settle)
+  }
 }
 
 /** Subscribe to the page theme and the system theme used when the page has no explicit selection. */

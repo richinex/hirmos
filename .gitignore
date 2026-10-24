@@ -46,3 +46,4 @@ PROOF.bend
 # Performance measurements, local only
 perf/
 causal-rl/
+sql-tutorial/
