@@ -1,16 +1,6 @@
-const READS = new Set([
-  'select',
-  'with',
-  'from',
-  'summarize',
-  'describe',
-  'show',
-  'explain',
-  'values',
-  'pivot',
-  'unpivot',
-  'table',
-])
+const READS = new Set(
+  'select with from summarize describe show explain values pivot unpivot table'.split(' '),
+)
 
 const stripped = (batch: string): string =>
   batch
